@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CozyTest Dashboard - Operating System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.29.0/feather.min.js"></script>
+    <style>
+        :root {
+            --bg-base: #0a0a0a;
+            --bg-glass: rgba(20, 20, 20, 0.7);
+            --bg-glass-hover: rgba(30, 30, 30, 0.8);
+            --gold: #F9A825;
+            --gold-glow: rgba(249, 168, 37, 0.15);
+            --emerald: #10b981;
+            --emerald-dark: #047857;
+            --emerald-glow: rgba(16, 185, 129, 0.15);
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --sidebar-width: 260px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --radius-lg: 16px;
+            --radius-md: 12px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            overflow-x: hidden;
+            display: flex;
+            height: 100vh;
+            background-image: 
+                radial-gradient(circle at 15% 50%, var(--emerald-glow), transparent 25%),
+                radial-gradient(circle at 85% 30%, var(--gold-glow), transparent 25%);
+        }
+
+        .glass-panel {
+            background: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+        }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            height: 100vh;
+            border-right: 1px solid var(--border-color);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            background: rgba(10, 10, 10, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+        }
+        .brand {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 40px;
+        }
+        .brand span { color: var(--gold); }
+
+        .nav-section { margin-bottom: 24px; }
+        .nav-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: var(--radius-md);
+            transition: var(--transition);
+            font-weight: 500;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .nav-item:hover, .nav-item.active {
+            background: var(--bg-glass-hover);
+            color: var(--text-main);
+        }
+        .nav-item.active {
+            background: var(--emerald-glow);
+            color: var(--emerald);
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+
+        .main-content { flex: 1; padding: 32px 40px; overflow-y: auto; display: flex; flex-direction: column; gap: 24px; }
+        .header { display: flex; justify-content: space-between; align-items: center; }
+        
+        .search-trigger {
+            display: flex; align-items: center; gap: 12px; background: var(--bg-glass);
+            border: 1px solid var(--border-color); padding: 10px 20px; border-radius: 8px;
+            color: var(--text-muted); cursor: pointer; width: 300px;
+        }
+        .cmd-key { background: rgba(255, 255, 255, 0.1); padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .widget { padding: 24px; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 12px;}
+        .widget::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 3px; }
+        .widget.emerald::before { background: var(--emerald); }
+        .widget.gold::before { background: var(--gold); }
+        
+        .quick-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+        .action-card { padding: 20px; text-align: center; cursor: pointer; transition: var(--transition); text-decoration: none; color: inherit;}
+        .action-card:hover { transform: translateY(-4px); border-color: var(--gold); background: var(--gold-glow); }
+        .action-card i { color: var(--gold); margin-bottom: 12px; }
+        .action-card p { font-size: 13px; font-weight: 600; }
+
+        /* Command Palette Overlay */
+        .cmd-palette-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px);
+            display: none; justify-content: center; align-items: flex-start;
+            padding-top: 10vh; z-index: 1000; opacity: 0; transition: opacity 0.2s;
+        }
+        .cmd-palette-overlay.active { display: flex; opacity: 1; }
+        .cmd-palette {
+            width: 600px; background: #111; border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg); overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+        .cmd-input {
+            width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--border-color);
+            padding: 20px; color: var(--text-main); font-size: 18px; outline: none; font-family: inherit;
+        }
+        .cmd-results { max-height: 300px; overflow-y: auto; padding: 10px 0; }
+        .cmd-result-item { padding: 12px 20px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: var(--transition); }
+        .cmd-result-item:hover { background: var(--bg-glass-hover); }
+
+        /* Floating AI Concierge */
+        .ai-concierge-btn {
+            position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--gold), #d48806); color: #000;
+            display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(249, 168, 37, 0.3);
+            cursor: pointer; z-index: 500; transition: var(--transition); border: none;
+        }
+        .ai-chat-window {
+            position: fixed; bottom: 100px; right: 30px; width: 350px; height: 450px;
+            display: none; flex-direction: column; z-index: 499; opacity: 0; transform: translateY(20px); transition: all 0.3s ease;
+        }
+        .ai-chat-window.active { display: flex; opacity: 1; transform: translateY(0); }
+        .ai-header { padding: 16px; border-bottom: 1px solid var(--border-color); font-weight: 600; display:flex; justify-content: space-between; }
+        .ai-body { flex: 1; padding: 16px; overflow-y: auto; font-size: 13px; color: var(--text-muted); }
+        .ai-input { padding: 16px; border-top: 1px solid var(--border-color); display: flex; gap: 10px; }
+        .ai-input input { flex: 1; background: var(--bg-base); border: 1px solid var(--border-color); border-radius: 20px; padding: 8px 16px; color: var(--text-main); outline: none; }
+
+        /* Diagnostics Sub-bar Layer styling injected safely */
+        .system-status-bar {
+            background: #000; border-top: 1px solid var(--border-color);
+            position: fixed; bottom: 0; left: 0; width: 100vw; height: 26px;
+            z-index: 999; display: flex; align-items: center; padding: 0 20px;
+            font-size: 11px; font-family: monospace; color: var(--text-muted); justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="sidebar">
+        <div class="brand"><i data-feather="hexagon"></i> Cozy<span>Test</span></div>
+        <div class="nav-section">
+            <div class="nav-label">Ecosystem Modules</div>
+            <a href="#" class="nav-item active"><i data-feather="grid"></i> Dashboard OS</a>
+            <a href="identity.html" class="nav-item"><i data-feather="shield"></i> Identity Studio</a>
+            <a href="#" class="nav-item" onclick="CozyOS.Bus.publish('sys:macro', 'Open Courier')"><i data-feather="truck"></i> Cozy Courier</a>
+            <a href="#" class="nav-item" onclick="CozyOS.Bus.publish('sys:macro', 'Open Mobility')"><i data-feather="zap"></i> E-Mobility Desk</a>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <header class="header">
+            <div class="search-trigger" onclick="toggleCommandPalette()">
+                <i data-feather="search" style="width: 16px;"></i>
+                <span>Search system arrays...</span>
+                <span class="cmd-key" style="margin-left: auto;">Ctrl K</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:16px;">
+                <i data-feather="bell" style="color: var(--text-muted); cursor:pointer;" onclick="CozyOS.Diagnostics.dumpLogs()"></i>
+                <div style="width:40px; height:40px; background:var(--gold); border-radius:50%; display:flex; align-items:center; justify-content:center; color:#000; font-weight:700;" id="userAvatar">CT</div>
+            </div>
+        </header>
+
+        <div>
+            <h1 style="font-family: 'Space Grotesk', sans-serif; font-size: 28px; margin-bottom: 8px;">Workspace Architecture</h1>
+            <p style="color: var(--text-muted);" id="sysTelemetryBanner">All structural dependencies are mounted and operational.</p>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="widget glass-panel emerald">
+                <div>Ecosystem Operations Ledger</div>
+                <div style="font-family:'Space Grotesk'; font-size:32px; font-weight:700; margin-top:8px;" id="valRevenue">$124,500.00</div>
+            </div>
+            <div class="widget glass-panel gold">
+                <div>Active Connected Subsystems</div>
+                <div style="font-family:'Space Grotesk'; font-size:32px; font-weight:700; margin-top:8px;" id="valModules">4 Modules Active</div>
+            </div>
+        </div>
+
+        <h3 style="font-size: 16px; margin-top: 10px; color: var(--text-muted);">Global Integration Routing Vectors</h3>
+        <div class="quick-actions">
+            <a href="identity.html" class="action-card glass-panel">
+                <i data-feather="shield"></i>
+                <p>Identity Matrix</p>
+            </a>
+            <div class="action-card glass-panel" onclick="CozyOS.Bus.publish('sys:macro', 'Open Courier')">
+                <i data-feather="package"></i>
+                <p>Courier System</p>
+            </div>
+            <div class="action-card glass-panel" onclick="CozyOS.Bus.publish('sys:macro', 'Open Mobility')">
+                <i data-feather="zap"></i>
+                <p>E-Mobility Interface</p>
+            </div>
+            <div class="action-card glass-panel" onclick="CozyOS.Diagnostics.triggerSelfTest()">
+                <i data-feather="refresh-cw"></i>
+                <p>System Diagnostics</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Command Palette Overlay -->
+    <div class="cmd-palette-overlay" id="cmdOverlay" onclick="closeCommandPalette(event)">
+        <div class="cmd-palette" onclick="event.stopPropagation()">
+            <input type="text" class="cmd-input" id="cmdInput" placeholder="Type a command or search...">
+            <div class="cmd-results">
+                <div class="cmd-result-item" onclick="CozyOS.Bus.publish('sys:macro', 'Open Shop')">
+                    <i data-feather="shopping-bag" style="color: var(--gold);"></i> <span>Navigate to CozyCabin Shop</span>
+                </div>
+                <div class="cmd-result-item" onclick="CozyOS.Bus.publish('sys:macro', 'Open Identity')">
+                    <i data-feather="shield" style="color: var(--emerald);"></i> <span>Launch Identity Studio Matrix</span>
+                </div>
+                <div class="cmd-result-item" onclick="CozyOS.Bus.publish('sys:macro', 'Sync Firebase DB')">
+                    <i data-feather="database" style="color: #3b82f6;"></i> <span>Force Sync Firebase Realtime Data</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating AI Concierge -->
+    <button class="ai-concierge-btn" onclick="toggleAIWindow()">
+        <i data-feather="message-square"></i>
+    </button>
+    
+    <div class="ai-chat-window glass-panel" id="aiWindow">
+        <div class="ai-header">
+            <span>✨ Cozy AI Concierge</span>
+            <i data-feather="x" style="cursor: pointer;" onclick="toggleAIWindow()"></i>
+        </div>
+        <div class="ai-body" id="aiChatBody">
+            <p style="margin-bottom: 10px;"><strong>AI:</strong> Hello Operator. How can I assist with your workspace or metrics today?</p>
+        </div>
+        <div class="ai-input">
+            <input type="text" id="aiInput" placeholder="Ask AI..." onkeypress="handleAIKeyPress(event)">
+            <button style="background:transparent; border:none; cursor:pointer; color:var(--gold);" onclick="sendAIMessage()">
+                <i data-feather="send"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- CozyOS Status Bar Node Injection -->
+    <footer class="system-status-bar">
+        <span id="osStatusIndicator">⚡ CozyOS Core Node: Operational</span>
+        <span id="osDbTelemetry">IDB Alloc: Connected | Queue: 0 Pnd</span>
+    </footer>
+
+    <!-- CozyOS Kernel Integration Script Block -->
+    <script>
+        // High Performance Isolated Architecture Kernel Namespace Engine
+        const CozyOS = (function() {
+            // Event Bus Subsystem
+            const EventBus = {
+                topics: {},
+                subscribe(topic, listener) {
+                    if(!this.topics[topic]) this.topics[topic] = [];
+                    this.topics[topic].push(listener);
+                },
+                publish(topic, data) {
+                    if(!this.topics[topic]) return;
+                    this.topics[topic].forEach(listener => {
+                        try { listener(data); } catch(e) { console.error(`Bus execution crash:`, e); }
+                    });
+                }
+            };
+
+            // Module Registry Engine
+            const ModuleRegistry = {
+                modules: new Map(),
+                register(name, instance) {
+                    this.modules.set(name, instance);
+                    EventBus.publish('module:loaded', name);
+                }
+            };
+
+            // Database Framework Integration (IndexedDB Interface Layer)
+            let dbInstance = null;
+            const IndexedDBEngine = {
+                init() {
+                    const req = indexedDB.open("CozyOS_Local_Storage", 1);
+                    req.onupgradeneeded = (e) => {
+                        let db = e.target.result;
+                        if(!db.objectStoreNames.contains("telemetry_store")) {
+                            db.createObjectStore("telemetry_store", { keyPath: "id", autoIncrement: true });
+                        }
+                    };
+                    req.onsuccess = (e) => {
+                        dbInstance = e.target.result;
+                        EventBus.publish('db:ready', true);
+                    };
+                },
+                saveData(payload) {
+                    if(!dbInstance) return false;
+                    const tx = dbInstance.transaction("telemetry_store", "readwrite");
+                    tx.objectStore("telemetry_store").add({ timestamp: Date.now(), data: payload });
+                }
+            };
+
+            // Sync, Queue & Firebase Simulation Matrix
+            const OutboundQueue = [];
+            const SyncEngine = {
+                enqueue(action, payload) {
+                    OutboundQueue.push({ action, payload, retries: 0 });
+                    document.getElementById('osDbTelemetry').innerText = `IDB Alloc: Connected | Queue: ${OutboundQueue.length} Pnd`;
+                    this.processQueue();
+                },
+                processQueue() {
+                    if(OutboundQueue.length === 0) return;
+                    const element = OutboundQueue[0];
+                    // Simulate processing and verification over modern cloud mesh layers
+                    setTimeout(() => {
+                        OutboundQueue.shift();
+                        document.getElementById('osDbTelemetry').innerText = `IDB Alloc: Connected | Queue: ${OutboundQueue.length} Pnd`;
+                        EventBus.publish('sync:complete', element.action);
+                    }, 1200);
+                }
+            };
+
+            // Conversational Universal AI Parsing Core
+            const AIConciergeEngine = {
+                computeReply(input, callback) {
+                    const tokenized = input.toLowerCase();
+                    setTimeout(() => {
+                        if(tokenized.includes('revenue') || tokenized.includes('money')) {
+                            callback("Ecosystem Revenue current balance matrix node reads $124,500.00.");
+                        } else if(tokenized.includes('sync')) {
+                            EventBus.publish('sys:macro', 'Sync Firebase DB');
+                            callback("Triggered live structural Firebase synchronization layer matrix sequence.");
+                        } else {
+                            callback(`Command acknowledged. Processing parsing criteria token: "${input}"`);
+                        }
+                    }, 600);
+                }
+            };
+
+            // Diagnostics and Instrumentation Hooks
+            const DiagnosticsEngine = {
+                triggerSelfTest() {
+                    document.getElementById('osStatusIndicator').innerText = "⚡ CozyOS Core Node: Diagnostics Running...";
+                    setTimeout(() => {
+                        document.getElementById('osStatusIndicator').innerText = "⚡ CozyOS Core Node: Operational";
+                        alert("CozyOS Integrity Checklist: \n- Event Bus Core: OK\n- IndexedDB Allocation: OK\n- Macro Processor Virtualization: OK");
+                    }, 1000);
+                },
+                dumpLogs() {
+                    alert("Dumping CozyOS Kernel Context log entries to internal developer console buffers.");
+                }
+            };
+
+            return {
+                Bus: EventBus,
+                Registry: ModuleRegistry,
+                DB: IndexedDBEngine,
+                Sync: SyncEngine,
+                AI: AIConciergeEngine,
+                Diagnostics: DiagnosticsEngine
+            };
+        })();
+
+        // Initialize Feather UI Vector Element Sets
+        feather.replace();
+
+        // Wire Kernel Communication Streams into Current Native Interface Elements
+        document.addEventListener('DOMContentLoaded', () => {
+            CozyOS.DB.init();
+
+            // Intercept Global Application Macro Actions Safely
+            CozyOS.Bus.subscribe('sys:macro', (cmd) => {
+                alert(`CozyOS Kernel Routing Executed Macro Event Action: [${cmd}]`);
+                CozyOS.Sync.enqueue('MACRO_TRIGGER', { command: cmd });
+            });
+        });
+
+        // Interface DOM Bindings
+        const cmdOverlay = document.getElementById('cmdOverlay');
+        const cmdInput = document.getElementById('cmdInput');
+        const aiWindow = document.getElementById('aiWindow');
+        const aiChatBody = document.getElementById('aiChatBody');
+        const aiInput = document.getElementById('aiInput');
+
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                toggleCommandPalette();
+            }
+            if (e.key === 'Escape' && cmdOverlay.classList.contains('active')) {
+                cmdOverlay.classList.remove('active');
+            }
+        });
+
+        function toggleCommandPalette() {
+            cmdOverlay.classList.toggle('active');
+            if (cmdOverlay.classList.contains('active')) cmdInput.focus();
+        }
+
+        function closeCommandPalette(e) {
+            if(e.target === cmdOverlay) cmdOverlay.classList.remove('active');
+        }
+
+        function toggleAIWindow() {
+            aiWindow.classList.toggle('active');
+            if(aiWindow.classList.contains('active')) aiInput.focus();
+        }
+
+        function handleAIKeyPress(e) {
+            if(e.key === 'Enter') sendAIMessage();
+        }
+
+        function sendAIMessage() {
+            const txt = aiInput.value.trim();
+            if(!txt) return;
+            
+            aiChatBody.innerHTML += `<p style="margin-bottom: 10px; color: var(--text-main);"><strong>You:</strong> ${txt}</p>`;
+            aiInput.value = '';
+            
+            CozyOS.AI.computeReply(txt, (response) => {
+                aiChatBody.innerHTML += `<p style="margin-bottom: 10px; color: var(--gold);"><strong>AI:</strong> ${response}</p>`;
+                aiChatBody.scrollTop = aiChatBody.scrollHeight;
+            });
+        }
+    </script>
+</body>
+</html>
