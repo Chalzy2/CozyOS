@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="cozy-test.css">
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>Local Services · Cozycabin</title>
+
+
+<style>
+/* tokens from cozy-test.css */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--bg);-webkit-tap-highlight-color:transparent;;font-family:'Inter',sans-serif;color:var(--text);}
+.topbar{background:var(--green);color:#fff;padding:0 16px;height:56px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(27,94,32,0.25);}
+.back-btn{background:rgba(255,255,255,0.18);border:none;color:#fff;width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;flex-shrink:0;}
+.topbar-title{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;flex:1;}
+.add-btn{background:rgba(255,255,255,0.2);border:1.5px solid rgba(255,255,255,0.35);color:#fff;padding:7px 14px;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;}
+.page-pad{padding-bottom:80px;}
+.hero{background:var(--green);padding:20px 16px 18px;color:#fff;}
+.hero-title{font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;margin-bottom:4px;}
+.hero-sub{font-size:12px;opacity:.8;}
+.hero-stats{display:flex;gap:20px;margin-top:14px;}
+.h-stat-val{font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;}
+.h-stat-lbl{font-size:9px;opacity:.7;font-weight:600;}
+.filter-chips{display:flex;gap:7px;padding:12px 16px;overflow-x:auto;scrollbar-width:none;background:#fff;border-bottom:1px solid var(--border);}
+.filter-chips::-webkit-scrollbar{display:none;}
+.chip{flex:0 0 auto;padding:7px 13px;border-radius:20px;border:1.5px solid var(--border);background:var(--bg3);font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;}
+.chip.active{background:var(--green);color:#fff;border-color:var(--green);}
+.search-wrap{padding:10px 16px;background:#fff;border-bottom:1px solid var(--border);}
+.search-inp{width:100%;background:var(--bg3);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:11px 14px 11px 40px;font-size:13px;color:var(--text);outline:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238aaa8a' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:12px center;}
+.tab-bar{background:#fff;display:flex;border-bottom:1px solid var(--border);}
+.tab{flex:1;padding:12px 4px;text-align:center;font-size:12px;font-weight:700;color:var(--muted2);cursor:pointer;border-bottom:2.5px solid transparent;}
+.tab.active{color:var(--green);border-bottom-color: var(--gold);}
+.items-grid{padding:12px 16px;display:flex;flex-direction:column;gap:12px;}
+.provider-card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--border);overflow:hidden;}
+.pc-header{display:flex;gap:12px;padding:14px;}
+.pc-photo{width:54px;height:54px;border-radius:14px;background:var(--purple2);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;overflow:hidden;}
+.pc-photo img{width:100%;height:100%;object-fit:cover;}
+.pc-info{flex:1;min-width:0;}
+.pc-name{font-size:14px;font-weight:800;color:var(--text);}
+.pc-service{font-size:11px;color:var(--muted2);margin-top:2px;}
+.pc-location{font-size:11px;color:var(--muted2);margin-top:2px;}
+.pc-cat{display:inline-block;background:var(--purple2);color:var(--green);font-size:10px;font-weight:800;padding:3px 9px;border-radius:8px;margin-top:4px;}
+.pc-price{font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;color:var(--green);margin-top:2px;}
+.pc-desc{font-size:12px;color:var(--muted);padding:0 14px 10px;line-height:1.6;}
+.pc-comm{font-size:11px;color:var(--green);font-weight:700;padding:0 14px 8px;}
+.pc-actions{display:flex;border-top:1px solid var(--bg3);}
+.pca-btn{flex:1;padding:11px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:none;cursor:pointer;font-size:9px;font-weight:700;color:var(--muted);border-right:1px solid var(--bg3);}
+.pca-btn:last-child{border-right:none;}
+.pca-btn span:first-child{font-size:17px;}
+.pca-btn:hover{background:var(--bg3);}
+.empty-state{text-align:center;padding:48px 24px;}
+.empty-icon{font-size:52px;margin-bottom:12px;}
+.empty-title{font-size:15px;font-weight:800;margin-bottom:6px;}
+.empty-sub{font-size:12px;color:var(--muted2);line-height:1.6;}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;display:none;align-items:flex-end;}
+.modal-bg.open{display:flex;}
+.modal-box{background:#fff;border-radius:24px 24px 0 0;padding:20px;width:100%;max-height:90vh;overflow-y:auto;}
+.modal-title{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;}
+.modal-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted2);}
+.form-group{margin-bottom:11px;}
+.form-label{font-size:10px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px;}
+.form-inp{width:100%;background:var(--bg3);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 13px;font-size:13px;font-family:'Inter',sans-serif;color:var(--text);outline:none;}
+.form-inp:focus{border-color:var(--green);}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.btn-row{display:flex;gap:8px;margin-top:14px;}
+.btn-cancel{flex:1;background:var(--bg3);color:var(--muted);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:11px;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-purple{flex:1;background:var(--green);color:#fff;border:none;border-radius:var(--radius-sm);padding:11px;font-size:13px;font-weight:700;cursor:pointer;}
+/* ── Bottom Nav ── */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;background:#fff;border-top:1.5px solid var(--border);display:flex;z-index:200;box-shadow:0 -4px 24px rgba(0,0,0,0.08);}
+.bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:8px 4px 6px;cursor:pointer;color:var(--muted2);border:none;background:none;position:relative;transition:color .15s;}
+.bnav-item.active{color:var(--green);}
+.bnav-item.active::before{content:'';position:absolute;top:0;left:20%;right:20%;height:3px;background:var(--gold);border-radius:0 0 4px 4px;}
+.bnav-item span:first-child{font-size:21px;}
+.bnav-item span:last-child{font-size:9px;font-weight:800;letter-spacing:0.2px;}
+
+<!-- ADD SERVICE MODAL -->
+<div class="modal-bg" id="addModal">
+  <div class="modal-box">
+    <div class="modal-title">🔧 Add Your Service <button class="modal-close" onclick="closeAddModal()">×</button></div>
+    <div class="form-group"><label class="form-label">Your Name *</label><input class="form-inp" id="s-name" placeholder="John Mwangi"/></div>
+    <div class="form-group"><label class="form-label">Service Category *</label>
+      <select class="form-inp" id="s-cat">
+        <option value="">Select…</option>
+        <option>Electrician</option><option>Plumber</option><option>Solar Installer</option>
+        <option>CCTV Installer</option><option>Delivery Rider</option><option>Graphic Designer</option>
+        <option>Web Developer</option><option>Cleaner</option><option>Carpenter</option>
+        <option>Phone Repair</option><option>Other</option>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Service Description</label><input class="form-inp" id="s-service" placeholder="e.g. Electrical wiring & panel installation"/></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Starting Price (KES)</label><input class="form-inp" id="s-price" type="number" placeholder="500"/></div>
+      <div class="form-group"><label class="form-label">Commission (KES)</label><input class="form-inp" id="s-comm" type="number" placeholder="200"/></div>
+    </div>
+    <div class="form-group"><label class="form-label">Phone / WhatsApp *</label><input class="form-inp" id="s-phone" type="tel" placeholder="07XX XXX XXX"/></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Location</label><input class="form-inp" id="s-location" placeholder="Mavueni"/></div>
+      <div class="form-group"><label class="form-label">County</label>
+        <select class="form-inp" id="s-county"><option value="">Select…</option><option>Kilifi</option><option>Mombasa</option><option>Kwale</option><option>Nairobi</option><option>Other</option></select>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Availability</label>
+      <select class="form-inp" id="s-avail"><option value="weekdays">Weekdays</option><option value="weekends">Weekends</option><option value="anytime">Anytime</option><option value="on-call">On Call</option></select>
+    </div>
+    <div class="form-group"><label class="form-label">Extra Info</label><textarea class="form-inp" id="s-desc" rows="2" placeholder="Years of experience, certifications, areas covered…"></textarea></div>
+    <div class="btn-row">
+      <button class="btn-cancel" onclick="closeAddModal()">Cancel</button>
+      <button class="btn-purple" onclick="saveService()">Save Service</button>
+    </div>
+  </div>
+</div>
+<div id="cc-toast" class="ct-toast"></div>
+
+<script type="module">
+import { auth, db, WA_NUMBER, onAuthStateChanged, collection, doc, addDoc, getDocs, getDoc, updateDoc, deleteDoc, query, where, orderBy, serverTimestamp } from './firebase.js';
+let currentUser=null,userProfile=null,allItems=[],activeFilter='',searchQ='';
+function toast(m){const t=document.getElementById('cc-toast');t.textContent=m;t.className='ct-toast show';setTimeout(()=>t.className='ct-toast',2600);}
+onAuthStateChanged(auth,async user=>{
+  if(!user){location.href='dashboard.html';return;}
+  currentUser=user;
+  const snap=await getDoc(doc(db,'cozyUsers',user.uid));
+  userProfile=snap.exists()?snap.data():{cozyId:'',uid:user.uid};
+  document.getElementById('loadingScreen').style.display='none';
+  document.getElementById('appRoot').style.display='block';
+  await loadItems();
+});
+async function loadItems(){
+  try{const q=query(collection(db,'cozyItems'),where('itemType','==','service'),where('status','==','active'),orderBy('createdAt','desc'));const snap=await getDocs(q);allItems=snap.docs.map(d=>({id:d.id,...d.data()}));}
+  catch(_){try{const snap=await getDocs(query(collection(db,'cozyItems'),where('itemType','==','service')));allItems=snap.docs.map(d=>({id:d.id,...d.data()})).filter(i=>i.status==='active');}catch(__){allItems=[];}}
+  document.getElementById('totalCount').textContent=allItems.length;
+  document.getElementById('myCount').textContent=allItems.filter(i=>i.ownerUid===currentUser.uid).length;
+  render();
+}
+function filtered(){return allItems.filter(i=>{if(activeFilter&&i.category!==activeFilter)return false;if(searchQ){const s=searchQ.toLowerCase();return(i.title||'').toLowerCase().includes(s)||(i.description||'').toLowerCase().includes(s)||(i.location||'').toLowerCase().includes(s);}return true;});}
+function render(){
+  const items=filtered();
+  document.getElementById('itemsList').innerHTML=items.length?items.map(i=>{
+    const wa=(i.phone||'').replace(/\D/g,'').replace(/^0/,'254')||WA_NUMBER;
+    const msg=encodeURIComponent(`Hi ${i.title||''}, I found your service on Cozycabin. I need ${i.category||'your service'} in ${i.location||''}. Ref: ${userProfile.cozyId||''}`);
+    return`<div class="provider-card">
+      <div class="pc-header">
+        <div class="pc-photo">${i.photo?`<img src="${i.photo}" loading="lazy" alt="">`:'🔧'}</div>
+        <div class="pc-info">
+          <div class="pc-name">${i.title||'Service Provider'}</div>
+          <div class="pc-service">${i.description||i.category||''}</div>
+          <div class="pc-location">📍 ${i.location||''} ${i.county?'· '+i.county:''}</div>
+          <div class="pc-cat">${i.category||''}</div>
+          ${i.price?`<div class="pc-price">From KES ${Number(i.price).toLocaleString()}</div>`:''}
+        </div>
+      </div>
+      ${i.availability?`<div style="font-size:10px;color:var(--muted2);padding:0 14px 6px;">🕐 ${i.availability}</div>`:''}
+      ${i.rating?`<div style="font-size:11px;color:#f59e0b;padding:0 14px 4px;">★★★★★ <span style="color:var(--muted2);">${Number(i.rating).toFixed(1)} rating</span></div>`:''}
+      ${i.commission?`<div class="pc-comm">💰 KES ${Number(i.commission).toLocaleString()} commission per referral</div>`:''}
+      <div class="pc-actions">
+        <button class="pca-btn" onclick="window.open('https://wa.me/${wa}?text=${msg}','_blank')"><span>💬</span><span>WhatsApp</span></button>
+        <button class="pca-btn" onclick="window.open('tel:${i.phone||''}')"><span>📞</span><span>Call</span></button>
+        <button class="pca-btn" onclick="hireProvider('${i.id}','${(i.title||'').replace(/'/g,'')}')"><span>✅</span><span>Hire</span></button>
+        <button class="pca-btn" onclick="saveProvider('${i.id}')"><span>❤️</span><span>Save</span></button>
+        <button class="pca-btn" onclick="addLead('${i.id}','${(i.title||'').replace(/'/g,'')}')"><span>📋</span><span>Lead</span></button>
+      </div>
+    </div>`}).join(''):`<div class="empty-state"><div class="empty-icon">🔧</div><div class="empty-title">No services found</div><div class="empty-sub">Be the first to offer your service in this category.</div></div>`;
+  const mine=allItems.filter(i=>i.ownerUid===currentUser.uid);
+  document.getElementById('myList').innerHTML=mine.length?mine.map(i=>`<div class="provider-card"><div class="pc-header"><div class="pc-photo">🔧</div><div class="pc-info"><div class="pc-name">${i.title||'—'}</div><div class="pc-service">${i.category||''}</div><div class="pc-location">📍 ${i.location||'—'}</div>${i.price?`<div class="pc-price">KES ${Number(i.price).toLocaleString()}</div>`:''}</div></div><div style="display:flex;gap:6px;padding:0 14px 14px;"><button onclick="deleteItem('${i.id}')" style="background:#fef2f2;color:#D32F2F;border:none;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer;">🗑️ Remove</button></div></div>`).join(''):`<div class="empty-state"><div class="empty-icon">🔧</div><div class="empty-title">No services listed</div><div class="empty-sub">Tap "+ Offer" to add your service.</div></div>`;
+}
+window.switchTab=function(tab){['browse','mine'].forEach(t=>{document.getElementById('tab-'+t).classList.toggle('active',t===tab);document.getElementById('view-'+t).style.display=t===tab?'block':'none';});};
+window.setFilter=function(f){activeFilter=f;document.querySelectorAll('[data-f]').forEach(el=>el.classList.toggle('active',el.dataset.f===f));render();};
+window.onSearch=function(v){searchQ=v;render();};
+window.openAddModal=function(){document.getElementById('addModal').classList.add('open');};
+window.closeAddModal=function(){document.getElementById('addModal').classList.remove('open');};
+window.saveService=async function(){
+  const name=document.getElementById('s-name').value.trim();
+  const cat=document.getElementById('s-cat').value;
+  const phone=document.getElementById('s-phone').value.trim();
+  if(!name||!cat||!phone){toast('Name, category and phone are required.');return;}
+  await addDoc(collection(db,'cozyItems'),{owner:userProfile.cozyId||'',ownerUid:currentUser.uid,itemType:'service',category:cat,title:name,description:document.getElementById('s-desc').value.trim(),service:document.getElementById('s-service').value.trim(),price:Number(document.getElementById('s-price').value)||0,commission:Number(document.getElementById('s-comm').value)||0,phone,location:document.getElementById('s-location').value.trim(),county:document.getElementById('s-county').value,availability:document.getElementById('s-avail').value,status:'active',images:[],createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+  closeAddModal();
+  toast('✅ Service listed!');
+  await loadItems();
+};
+window.deleteItem=async function(id){if(!confirm('Remove?'))return;await deleteDoc(doc(db,'cozyItems',id));toast('Removed.');await loadItems();};
+window.hireProvider=function(id,name){toast('✅ Hire request sent via WhatsApp!');};
+window.saveProvider=function(id){toast('❤️ Saved to favourites! (coming soon)');};
+window.addLead=function(id,name){location.href=`contacts.html#leads`;}; 
+</script>
+</body>
+</html>
