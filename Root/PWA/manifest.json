@@ -1,0 +1,114 @@
+{
+  "name": "CozyOS",
+  "short_name": "CozyOS",
+  "description": "CozyOS – Unified Smart Living Operating System",
+  "start_url": "/dashboard.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "lang": "en",
+  "categories": [
+    "business",
+    "productivity",
+    "shopping",
+    "utilities"
+  ],
+  "icons": [
+    {
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
+                <div class="input-box">
+                    <input type="text" id="terminalPrompt" placeholder="Inject orchestration instruction (e.g., 'Sync ledger and issue receipt')..." onkeypress="checkEnter(event)">
+                    <button class="btn-send" onclick="sendPrompt()">Execute</button>
+                </div>
+            </div>
+
+            <div class="meta-panel">
+                <h3>Neural Instrumentation</h3>
+                <div class="status-card">
+                    <p style="font-size: 12px; color: var(--text-muted);">Context Window Load</p>
+                    <p style="font-size: 20px; font-family: 'Space Grotesk'; font-weight: 700; color: var(--gold); margin-top: 4px;">0.04% utilized</p>
+                </div>
+                <div class="status-card">
+                    <p style="font-size: 12px; color: var(--text-muted);">Cross-Module Sync Registry</p>
+                    <p style="font-size: 14px; margin-top: 8px; color: var(--emerald);">✓ Identity Studio Bound</p>
+                    <p style="font-size: 14px; color: var(--emerald);">✓ Logistics Dispatch Bound</p>
+                    <p style="font-size: 14px; color: var(--emerald);">✓ Mobility Cluster Bound</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        feather.replace();
+        function checkEnter(e) { if(e.key === 'Enter') sendPrompt(); }
+        function sendPrompt() {
+            const input = document.getElementById('terminalPrompt');
+            const logs = document.getElementById('terminalLogs');
+            if(!input.value.trim()) return;
+
+            logs.innerHTML += `<p style="color: #fff;">&gt; ${input.value}</p>`;
+            const val = input.value.toLowerCase();
+            input.value = '';
+
+            setTimeout(() => {
+                if(val.includes('receipt') || val.includes('identity')) {
+                    logs.innerHTML += `<p style="color: var(--gold);"><strong>System Orchestrator:</strong> Initializing document canvas routine hook. Dispatched payload macro redirect target to asset studio stack matrix successfully.</p>`;
+                } else {
+                    logs.innerHTML += `<p style="color: var(--gold);"><strong>System Orchestrator:</strong> Processing array tokens. Distributed telemetry pipeline execution step verified.</p>`;
+                }
+                logs.scrollTop = logs.scrollHeight;
+            }, 600);
+        }
+    </script>
+</body>
+</html>
