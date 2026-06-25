@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="cozy-test.css">
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>My Profile · Cozycabin</title>
+
+
+<style>
+/* tokens from cozy-test.css */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--bg);font-family:'Inter',sans-serif;color:var(--text);min-height:100%;}
+
+/* ── TOPBAR ── */
+.topbar{background:var(--green);color:#fff;padding:0 16px;height:56px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(27,94,32,0.25);}
+.back-btn{background:rgba(255,255,255,0.18);border:none;color:#fff;width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;flex-shrink:0;}
+.topbar-title{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;flex:1;}
+.signout-btn{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);color:#fff;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;}
+.page-pad{padding-bottom:90px;}
+
+/* ── PROFILE HERO ── */
+.profile-hero{background:linear-gradient(160deg,var(--green) 0%,var(--green-mid) 55%,#092a14 100%);padding:30px 20px 26px;text-align:center;position:relative;overflow:hidden;}
+.profile-hero::before{content:'';position:absolute;right:-40px;top:-40px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,0.05);}
+.profile-hero::after{content:'';position:absolute;left:-20px;bottom:-30px;width:100px;height:100px;border-radius:50%;background:rgba(255,255,255,0.04);}
+
+/* Photo */
+.photo-wrap{position:relative;display:inline-block;margin-bottom:16px;}
+.photo-ring{width:96px;height:96px;border-radius:50%;padding:3px;background:linear-gradient(135deg,#ffd700,rgba(255,255,255,0.4));display:inline-block;}
+.photo-inner{width:90px;height:90px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:38px;color:#fff;font-weight:900;overflow:hidden;}
+.photo-inner img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+.photo-edit{position:absolute;bottom:2px;right:2px;width:28px;height:28px;border-radius:50%;background:#ffd700;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.2);}
+
+/* Name & ID */
+.hero-name{font-family:'Rajdhani',sans-serif;font-size:24px;font-weight:700;color:#fff;margin-bottom:4px;position:relative;z-index:1;}
+.hero-email{font-size:12px;color:rgba(255,255,255,0.65);margin-bottom:10px;}
+
+/* Cozy ID badge */
+.cozy-id-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,0,0,0.25);border:1px solid rgba(255,215,0,0.4);border-radius:20px;padding:6px 14px;margin-bottom:10px;position:relative;z-index:1;}
+.cozy-id-label{font-size:9px;color:rgba(255,255,255,0.6);font-weight:700;text-transform:uppercase;letter-spacing:1px;}
+.cozy-id-value{font-family:'Rajdhani',sans-serif;font-size:17px;font-weight:700;color:#ffd700;letter-spacing:2px;}
+.copy-id-btn{background:rgba(255,215,0,0.2);border:1px solid rgba(255,215,0,0.3);color:#ffd700;border-radius:6px;padding:2px 7px;font-size:9px;font-weight:800;cursor:pointer;}
+
+/* Verified badge */
+.verified-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(255,215,0,0.18);border:1px solid rgba(255,215,0,0.45);color:#ffd700;padding:5px 12px;border-radius:20px;font-size:10px;font-weight:800;margin-top:4px;letter-spacing:.3px;}
+.unverified-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.55);padding:5px 12px;border-radius:20px;font-size:10px;font-weight:700;margin-top:4px;}
+
+/* Roles strip */
+.roles-strip{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-top:12px;position:relative;z-index:1;}
+.role-pill{display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.22);color:#fff;padding:4px 10px;border-radius:20px;font-size:10px;font-weight:700;}
+
+/* ── INFO CARD ── */
+.card{background:var(--bg2);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--border);margin:12px 16px;overflow:hidden;}
+.card-header{padding:14px 16px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.card-title{font-size:13px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:7px;}
+.card-action{font-size:12px;color:var(--green);font-weight:700;cursor:pointer;border:none;background:none;padding:4px 8px;border-radius:6px;}
+.card-action:hover{background:var(--green-bg);}
+
+.info-row{display:flex;align-items:center;padding:11px 16px;border-bottom:1px solid var(--bg3);gap:12px;}
+.info-row:last-child{border-bottom:none;}
+.info-icon{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.info-text{flex:1;min-width:0;}
+.info-label{font-size:10px;color:var(--muted2);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:1px;}
+.info-value{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.info-value.empty{color:var(--muted2);font-style:italic;font-weight:400;}
+
+/* ── BECOME ROLES SECTION ── */
+.become-list{padding:8px 16px 14px;display:flex;flex-direction:column;gap:8px;}
+.become-btn{display:flex;align-items:center;gap:13px;padding:13px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--bg3);cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent;width:100%;}
+.become-btn.active{border-color:var(--green);background:var(--green-bg);}
+.become-btn:active{transform:scale(.98);}
+.become-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.become-info{flex:1;text-align:left;}
+.become-name{font-size:13px;font-weight:800;color:var(--text);margin-bottom:2px;}
+.become-sub{font-size:10px;color:var(--muted2);line-height:1.4;}
+.become-status{flex-shrink:0;}
+.status-pill{padding:4px 10px;border-radius:20px;font-size:9px;font-weight:800;letter-spacing:.3px;}
+.status-pill.on{background:var(--green-bg);color:var(--green);border:1px solid var(--border);}
+.status-pill.off{background:#fff;color:var(--muted2);border:1px solid var(--border);}
+
+/* ── SHARE CARD ── */
+.ref-box{margin:4px 16px 12px;background:linear-gradient(135deg,#E8F5E9,#E8F5E9);border:1.5px dashed var(--border);border-radius:var(--radius-sm);padding:14px;}
+.ref-title{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.7px;}
+.ref-url{font-size:12px;font-weight:700;color:var(--green);word-break:break-all;margin-bottom:10px;}
+.ref-btns{display:flex;gap:8px;}
+.ref-btn{flex:1;padding:9px;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;border:none;text-align:center;}
+.ref-copy{background:#fff;color:var(--green);border:1.5px solid var(--border);}
+.ref-share{background:var(--green);color:#fff;}
+
+/* ── BOTTOM ACTIONS ── */
+.bottom-actions{margin:0 16px 12px;display:flex;gap:8px;}
+.ba-btn{flex:1;padding:12px;border-radius:var(--radius-sm);font-size:12px;font-weight:800;cursor:pointer;border:none;text-align:center;}
+.ba-wallet{background:var(--green-bg);color:var(--green);border:1.5px solid var(--border);}
+.ba-signout{background:#fef2f2;color:var(--red);border:1.5px solid #fecaca;}
+
+/* ── BOTTOM NAV ── */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--border);display:flex;z-index:200;box-shadow:0 -4px 20px rgba(0,0,0,0.08);}
+.bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 4px 6px;cursor:pointer;color:var(--muted2);border:none;background:none;}
+.bnav-item.active{color:var(--green);}
+.bnav-item span:first-child{font-size:20px;}
+.bnav-item span:last-child{font-size:9px;font-weight:700;}
+
+/* ── EDIT MODAL ── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;display:none;align-items:flex-end;}
+.modal-bg.open{display:flex;}
+.modal-box{background:#fff;border-radius:24px 24px 0 0;padding:24px 20px;width:100%;max-height:88vh;overflow-y:auto;}
+.modal-title{font-family:'Rajdhani',sans-serif;font-size:19px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;}
+.modal-close{background:none;border:none;font-size:24px;cursor:pointer;color:var(--muted2);line-height:1;}
+.field{margin-bottom:13px;}
+.field label{display:block;font-size:10px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px;}
+.field input,.field select,.field textarea{width:100%;background:var(--bg3);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:11px 13px;font-size:13px;font-family:'Inter',sans-serif;color:var(--text);outline:none;}
+.field input:focus,.field select:focus{border-color:var(--green);}
+.modal-btns{display:flex;gap:8px;margin-top:16px;}
+.btn-cancel{flex:1;background:var(--bg3);color:var(--muted);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-save{flex:1;background:var(--green);color:#fff;border:none;border-radius:var(--radius-sm);padding:12px;font-size:13px;font-weight:700;cursor:pointer;}
+
+/* ── TOAST & LOADER ── */
+#cc-toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:#212121;color:#fff;padding:10px 20px;border-radius:20px;font-size:12px;font-weight:700;opacity:0;transition:.25s;z-index:9999;pointer-events:none;white-space:nowrap;}
+#cc-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.loading-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:12px;}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<div class="loading-screen" id="loadingScreen">
+  <div class="spinner"></div>
+  <div style="font-size:13px;color:var(--muted);font-weight:600;">Loading profile…</div>
+</div>
+
+<div id="appRoot" style="display:none;">
+<div class="page-pad">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <button class="back-btn" onclick="history.back()">←</button>
+    <div class="topbar-title">My Profile</div>
+    <button class="signout-btn" onclick="doLogout()">Sign Out</button>
+  </div>
+
+  <!-- PROFILE HERO -->
+  <div class="profile-hero">
+    <!-- Photo -->
+    <div class="photo-wrap">
+      <div class="photo-ring">
+        <div class="photo-inner" id="profilePhoto">?</div>
+      </div>
+      <div class="photo-edit" onclick="document.getElementById('photoInput').click()" title="Change photo">📷</div>
+      <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="handlePhotoChange(this)">
+    </div>
+
+    <!-- Name -->
+    <div class="hero-name" id="profileName">Loading…</div>
+    <div class="hero-email" id="profileEmail"></div>
+
+    <!-- Cozy ID badge -->
+    <div class="cozy-id-badge">
+      <div>
+        <div class="cozy-id-label">Cozy ID</div>
+        <div class="cozy-id-value" id="profileCozyId">CZ-•••••</div>
+      </div>
+      <button class="copy-id-btn" onclick="copyCozyId()">Copy</button>
+    </div>
+
+    <!-- Verified / unverified -->
+    <div id="verifiedBadge" style="display:none;" class="verified-badge">✅ Verified Account</div>
+    <div id="unverifiedBadge" class="unverified-badge">🕐 Pending Verification</div>
+
+    <!-- Active roles strip -->
+    <div class="roles-strip" id="rolesStrip"></div>
+  </div>
+
+  <!-- PERSONAL INFO CARD -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📋 Personal Info</div>
+      <button class="card-action" onclick="openEditModal()">✏️ Edit</button>
+    </div>
+    <div class="info-row">
+      <div class="info-icon" style="background:#E8F5E9;">👤</div>
+      <div class="info-text"><div class="info-label">Full Name</div><div class="info-value" id="infoName">—</div></div>
+    </div>
+    <div class="info-row">
+      <div class="info-icon" style="background:#eff6ff;">📱</div>
+      <div class="info-text"><div class="info-label">Phone</div><div class="info-value" id="infoPhone">—</div></div>
+    </div>
+    <div class="info-row">
+      <div class="info-icon" style="background:#fefce8;">✉️</div>
+      <div class="info-text"><div class="info-label">Email</div><div class="info-value" id="infoEmail">—</div></div>
+    </div>
+    <div class="info-row">
+      <div class="info-icon" style="background:#fff7ed;">🗺️</div>
+      <div class="info-text"><div class="info-label">County</div><div class="info-value" id="infoCounty">—</div></div>
+    </div>
+    <div class="info-row">
+      <div class="info-icon" style="background:#F5F5F5;">📍</div>
+      <div class="info-text"><div class="info-label">Location / Area</div><div class="info-value" id="infoLocation">—</div></div>
+    </div>
+    <div class="info-row">
+      <div class="info-icon" style="background:#F5F5F5;">📅</div>
+      <div class="info-text"><div class="info-label">Member Since</div><div class="info-value" id="infoJoined">—</div></div>
+    </div>
+  </div>
+
+  <!-- BECOME / ROLES SECTION -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🎯 My Roles & Capabilities</div>
+    </div>
+    <div class="become-list" id="becomeList"></div>
+  </div>
+
+  <!-- SHARE COZY ID -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">📤 My Referral Link</div></div>
+    <div class="ref-box">
+      <div class="ref-title">Share & Earn</div>
+      <div class="ref-url" id="refUrl">—</div>
+      <div class="ref-btns">
+        <button class="ref-btn ref-copy" onclick="copyRefLink()">📋 Copy Link</button>
+        <button class="ref-btn ref-share" onclick="shareRefLink()">📤 Share Now</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROFILE COMPLETENESS -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">📊 Profile Completeness</div></div>
+    <div style="padding:14px 16px 16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-size:12px;color:var(--muted);font-weight:600;">Your profile strength</span>
+        <span style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;color:var(--green);" id="completePct">0%</span>
+      </div>
+      <div style="background:var(--border);border-radius:20px;height:8px;overflow:hidden;">
+        <div id="completeBar" style="height:100%;border-radius:20px;background:linear-gradient(90deg,var(--green),#4ade80);width:0%;transition:width .5s;"></div>
+      </div>
+      <div id="completeHints" style="margin-top:10px;display:flex;flex-direction:column;gap:5px;"></div>
+    </div>
+  </div>
+
+  <!-- BADGES -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">🏅 My Badges</div></div>
+    <div id="badgesGrid" style="display:flex;flex-wrap:wrap;gap:8px;padding:14px 16px 16px;"></div>
+  </div>
+
+  <!-- QUICK ACTIONS — Chat & Earnings -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 16px 12px;">
+    <button onclick="location.href='chat.html'" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;border-radius:var(--radius-sm);padding:14px 10px;font-size:13px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">💬 Open Chat</button>
+    <button onclick="location.href='wallet.html'" style="background:linear-gradient(135deg,var(--green),var(--green-mid));color:#fff;border:none;border-radius:var(--radius-sm);padding:14px 10px;font-size:13px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">💳 View Earnings</button>
+  </div>
+
+  <!-- ACTIVITY TIMELINE -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">⚡ Recent Activity</div>
+      <button class="card-action" onclick="location.href='contacts.html'">See All</button>
+    </div>
+    <div id="activityTimeline" style="padding:8px 16px 14px;">
+      <div style="text-align:center;padding:16px;font-size:12px;color:var(--muted2);">Loading…</div>
+    </div>
+  </div>
+
+  <!-- LANGUAGE PREFERENCES -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🌍 Languages</div>
+      <button class="card-action" onclick="openLangModal()">Edit</button>
+    </div>
+    <div class="info-row">
+      <div class="info-icon" style="background:#fefce8;">🗣️</div>
+      <div class="info-text"><div class="info-label">Primary Language</div><div class="info-value" id="langPrimary">Not set</div></div>
+    </div>
+    <div class="info-row">
+      <div class="info-icon" style="background:#E8F5E9;">💬</div>
+      <div class="info-text"><div class="info-label">Secondary</div><div class="info-value" id="langSecondary">Not set</div></div>
+    </div>
+    <div class="info-row">
+      <div class="info-icon" style="background:#F5F5F5;">🌐</div>
+      <div class="info-text"><div class="info-label">Also Speaks</div><div class="info-value" id="langOther">—</div></div>
+    </div>
+  </div>
+
+  <!-- REPUTATION / TRUST SCORE -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">🛡️ Reputation & Trust</div></div>
+    <div style="padding:14px 16px 6px;">
+      <!-- Trust score bar -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <span style="font-size:12px;color:var(--muted);font-weight:600;">Trust Score</span>
+        <span style="font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;" id="trustScoreVal">—</span>
+      </div>
+      <div style="background:var(--border);border-radius:20px;height:10px;overflow:hidden;margin-bottom:10px;">
+        <div id="trustScoreBar" style="height:100%;border-radius:20px;background:linear-gradient(90deg,#22c55e,#16a34a);width:0%;transition:width .6s;"></div>
+      </div>
+      <div id="trustLabel" style="display:inline-flex;align-items:center;gap:6px;background:var(--green-bg);color:var(--green);padding:5px 12px;border-radius:20px;font-size:11px;font-weight:800;">🛡️ Building Trust</div>
+    </div>
+    <!-- Reputation rows -->
+    <div class="info-row">
+      <div class="info-icon" style="background:#fefce8;">⭐</div>
+      <div class="info-text"><div class="info-label">Reviews</div><div class="info-value" id="repReviews">0 reviews</div></div>
+    </div>
+    <div class="info-row">
+      <div class="info-icon" style="background:#E8F5E9;">🤝</div>
+      <div class="info-text"><div class="info-label">Deals Closed</div><div class="info-value" id="repDeals">0</div></div>
+    </div>
+    <div class="info-row">
+      <div class="info-icon" style="background:#eff6ff;">👥</div>
+      <div class="info-text"><div class="info-label">Community Invites</div><div class="info-value" id="repInvites">0 people invited</div></div>
+    </div>
+    <div class="info-row">
+      <div class="info-icon" style="background:#F5F5F5;">📅</div>
+      <div class="info-text"><div class="info-label">Years Active</div><div class="info-value" id="repYears">—</div></div>
+    </div>
+  </div>
+
+  <!-- AI LEARNING PERMISSION -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">🤖 Cozy AI Learning</div></div>
+    <div style="padding:14px 16px 16px;">
+      <div style="font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:14px;">Can Cozy AI learn from your public words and activity to improve itself and help the African community?</div>
+      <div style="display:flex;gap:10px;">
+        <button id="aiPermYes" onclick="setAIPermission(true)"
+          style="flex:1;padding:12px;border-radius:var(--radius-sm);font-size:13px;font-weight:800;cursor:pointer;border:2px solid var(--border);background:var(--bg3);color:var(--muted);transition:.15s;font-family:'Inter',sans-serif;">
+          ✅ Yes, Help AI Learn
+        </button>
+        <button id="aiPermNo" onclick="setAIPermission(false)"
+          style="flex:1;padding:12px;border-radius:var(--radius-sm);font-size:13px;font-weight:800;cursor:pointer;border:2px solid var(--border);background:var(--bg3);color:var(--muted);transition:.15s;font-family:'Inter',sans-serif;">
+          🔒 No, Keep Private
+        </button>
+      </div>
+      <div id="aiPermStatus" style="font-size:11px;color:var(--muted2);text-align:center;margin-top:8px;"></div>
+    </div>
+  </div>
+    <button class="ba-btn ba-wallet" onclick="location.href='wallet.html'">💳 My Wallet</button>
+    <button class="ba-btn ba-signout" onclick="doLogout()">🚪 Sign Out</button>
+  </div>
+
+</div><!-- /page-pad -->
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="bnav-item" onclick="location.href='dashboard.html'"><span>🏡</span><span>Home</span></button>
+  <button class="bnav-item" onclick="location.href='contacts.html'"><span>👥</span><span>Contacts</span></button>
+  <button class="bnav-item" onclick="location.href='wallet.html'"><span>💳</span><span>Wallet</span></button>
+  <button class="bnav-item active"><span>👤</span><span>Profile</span></button>
+</nav>
+</div><!-- /appRoot -->
+
+<!-- LANGUAGE MODAL -->
+<div class="modal-bg" id="langModal">
+  <div class="modal-box">
+    <div class="modal-title">🌍 Language Preferences <button class="modal-close" onclick="closeLang()">×</button></div>
+    <div class="field"><label>Primary Language</label>
+      <select id="l-primary" class="field input" style="width:100%;background:var(--bg3);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:11px 13px;font-size:13px;font-family:'Inter',sans-serif;color:var(--text);outline:none;">
+        <option value="">Select…</option>
+        <option>Kiswahili</option><option>English</option><option>Luo</option>
+        <option>Kikuyu</option><option>Kamba</option><option>Kalenjin</option><option>Arabic</option><option>Other</option>
+      </select>
+    </div>
+    <div class="field"><label>Secondary Language</label>
+      <select id="l-secondary" style="width:100%;background:var(--bg3);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:11px 13px;font-size:13px;font-family:'Inter',sans-serif;color:var(--text);outline:none;">
+        <option value="">Select…</option>
+        <option>English</option><option>Kiswahili</option><option>Luo</option>
+        <option>Kikuyu</option><option>Kamba</option><option>Arabic</option><option>Other</option>
+      </select>
+    </div>
+    <div class="field"><label>Also Speaks (comma separated)</label>
+      <input id="l-other" class="field input" style="width:100%;background:var(--bg3);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:11px 13px;font-size:13px;font-family:'Inter',sans-serif;color:var(--text);outline:none;" placeholder="e.g. Luo, Kamba, Kalenjin"/>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeLang()">Cancel</button>
+      <button class="btn-save" onclick="saveLangs()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT PROFILE MODAL -->
+<div class="modal-bg" id="editModal">
+  <div class="modal-box">
+    <div class="modal-title">
+      ✏️ Edit Profile
+      <button class="modal-close" onclick="closeEdit()">×</button>
+    </div>
+    <div class="field"><label>Full Name</label><input id="e-name" placeholder="Your full name"/></div>
+    <div class="field"><label>Phone Number</label><input id="e-phone" type="tel" placeholder="07XX XXX XXX"/></div>
+    <div class="field"><label>County</label>
+      <select id="e-county">
+        <option value="">Select county…</option>
+        <option>Kilifi</option><option>Mombasa</option><option>Kwale</option>
+        <option>Nairobi</option><option>Kisumu</option><option>Nakuru</option>
+        <option>Eldoret</option><option>Malindi</option><option>Lamu</option>
+        <option>Tana River</option><option>Other</option>
+      </select>
+    </div>
+    <div class="field"><label>Location / Area</label><input id="e-location" placeholder="e.g. Mavueni, Kilifi"/></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeEdit()">Cancel</button>
+      <button class="btn-save"   onclick="saveProfile()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<div id="cc-toast" class="ct-toast"></div>
+
+<script type="module">
+import {
+  auth, db, ADMIN_EMAILS,
+  signOut, onAuthStateChanged,
+  doc, getDoc, getDocs, updateDoc,
+  collection, query, where, orderBy,
+  serverTimestamp
+} from './firebase.js';
+
+// ── Role definitions ──────────────────────────────────────
+const ROLES = [
+  { key:'customer',         icon:'🛒', label:'Customer',          sub:'Browse & buy products',             color:'#3b82f6', bg:'#eff6ff',  permanent:true  },
+  { key:'seller',           icon:'🏪', label:'Become Seller',     sub:'List & sell your products',         color:'#22c55e', bg:'#E8F5E9',  dest:'index.html'     },
+  { key:'affiliate',        icon:'💰', label:'Become Affiliate',  sub:'Earn commission via referral links', color:'#d97706', bg:'#FFF8E1',  dest:'affiliate.html' },
+  { key:'landlord',         icon:'🏠', label:'Become Landlord',   sub:'List rental properties & earn',     color:'#EF6C00', bg:'#fff7ed',  dest:'rentals.html'   },
+  { key:'service_provider', icon:'🔧', label:'Become Service Provider', sub:'Offer local services to customers', color:'#8b5cf6', bg:'#F5F5F5', dest:'services.html' },
+  { key:'mobility_partner', icon:'⚡', label:'Become Mobility Partner',  sub:'Sell or rent e-bikes & scooters',  color:'#1B5E20', bg:'#E8F5E9', dest:'mobility.html' },
+  { key:'craft_creator',    icon:'🎨', label:'Become Craft Creator',     sub:'Sell handmade & creative items',   color:'#2E7D32', bg:'#fdf2f8', dest:'crafts.html'   },
+  { key:'digital_creator',  icon:'💻', label:'Become Digital Creator',   sub:'Sell e-books, courses & templates',color:'#0ea5e9', bg:'#E8F5E9', dest:'dashboard.html'},
+];
+
+// Roles shown in the hero strip (already active ones)
+const ROLE_LABELS = {
+  customer:'🛒 Customer', seller:'🏪 Seller', affiliate:'💰 Affiliate',
+  landlord:'🏠 Landlord', service_provider:'🔧 Provider',
+  mobility_partner:'⚡ Mobility', craft_creator:'🎨 Creator', digital_creator:'💻 Digital',
+};
+
+let currentUser = null, profile = null;
+
+function toast(m){ const t=document.getElementById('cc-toast'); t.textContent=m; t.className='show'; setTimeout(()=>t.className='',2800); }
+
+// ── Auth gate ─────────────────────────────────────────────
+onAuthStateChanged(auth, async user => {
+  if (!user) { location.href='dashboard.html'; return; }
+  currentUser = user;
+  const snap = await getDoc(doc(db,'cozyUsers',user.uid));
+  if (!snap.exists()) { location.href='dashboard.html'; return; }
+  profile = snap.data();
+  render();
+  renderCompleteness(snap.data());
+  renderBadges(snap.data());
+  renderLanguages(snap.data());
+  renderReputation(snap.data());
+  renderAIPermission(snap.data());
+  loadActivityTimeline(user.uid, snap.data().cozyId);
+  document.getElementById('loadingScreen').style.display='none';
+  document.getElementById('appRoot').style.display='block';
+});
+
+// ── Render ────────────────────────────────────────────────
+function render() {
+  const p = profile;
+  const roles = p.roles || ['customer'];
+
+  // Photo
+  const ph = document.getElementById('profilePhoto');
+  if (p.photo) {
+    ph.innerHTML = `<img src="${p.photo}" alt="">`;
+  } else {
+    ph.textContent = (p.name || '?')[0].toUpperCase();
+  }
+
+  // Hero text
+  document.getElementById('profileName').textContent    = p.name  || 'No name set';
+  document.getElementById('profileEmail').textContent   = p.email || '';
+  document.getElementById('profileCozyId').textContent  = p.cozyId || '—';
+
+  // Verified / unverified
+  if (p.verified) {
+    document.getElementById('verifiedBadge').style.display   = 'inline-flex';
+    document.getElementById('unverifiedBadge').style.display = 'none';
+  } else {
+    document.getElementById('verifiedBadge').style.display   = 'none';
+    document.getElementById('unverifiedBadge').style.display = 'inline-flex';
+  }
+
+  // Active roles strip
+  document.getElementById('rolesStrip').innerHTML = roles
+    .map(r => `<span class="role-pill">${ROLE_LABELS[r] || r}</span>`)
+    .join('');
+
+  // Info card
+  document.getElementById('infoName').textContent     = p.name     || '—';
+  document.getElementById('infoPhone').textContent    = p.phone    || '—';
+  document.getElementById('infoEmail').textContent    = p.email    || '—';
+  document.getElementById('infoCounty').textContent   = p.county   || '—';
+  document.getElementById('infoLocation').textContent = p.location || '—';
+  document.getElementById('infoJoined').textContent   = p.joinedDate
+    ? new Date(p.joinedDate).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})
+    : '—';
+
+  // Referral URL
+  const refUrl = `https://cozycabin.co.ke/?ref=${p.cozyId}`;
+  document.getElementById('refUrl').textContent = refUrl;
+
+  // Become / roles list
+  document.getElementById('becomeList').innerHTML = ROLES.map(r => {
+    const isActive = roles.includes(r.key);
+    return `
+    <button class="become-btn${isActive?' active':''}"
+            onclick="${r.permanent ? `toast('You are already a ${r.label}.')` : isActive ? `goTo('${r.dest}')` : `activateRole('${r.key}','${r.dest}')`}">
+      <div class="become-icon" style="background:${r.bg};">${r.icon}</div>
+      <div class="become-info">
+        <div class="become-name">${isActive && !r.permanent ? r.label.replace('Become ','') : r.label}</div>
+        <div class="become-sub">${r.sub}</div>
+      </div>
+      <div class="become-status">
+        <span class="status-pill ${isActive?'on':'off'}">${isActive?'✓ Active':'Tap to join'}</span>
+      </div>
+    </button>`;
+  }).join('');
+}
+
+// ── Activate role ─────────────────────────────────────────
+window.activateRole = async function(key, dest) {
+  if (!profile) return;
+  const roles = profile.roles || [];
+  if (roles.includes(key)) { location.href = dest; return; }
+  const newRoles = [...roles, key];
+  await updateDoc(doc(db,'cozyUsers',currentUser.uid), { roles:newRoles, updatedAt:serverTimestamp() });
+  profile.roles = newRoles;
+  render();
+  toast('✅ Role activated! Redirecting…');
+  setTimeout(() => { if (dest) location.href = dest; }, 1200);
+};
+
+window.goTo = function(dest) { if (dest) location.href = dest; };
+
+// ── Edit modal ────────────────────────────────────────────
+window.openEditModal = function() {
+  document.getElementById('e-name').value     = profile.name     || '';
+  document.getElementById('e-phone').value    = profile.phone    || '';
+  document.getElementById('e-county').value   = profile.county   || '';
+  document.getElementById('e-location').value = profile.location || '';
+  document.getElementById('editModal').classList.add('open');
+};
+window.closeEdit = function() {
+  document.getElementById('editModal').classList.remove('open');
+};
+window.saveProfile = async function() {
+  const name     = document.getElementById('e-name').value.trim();
+  const phone    = document.getElementById('e-phone').value.trim();
+  const county   = document.getElementById('e-county').value;
+  const location = document.getElementById('e-location').value.trim();
+  if (!name) { toast('Name is required.'); return; }
+  await updateDoc(doc(db,'cozyUsers',currentUser.uid), { name, phone, county, location, updatedAt:serverTimestamp() });
+  profile = { ...profile, name, phone, county, location };
+  render();
+  window.closeEdit();
+  toast('✅ Profile updated!');
+};
+
+// ── Photo ─────────────────────────────────────────────────
+window.handlePhotoChange = function(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 3*1024*1024) { toast('Image too large — max 3MB.'); return; }
+  const reader = new FileReader();
+  reader.onload = async e => {
+    const dataUrl = e.target.result;
+    await updateDoc(doc(db,'cozyUsers',currentUser.uid), { photo:dataUrl, updatedAt:serverTimestamp() });
+    profile.photo = dataUrl;
+    render();
+    toast('✅ Photo updated!');
+  };
+  reader.readAsDataURL(file);
+};
+
+// ── Share / copy ──────────────────────────────────────────
+window.copyCozyId = function() {
+  navigator.clipboard.writeText(profile.cozyId || '').then(() => toast('✅ Cozy ID copied!'));
+};
+window.copyRefLink = function() {
+  const url = `https://cozycabin.co.ke/?ref=${profile.cozyId}`;
+  navigator.clipboard.writeText(url).then(() => toast('✅ Link copied!'));
+};
+window.shareRefLink = function() {
+  const url  = `https://cozycabin.co.ke/?ref=${profile.cozyId}`;
+  const text = `Shop on Cozycabin Kenya via my link and get the best deals! 🛒`;
+  if (navigator.share) navigator.share({ title:'Cozycabin Kenya', text, url });
+  else window.copyRefLink();
+};
+
+// ── Sign out ──────────────────────────────────────────────
+window.doLogout = async function() {
+  await signOut(auth);
+  location.href = 'dashboard.html';
+};
+
+// ── Profile completeness ──────────────────────────────────
+function renderCompleteness(p) {
+  const checks = [
+    { label:'Photo added',      done:!!p.photo },
+    { label:'Name set',         done:!!p.name  },
+    { label:'Phone added',      done:!!p.phone },
+    { label:'County selected',  done:!!p.county },
+    { label:'Location added',   done:!!p.location },
+    { label:'Extra role added', done:(p.roles||[]).length > 1 },
+  ];
+  const done  = checks.filter(c=>c.done).length;
+  const pct   = Math.round((done/checks.length)*100);
+  document.getElementById('completePct').textContent = pct+'%';
+  document.getElementById('completeBar').style.width  = pct+'%';
+  const hints = checks.filter(c=>!c.done);
+  document.getElementById('completeHints').innerHTML = hints.length
+    ? hints.map(h=>`<div style="display:flex;align-items:center;gap:7px;font-size:11px;color:var(--muted2);"><span style="color:#f59e0b;">⚠️</span>${h.label}</div>`).join('')
+    : '<div style="font-size:11px;color:var(--green);font-weight:700;">✅ Profile complete!</div>';
+}
+
+// ── Badges ────────────────────────────────────────────────
+function renderBadges(p) {
+  const roles = p.roles || [];
+  const ALL_BADGES = [
+    { id:'member',      icon:'🎖️', label:'Member',          earned:true },
+    { id:'verified',    icon:'✅',  label:'Verified',         earned:!!p.verified },
+    { id:'affiliate',   icon:'💰',  label:'Affiliate',        earned:roles.includes('affiliate') },
+    { id:'landlord',    icon:'🏠',  label:'Landlord',         earned:roles.includes('landlord') },
+    { id:'seller',      icon:'🏪',  label:'Seller',           earned:roles.includes('seller') },
+    { id:'provider',    icon:'🔧',  label:'Service Provider', earned:roles.includes('service_provider') },
+    { id:'mobility',    icon:'⚡',  label:'Mobility Partner', earned:roles.includes('mobility_partner') },
+    { id:'crafter',     icon:'🎨',  label:'Craft Creator',    earned:roles.includes('craft_creator') },
+    { id:'digital',     icon:'💻',  label:'Digital Creator',  earned:roles.includes('digital_creator') },
+  ];
+  document.getElementById('badgesGrid').innerHTML = ALL_BADGES.map(b=>`
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 8px;background:${b.earned?'var(--green-bg)':'var(--bg3)'};border:1.5px solid ${b.earned?'var(--green)':'var(--border)'};border-radius:var(--radius-sm);min-width:64px;opacity:${b.earned?1:.45};">
+      <span style="font-size:22px;">${b.icon}</span>
+      <span style="font-size:9px;font-weight:800;color:${b.earned?'var(--green)':'var(--muted2)'};text-align:center;">${b.label}</span>
+    </div>`).join('');
+}
+
+// ── Activity timeline ─────────────────────────────────────
+async function loadActivityTimeline(uid, cozyId) {
+  const el = document.getElementById('activityTimeline');
+  const items = [];
+  try {
+    const ls = await getDocs(query(collection(db,'cozyLeads'), where('addedBy','==',cozyId||''), orderBy('createdAt','desc')));
+    ls.docs.slice(0,3).forEach(d=>{const l=d.data();items.push({icon:'📋',color:'#eff6ff',text:`Lead added: ${l.customerName||'—'}`,sub:l.interestedIn||'',time:l.createdAt});});
+  }catch(_){}
+  try {
+    const ws = await getDocs(query(collection(db,'cozyWallet'), where('cozyId','==',cozyId||''), orderBy('createdAt','desc')));
+    ws.docs.slice(0,3).forEach(d=>{const w=d.data();items.push({icon:'💰',color:'#E8F5E9',text:`Earned KES ${Number(w.amount||0).toLocaleString()}`,sub:w.description||w.type||'',time:w.createdAt});});
+  }catch(_){}
+  try {
+    const cs = await getDocs(query(collection(db,'cozyContacts'), where('addedBy','==',cozyId||''), orderBy('createdAt','desc')));
+    cs.docs.slice(0,2).forEach(d=>{const c=d.data();items.push({icon:'👤',color:'#F5F5F5',text:`Contact saved: ${c.name||'—'}`,sub:c.category||'',time:c.createdAt});});
+  }catch(_){}
+  if(!items.length){el.innerHTML='<div style="text-align:center;padding:12px;font-size:12px;color:var(--muted2);">No activity yet. Add contacts or list items to see your activity here.</div>';return;}
+  items.sort((a,b)=>(b.time?.seconds||0)-(a.time?.seconds||0));
+  el.innerHTML=items.slice(0,6).map(i=>{
+    const date=i.time?.seconds?new Date(i.time.seconds*1000).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'—';
+    return`<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--bg3);">
+      <div style="width:34px;height:34px;border-radius:10px;background:${i.color};display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;">${i.icon}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;font-weight:700;color:var(--text);">${i.text}</div>
+        ${i.sub?`<div style="font-size:10px;color:var(--muted2);">${i.sub}</div>`:''}
+        <div style="font-size:10px;color:var(--muted2);margin-top:2px;">${date}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Languages ─────────────────────────────────────────────
+function renderLanguages(p) {
+  const l = p.languages || {};
+  document.getElementById('langPrimary').textContent   = l.primary   || 'Not set';
+  document.getElementById('langSecondary').textContent = l.secondary || 'Not set';
+  document.getElementById('langOther').textContent     = l.other     || '—';
+}
+window.openLangModal = function() {
+  const l = profile.languages || {};
+  document.getElementById('l-primary').value   = l.primary   || '';
+  document.getElementById('l-secondary').value = l.secondary || '';
+  document.getElementById('l-other').value     = l.other     || '';
+  document.getElementById('langModal').classList.add('open');
+};
+window.closeLang = function() { document.getElementById('langModal').classList.remove('open'); };
+window.saveLangs = async function() {
+  const languages = {
+    primary:   document.getElementById('l-primary').value,
+    secondary: document.getElementById('l-secondary').value,
+    other:     document.getElementById('l-other').value.trim(),
+  };
+  await updateDoc(doc(db,'cozyUsers',currentUser.uid), { languages, updatedAt:serverTimestamp() });
+  profile.languages = languages;
+  renderLanguages(profile);
+  window.closeLang();
+  toast('✅ Languages saved!');
+};
+
+// ── Reputation & Trust ────────────────────────────────────
+function renderReputation(p) {
+  // Simple trust score from profile fields
+  let score = 0;
+  if (p.phone)     score += 20;
+  if (p.email)     score += 15;
+  if (p.photo)     score += 10;
+  if (p.county)    score += 5;
+  if (p.location)  score += 5;
+  if (p.verified)  score += 25;
+  const roles = p.roles || [];
+  score += Math.min(20, (roles.length - 1) * 5);
+
+  document.getElementById('trustScoreVal').textContent = score + '/100';
+  document.getElementById('trustScoreBar').style.width = score + '%';
+
+  const LABELS = [
+    { min:85, icon:'🛡️', label:'Highly Trusted',  color:'#16a34a', bg:'#E8F5E9' },
+    { min:65, icon:'✅',  label:'Trusted',          color:'#22c55e', bg:'#E8F5E9' },
+    { min:40, icon:'🔶', label:'Building Trust',   color:'#f59e0b', bg:'#FFF8E1' },
+    { min:20, icon:'🆕',  label:'New Member',       color:'#94a3b8', bg:'#f8fafc' },
+    { min:0,  icon:'⚠️', label:'Caution',          color:'#D32F2F', bg:'#fef2f2' },
+  ];
+  const lbl = LABELS.find(l => score >= l.min) || LABELS[LABELS.length-1];
+  const trustEl = document.getElementById('trustLabel');
+  trustEl.textContent = `${lbl.icon} ${lbl.label}`;
+  trustEl.style.cssText = `display:inline-flex;align-items:center;gap:6px;background:${lbl.bg};color:${lbl.color};padding:5px 12px;border-radius:20px;font-size:11px;font-weight:800;`;
+
+  // Joined date → years active
+  const years = p.joinedDate
+    ? ((Date.now() - new Date(p.joinedDate).getTime()) / (365.25*86400000)).toFixed(1)
+    : '0';
+  document.getElementById('repYears').textContent    = years + ' years';
+  document.getElementById('repReviews').textContent  = (p.reviewCount  || 0) + ' reviews';
+  document.getElementById('repDeals').textContent    = (p.dealsCount   || 0) + ' deals';
+  document.getElementById('repInvites').textContent  = (p.inviteCount  || 0) + ' people invited';
+}
+
+// ── AI Permission ─────────────────────────────────────────
+function renderAIPermission(p) {
+  const allowed = p.aiLearningPermission;
+  const yesBtn  = document.getElementById('aiPermYes');
+  const noBtn   = document.getElementById('aiPermNo');
+  const status  = document.getElementById('aiPermStatus');
+  if (allowed === true) {
+    yesBtn.style.cssText = 'flex:1;padding:12px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;border:2px solid var(--green);background:var(--green-bg);color:var(--green);font-family:"Inter",sans-serif;';
+    noBtn.style.cssText  = 'flex:1;padding:12px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;border:2px solid var(--border);background:var(--bg3);color:var(--muted2);font-family:"Inter",sans-serif;';
+    status.textContent = '✅ AI can learn from your public activity. Thank you for helping Africa!';
+    status.style.color = 'var(--green)';
+  } else if (allowed === false) {
+    yesBtn.style.cssText = 'flex:1;padding:12px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;border:2px solid var(--border);background:var(--bg3);color:var(--muted2);font-family:"Inter",sans-serif;';
+    noBtn.style.cssText  = 'flex:1;padding:12px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;border:2px solid var(--red);background:#fef2f2;color:var(--red);font-family:"Inter",sans-serif;';
+    status.textContent = '🔒 AI learning is off. Your data stays private.';
+    status.style.color = 'var(--muted2)';
+  } else {
+    status.textContent = 'Your preference is not set yet.';
+  }
+}
+window.setAIPermission = async function(allow) {
+  await updateDoc(doc(db,'cozyUsers',currentUser.uid), {
+    aiLearningPermission: allow, updatedAt: serverTimestamp()
+  });
+  profile.aiLearningPermission = allow;
+  renderAIPermission(profile);
+  toast(allow ? '✅ Thank you for helping Cozy AI learn!' : '🔒 AI learning disabled. Privacy respected.');
+};
+
+window.toast = toast;
+</script>
+</body>
+</html>
