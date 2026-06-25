@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="cozy-test.css">
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>Cozy Learn Kids · OurCozy</title>
+
+
+<style>
+/* tokens from cozy-test.css */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--bg);font-family:var(--font);color:var(--text);min-height:100%;}
+
+/* Stars background */
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 0%,rgba(124,58,237,0.06) 0%,transparent 60%),radial-gradient(ellipse at 80% 10%,rgba(37,99,235,0.05) 0%,transparent 50%);pointer-events:none;}
+
+/* HEADER */
+.kids-header{background:linear-gradient(135deg,var(--green),var(--green-mid));padding:20px 16px 18px;text-align:center;position:relative;overflow:hidden;}
+.kids-header::before{content:'⭐';position:absolute;left:16px;top:16px;font-size:28px;animation:spin 4s linear infinite;}
+.kids-header::after{content:'🌟';position:absolute;right:16px;top:16px;font-size:28px;animation:spin 4s linear infinite reverse;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.kids-logo{font-size:52px;margin-bottom:8px;animation:bounce 2s ease infinite;}
+@keyframes bounce{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
+.kids-title{font-size:26px;font-weight:900;color:#fff;letter-spacing:.5px;}
+.kids-sub{font-size:13px;color:rgba(255,255,255,0.8);margin-top:4px;}
+.age-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.2);border:1.5px solid rgba(255,255,255,0.35);border-radius:20px;padding:6px 14px;margin-top:10px;font-size:12px;font-weight:800;color:#fff;}
+
+/* AI TUTOR BAR */
+.ai-bar{background:#fff;border:2px solid var(--green);border-radius:var(--radius-sm);margin:14px 16px 0;padding:12px 14px;display:flex;align-items:center;gap:10px;}
+.ai-avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--green),var(--green-mid));display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.ai-text{flex:1;}
+.ai-name{font-size:11px;font-weight:800;color:var(--green);margin-bottom:2px;}
+.ai-message{font-size:13px;font-weight:700;color:var(--text);line-height:1.4;}
+.ai-input-row{display:flex;gap:8px;margin:10px 16px 0;}
+.ai-inp{flex:1;background:#f8f4ff;border:2px solid var(--green);border-radius:var(--radius-sm);padding:11px 14px;font-size:13px;font-family:var(--font);color:var(--text);outline:none;}
+.ai-inp:focus{border-color:var(--blue);}
+.ai-send{background:var(--purple);color:#fff;border:none;border-radius:var(--radius-sm);padding:11px 16px;font-size:16px;cursor:pointer;font-weight:800;}
+
+/* SUBJECT GRID */
+.section-label{padding:16px 16px 8px;font-size:13px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;}
+.subject-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:0 16px 16px;}
+.subject-card{border-radius:var(--radius-sm);padding:16px 8px;text-align:center;cursor:pointer;transition:transform .15s;-webkit-tap-highlight-color:transparent;border:2.5px solid transparent;}
+.subject-card:active{transform:scale(.94);}
+.subject-card:hover{border-color:currentColor;}
+.subj-icon{font-size:34px;margin-bottom:8px;display:block;}
+.subj-label{font-size:11px;font-weight:900;letter-spacing:.3px;}
+.subj-badge{display:inline-block;background:rgba(255,255,255,0.6);border-radius:10px;padding:2px 8px;font-size:9px;font-weight:800;margin-top:5px;}
+
+/* DAILY LESSON CARD */
+.lesson-card{background:#fff;border-radius:var(--radius);border:2px solid #e9d5ff;margin:0 16px 14px;padding:16px;box-shadow:var(--shadow);}
+.lesson-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.lesson-icon{width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,var(--green),var(--green-mid));display:flex;align-items:center;justify-content:center;font-size:22px;}
+.lesson-title{font-size:15px;font-weight:900;color:var(--text);}
+.lesson-sub{font-size:11px;color:var(--muted);}
+.lesson-progress{background:#f3e8ff;border-radius:10px;height:8px;overflow:hidden;margin:10px 0 6px;}
+.lesson-bar{height:100%;background:linear-gradient(90deg,var(--purple),var(--blue));border-radius:10px;transition:width .5s;}
+.lesson-cta{background:linear-gradient(135deg,var(--green),var(--green-mid));color:#fff;border:none;border-radius:var(--radius-sm);padding:11px;width:100%;font-size:13px;font-weight:900;cursor:pointer;font-family:var(--font);margin-top:6px;}
+
+/* POINTS & BADGES */
+.rewards-bar{display:flex;gap:10px;padding:0 16px 14px;}
+.reward-card{flex:1;background:#fff;border-radius:var(--radius-sm);border:2px solid var(--border);padding:12px 8px;text-align:center;}
+.reward-val{font-size:22px;font-weight:900;color:var(--green);}
+.reward-lbl{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;margin-top:2px;}
+
+/* PARENT CORNER */
+.parent-corner{background:linear-gradient(135deg,#0d2e1a,#1a4a2a);border-radius:var(--radius);margin:0 16px 14px;padding:14px;color:#fff;display:flex;align-items:center;gap:12px;}
+.parent-icon{font-size:28px;flex-shrink:0;}
+.parent-text{flex:1;}
+.parent-title{font-size:13px;font-weight:900;margin-bottom:2px;}
+.parent-sub{font-size:11px;opacity:.8;}
+.parent-btn{background:rgba(255,255,255,0.2);border:1.5px solid rgba(255,255,255,0.3);color:#fff;border-radius:10px;padding:7px 12px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;font-family:var(--font);}
+
+/* AGE SET MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-bg.open{display:flex;}
+.modal-box{background:#fff;border-radius:var(--radius);padding:28px 24px;width:100%;max-width:340px;text-align:center;}
+.modal-title{font-size:20px;font-weight:900;color:var(--text);margin-bottom:8px;}
+.modal-sub{font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.5;}
+.age-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;}
+.age-btn{background:var(--bg);border:2px solid var(--border);border-radius:var(--radius-sm);padding:14px 8px;cursor:pointer;font-family:var(--font);}
+.age-btn:hover{border-color:var(--green);}
+.age-num{font-size:20px;font-weight:900;color:var(--green);}
+.age-lbl{font-size:9px;color:var(--muted);font-weight:700;}
+
+/* LESSON MODAL */
+.lesson-modal{background:#fff;border-radius:var(--radius);padding:24px 20px;width:100%;max-width:400px;max-height:90vh;overflow-y:auto;}
+.quiz-option{background:var(--bg);border:2.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:8px;cursor:pointer;font-size:14px;font-weight:700;transition:.15s;text-align:left;width:100%;font-family:var(--font);}
+.quiz-option:hover{border-color:var(--green);background:#f8f4ff;}
+.quiz-option.correct{background:#E8F5E9;border-color:#16a34a;color:#16a34a;}
+.quiz-option.wrong{background:#fef2f2;border-color:#D32F2F;color:#D32F2F;}
+
+/* BOTTOM NAV */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:2px solid var(--border);display:flex;z-index:200;}
+.bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px 6px;cursor:pointer;color:var(--muted);border:none;background:none;font-family:var(--font);}
+.bnav-item.active{color:var(--green);}
+.bnav-item span:first-child{font-size:22px;}
+.bnav-item span:last-child{font-size:9px;font-weight:800;}
+.page-pad{padding-bottom:75px;}
+
+#cc-toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a1a2e;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:800;opacity:0;transition:.25s;z-index:9999;pointer-events:none;}
+#cc-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.loading-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:12px;}
+.spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin2 .7s linear infinite;}
+@keyframes spin2{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<div class="loading-screen" id="loadingScreen">
+  <div style="font-size:56px;animation:bounce 1s ease infinite;">🌟</div>
+  <div class="spinner"></div>
+  <div style="font-size:14px;color:var(--muted);font-weight:800;">Loading Cozy Learn…</div>
+</div>
+
+<!-- AGE GATE MODAL -->
+<div class="modal-bg" id="ageModal">
+  <div class="modal-box">
+    <div style="font-size:48px;margin-bottom:12px;">👋</div>
+    <div class="modal-title">Welcome to Cozy Learn!</div>
+    <div class="modal-sub">How old are you? We'll set up the right learning experience for you.</div>
+    <div class="age-grid">
+      <button class="age-btn" onclick="setAge('child')"><div class="age-num">🌱</div><div class="age-lbl">Ages 5–12</div></button>
+      <button class="age-btn" onclick="setAge('teen')"><div class="age-num">📚</div><div class="age-lbl">Ages 13–17</div></button>
+      <button class="age-btn" onclick="setAge('adult')"><div class="age-num">🎓</div><div class="age-lbl">18+</div></button>
+    </div>
+    <div style="font-size:10px;color:var(--muted);line-height:1.6;">We only use your age group to protect you and show the right content. We never share this.</div>
+  </div>
+</div>
+
+<!-- LESSON MODAL -->
+<div class="modal-bg" id="lessonModal">
+  <div class="lesson-modal">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+      <div style="font-size:30px;" id="lessonSubjIcon">📚</div>
+      <div><div style="font-size:16px;font-weight:900;" id="lessonSubjTitle">Lesson</div><div style="font-size:11px;color:var(--muted);" id="lessonLevel">Level 1</div></div>
+      <button onclick="closeLesson()" style="margin-left:auto;background:none;border:none;font-size:24px;cursor:pointer;color:var(--muted);">×</button>
+    </div>
+    <div id="lessonContent"></div>
+  </div>
+</div>
+
+<!-- PARENT MODAL -->
+<div class="modal-bg" id="parentModal">
+  <div class="modal-box">
+    <div style="font-size:36px;margin-bottom:10px;">🔐</div>
+    <div class="modal-title">Parent Corner</div>
+    <div class="modal-sub">Manage your child's learning and safety settings.</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px;">
+      <button onclick="toast('Progress report coming soon!');closeParent();" style="background:#E8F5E9;color:#16a34a;border:2px solid #d1fae5;border-radius:var(--radius-sm);padding:12px;font-size:13px;font-weight:800;cursor:pointer;font-family:var(--font);">📊 View Progress Report</button>
+      <button onclick="toast('Time limits coming soon!');closeParent();" style="background:#eff6ff;color:#1565C0;border:2px solid #dbeafe;border-radius:var(--radius-sm);padding:12px;font-size:13px;font-weight:800;cursor:pointer;font-family:var(--font);">⏰ Set Daily Time Limits</button>
+      <button onclick="toast('Subject controls coming soon!');closeParent();" style="background:#F5F5F5;color:#1B5E20;border:2px solid #F5F5F5;border-radius:var(--radius-sm);padding:12px;font-size:13px;font-weight:800;cursor:pointer;font-family:var(--font);">📚 Control Subjects</button>
+      <button onclick="closeParent()" style="background:#f3f4f6;color:#6b7280;border:none;border-radius:var(--radius-sm);padding:12px;font-size:13px;font-weight:800;cursor:pointer;font-family:var(--font);">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="appRoot" style="display:none;">
+<div class="page-pad">
+
+  <!-- HEADER -->
+  <div class="kids-header">
+    <div class="kids-logo">🌟</div>
+    <div class="kids-title">Cozy Learn</div>
+    <div class="kids-sub">OurCozy · Smart Learning for Africa</div>
+    <div class="age-badge" id="ageBadge">🌱 Kids Mode</div>
+  </div>
+
+  <!-- AI TUTOR -->
+  <div class="ai-bar">
+    <div class="ai-avatar">🤖</div>
+    <div class="ai-text">
+      <div class="ai-name">COZY AI TUTOR</div>
+      <div class="ai-message" id="aiMessage">Habari! I'm your learning friend. What would you like to learn today? 📚</div>
+    </div>
+  </div>
+  <div class="ai-input-row">
+    <input class="ai-inp" id="aiInp" placeholder="Ask me anything… or type in Kiswahili!" onkeydown="if(event.key==='Enter')askAI()"/>
+    <button class="ai-send" onclick="askAI()">➤</button>
+  </div>
+
+  <!-- DAILY LESSON -->
+  <div class="section-label">⭐ Today's Lesson</div>
+  <div class="lesson-card">
+    <div class="lesson-header">
+      <div class="lesson-icon">📐</div>
+      <div><div class="lesson-title" id="dailyLessonTitle">Maths — Addition</div><div class="lesson-sub">Level 1 · 10 minutes · Free today</div></div>
+    </div>
+    <div class="lesson-progress"><div class="lesson-bar" id="lessonBar" style="width:0%;"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);font-weight:700;margin-bottom:4px;">
+      <span id="progressLabel">0% complete</span>
+      <span>🔥 Day 1</span>
+    </div>
+    <button class="lesson-cta" onclick="startLesson('maths','📐','Maths — Addition','Level 1')">▶ Start Today's Lesson</button>
+  </div>
+
+  <!-- REWARDS -->
+  <div class="section-label">🏅 My Progress</div>
+  <div class="rewards-bar">
+    <div class="reward-card"><div class="reward-val" id="totalPoints">0</div><div class="reward-lbl">Cozy Points</div></div>
+    <div class="reward-card"><div class="reward-val" id="streakDays">0</div><div class="reward-lbl">Day Streak 🔥</div></div>
+    <div class="reward-card"><div class="reward-val" id="badgeCount">0</div><div class="reward-lbl">Badges 🏅</div></div>
+  </div>
+
+  <!-- SUBJECTS -->
+  <div class="section-label">📚 All Subjects</div>
+  <div class="subject-grid" id="subjectGrid"></div>
+
+  <!-- TEACH AI A WORD -->
+  <div style="margin:0 16px 14px;background:linear-gradient(135deg,#0d2e1a,#1a4a2a);border-radius:var(--radius);padding:16px;color:#fff;">
+    <div style="font-size:14px;font-weight:900;margin-bottom:4px;">🌍 Teach Cozy AI a Word!</div>
+    <div style="font-size:11px;opacity:.8;margin-bottom:12px;">Help AI learn African languages. Earn Cozy Points!</div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <input id="teach-word" class="ai-inp" style="background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.25);color:#fff;" placeholder="Word (e.g. Mukate)"/>
+      <input id="teach-meaning" class="ai-inp" style="background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.25);color:#fff;" placeholder="Meaning (e.g. Bread)"/>
+      <select id="teach-lang" style="background:rgba(255,255,255,0.1);border:2px solid rgba(255,255,255,0.25);border-radius:var(--radius-sm);padding:10px 13px;font-size:13px;font-family:var(--font);color:#fff;outline:none;">
+        <option value="sw">Kiswahili</option>
+        <option value="luo">Luo</option>
+        <option value="kik">Kikuyu</option>
+        <option value="kam">Kamba</option>
+        <option value="kal">Kalenjin</option>
+        <option value="other">Other African Language</option>
+      </select>
+      <button onclick="teachAIWord()" style="background:rgba(255,255,255,0.2);border:1.5px solid rgba(255,255,255,0.3);color:#fff;border-radius:var(--radius-sm);padding:11px;font-size:13px;font-weight:900;cursor:pointer;font-family:var(--font);">🎓 Teach Cozy AI +0.01 pts</button>
+    </div>
+  </div>
+
+  <!-- PARENT CORNER -->
+  <div class="parent-corner">
+    <div class="parent-icon">👨‍👩‍👧</div>
+    <div class="parent-text">
+      <div class="parent-title">Parent Corner</div>
+      <div class="parent-sub">Set limits, view progress, manage subjects</div>
+    </div>
+    <button class="parent-btn" onclick="openParent()">Open</button>
+  </div>
+
+</div><!-- /page-pad -->
+
+<nav class="bottom-nav">
+  <button class="bnav-item active"><span>🏠</span><span>Home</span></button>
+  <button class="bnav-item" onclick="scrollToSubjects()"><span>📚</span><span>Subjects</span></button>
+  <button class="bnav-item" onclick="toast('Certificates coming soon!')"><span>🏅</span><span>Badges</span></button>
+  <button class="bnav-item" onclick="location.href='dashboard.html'"><span>🌍</span><span><span style="color:#fff;">Our</span><span style="color:var(--gold);">Cozy</span></span></button>
+</nav>
+</div>
+
+<div id="cc-toast" class="ct-toast"></div>
+
+<script type="module">
+import { auth, db, onAuthStateChanged, doc, getDoc, updateDoc, addDoc, collection, serverTimestamp } from './firebase.js';
+
+const SUBJECTS = [
+  { id:'maths',    icon:'📐', label:'Maths',      color:'#1565C0', bg:'#eff6ff'  },
+  { id:'english',  icon:'🇬🇧', label:'English',    color:'#1B5E20', bg:'#F5F5F5'  },
+  { id:'kiswahili',icon:'🇰🇪', label:'Kiswahili',  color:'#16a34a', bg:'#E8F5E9'  },
+  { id:'arabic',   icon:'🇸🇦', label:'Arabic',     color:'#d97706', bg:'#FFF8E1'  },
+  { id:'science',  icon:'🔬', label:'Science',    color:'#1565C0', bg:'#ecfeff'  },
+  { id:'coding',   icon:'💻', label:'Coding',     color:'#1B5E20', bg:'#F5F5F5'  },
+  { id:'stories',  icon:'📖', label:'Stories',    color:'#2E7D32', bg:'#fdf2f8'  },
+  { id:'drawing',  icon:'🎨', label:'Drawing',    color:'#2E7D32', bg:'#fdf2f8'  },
+  { id:'music',    icon:'🎵', label:'Music',      color:'#0ea5e9', bg:'#E8F5E9'  },
+  { id:'farming',  icon:'🌱', label:'Farming',    color:'#15803d', bg:'#E8F5E9'  },
+  { id:'crafts',   icon:'✂️', label:'Crafts',     color:'#1B5E20', bg:'#faf5ff'  },
+  { id:'animals',  icon:'🦁', label:'Animals',    color:'#ca8a04', bg:'#fefce8'  },
+];
+
+// Built-in mini lessons
+const LESSONS = {
+  maths: [
+    { q:'What is 5 + 3?', opts:['6','8','9','7'], ans:1, explain:'5 + 3 = 8 ✅' },
+    { q:'What is 10 - 4?', opts:['5','7','6','8'], ans:2, explain:'10 - 4 = 6 ✅' },
+    { q:'What is 3 × 4?', opts:['10','11','12','14'], ans:2, explain:'3 × 4 = 12 ✅' },
+  ],
+  kiswahili: [
+    { q:'Maana ya "Asante" ni nini? (What does Asante mean?)', opts:['Hello','Please','Thank you','Goodbye'], ans:2, explain:'"Asante" means Thank you! ✅' },
+    { q:'Neno "Nyumba" linamaanisha nini? (What does Nyumba mean?)', opts:['School','House','Car','Tree'], ans:1, explain:'"Nyumba" means House! ✅' },
+    { q:'"Habari" ni salamu gani? (What greeting is Habari?)', opts:['Goodbye','Good night','How are you?','Come in'], ans:2, explain:'"Habari" means "How are you?" or "News/Greetings" ✅' },
+  ],
+  english: [
+    { q:'Which word is a noun?', opts:['Run','Beautiful','Dog','Quickly'], ans:2, explain:'"Dog" is a noun — a person, place or thing ✅' },
+    { q:'Complete: "She ___ to school every day."', opts:['go','goes','going','gone'], ans:1, explain:'"goes" — She goes to school every day ✅' },
+  ],
+  science: [
+    { q:'What do plants need to make food?', opts:['Moonlight','Sunlight','Darkness','Rain only'], ans:1, explain:'Plants use sunlight for photosynthesis ✅' },
+    { q:'How many planets are in our solar system?', opts:['7','8','9','10'], ans:1, explain:'There are 8 planets in our solar system ✅' },
+  ],
+};
+
+let currentUser=null, ageGroup='child', lessonProgress=0;
+
+function toast(m){const t=document.getElementById('cc-toast');t.textContent=m;t.className='ct-toast show';setTimeout(()=>t.className='ct-toast',2600);}
+
+onAuthStateChanged(auth,async user=>{
+  if(!user){location.href='dashboard.html';return;}
+  currentUser=user;
+  const snap=await getDoc(doc(db,'cozyUsers',user.uid));
+  const data=snap.exists()?snap.data():{};
+  ageGroup=data.ageGroup||'';
+
+  document.getElementById('loadingScreen').style.display='none';
+  document.getElementById('appRoot').style.display='block';
+
+  if(!ageGroup){
+    document.getElementById('ageModal').classList.add('open');
+  } else {
+    loadApp(data);
+  }
+});
+
+function loadApp(data){
+  const labels={'child':'🌱 Kids Mode (5–12)','teen':'📚 Teen Mode (13–17)','adult':'🎓 Full Access'};
+  document.getElementById('ageBadge').textContent=labels[ageGroup]||'🌟 Learn Mode';
+
+  // AI greeting
+  const hour=new Date().getHours();
+  const greet=hour<12?'Good morning':'hour<17'?'Good afternoon':'Good evening';
+  const name=data.name?data.name.split(' ')[0]:'';
+  document.getElementById('aiMessage').textContent=`${greet}${name?', '+name:''}! 👋 Nimefurahi kukuona! Ready to learn something amazing today? 🌟`;
+
+  renderSubjects();
+  loadProgress(data);
+}
+
+function renderSubjects(){
+  const visibleSubjects = ageGroup==='adult' ? SUBJECTS : SUBJECTS;
+  document.getElementById('subjectGrid').innerHTML=visibleSubjects.map(s=>`
+    <div class="subject-card" style="background:${s.bg};color:${s.color};" onclick="startLesson('${s.id}','${s.icon}','${s.label}','Level 1')">
+      <span class="subj-icon">${s.icon}</span>
+      <div class="subj-label" style="color:${s.color};">${s.label}</div>
+      <div class="subj-badge" style="color:${s.color};">Free</div>
+    </div>`).join('');
+}
+
+function loadProgress(data){
+  const pts=data.cozyPoints||0;
+  const streak=data.streak||0;
+  const badges=data.badges?.length||0;
+  document.getElementById('totalPoints').textContent=pts;
+  document.getElementById('streakDays').textContent=streak;
+  document.getElementById('badgeCount').textContent=badges;
+  const prog=data.lessonProgress||0;
+  document.getElementById('lessonBar').style.width=prog+'%';
+  document.getElementById('progressLabel').textContent=prog+'% complete';
+}
+
+// ── Age setting ───────────────────────────────────────────
+window.setAge=async function(group){
+  if(!currentUser) return;
+  await updateDoc(doc(db,'cozyUsers',currentUser.uid),{ageGroup:group,ageSet:true,updatedAt:serverTimestamp()});
+  ageGroup=group;
+  document.getElementById('ageModal').classList.remove('open');
+  const snap=await getDoc(doc(db,'cozyUsers',currentUser.uid));
+  loadApp(snap.exists()?snap.data():{});
+  toast('✅ Learning mode set!');
+};
+
+// ── AI tutor ──────────────────────────────────────────────
+const AI_RESPONSES=[
+  {pat:/maths|hesabu|add|plus|minus|multiply/i, reply:'Let\'s do Maths! 📐 I\'ll make numbers fun for you. Tap Maths below to start!'},
+  {pat:/kiswahili|swahili/i,                    reply:'Vizuri! Kiswahili ni lugha nzuri sana! 🇰🇪 Tap Kiswahili to start learning!'},
+  {pat:/english/i,                              reply:'Great choice! English opens many doors. 🇬🇧 Let\'s start with basics!'},
+  {pat:/science|biology|physics/i,              reply:'Science is amazing! 🔬 Let\'s explore how the world works!'},
+  {pat:/story|hadithi|stories/i,                reply:'I love stories! 📖 Let me take you on an adventure!'},
+  {pat:/help|msaada|sina.*jua/i,                reply:'Don\'t worry! 😊 I\'m here to help. Ask me anything about any subject!'},
+  {pat:/habari|hello|hi|hujambo/i,              reply:'Habari! 👋 Nimefurahi kukuona! I\'m happy to see you! What shall we learn today?'},
+];
+window.askAI=function(){
+  const inp=document.getElementById('aiInp');
+  const text=inp.value.trim();
+  if(!text) return;
+  const match=AI_RESPONSES.find(r=>r.pat.test(text));
+  document.getElementById('aiMessage').textContent=match?match.reply:`That's a great question! 🤔 I'm still learning that one. Maybe try asking your teacher? In the meantime, let's explore our subjects! 📚`;
+  inp.value='';
+};
+
+// ── Lesson system ─────────────────────────────────────────
+let currentLesson=[], currentQ=0, score=0;
+window.startLesson=function(subjectId, icon, title, level){
+  const questions=LESSONS[subjectId];
+  if(!questions){toast(`${title} lessons coming soon! 🚀`);return;}
+  currentLesson=questions;currentQ=0;score=0;
+  document.getElementById('lessonSubjIcon').textContent=icon;
+  document.getElementById('lessonSubjTitle').textContent=title;
+  document.getElementById('lessonLevel').textContent=level;
+  document.getElementById('lessonModal').classList.add('open');
+  renderQuestion();
+};
+function renderQuestion(){
+  const q=currentLesson[currentQ];
+  if(!q){showResult();return;}
+  document.getElementById('lessonContent').innerHTML=`
+    <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:16px;line-height:1.5;">${currentQ+1}/${currentLesson.length}: ${q.q}</div>
+    ${q.opts.map((o,i)=>`<button class="quiz-option" onclick="answerQ(${i})">${o}</button>`).join('')}
+    <div style="font-size:11px;color:var(--muted);margin-top:10px;">Question ${currentQ+1} of ${currentLesson.length}</div>`;
+}
+window.answerQ=function(idx){
+  const q=currentLesson[currentQ];
+  const btns=document.querySelectorAll('.quiz-option');
+  btns.forEach((b,i)=>{b.disabled=true;if(i===q.ans)b.classList.add('correct');else if(i===idx&&idx!==q.ans)b.classList.add('wrong');});
+  if(idx===q.ans){score++;}
+  setTimeout(()=>{currentQ++;renderQuestion();},1000);
+};
+function showResult(){
+  const pct=Math.round((score/currentLesson.length)*100);
+  const msg=pct>=80?'🌟 Excellent work!':pct>=60?'👍 Good job!':'📚 Keep practising!';
+  document.getElementById('lessonContent').innerHTML=`
+    <div style="text-align:center;padding:20px 0;">
+      <div style="font-size:56px;margin-bottom:12px;">${pct>=80?'🏆':pct>=60?'🥈':'📚'}</div>
+      <div style="font-size:22px;font-weight:900;color:var(--green);margin-bottom:8px;">${msg}</div>
+      <div style="font-size:15px;font-weight:700;color:var(--muted);margin-bottom:20px;">Score: ${score}/${currentLesson.length} (${pct}%)</div>
+      <button onclick="closeLesson();awardPoints(${pct});" style="background:linear-gradient(135deg,var(--green),var(--green-mid));color:#fff;border:none;border-radius:var(--radius-sm);padding:14px 28px;font-size:14px;font-weight:900;cursor:pointer;font-family:var(--font);">✅ Finish Lesson</button>
+    </div>`;
+}
+window.awardPoints=async function(pct){
+  if(!currentUser) return;
+  const pts=pct>=80?10:pct>=60?5:2;
+  try{
+    const ref=doc(db,'cozyUsers',currentUser.uid);
+    const snap=await getDoc(ref);
+    const current=snap.exists()?snap.data().cozyPoints||0:0;
+    await updateDoc(ref,{cozyPoints:current+pts,updatedAt:serverTimestamp()});
+    document.getElementById('totalPoints').textContent=current+pts;
+    toast(`+${pts} Cozy Points! 🌟`);
+  }catch(_){}
+};
+
+// ── Teach AI a word ───────────────────────────────────────
+window.teachAIWord=async function(){
+  const word=document.getElementById('teach-word').value.trim();
+  const meaning=document.getElementById('teach-meaning').value.trim();
+  const lang=document.getElementById('teach-lang').value;
+  if(!word||!meaning){toast('Please enter both word and meaning.');return;}
+  try{
+    const existing=await import('./cozy-language.js').then(m=>m.lookupWord(word));
+    const result=await import('./cozy-language.js').then(m=>m.addWord({word,meaning,language:lang,suggestedBy:currentUser.uid}));
+    toast(result.action==='upvoted'?`✅ Word confirmed! Confidence: ${result.confidence}%`:`🎓 Word added! +0.01 Cozy Points earned!`);
+    document.getElementById('teach-word').value='';
+    document.getElementById('teach-meaning').value='';
+  }catch(e){toast('Error: '+e.message);}
+};
+
+window.closeLesson=function(){document.getElementById('lessonModal').classList.remove('open');};
+window.openParent=function(){document.getElementById('parentModal').classList.add('open');};
+window.closeParent=function(){document.getElementById('parentModal').classList.remove('open');};
+window.scrollToSubjects=function(){document.getElementById('subjectGrid').scrollIntoView({behavior:'smooth'});};
+window.toast=toast;
+</script>
+</body>
+</html>

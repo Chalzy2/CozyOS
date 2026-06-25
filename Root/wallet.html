@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="cozy-test.css">
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>Wallet · Cozycabin</title>
+
+
+<style>
+/* tokens from cozy-test.css */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--bg);-webkit-tap-highlight-color:transparent;;font-family:'Inter',sans-serif;color:var(--text);}
+.topbar{background:var(--green);color:#fff;padding:0 16px;height:56px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(27,94,32,0.25);}
+.back-btn{background:rgba(255,255,255,0.18);border:none;color:#fff;width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;flex-shrink:0;}
+.topbar-title{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;flex:1;}
+.page-pad{padding-bottom:80px;}
+
+/* WALLET HERO */
+.wallet-hero{background:linear-gradient(135deg,var(--green),var(--green-mid),#0a3d1f);padding:28px 20px 24px;color:#fff;text-align:center;position:relative;overflow:hidden;}
+.wallet-hero::before{content:'';position:absolute;right:-30px;top:-30px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,0.05);}
+.wallet-label{font-size:11px;opacity:.7;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;}
+.wallet-balance{font-family:'Rajdhani',sans-serif;font-size:42px;font-weight:700;letter-spacing:-1px;position:relative;z-index:1;}
+.wallet-currency{font-size:16px;font-weight:600;opacity:.8;margin-right:4px;}
+.wallet-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:rgba(255,255,255,0.15);border-radius:14px;overflow:hidden;margin-top:20px;}
+.w-stat{background:rgba(0,0,0,0.15);padding:12px 6px;text-align:center;}
+.w-stat-val{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;}
+.w-stat-lbl{font-size:9px;opacity:.7;font-weight:600;margin-top:1px;}
+.withdraw-btn{display:block;width:calc(100% - 0px);background:rgba(255,255,255,0.18);border:1.5px solid rgba(255,255,255,0.3);color:#fff;padding:12px;border-radius:var(--radius-sm);font-size:13px;font-weight:700;cursor:pointer;margin-top:16px;letter-spacing:.3px;}
+.withdraw-btn:hover{background:rgba(255,255,255,0.28);}
+
+/* EARNING TYPE CARDS */
+.type-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:16px;}
+.type-card{background:var(--bg2);border-radius:var(--radius-sm);border:1px solid var(--border);padding:12px 10px;text-align:center;box-shadow:var(--shadow);}
+.type-icon{font-size:22px;margin-bottom:6px;}
+.type-val{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;color:var(--green);}
+.type-lbl{font-size:9px;color:var(--muted2);font-weight:700;margin-top:1px;}
+
+/* SECTION */
+.section-header{padding:0 16px 8px;display:flex;align-items:center;justify-content:space-between;}
+.section-title{font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;}
+
+/* TRANSACTION LIST */
+.txn-list{padding:0 16px;display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
+.txn-card{background:var(--bg2);border-radius:var(--radius-sm);border:1px solid var(--border);padding:13px 14px;display:flex;align-items:center;gap:12px;}
+.txn-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.txn-info{flex:1;min-width:0;}
+.txn-desc{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.txn-date{font-size:10px;color:var(--muted2);margin-top:2px;}
+.txn-amount{font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;color:var(--green);white-space:nowrap;}
+.txn-status{font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;margin-top:3px;display:inline-block;}
+
+.empty-state{text-align:center;padding:40px 24px;}
+.empty-icon{font-size:48px;margin-bottom:12px;}
+.empty-title{font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px;}
+.empty-sub{font-size:12px;color:var(--muted2);line-height:1.6;}
+
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;display:none;align-items:flex-end;}
+.modal-bg.open{display:flex;}
+.modal-box{background:#fff;border-radius:24px 24px 0 0;padding:24px 20px;width:100%;max-height:85vh;overflow-y:auto;}
+.modal-title{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;}
+.modal-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted2);}
+.form-group{margin-bottom:11px;}
+.form-label{font-size:10px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px;}
+.form-inp{width:100%;background:var(--bg3);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 13px;font-size:13px;font-family:'Inter',sans-serif;color:var(--text);outline:none;}
+.form-inp:focus{border-color:var(--green);}
+.btn-green{width:100%;background:var(--green);color:#fff;border:none;border-radius:var(--radius-sm);padding:12px;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;}
+.info-box{background:var(--green-bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:14px;}
+
+/* ── Bottom Nav ── */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;background:#fff;border-top:1.5px solid var(--border);display:flex;z-index:200;box-shadow:0 -4px 24px rgba(0,0,0,0.08);}
+.bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:8px 4px 6px;cursor:pointer;color:var(--muted2);border:none;background:none;position:relative;transition:color .15s;}
+.bnav-item.active{color:var(--green);}
+.bnav-item.active::before{content:'';position:absolute;top:0;left:20%;right:20%;height:3px;background:var(--gold);border-radius:0 0 4px 4px;}
+.bnav-item span:first-child{font-size:21px;}
+.bnav-item span:last-child{font-size:9px;font-weight:800;letter-spacing:0.2px;}
+
+#cc-toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:#212121;color:#fff;padding:10px 20px;border-radius:20px;font-size:12px;font-weight:700;opacity:0;transition:.25s;z-index:9999;pointer-events:none;white-space:nowrap;}
+#cc-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.loading-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999;}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<div class="ct-loading" id="loadingScreen">
+  <div class="ct-loading-logo">🏡</div>
+  <div class="ct-spinner"></div>
+  <div class="ct-loading-text">Loading…</div>
+</div>
+
+<div id="appRoot" style="display:none;">
+<div class="page-pad">
+
+  <div class="topbar">
+    <button class="back-btn" onclick="history.back()">←</button>
+    <div class="topbar-title">💳 My Wallet</div>
+  </div>
+
+  <!-- WALLET HERO -->
+  <div class="wallet-hero">
+    <div class="wallet-label">Confirmed Balance</div>
+    <div class="wallet-balance"><span class="wallet-currency">KES</span><span id="wBalance">0</span></div>
+    <div class="wallet-stats">
+      <div class="w-stat"><div class="w-stat-val" id="wPending">0</div><div class="w-stat-lbl">Pending</div></div>
+      <div class="w-stat"><div class="w-stat-val" id="wLifetime">0</div><div class="w-stat-lbl">Lifetime</div></div>
+      <div class="w-stat"><div class="w-stat-val" id="wWithdrawn">0</div><div class="w-stat-lbl">Withdrawn</div></div>
+    </div>
+    <button class="withdraw-btn" onclick="openWithdrawModal()">💸 Request Withdrawal</button>
+    <!-- Payment method quick buttons -->
+    <div style="display:flex;gap:8px;margin-top:10px;position:relative;z-index:1;">
+      <button onclick="openWithdrawModal()" style="flex:1;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:#fff;padding:8px 4px;border-radius:8px;font-size:10px;font-weight:800;cursor:pointer;">📱 M-Pesa</button>
+      <button onclick="toast('PayPal coming soon!')" style="flex:1;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:#fff;padding:8px 4px;border-radius:8px;font-size:10px;font-weight:800;cursor:pointer;">💰 PayPal</button>
+      <button onclick="toast('Crypto coming soon!')" style="flex:1;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:#fff;padding:8px 4px;border-radius:8px;font-size:10px;font-weight:800;cursor:pointer;">₿ Crypto</button>
+      <button onclick="toast('Bank transfer coming soon!')" style="flex:1;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:#fff;padding:8px 4px;border-radius:8px;font-size:10px;font-weight:800;cursor:pointer;">🏦 Bank</button>
+    </div>
+  </div>
+
+  <!-- EARNING TYPES -->
+  <div style="padding:16px 16px 0;"><div class="section-title">📊 Earnings by Source</div></div>
+  <div class="type-grid">
+    <div class="type-card"><div class="type-icon">💰</div><div class="type-val" id="eAffiliate">0</div><div class="type-lbl">Affiliate</div></div>
+    <div class="type-card"><div class="type-icon">🏠</div><div class="type-val" id="eRental">0</div><div class="type-lbl">Rental</div></div>
+    <div class="type-card"><div class="type-icon">🔧</div><div class="type-val" id="eService">0</div><div class="type-lbl">Service</div></div>
+    <div class="type-card"><div class="type-icon">⚡</div><div class="type-val" id="eMobility">0</div><div class="type-lbl">Mobility</div></div>
+    <div class="type-card"><div class="type-icon">🎨</div><div class="type-val" id="eCraft">0</div><div class="type-lbl">Crafts</div></div>
+    <div class="type-card"><div class="type-icon">💻</div><div class="type-val" id="eDigital">0</div><div class="type-lbl">Digital</div></div>
+  </div>
+
+  <!-- MONTHLY CHART -->
+  <div class="section-header" style="padding-top:4px;">
+    <div class="section-title">📈 Monthly Earnings</div>
+    <button onclick="exportStatement()" style="font-size:11px;color:var(--green);font-weight:700;background:none;border:none;cursor:pointer;">📥 Export</button>
+  </div>
+  <div style="margin:0 16px 16px;background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);">
+    <canvas id="earningsChart" height="120"></canvas>
+    <div id="chartEmpty" style="text-align:center;padding:20px;font-size:12px;color:var(--muted2);">No earnings data yet.</div>
+  </div>
+
+  <!-- TRANSACTIONS -->
+  <div class="section-header" style="padding-top:4px;">
+    <div class="section-title">📋 Recent Transactions</div>
+  </div>
+  <div class="txn-list" id="txnList">
+    <div class="empty-state"><div class="empty-icon">💳</div><div class="empty-title">No transactions yet</div><div class="empty-sub">Your earnings from affiliate referrals, rentals, services, crafts and digital sales will appear here.</div></div>
+  </div>
+
+  <!-- WITHDRAWALS -->
+  <div class="section-header">
+    <div class="section-title">💸 Withdrawal History</div>
+  </div>
+  <div class="txn-list" id="withdrawList">
+    <div style="text-align:center;padding:16px;font-size:12px;color:var(--muted2);">No withdrawals yet.</div>
+  </div>
+
+</div>
+
+<nav class="bottom-nav">
+  <button class="bnav-item" onclick="location.href='dashboard.html'"><span>🏡</span><span>Home</span></button>
+  <button class="bnav-item" onclick="location.href='contacts.html'"><span>👥</span><span>Contacts</span></button>
+  <button class="bnav-item active"><span>💳</span><span>Wallet</span></button>
+  <button class="bnav-item" onclick="location.href='profile.html'"><span>👤</span><span>Profile</span></button>
+</nav>
+</div>
+
+<!-- WITHDRAW MODAL -->
+<div class="modal-bg" id="withdrawModal">
+  <div class="modal-box">
+    <div class="modal-title">💸 Request Withdrawal <button class="modal-close" onclick="document.getElementById('withdrawModal').classList.remove('open')">×</button></div>
+    <div class="info-box">⚠️ Withdrawals are processed within 24–48 hours via M-Pesa. Minimum withdrawal: KES 500.</div>
+    <div class="form-group"><label class="form-label">Amount (KES)</label><input class="form-inp" id="w-amount" type="number" placeholder="e.g. 1000"/></div>
+    <div class="form-group"><label class="form-label">M-Pesa Phone</label><input class="form-inp" id="w-phone" type="tel" placeholder="07XX XXX XXX"/></div>
+    <div class="form-group"><label class="form-label">Your Name (as on M-Pesa)</label><input class="form-inp" id="w-name" placeholder="Full name"/></div>
+    <button class="btn-green" onclick="requestWithdrawal()">Submit Request</button>
+  </div>
+</div>
+
+<div id="cc-toast" class="ct-toast"></div>
+
+<script type="module">
+import {
+  auth, db, onAuthStateChanged,
+  collection, doc, addDoc, getDoc, getDocs,
+  updateDoc, query, where, orderBy,
+  serverTimestamp, increment
+} from './firebase.js';
+
+let currentUser=null, userProfile=null, walletTotals={balance:0,pending:0,lifetime:0,withdrawn:0};
+
+function toast(m){const t=document.getElementById('cc-toast');t.textContent=m;t.className='ct-toast show';setTimeout(()=>t.className='ct-toast',2600);}
+function fmt(n){return Number(n||0).toLocaleString();}
+
+onAuthStateChanged(auth,async user=>{
+  if(!user){location.href='dashboard.html';return;}
+  currentUser=user;
+  const snap=await getDoc(doc(db,'cozyUsers',user.uid));
+  userProfile=snap.exists()?snap.data():{cozyId:'',uid:user.uid};
+  document.getElementById('loadingScreen').style.display='none';
+  document.getElementById('appRoot').style.display='block';
+  await loadWallet();
+});
+
+async function loadWallet(){
+  const cozyId=userProfile.cozyId;
+  if(!cozyId) return;
+
+  // Totals
+  try{
+    const snap=await getDoc(doc(db,'cozyWalletTotals',cozyId));
+    if(snap.exists()) walletTotals={...walletTotals,...snap.data()};
+  }catch(_){}
+  document.getElementById('wBalance').textContent=fmt(walletTotals.balance);
+  document.getElementById('wPending').textContent=fmt(walletTotals.pending);
+  document.getElementById('wLifetime').textContent=fmt(walletTotals.lifetime);
+  document.getElementById('wWithdrawn').textContent=fmt(walletTotals.withdrawn);
+
+  // Transactions
+  let txns=[];
+  try{
+    const q=query(collection(db,'cozyWallet'),where('cozyId','==',cozyId),orderBy('createdAt','desc'));
+    const snap=await getDocs(q);
+    txns=snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(_){
+    try{
+      const snap=await getDocs(query(collection(db,'cozyWallet'),where('cozyId','==',cozyId)));
+      txns=snap.docs.map(d=>({id:d.id,...d.data()}));
+    }catch(__) {}
+  }
+
+  // Also pull from legacy commissions collection
+  try{
+    const q2=query(collection(db,'commissions'),where('affiliateId','==',currentUser.uid),orderBy('createdAt','desc'));
+    const snap2=await getDocs(q2);
+    snap2.docs.forEach(d=>{
+      const data=d.data();
+      txns.push({id:d.id,type:'affiliate',amount:data.amount,description:'Affiliate commission — '+( data.productName||'Order'),status:data.status||'confirmed',createdAt:data.createdAt});
+    });
+  }catch(_){}
+
+  // Tally by type
+  const byType={};
+  txns.forEach(t=>{byType[t.type]=(byType[t.type]||0)+Number(t.amount||0);});
+  ['affiliate','rental','service','mobility','craft','digital'].forEach(t=>{
+    const el=document.getElementById('e'+t.charAt(0).toUpperCase()+t.slice(1));
+    if(el) el.textContent=fmt(byType[t]||0);
+  });
+
+  const STATUS_STYLE={pending:{bg:'#FFF8E1',color:'#d97706'},confirmed:{bg:'#E8F5E9',color:'#16a34a'},paid:{bg:'#eff6ff',color:'#1565C0'}};
+  const TYPE_ICONS={affiliate:'💰',rental:'🏠',service:'🔧',mobility:'⚡',craft:'🎨',digital:'💻',referral:'🎁'};
+  const TYPE_BG={affiliate:'#FFF8E1',rental:'#fff7ed',service:'#F5F5F5',mobility:'#E8F5E9',craft:'#fdf2f8',digital:'#E8F5E9',referral:'#E8F5E9'};
+
+  // Render monthly chart
+  renderChart(txns);
+
+  const txnList=document.getElementById('txnList');
+  if(!txns.length){
+    txnList.innerHTML=`<div class="empty-state"><div class="empty-icon">💳</div><div class="empty-title">No transactions yet</div><div class="empty-sub">Earnings from affiliate referrals, rentals, services, crafts and digital sales will appear here.</div></div>`;
+  } else {
+    txnList.innerHTML=txns.slice(0,50).map(t=>{
+      const sm=STATUS_STYLE[t.status]||STATUS_STYLE.pending;
+      const icon=TYPE_ICONS[t.type]||'💵';
+      const bg=TYPE_BG[t.type]||'#f5f5f5';
+      const date=t.createdAt?.seconds?new Date(t.createdAt.seconds*1000).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'—';
+      return`<div class="txn-card">
+        <div class="txn-icon" style="background:${bg};">${icon}</div>
+        <div class="txn-info">
+          <div class="txn-desc">${t.description||t.type||'Earning'}</div>
+          <div class="txn-date">${date}</div>
+          <span class="txn-status" style="background:${sm.bg};color:${sm.color};">${t.status||'pending'}</span>
+        </div>
+        <div class="txn-amount">KES ${fmt(t.amount)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // Withdrawals
+  let withdrawals=[];
+  try{
+    const q=query(collection(db,'cozyWithdrawals'),where('cozyId','==',cozyId),orderBy('createdAt','desc'));
+    const snap=await getDocs(q);
+    withdrawals=snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(_){}
+  try{
+    const q2=query(collection(db,'withdrawals'),where('affiliateId','==',currentUser.uid),orderBy('createdAt','desc'));
+    const snap2=await getDocs(q2);
+    snap2.docs.forEach(d=>withdrawals.push({id:d.id,...d.data()}));
+  }catch(_){}
+
+  const wList=document.getElementById('withdrawList');
+  if(!withdrawals.length){
+    wList.innerHTML='<div style="text-align:center;padding:16px;font-size:12px;color:var(--muted2);">No withdrawals yet.</div>';
+  } else {
+    wList.innerHTML=withdrawals.map(w=>{
+      const date=w.createdAt?.seconds?new Date(w.createdAt.seconds*1000).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'—';
+      const s=w.status||'pending';
+      const sc=s==='paid'?{bg:'#E8F5E9',c:'#16a34a'}:s==='rejected'?{bg:'#fef2f2',c:'#D32F2F'}:{bg:'#FFF8E1',c:'#d97706'};
+      return`<div class="txn-card">
+        <div class="txn-icon" style="background:#E8F5E9;">💸</div>
+        <div class="txn-info">
+          <div class="txn-desc">Withdrawal — ${w.mpesaPhone||w.phone||''}</div>
+          <div class="txn-date">${date}</div>
+          <span class="txn-status" style="background:${sc.bg};color:${sc.c};">${s}</span>
+        </div>
+        <div class="txn-amount">KES ${fmt(w.amount)}</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+window.openWithdrawModal=function(){document.getElementById('withdrawModal').classList.add('open');};
+
+// ── Monthly chart ─────────────────────────────────────────
+function renderChart(txns){
+  const months={};
+  txns.forEach(t=>{
+    if(!t.createdAt?.seconds) return;
+    const d=new Date(t.createdAt.seconds*1000);
+    const key=d.toLocaleDateString('en-GB',{month:'short',year:'2-digit'});
+    months[key]=(months[key]||0)+Number(t.amount||0);
+  });
+  const labels=Object.keys(months).slice(-6);
+  const vals=labels.map(l=>months[l]);
+  if(!labels.length){document.getElementById('chartEmpty').style.display='block';document.getElementById('earningsChart').style.display='none';return;}
+  document.getElementById('chartEmpty').style.display='none';
+  document.getElementById('earningsChart').style.display='block';
+  const canvas=document.getElementById('earningsChart');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.offsetWidth||300;const H=120;canvas.width=W;canvas.height=H;
+  const max=Math.max(...vals)||1;
+  const barW=Math.floor((W-32)/labels.length)-6;
+  ctx.clearRect(0,0,W,H);
+  labels.forEach((lbl,i)=>{
+    const x=16+(barW+6)*i;
+    const barH=Math.floor((vals[i]/max)*(H-30));
+    const y=H-20-barH;
+    // Bar
+    ctx.fillStyle='#1B5E20';
+    ctx.beginPath();
+    ctx.roundRect(x,y,barW,barH,4);
+    ctx.fill();
+    // Value
+    if(vals[i]>0){ctx.fillStyle='#212121';ctx.font='bold 8px Inter,sans-serif';ctx.textAlign='center';ctx.fillText('K'+(vals[i]/1000).toFixed(1),x+barW/2,y-3);}
+    // Label
+    ctx.fillStyle='#9E9E9E';ctx.font='9px Inter,sans-serif';ctx.textAlign='center';ctx.fillText(lbl,x+barW/2,H-4);
+  });
+}
+
+// ── Export statement ──────────────────────────────────────
+window.exportStatement=function(){
+  const rows=[['Date','Type','Description','Amount','Status']];
+  document.querySelectorAll('.txn-card').forEach(card=>{
+    const desc=card.querySelector('.txn-desc')?.textContent||'';
+    const date=card.querySelector('.txn-date')?.textContent||'';
+    const amt=card.querySelector('.txn-amount')?.textContent||'';
+    const status=card.querySelector('.txn-status')?.textContent||'';
+    rows.push([date,'—',desc,amt,status]);
+  });
+  const csv=rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='cozy-wallet-statement.csv';a.click();
+  URL.revokeObjectURL(url);
+  toast('✅ Statement exported!');
+};;
+
+window.requestWithdrawal=async function(){
+  const amount=Number(document.getElementById('w-amount').value);
+  const phone=document.getElementById('w-phone').value.trim();
+  const name=document.getElementById('w-name').value.trim();
+  if(!amount||amount<500){toast('Minimum withdrawal is KES 500.');return;}
+  if(!phone||!name){toast('Phone and name are required.');return;}
+  if((walletTotals.balance||0)<amount){toast('Insufficient balance.');return;}
+  try{
+    await addDoc(collection(db,'cozyWithdrawals'),{
+      cozyId:userProfile.cozyId,uid:currentUser.uid,
+      amount,mpesaPhone:phone,name,status:'pending',
+      createdAt:serverTimestamp()
+    });
+    // Update totals
+    const ref=doc(db,'cozyWalletTotals',userProfile.cozyId);
+    const snap=await getDoc(ref);
+    if(snap.exists()){
+      await updateDoc(ref,{balance:increment(-amount),withdrawn:increment(amount),updatedAt:serverTimestamp()});
+    }
+    document.getElementById('withdrawModal').classList.remove('open');
+    toast('✅ Withdrawal request submitted!');
+    await loadWallet();
+  }catch(e){toast('Error: '+e.message);}
+};
+</script>
+</body>
+</html>
