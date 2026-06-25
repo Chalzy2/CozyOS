@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cozy Identity Studio - Asset Manager</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.29.0/feather.min.js"></script>
+    <style>
+        :root {
+            --bg-base: #060d1f;
+            --bg-card: #0d1830;
+            --gold: #ffd700;
+            --emerald: #1B5E20;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --border-color: rgba(255, 215, 0, 0.15);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --radius: 12px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Standard Studio Layout Sidebar */
+        .sidebar {
+            width: 260px;
+            background: #040914;
+            border-right: 1px solid var(--border-color);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+        .brand {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--gold);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: var(--radius);
+            font-size: 14px;
+            transition: var(--transition);
+        }
+        .nav-item:hover, .nav-item.active {
+            background: rgba(255, 215, 0, 0.08);
+            color: var(--text-main);
+            border-left: 3px solid var(--gold);
+        }
+
+        /* Workspace Grid Splitter */
+        .workspace {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            overflow: hidden;
+        }
+
+        /* Controls Panel Left */
+        .controls-panel {
+            background: var(--bg-card);
+            border-right: 1px solid var(--border-color);
+            padding: 24px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        h2 { font-family: 'Space Grotesk', sans-serif; font-size: 18px; margin-bottom: 10px; }
+        label { font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 6px; }
+        input, select {
+            width: 100%; padding: 12px; background: rgba(0,0,0,0.2); 
+            border: 1px solid var(--border-color); border-radius: 6px; 
+            color: white; outline: none; transition: var(--transition);
+        }
+        input:focus { border-color: var(--gold); }
+
+        /* Canvas Preview Container Right */
+        .preview-pane {
+            background: #091124;
+            padding: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-y: auto;
+        }
+        .document-canvas {
+            width: 595px; /* Standard A4 Aspect Ratio scaled down */
+            min-height: 842px;
+            background: white;
+            color: #111;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            border-radius: 4px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .doc-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid #ccc;
+            padding-bottom: 20px;
+        }
+        .doc-watermark {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 60px;
+            font-weight: 700;
+            color: rgba(0, 0, 0, 0.04);
+            white-space: nowrap;
+            user-select: none;
+            pointer-events: none;
+            display: block;
+        }
+        .doc-watermark.hidden { display: none; }
+        
+        .btn-action {
+            background: var(--gold);
+            color: #000;
+            border: none;
+            padding: 14px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            width: 100%;
+            margin-top: 10px;
+        }
+        .btn-action:hover { opacity: 0.9; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="brand"><i data-feather="shield"></i> Identity Studio</div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+            <a href="dashboard.html" class="nav-item"><i data-feather="arrow-left"></i> Core System OS</a>
+            <a href="#" class="nav-item active"><i data-feather="file-text"></i> Asset Studio Matrix</a>
+            <a href="parcel.html" class="nav-item"><i data-feather="truck"></i> Courier Dispatch</a>
+            <a href="mobility.html" class="nav-item"><i data-feather="zap"></i> E-Mobility Portal</a>
+        </div>
+    </div>
+
+    <div class="workspace">
+        <div class="controls-panel">
+            <h2>Identity Engine Configuration</h2>
+            
+            <div>
+                <label>Target Asset Profile Template</label>
+                <select id="docTemplate" onchange="updatePreview()">
+                    <option value="Receipt">Organizational Receipt Token</option>
+                    <option value="Invoice">Commercial Account Invoice</option>
+                    <option value="Certificate">Certificate of Merit / Ownership</option>
+                </select>
+            </div>
+
+            <div>
+                <label>Tenant / Workspace Identifier Name</label>
+                <input type="text" id="orgName" value="CozyCabin Hub East Africa" oninput="updatePreview()">
+            </div>
+
+            <div>
+                <label>Operational Sub-header Motto</label>
+                <input type="text" id="orgMotto" value="Preserving Shared Institutional Asset Footprints" oninput="updatePreview()">
+            </div>
+
+            <div>
+                <label>Monetary Valued Target Reference Amount</label>
+                <input type="text" id="docAmount" value="KES 45,500" oninput="updatePreview()">
+            </div>
+
+            <div style="display:flex; gap:10px; align-items:center; margin-top:10px;">
+                <input type="checkbox" id="toggleWatermark" checked onchange="updateWatermark()" style="width:20px; height:20px;">
+                <label for="toggleWatermark" style="margin:0; cursor:pointer;">Render Security Watermark Layer</label>
+            </div>
+
+            <button class="btn-action" onclick="alert('Asset finalized and generated successfully.')"><i data-feather="download" style="width:16px; display:inline-block; vertical-align:middle; margin-right:6px;"></i> Compile & Mint Asset</button>
+        </div>
+
+        <div class="preview-pane">
+            <div class="document-canvas" id="renderCanvas">
+                <div class="doc-watermark" id="watermarkLayer">SECURED VERIFIED SECURED</div>
+                
+                <div class="doc-header">
+                    <div>
+                        <h2 id="previewTitle" style="color:#111; font-size:24px; font-weight:700;">CozyCabin Hub East Africa</h2>
+                        <p id="previewMotto" style="color:#666; font-size:12px; margin-top:4px;">Preserving Shared Institutional Asset Footprints</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <span id="badgeType" style="background:#1B5E20; color:white; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:600; text-transform:uppercase;">Receipt</span>
+                    </div>
+                </div>
+
+                <div style="margin: 40px 0; flex:1;">
+                    <table style="width:100%; border-collapse:collapse; font-size:14px;">
+                        <thead>
+                            <tr style="border-bottom:1px solid #ddd; text-align:left; color:#555;">
+                                <th style="padding:10px 0;">Description of Core Allocation Unit</th>
+                                <th style="text-align:right; padding:10px 0;">Stipulated Subtotal Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:15px 0; font-weight:500;">Ecosystem Space Initialization & Multi-tenant Core Provision</td>
+                                <td style="text-align:right; padding:15px 0; font-weight:600;" id="tableAmount">KES 45,500</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="border-top:1px solid #ddd; padding-top:20px; display:flex; justify-content:space-between; font-size:11px; color:#777;">
+                    <div>System ID Tracking Reference: CZ-MINT-89822</div>
+                    <div>Authorized Authenticated Footprint Signature Layer</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        feather.replace();
+
+        function updatePreview() {
+            document.getElementById('previewTitle').innerText = document.getElementById('orgName').value;
+            document.getElementById('previewMotto').innerText = document.getElementById('orgMotto').value;
+            document.getElementById('badgeType').innerText = document.getElementById('docTemplate').value;
+            document.getElementById('tableAmount').innerText = document.getElementById('docAmount').value;
+        }
+
+        function updateWatermark() {
+            const el = document.getElementById('watermarkLayer');
+            if(document.getElementById('toggleWatermark').checked) {
+                el.classList.remove('hidden');
+            } else {
+                el.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
