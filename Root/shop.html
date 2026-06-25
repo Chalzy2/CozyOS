@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CozyOS Shop Module - Smart Living Store</title>
+    <!-- CozyOS PWA Link Framework Vectors -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="CozyOS Shop">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.29.0/feather.min.js"></script>
+    <style>
+        :root {
+            --bg-base: #0a0a0a;
+            --bg-glass: rgba(20, 20, 20, 0.7);
+            --bg-glass-hover: rgba(30, 30, 30, 0.8);
+            --gold: #F9A825;
+            --gold-glow: rgba(249, 168, 37, 0.15);
+            --emerald: #10b981;
+            --emerald-glow: rgba(16, 185, 129, 0.15);
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 85% 15%, var(--emerald-glow), transparent 30%),
+                radial-gradient(circle at 15% 85%, var(--gold-glow), transparent 30%);
+            min-height: 100vh;
+            padding-bottom: 60px;
+        }
+
+        .glass-panel {
+            background: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+        }
+
+        /* Top Navigation Bar */
+        .top-nav {
+            height: 70px;
+            padding: 0 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(10, 10, 10, 0.85);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .nav-left, .nav-right { display: flex; align-items: center; gap: 20px; }
+        .back-btn {
+            display: flex; align-items: center; gap: 8px; color: var(--text-muted);
+            text-decoration: none; font-size: 14px; font-weight: 500; transition: var(--transition);
+        }
+        .back-btn:hover { color: var(--gold); }
+        
+        .search-container {
+            display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border-color); border-radius: var(--radius-md);
+            padding: 6px 16px; width: 350px; transition: var(--transition);
+        }
+        .search-container:focus-within { border-color: var(--gold); }
+        .search-container input {
+            background: transparent; border: none; outline: none; color: white; width: 100%;
+        }
+
+        .icon-btn {
+            background: transparent; border: none; color: var(--text-muted); cursor: pointer;
+            position: relative; transition: var(--transition);
+        }
+        .icon-btn:hover { color: var(--text-main); }
+        .badge-count {
+            position: absolute; top: -5px; right: -5px; background: var(--emerald);
+            color: black; font-size: 10px; font-weight: 700; border-radius: 50%;
+            width: 16px; height: 16px; display: flex; align-items: center; justify-content: center;
+        }
+
+        /* Main Store Content Layout */
+        .store-layout { max-width: 1400px; margin: 0 auto; padding: 32px 40px; display: flex; flex-direction: column; gap: 40px; }
+
+        /* Hero Frame */
+        .hero-section { padding: 48px; position: relative; overflow: hidden; }
+        .hero-section h1 { font-family: 'Space Grotesk', sans-serif; font-size: 36px; font-weight: 700; margin-bottom: 8px; }
+        .hero-section p { color: var(--text-muted); margin-bottom: 24px; }
+        .hero-buttons { display: flex; gap: 16px; flex-wrap: wrap; }
+        .btn-core {
+            padding: 12px 24px; border-radius: var(--radius-md); font-weight: 600; font-size: 14px;
+            cursor: pointer; transition: var(--transition); border: 1px solid transparent; text-decoration: none;
+        }
+        .btn-gold { background: var(--gold); color: #000; }
+        .btn-gold:hover { background: #e59516; }
+        .btn-outline { background: transparent; border-color: var(--border-color); color: var(--text-main); }
+        .btn-outline:hover { background: var(--bg-glass-hover); border-color: var(--gold); }
+
+        /* Grid Framework for Catalog & Filters */
+        .catalog-container { display: grid; grid-template-columns: 280px 1fr; gap: 32px; align-items: start; }
+        
+        /* Left Filter Architecture Panel */
+        .filter-panel { padding: 24px; display: flex; flex-direction: column; gap: 24px; }
+        .filter-group h4 { font-family: 'Space Grotesk', sans-serif; font-size: 14px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gold); }
+        .filter-list { display: flex; flex-direction: column; gap: 8px; list-style: none; }
+        .filter-item { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text-muted); cursor: pointer; }
+        .filter-item input { accent-color: var(--gold); }
+
+        /* Categories Ribbon */
+        .categories-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+        .category-chip {
+            padding: 14px; text-align: center; border-radius: var(--radius-md); cursor: pointer;
+            transition: var(--transition); font-size: 13px; font-weight: 500; border: 1px solid var(--border-color);
+        }
+        .category-chip:hover, .category-chip.active { border-color: var(--emerald); background: var(--emerald-glow); color: var(--emerald); }
+
+        /* Product Gallery (Grid View) */
+        .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 24px; }
+        .product-card { overflow: hidden; display: flex; flex-direction: column; height: 100%; transition: var(--transition); transform: translateZ(0); }
+        .product-card:hover { transform: translateY(-4px); border-color: var(--gold); }
+        .product-img { width: 100%; height: 200px; background: #161616; object-fit: cover; border-bottom: 1px solid var(--border-color); }
+        .product-details { padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 8px; }
+        .product-title { font-size: 15px; font-weight: 600; line-height: 1.4; }
+        .product-meta { display: flex; justify-content: space-between; align-items: center; margin-top: auto; }
+        .product-price { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; color: var(--gold); }
+
+        /* Dynamic Sliding Panels (Cart & Customers) */
+        .side-drawer {
+            position: fixed; top: 0; right: -400px; width: 400px; height: 100vh;
+            background: #0f0f0f; border-left: 1px solid var(--border-color); z-index: 500;
+            transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1); padding: 32px; display: flex; flex-direction: column;
+        }
+        .side-drawer.open { right: 0; }
+        .drawer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 1px solid var(--border-color); padding-bottom: 16px; }
+        .drawer-content { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+
+        /* Floating AI Infrastructure */
+        .ai-concierge-btn {
+            position: fixed; bottom: 85px; right: 30px; width: 60px; height: 60px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--gold), #d48806); color: #000;
+            display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(249, 168, 37, 0.3);
+            cursor: pointer; z-index: 500; transition: var(--transition); border: none;
+        }
+        .ai-chat-window {
+            position: fixed; bottom: 155px; right: 30px; width: 350px; height: 450px;
+            display: none; flex-direction: column; z-index: 499; opacity: 0; transform: translateY(20px); transition: var(--transition);
+        }
+        .ai-chat-window.active { display: flex; opacity: 1; transform: translateY(0); }
+
+        /* Footer Element Frame */
+        .shop-footer { border-top: 1px solid var(--border-color); padding: 40px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--text-muted); background: #050505; margin-top: 60px; }
+        .footer-links { display: flex; gap: 24px; }
+        .footer-links a { color: var(--text-muted); text-decoration: none; transition: var(--transition); }
+        .footer-links a:hover { color: var(--text-main); }
+
+        .system-status-bar {
+            background: #000; border-top: 1px solid var(--border-color);
+            position: fixed; bottom: 0; left: 0; width: 100vw; height: 26px;
+            z-index: 999; display: flex; align-items: center; padding: 0 20px;
+            font-size: 11px; font-family: monospace; color: var(--text-muted); justify-content: space-between;
+        }
+
+        @media (max-width: 1024px) {
+            .catalog-container { grid-template-columns: 1fr; }
+            .filter-panel { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Top Integrated Navigation Matrix -->
+    <nav class="top-nav">
+        <div class="nav-left">
+            <a href="dashboard.html" class="back-btn">
+                <i data-feather="arrow-left" style="width: 18px;"></i>
+                <span>Back to Dashboard</span>
+            </a>
+            <div class="search-container">
+                <i data-feather="search" style="width: 16px; color: var(--text-muted);"></i>
+                <input type="text" id="storeSearch" placeholder="Universal product search..." oninput="triggerSearchFilter()">
+            </div>
+        </div>
+        <div class="nav-right">
+            <button class="icon-btn" onclick="alert('System Notifications Balance Intact')"><i data-feather="bell"></i></button>
+            <button class="icon-btn" onclick="toggleDrawer('cartDrawer')">
+                <i data-feather="shopping-cart"></i>
+                <span class="badge-count" id="cartCount">0</span>
+            </button>
+            <button class="icon-btn" onclick="toggleDrawer('customerDrawer')"><i data-feather="user"></i></button>
+        </div>
+    </nav>
+
+    <div class="store-layout">
+        <!-- Hero Section -->
+        <section class="hero-section glass-panel">
+            <h1>Cozycabin Smart Living Store</h1>
+            <p>Everything for Smart Living in one place.</p>
+            <div class="hero-buttons">
+                <button class="btn-core btn-gold" onclick="scrollToCatalog()">Browse Products</button>
+                <button class="btn-core btn-outline" onclick="toggleDrawer('customerDrawer')">Orders</button>
+                <button class="btn-core btn-outline" onclick="toggleDrawer('customerDrawer')">Wishlist</button>
+                <button class="btn-core btn-outline" onclick="toggleDrawer('cartDrawer')">Cart</button>
+            </div>
+        </section>
+
+        <!-- Product Categories Ribbon Grid -->
+        <section>
+            <h3 style="font-family:'Space Grotesk'; font-size:16px; margin-bottom:16px; color:var(--text-muted);">Ecosystem Categories</h3>
+            <div class="categories-grid" id="categoryContainer">
+                <!-- Hardwired loop for fast mapping directly matching native store layout entries -->
+                <div class="category-chip active" onclick="filterCategory('all', this)">All Items</div>
+                <div class="category-chip" onclick="filterCategory('Kitchen', this)">Kitchen</div>
+                <div class="category-chip" onclick="filterCategory('Solar', this)">Solar</div>
+                <div class="category-chip" onclick="filterCategory('Electronics', this)">Electronics</div>
+                <div class="category-chip" onclick="filterCategory('Appliances', this)">Appliances</div>
+                <div class="category-chip" onclick="filterCategory('Fashion', this)">Fashion</div>
+                <div class="category-chip" onclick="filterCategory('Security', this)">Security</div>
+                <div class="category-chip" onclick="filterCategory('Decor', this)">Decor</div>
+                <div class="category-chip" onclick="filterCategory('Beddings', this)">Beddings</div>
+                <div class="category-chip" onclick="filterCategory('Kids', this)">Kids</div>
+                <div class="category-chip" onclick="filterCategory('Travel', this)">Travel</div>
+                <div class="category-chip" onclick="filterCategory('Tools', this)">Tools</div>
+                <div class="category-chip" onclick="filterCategory('Digital', this)">Digital Products</div>
+                <div class="category-chip" onclick="filterCategory('Affiliate', this)">Affiliate Products</div>
+            </div>
+        </section>
+
+        <!-- Catalog Container Grid Grid Layout -->
+        <div class="catalog-container" id="catalogFrame">
+            <!-- Sidebar Panel Refinement Filters -->
+            <aside class="filter-panel glass-panel">
+                <div class="filter-group">
+                    <h4>Availability</h4>
+                    <div class="filter-list">
+                        <label class="filter-item"><input type="checkbox" checked id="filterStock"> In Stock Only</label>
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <h4>Price Ranges</h4>
+                    <div class="filter-list">
+                        <label class="filter-item"><input type="radio" name="priceRange" value="all" checked onchange="triggerSearchFilter()"> All Prices</label>
+                        <label class="filter-item"><input type="radio" name="priceRange" value="0-50" onchange="triggerSearchFilter()"> Under $50</label>
+                        <label class="filter-item"><input type="radio" name="priceRange" value="50-200" onchange="triggerSearchFilter()"> $50 - $200</label>
+                        <label class="filter-item"><input type="radio" name="priceRange" value="200+" onchange="triggerSearchFilter()"> Over $200</label>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Dynamic Products Matrix -->
+            <main class="products-grid" id="productGrid">
+                <!-- Fallback card to ensure application is layout-stable prior to external scripts mounting -->
+                <div style="grid-column: 1/-1; padding:40px; text-align:center; color:var(--text-muted);">
+                    Initializing cross-link context hooks into products.js stream array...
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Dynamic Drawers Infrastructure Container -->
+    <!-- Shopping Cart Panel Drawer -->
+    <div class="side-drawer" id="cartDrawer">
+        <div class="drawer-header">
+            <h3 style="font-family:'Space Grotesk';">Ecosystem Cart</h3>
+            <button class="icon-btn" onclick="toggleDrawer('cartDrawer')"><i data-feather="x"></i></button>
+        </div>
+        <div class="drawer-content" id="cartItemsContainer">
+            <p style="color:var(--text-muted); font-size:14px;">Your system checkout cart sequence is empty.</p>
+        </div>
+        <div style="border-top:1px solid var(--border-color); padding-top:20px; margin-top:auto; display:flex; flex-direction:column; gap:12px;">
+            <div style="display:flex; justify-content:space-between; font-size:14px; color:var(--text-muted);"><span>Subtotal:</span><span id="cartSubtotal">$0.00</span></div>
+            <div style="display:flex; justify-content:space-between; font-size:14px; color:var(--text-muted);"><span>Est. Shipping:</span><span id="cartShipping">$0.00</span></div>
+            <div style="display:flex; justify-content:space-between; font-size:16px; font-weight:700; color:var(--gold);"><span>Total Balance:</span><span id="cartTotal">$0.00</span></div>
+            <button class="btn-core btn-gold" style="width:100%; text-align:center;" onclick="executeCheckout()">Proceed to Secure Checkout Vector</button>
+        </div>
+    </div>
+
+    <!-- Customer Section Framework Drawer -->
+    <div class="side-drawer" id="customerDrawer">
+        <div class="drawer-header">
+            <h3 style="font-family:'Space Grotesk';">Customer Matrix Desk</h3>
+            <button class="icon-btn" onclick="toggleDrawer('customerDrawer')"><i data-feather="x"></i></button>
+        </div>
+        <div class="drawer-content" style="gap:20px;">
+            <div class="glass-panel" style="padding:16px; cursor:pointer;" onclick="alert('Routing to parcel tracing array matrix...')">
+                <h4 style="font-size:14px; color:var(--emerald); margin-bottom:4px;">📦 Track active Parcel</h4>
+                <p style="font-size:12px; color:var(--text-muted);">Verify live courier allocation status markers.</p>
+            </div>
+            <div class="glass-panel" style="padding:16px;">
+                <h4 style="font-size:14px; margin-bottom:4px;">Recent Orders</h4>
+                <p style="font-size:12px; color:var(--text-muted);">No transactions recorded in the current session token space.</p>
+            </div>
+            <div class="glass-panel" style="padding:16px;">
+                <h4 style="font-size:14px; margin-bottom:4px;">Saved Verification Addresses</h4>
+                <p style="font-size:12px; color:var(--text-muted);">Nairobi Central Hub Node alpha.</p>
+            </div>
+            <div class="glass-panel" style="padding:16px;">
+                <h4 style="font-size:14px; margin-bottom:4px;">Active Coupons & Rewards</h4>
+                <p style="font-size:12px; color:var(--text-muted);">COZYFIRST10 (10% Balance Deduction Active)</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating AI Shopping Interface Engine Hooks -->
+    <button class="ai-concierge-btn" onclick="toggleAIWindow()">
+        <i data-feather="message-square"></i>
+    </button>
+    <div class="ai-chat-window glass-panel" id="aiWindow">
+        <div class="drawer-header" style="padding:16px; margin:0;">
+            <span style="font-weight:600;">✨ CozyAI Shopping Assistant</span>
+            <i data-feather="x" style="cursor: pointer;" onclick="toggleAIWindow()"></i>
+        </div>
+        <div style="flex:1; padding:16px; overflow-y:auto; font-size:13px; color:var(--text-muted);" id="aiShopBody">
+            <p style="margin-bottom:10px;"><strong>AI:</strong> Welcome Operator. Tell me what item profiles you're hunting down today (e.g., solar, flasks, blenders).</p>
+        </div>
+        <div style="padding:16px; border-top:1px solid var(--border-color); display:flex; gap:10px;">
+            <input type="text" id="aiShopInput" placeholder="Ask CozyAI..." style="flex:1; background:var(--bg-base); border:1px solid var(--border-color); border-radius:20px; padding:8px 16px; color:white; outline:none;" onkeypress="if(event.key==='Enter') sendAiShopMessage()">
+        </div>
+    </div>
+
+   
+    <   <!-- Bottom System Status Matrix -->
+    <footer class="shop-footer">
+        <div>© 2026 Cozycabin System Ecosystem. All rights reserved. Operating parameters nominal.</div>
+        <div class="footer-links">
+            <a href="dashboard.html">System OS</a>
+            <a href="#" onclick="alert('Opening support dispatch socket...')">Contact Support</a>
+            <a href="#">Privacy Framework</a>
+            <a href="#">Terms Layer</a>
+        </div>
+        <div>Version Core v3.4.1-Shop</div>
+    </footer>
+
+    <footer class="system-status-bar">
+        <span>⚡ CozyOS System Shell Component: Connected</span>
+        <span id="shopTelemetryState">System Data Link: Live Cache Mode</span>
+    </footer>
+
+    <!-- Script Layer Engine Connections -->
+    <!-- Graceful Fallback Injection Strategy if products.js/cart.js are missing inside workspace local root -->
+    <script>
+        // Check for presence of external datasets, inject virtual layers if fallback is triggered
+        window.CozyProductsDatabase = window.CozyProductsDatabase || [
+            { id: 101, title: "High-Efficiency Solar Array Light Pack", price: 120.00, category: "Solar", img: "https://images.unsplash.com/photo-1509391366360-2e959784a276?w=400&q=80", inStock: true },
+            { id: 102, title: "Cozy Cabin Insulated Thermal Flask Array", price: 45.00, category: "Kitchen", img: "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&q=80", inStock: true },
+            { id: 103, title: "Commercial Grade Countertop Nutrient Blender", price: 245.00, category: "Kitchen", img: "https://images.unsplash.com/photo-1578643463396-0997cb5328c1?w=400&q=80", inStock: true },
+            { id: 104, title: "Modular IoT Secure Access Camera Node", price: 189.00, category: "Security", img: "https://images.unsplash.com/photo-1557862921-37829c790f19?w=400&q=80", inStock: true },
+            { id: 105, title: "Digital Platform Integration Core License Token", price: 29.00, category: "Digital", img: "", inStock: true }
+        ];
+
+        window.CozyCartEngine = window.CozyCartEngine || {
+            items: [],
+            add(product) {
+                this.items.push(product);
+                document.dispatchEvent(new CustomEvent('cozy-cart-updated'));
+                // Native IndexedDB / Offline Cache backup sync emulation step
+                localStorage.setItem('cozy_offline_cart_buffer', JSON.stringify(this.items));
+            }
+        };
+    </script>
+
+    <!-- Connect local engine control handlers -->
+    <script>
+        let currentSelectedCategory = 'all';
+
+        function renderStoreFront(productsArray) {
+            const grid = document.getElementById('productGrid');
+            grid.innerHTML = '';
+            
+            if(productsArray.length === 0) {
+                grid.innerHTML = `<div style="grid-column:1/-1; padding:40px; text-align:center; color:var(--text-muted);">No corresponding items found matching execution parameters.</div>`;
+                return;
+            }
+
+            // High performance localized layout mapping with lazy rendering fallback properties intact
+            productsArray.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'product-card glass-panel';
+                card.innerHTML = `
+                    <img class="product-img" src="${p.img || 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=400&q=80'}" alt="${p.title}" loading="lazy">
+                    <div class="product-details">
+                        <span style="font-size:11px; text-transform:uppercase; color:var(--emerald); font-weight:700;">${p.category}</span>
+                        <div class="product-title">${p.title}</div>
+                        <div class="product-meta">
+                            <span class="product-price">$${p.price.toFixed(2)}</span>
+                            <button class="btn-core btn-gold" style="padding:6px 12px; font-size:12px;" onclick="addItemToEcosystemCart(${p.id})">Add to Segment</button>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function triggerSearchFilter() {
+            const q = document.getElementById('storeSearch').value.toLowerCase();
+            const range = document.querySelector('input[name="priceRange"]:checked').value;
+            
+            let dataset = window.CozyProductsDatabase;
+
+            if(currentSelectedCategory !== 'all') {
+                dataset = dataset.filter(p => p.category === currentSelectedCategory);
+            }
+
+            if(q) {
+                dataset = dataset.filter(p => p.title.toLowerCase().includes(q) || p.category.toLowerCase().includes(q));
+            }
+
+            if(range !== 'all') {
+                if(range === '0-50') dataset = dataset.filter(p => p.price <= 50);
+                if(range === '50-200') dataset = dataset.filter(p => p.price > 50 && p.price <= 200);
+                if(range === '200+') dataset = dataset.filter(p => p.price > 200);
+            }
+
+            renderStoreFront(dataset);
+        }
+
+        function filterCategory(cat, el) {
+            document.querySelectorAll('.category-chip').forEach(c => c.classList.remove('active'));
+            el.classList.add('active');
+            currentSelectedCategory = cat;
+            triggerSearchFilter();
+        }
+
+        function addItemToEcosystemCart(id) {
+            const product = window.CozyProductsDatabase.find(p => p.id === id);
+            if(product) {
+                window.CozyCartEngine.add(product);
+                alert(`${product.title} verified and assigned to workspace transaction stack.`);
+            }
+        }
+
+        document.addEventListener('cozy-cart-updated', () => {
+            const items = window.CozyCartEngine.items;
+            document.getElementById('cartCount').innerText = items.length;
+            
+            const container = document.getElementById('cartItemsContainer');
+            if(items.length === 0) {
+                container.innerHTML = `<p style="color:var(--text-muted); font-size:14px;">Your system checkout cart sequence is empty.</p>`;
+                return;
+            }
+
+            container.innerHTML = items.map((item, idx) => `
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:8px;">
+                    <div>
+                        <div style="font-size:13px; font-weight:600;">${item.title}</div>
+                        <div style="font-size:12px; color:var(--gold); font-family:'Space Grotesk';">$${item.price.toFixed(2)}</div>
+                    </div>
+                    <button class="icon-btn" style="color:#ef4444;" onclick="window.CozyCartEngine.items.splice(${idx},1); document.dispatchEvent(new CustomEvent('cozy-cart-updated'));"><i data-feather="trash-2" style="width:14px;"></i></button>
+                </div>
+            `).join('');
+            
+            feather.replace();
+
+            // Calculate Ledger balance matrix parameters
+            const sub = items.reduce((acc, current) => acc + current.price, 0);
+            document.getElementById('cartSubtotal').innerText = `$${sub.toFixed(2)}`;
+            document.getElementById('cartTotal').innerText = `$${sub.toFixed(2)}`;
+        });
+
+        function toggleDrawer(id) {
+            document.getElementById(id).classList.toggle('open');
+        }
+
+        function scrollToCatalog() {
+            document.getElementById('catalogFrame').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function executeCheckout() {
+            if(window.CozyCartEngine.items.length === 0) {
+                alert("Transaction stack buffer space is clean. Add inventory units before validation execution mapping.");
+                return;
+            }
+            alert("Routing processing tokens securely to main Firebase integration gateway pipeline...");
+        }
+
+        // Conversational Engine Simulation Interface Matrix
+        const aiWindow = document.getElementById('aiWindow');
+        const aiShopBody = document.getElementById('aiShopBody');
+        const aiShopInput = document.getElementById('aiShopInput');
+
+        function toggleAIWindow() { aiWindow.classList.toggle('active'); if(aiWindow.classList.contains('active')) aiShopInput.focus(); }
+
+        function sendAiShopMessage() {
+            const val = aiShopInput.value.trim();
+            if(!val) return;
+
+            aiShopBody.innerHTML += `<p style="margin-bottom:8px; color:white;"><strong>You:</strong> ${val}</p>`;
+            aiShopInput.value = '';
+            
+            const tokens = val.toLowerCase();
+
+            setTimeout(() => {
+                if(tokens.includes('solar')) {
+                    aiShopBody.innerHTML += `<p style="margin-bottom:8px; color:var(--gold);"><strong>AI:</strong> Isolation algorithm extraction confirmed. Pulling up 'High-Efficiency Solar Array Light Pack'. Filtering active store catalogs automatically.</p>`;
+                    document.getElementById('storeSearch').value = 'solar';
+                    triggerSearchFilter();
+                } else if(tokens.includes('flask')) {
+                    aiShopBody.innerHTML += `<p style="margin-bottom:8px; color:var(--gold);"><strong>AI:</strong> Located thermal retention storage devices matching 'Cozy Cabin Insulated Thermal Flask Array'.</p>`;
+                    document.getElementById('storeSearch').value = 'flask';
+                    triggerSearchFilter();
+                } else {
+                    aiShopBody.innerHTML += `<p style="margin-bottom:8px; color:var(--gold);"><strong>AI:</strong> Categorization indexing completed. Parsing system matrix query options over local product arrays.</p>`;
+                }
+                aiShopBody.scrollTop = aiShopBody.scrollHeight;
+            }, 600);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            feather.replace();
+            renderStoreFront(window.CozyProductsDatabase);
+            
+            // Rehydrate structural offline state components if found safely in browser environment layers
+            const localCachedBuffer = localStorage.getItem('cozy_offline_cart_buffer');
+            if(localCachedBuffer) {
+                try {
+                    window.CozyCartEngine.items = JSON.parse(localCachedBuffer);
+                    document.dispatchEvent(new CustomEvent('cozy-cart-updated'));
+                } catch(e) { console.error("Rehydration sequence dropped initialization keys.", e); }
+            }
+        });
+    </script>
+</body>
+</html>
+
