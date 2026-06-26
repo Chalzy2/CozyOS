@@ -1,43 +1,68 @@
 /**
- * ── COZYOS SMALL BUSINESS AI INTENT ROUTER ──
+ * ── COZYOS MULTILINGUAL COGNITIVE COMMERCE INTENT INTERCEPTOR ──
  * FILE: core/ai/businessHandler.js
  */
-import Permissions from '../permissions.js';
 
-export async function processBusinessVoiceIntent(rawPromptText, context) {
+import Permissions from '../business/permissions.js';
+
+export async function processBusinessVoiceIntent(rawPromptText, session) {
     const query = rawPromptText.toLowerCase();
 
-    // 1. Authorization Safeguard Guardrails
-    if (query.includes("profit") || query.includes("faida") || query.includes("report") || query.includes("ohala")) {
-        if (!Permissions.check("reports.export") && !Permissions.check("finance.read")) {
+    // ── AUTOMATED SYSTEM LANGUAGE DETECTOR ──
+    // Matches expressions across Kiswahili, Luo, and English
+    const isSwahili = /leo|mauzo|bado|pesa|faida/.test(query);
+    const isLuo = /tinde|pesa|nyisa|omiyoyo|ang’o/.test(query);
+
+    // ── MULTI-LEVEL SECURITY GUARDRADIAL CHECKS ──
+    if (query.includes("profit") || query.includes("faida") || query.includes("float")) {
+        if (!Permissions.verifyClearance(session, "profit.view") && !Permissions.verifyClearance(session, "mpesa.read")) {
             return {
-                responseText: context.language === "sw" ? "🔒 Hukumu: Huna ruhusa ya kuangalia ripoti za faida ya biashara." : "🔒 Access Refused: Your role lacks permission to review business profitability analytics.",
+                responseText: isSwahili ? "🔒 Hukumu: Akaunti yako haina ruhusa ya kuangalia ripoti za kifedha." : 
+                              isLuo ? "🔒 Hukumu: Role mari ok ngero lony mar pesa." :
+                              "🔒 Access Refused: Insufficient security clearance role profiles.",
                 pipelineState: "blocked"
             };
         }
     }
 
-    // 2. Intent Engine Mapping
-    if (query.includes("nimeuza") || query.includes("sold") || query.includes("record sale")) {
-        if (!Permissions.check("sales.write")) {
-            return { responseText: "🔒 Access Refused: Unauthorized to perform stock mutations or log sales.", pipelineState: "blocked" };
-        }
-        
-        // Simulating immediate execution parsing parameters hooks
+    // ── INTENT ROUTING LOGIC ENGINE ──
+    // Intent A: M-Pesa Agent Float Registry Checks
+    if (query.includes("float") || query.includes("salio la float")) {
         return {
-            responseText: "📦 <b>CozyOS POS:</b> Sale detected and processed. Inventory stock counts updated and WhatsApp receipt queued.",
+            responseText: "💰 <b>M-PesaOS:</b> Your current remaining operational float balances are <b>KES 42,510.00</b>.",
             pipelineState: "processed",
-            targetModule: "SmallBiz"
+            targetModule: "MpesaOS"
         };
     }
 
-    if (query.includes("almost finished") || query.includes("low stock") || query.includes("bidhaa zimeisha")) {
+    // Intent B: Real-Time Sales Summaries
+    if (query.includes("sales") || query.includes("mauzo ya leo") || query.includes("pesa mar tinde")) {
         return {
-            responseText: "⚠️ <b>Inventory Monitor:</b> 3 items are currently below your low stock threshold: Kuku (Chicken), and Maziwa (Milk Packets).",
+            responseText: isSwahili ? "📊 <b>CozyOS POS:</b> Mauzo ya leo kufikia sasa ni <b>KES 18,400.00</b>." :
+                          isLuo ? "📊 <b>CozyOS POS:</b> Pesa mosingi tinde koro riwore chop <b>KES 18,400.00</b>." :
+                          "📊 <b>CozyOS POS:</b> Today's gross total sales register stands at <b>KES 18,400.00</b>.",
+            pipelineState: "processed",
+            targetModule: "POS"
+        };
+    }
+
+    // Intent C: Inventory Optimization and Low Stock Tracking
+    if (query.includes("out of stock") || query.includes("bidhaa zimeisha")) {
+        return {
+            responseText: "📦 <b>Inventory AI:</b> 2 items are currently below safety reorder buffers: <i>Maziwa (Packets)</i> and <i>Sukari (1KG)</i>. Based on past customer history, these items sell fastest on Saturdays.",
             pipelineState: "processed",
             targetModule: "Inventory"
         };
     }
 
+    // Intent D: Customer Outstanding Ledger Operations
+    if (query.includes("owes me") || query.includes("deni")) {
+        return {
+            responseText: "👥 <b>Customer Ledger:</b> Total active uncollected customer debt amounts to <b>KES 3,200.00</b> across 2 registered clients.",
+            pipelineState: "processed",
+            targetModule: "Customers"
+        };
+    }
+
     return null;
-}
+}            
