@@ -1,106 +1,71 @@
 /**
- * ── COZYOS CENTRAL USER SESSION & SECURITY KERNEL ──
- * DOMAIN: core/permissions.js
- * REFERENCE: CozyOS_Universal_Session_Identity_Kernel_Production_Upgrade.pdf
+ * ── COZYOS RBAC AND SYSTEM LOCALIZATION INTERACTION MATRIX ──
+ * FILE: core/permissions.js
  */
 
-import { db } from './firebase.js';
-import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js';
 import AuditLogger from './audit.js';
 
-// Initialize the root namespace safely
-window.CozyOS = window.CozyOS || {};
-window.CozyOS.Session = window.CozyOS.Session || null;
+// 2.2 ROLES ACCESS DICTIONARY PERMISSION SCHEMAS
+const ROLE_PERMISSIONS = {
+    "Principal": ["dashboard", "finance", "students", "teachers", "reports", "billing", "settings", "wellbeing_admin"],
+    "Accountant": ["finance", "fees", "receipts", "reports"],
+    "Teacher": ["students", "attendance", "exams", "report_cards", "wellbeing_write"],
+    "Parent": ["children_view", "fee_balance", "report_cards_view", "announcements", "wellbeing_view"],
+    "Student": ["homework", "results", "timetable", "wellbeing_self"]
+};
+
+// 2.4 DYNAMIC SYSTEM MULTI-LANGUAGE TRANSLATION DICTIONARY
+export const LOCALIZATION_ENGINE = {
+    en: { dashboard: "Control Dashboard", finance: "Finance", balance: "Fee Balance", alerts: "Wellbeing Alerts" },
+    sw: { dashboard: "Mawasiliano ya Dashibodi", finance: "Uhasibu", balance: "Salio la Karo", alerts: "Taarifa za Ustawi" },
+    luo: { dashboard: "Malo weche Dashboard", finance: "Pesa", balance: "Gowi mar Karo", alerts: "Weche Maendeleo" },
+    ki: { dashboard: "Metha ya Utongoria", finance: "Mbeca", balance: "Thiiri wa Thuruuru", alerts: "Ustawi wa Ciana" },
+    km: { dashboard: "Kavuku ka Utongoria", finance: "Mbesa", balance: "Thiri wa Usulu", alerts: "Uima wa Kana" }
+};
 
 export default {
     /**
-     * CENTRAL LIFECYCLE INITIALIZER (Steps 1-8)
-     * Compiles the comprehensive multi-tenant session matrix[span_3](start_span)[span_3](end_span).
+     * VERIFY RESOURCE ROUTE ACCESS PRIVILEGES
      */
-    async initializeUserSession(authUserData, deviceId = "client_browser_shell") {
-        const startTime = Date.now();
-        
-        try {
-            // Read deep corporate metadata records from Cloud Firestore
-            const userRef = doc(db, 'users', authUserData.uid);
-            const userSnap = await getDoc(userRef);
-            
-            if (!userSnap.exists()) {
-                throw new Error("Security Exception: Core registration metadata missing.");
-            }
-            
-            const profileData = userSnap.data();
+    check(requiredPermission) {
+        const session = window.CozyOS?.Session;
+        if (!session) return false;
 
-            // Establish the definitive Global Session Object Schema[span_4](start_span)[span_4](end_span)
-            window.CozyOS.Session = {
-                authenticated: true,
-                userId: authUserData.uid,
-                organizationId: profileData.organizationId || "",
-                workspaceId: profileData.workspaceId || "",
-                industry: profileData.industry || "general", // e.g., 'school', 'hotel', 'shop'
-                organizationName: profileData.organizationName || "CozyOS Workspace",
-                role: profileData.role || "guest",
-                permissions: profileData.permissions || [], // Array of fine-grained scope strings
-                language: profileData.language || "en",
-                timezone: profileData.timezone || "Africa/Nairobi",
-                currency: profileData.currency || "KES",
-                country: profileData.country || "KE",
-                subscriptionPlan: profileData.subscriptionPlan || "standard",
-                tenantId: `${profileData.industry || 'ind'}_${profileData.organizationId || 'org'}`,
-                deviceId: deviceId,
-                sessionId: `sess_${Math.random().toString(36).substring(2, 15)}_${Date.now()}`,
-                onlineStatus: navigator.onLine ? "online" : "offline",
-                lastSyncTime: new Date().toISOString(),
-                theme: profileData.theme || "premium-dark",
-                profile: { name: profileData.name || "", email: authUserData.email || "" },
-                avatar: profileData.avatar || "",
-                featureFlags: profileData.featureFlags || {},
-                aiCapabilities: profileData.aiCapabilities || { allowedTokens: ["ai.execute"] },
-                metadata: { initializationLatencyMs: Date.now() - startTime }
-            };
+        const userRole = session.profile?.role;
+        const permittedScopes = ROLE_PERMISSIONS[userRole] || [];
 
-            // Hook into external UI translation mechanisms if present
-            if (window.CozyOS.LanguageEngine?.setLocale) {
-                window.CozyOS.LanguageEngine.setLocale(window.CozyOS.Session.language);
-            }
+        return permittedScopes.includes(requiredPermission);
+    },
 
-            await AuditLogger.log("Login", "CozyOS Global Session initialized and actively cached.");
-            return window.CozyOS.Session;
-            
-        } catch (error) {
-            console.error("🚨 Kernel Boot Failure: Session compilation tracing failed.", error);
-            throw error;
+    /**
+     * 2.3 & 2.4 DYNAMIC SIDEBAR RENDERER
+     * Automatically translates labels and strips unauthorized modules completely from the DOM
+     */
+    compileAccessibleSidebar(targetElementId) {
+        const session = window.CozyOS?.Session;
+        const el = document.getElementById(targetElementId);
+        if (!session || !el) return;
+
+        const lang = session.profile?.language || "en";
+        const dictionary = LOCALIZATION_ENGINE[lang] || LOCALIZATION_ENGINE.en;
+        const permittedScopes = ROLE_PERMISSIONS[session.profile.role] || [];
+
+        let sidebarHtml = "";
+
+        // Conditionally compile DOM nodes only if the role profile possesses explicit clearance
+        if (permittedScopes.includes("dashboard")) {
+            sidebarHtml += `<li><a href="#dash">📊 ${dictionary.dashboard}</a></li>`;
         }
-    },
+        if (permittedScopes.includes("finance")) {
+            sidebarHtml += `<li><a href="#fin">💰 ${dictionary.finance}</a></li>`;
+        }
+        if (permittedScopes.includes("wellbeing_view") || permittedScopes.includes("wellbeing_write") || permittedScopes.includes("wellbeing_admin")) {
+            sidebarHtml += `<li><a href="#well">🌱 ${dictionary.alerts}</a></li>`;
+        }
 
-    /**
-     * CLEAR OPERATOR SESSION STATE
-     */
-    async clearSession() {
-        await AuditLogger.log("Logout", "Terminating active global session context safely.");
-        window.CozyOS.Session = null;
-    },
-
-    /**
-     * FINE-GRAINED ACTION SCOPE CHECKER
-     * Enforces explicit permission rules globally across layout files[span_5](start_span)[span_5](end_span).
-     */
-    check(scopeToken) {
-        if (!window.CozyOS.Session || !window.CozyOS.Session.authenticated) return false;
-        
-        // Root developer override configuration
-        if (window.CozyOS.Session.permissions.includes("admin.all")) return true;
-        
-        // Match fine-grained string tokens (e.g., 'finance.write', 'students.read')[span_6](start_span)[span_6](end_span)
-        return window.CozyOS.Session.permissions.includes(scopeToken);
+        el.innerHTML = sidebarHtml;
     }
 };
 
-// Expose verification endpoints globally to satisfy the universal specification[span_7](start_span)[span_7](end_span)
-window.CozyOS.Permissions = {
-    check: (token) => {
-        if (!window.CozyOS.Session) return false;
-        if (window.CozyOS.Session.permissions.includes("admin.all")) return true;
-        return window.CozyOS.Session.permissions.includes(token);
-    }
-};
+window.CozyOS = window.CozyOS || {};
+window.CozyOS.Permissions = module.exports.default;
