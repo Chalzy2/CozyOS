@@ -1,58 +1,97 @@
 /**
- * ── COZYOS DYNAMIC DASHBOARD RENDERER BOOTSTRAPPER ──
- * VERSION: 15.0.0 (Production Performance Isolation Script)
+ * ── COZYOS CORE INTERFACE DASHBOARD MATRICES COMPILER ──
  * DOMAIN: core/dashboard.js
+ * REFERENCE: CozyOS_Universal_Session_Identity_Kernel_Production_Upgrade.pdf
  */
 
 import Permissions from './permissions.js';
-import Logger from './logger.js';
+
+// Complete dictionary of secure layout elements
+const COMPONENT_REGISTRY = {
+    // School Management Module Widgets
+    school_analytics: {
+        scope: "students.read",
+        title: "Academic Registry Insights",
+        html: `<div class="cozy-dashboard-card" style="border-top: 3px solid #C5A059;">
+                <h4 style="color:#C5A059; margin:0 0 10px 0;">Academy Tracker</h4>
+                <p style="font-size:24px; font-weight:bold; margin:5px 0;">1,420</p>
+                <span style="color:#888; font-size:12px;">Active Students Validated</span>
+               </div>`
+    },
+    // Financial Ledger Records Widgets
+    finance_ledger: {
+        scope: "finance.write",
+        title: "Executive Wallet & Clearing Metrics",
+        html: `<div class="cozy-dashboard-card" style="border-top: 3px solid #10b981;">
+                <h4 style="color:#10b981; margin:0 0 10px 0;">Revenue Streams</h4>
+                <p style="font-size:24px; font-weight:bold; margin:5px 0;">KES 2.4M</p>
+                <span style="color:#888; font-size:12px;">Settled Vault Clearings</span>
+               </div>`
+    },
+    // E-Commerce & Smart Living Inventory Widgets
+    inventory_matrix: {
+        scope: "inventory.manage",
+        title: "Smart Living Systems Control panel",
+        html: `<div class="cozy-dashboard-card" style="border-top: 3px solid #3b82f6;">
+                <h4 style="color:#3b82f6; margin:0 0 10px 0;">Inventory Management</h4>
+                <p style="font-size:24px; font-weight:bold; margin:5px 0;">184 Units</p>
+                <span style="color:#888; font-size:12px;">Solar Floodlights Stock Array</span>
+               </div>`
+    }
+};
 
 export default {
     /**
-     * DYNAMIC DOM LAYER COMPILING PIPELINE
-     * Mounts only the precise user dashboard view context, completely skipping forbidden components.
+     * BOOTSTRAP DASHBOARD VIEWS
+     * Compiles layout blocks safely based on active session access levels[span_9](start_span)[span_9](end_span).
      */
-    async bootstrapDashboardShell() {
-        Logger.info("Shell Engine", "Beginning dynamic system dashboard rendering loop...");
+    async bootstrapDashboardShell(session = window.CozyOS.Session) {
+        if (!session) throw new Error("Interface Boot Error: Active user operational session state untraceable.");
 
-        const navigationContainer = document.getElementById("cozy-sidebar-nav");
-        const dashboardGridContainer = document.getElementById("cozy-dashboard-grid");
+        const navContainer = document.getElementById("cozy-sidebar-nav");
+        const gridContainer = document.getElementById("cozy-dashboard-grid");
 
-        if (!navigationContainer || !dashboardGridContainer) {
-            Logger.warn("Shell Engine", "Awaiting viewport structure DOM bindings anchor nodes.");
-            return;
+        if (!navContainer || !gridContainer) return;
+
+        // Clear layout canvas to avoid duplicate interface artifacts
+        navContainer.innerHTML = "";
+        gridContainer.innerHTML = "";
+
+        // Iterate through system layout definitions and check permission rules dynamically
+        for (const [key, element] of Object.entries(COMPONENT_REGISTRY)) {
+            
+            // Execute security checks using the fine-grained scope engine[span_10](start_span)[span_10](end_span)
+            if (Permissions.check(element.scope)) {
+                
+                // 1. Mount Navigation Links to Sidebar Elements
+                const navItem = document.createElement("li");
+                navItem.innerHTML = `
+                    <a href="#${key}" style="display:block; color:#ccc; text-decoration:none; padding:10px 15px; border-radius:4px; font-size:14px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05);">
+                        • ${element.title}
+                    </a>
+                `;
+                navContainer.appendChild(navItem);
+
+                // 2. Mount Metric Cards into the Viewport Grid Canvas Area
+                const rangeWrapper = document.createElement("div");
+                rangeWrapper.innerHTML = element.html;
+                gridContainer.appendChild(rangeWrapper.firstElementChild);
+            } else {
+                console.log(`ℹ️ System Compiler: Excluded block [${key}] due to missing [${element.scope}] permission scope.`);
+            }
         }
 
-        // Clear out fallback templates completely to prevent markup flashing
-        navigationContainer.innerHTML = "";
-        dashboardGridContainer.innerHTML = "";
-
-        // 1. Dynamic Menu Sidebar Item Iteration Loop
-        const userAllowedModules = Permissions.getAllowedModules(); // Array format: ['Students', 'Teachers', 'AI']
-        
-        userAllowedModules.forEach(modKey => {
-            const navItem = document.createElement("li");
-            navItem.className = "cozy-nav-item";
-            navItem.innerHTML = `<a href="${modKey.toLowerCase()}.html" class="nav-link"><span>${modKey}</span></a>`;
-            navigationContainer.appendChild(navItem);
-        });
-
-        // 2. Dynamic Interface Dashboard Component Grid Card Injection Loop
-        const userAllocatedCards = Permissions.getDashboardCards(); // Array format: [{id:'card_fees', label:'Fees Tracker'}]
-        
-        userAllocatedCards.forEach(card => {
-            const cardEl = document.createElement("div");
-            cardEl.className = "cozy-dashboard-card premium-accent";
-            cardEl.id = card.id;
-            cardEl.innerHTML = `
-                <div class="card-header"><h4>${card.label}</h4></div>
-                <div class="card-content-viewport" id="viewport_${card.id}">
-                    <p class="placeholder-text">Syncing modular parameters...</p>
+        // Handle empty dashboard views gracefully
+        if (gridContainer.children.length === 0) {
+            gridContainer.innerHTML = `
+                <div style="grid-column: 1/-1; padding: 40px; text-align: center; border: 1px dashed #333; border-radius: 8px;">
+                    <p style="color:#777; margin:0;">Operational desk empty. You don't have active authorization scopes configured for this tenant workspace view.</p>
                 </div>
             `;
-            dashboardGridContainer.appendChild(cardEl);
-        });
-
-        Logger.info("Shell Engine", `Dynamic Shell Build Complete. Mounted [${userAllowedModules.length}] modules securely.`);
+        }
     }
+};
+
+window.CozyOS.DashboardShell = {
+    bootstrap: async () => { return await module.exports.default.bootstrapDashboardShell(); }
 };
