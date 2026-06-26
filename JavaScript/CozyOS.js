@@ -1,7 +1,4 @@
-/**
- * ── COZYOS CENTRAL KERNEL CORE ──
- * VERSION: 4.0.0 (AI-First, Production Stable Engine)
- * ARCHITECTURE: Monolithic Global Namespace Abstraction Layer
+onolithic Global Namespace Abstraction Layer
  */
 
 const CozyOS = (function() {
@@ -240,3 +237,30 @@ const CozyOS = (function() {
 window.CozyOS = CozyOS;
 
                   
+/**
+ * ── COZYOS REVOLUTIONARY LIGHTWEIGHT BOOTSTRAP ──
+ * VERSION: 7.0.0 (Production Architecture)
+ */
+(function() {
+    // Early allocation namespace stubbing to prevent script race condition errors in layouts
+    const CozyOS = { _bootstrapped: false };
+    const apis = ['AI','Storage','Auth','Security','Notifications','Analytics','Router','Plugins','Cache','Sync','Documents','Media','Wallet','CRM','Affiliate','Studio3D','Academy','Settings','Logger','Permissions','Scheduler','Telemetry','Updates'];
+    apis.forEach(api => { CozyOS[api] = {}; });
+
+    CozyOS.init = async function() {
+        if (this._bootstrapped) return true;
+        console.log("🌌 [CozyOS Bootstrap] Igniting Microkernel Payload Loader...");
+        try {
+            const kernelMod = await import('./core/kernel.js');
+            window.CozyOS = kernelMod.default;
+            await window.CozyOS.bootSequence();
+            this._bootstrapped = true;
+            return true;
+        } catch (panic) {
+            console.error("🚨 [Bootstrap Panic] Base Core Loader Severed:", panic);
+            return false;
+        }
+    };
+
+    window.CozyOS = CozyOS;
+})();
