@@ -1,7 +1,7 @@
 /**
- * ── COZYOS AI MULTI-TENANT SECURE GATEWAY ──
- * SERVICE DOMAIN: core/ai.js
- * REFERENCES: 665035.jpg, 665036.jpg, 665039.jpg, 665040.jpg
+ * ── COZYOS CORE MULTI-TENANT AI OPERATIONS GATEWAY ──
+ * DOMAIN: core/ai.js
+ * REFERENCE: [source: 1]
  */
 
 import Permissions from './permissions.js';
@@ -10,67 +10,67 @@ import Config from './config.js';
 
 export default {
     /**
-     * Sequential execution chain matching 665035.jpg and 665036.jpg workflows.
+     * Entry hook endpoint from [source: 1]: CozyOS.AI.execute({module, action, payload})
      */
-    async execute(promptString, operationalModule = "general") {
-        const session = Permissions.getSession();
+    async execute({ module = "General", action = "readState", payload = {} }) {
+        const session = window.CozyOS.Session;
 
-        // 1. Check Login
-        if (!session) {
-            throw new Error("🚫 Security Exception: Unauthenticated execution request rejected.");
+        // 1. Validate Session Authentication Boundary
+        if (!session || !session.authenticated) {
+            throw new Error("🚫 Security Intercept: Context structure uninitialized or unauthenticated.");
         }
 
-        // 2. Check Workspace & Tenant Isolation Boundaries (Ref: 665039.jpg / 665040.jpg)
-        // System enforces that the execution scope remains locked inside the logged-in user's context
-        const tenantContextId = session.organizationId;
-        const activeWorkspaceId = session.workspaceId;
+        // 2. Universal Multi-Tenant Cross-Contamination Guard Frame Check
+        const targetOrgCheck = payload.organizationId || session.organizationId;
+        const targetWorkspaceCheck = payload.workspaceId || session.workspaceId;
 
-        // 3. Check Role & 4. Check Granular Permission Tokens
-        if (!Permissions.hasToken("ai.execute")) {
-            await AuditLogger.log("AI request denied", `Unauthorized attempt: Prompt [${promptString}]`);
-            throw new Error("🚫 Access Denied: Account lacks granular 'ai.execute' token authorization.");
+        if (targetOrgCheck !== session.organizationId || targetWorkspaceCheck !== session.workspaceId) {
+            await AuditLogger.log("Security Exception", `Cross-Tenant boundary access blocked for User ${session.userId}`);
+            throw new Error("🚨 Cross-Tenant Security Block: Execution aborted. Attempted resource access outside tenant workspace context.");
         }
 
-        // Module specific permission intercept checks (Ref: 665034.jpg)
-        if (operationalModule === "finance" && !Permissions.hasToken("finance.read")) {
-            throw new Error("🚫 Access Denied: Account lacks permission to access financial ledger states.");
+        // 3. Enforce Fine-Grained Active Scope Permissions Token Matrix Checks
+        if (!Permissions.check("ai.execute")) {
+            throw new Error(`🚫 Access Blocked: Context account is missing explicit fine-grained string token 'ai.execute'.`);
         }
 
-        // 5. Execute with isolated organizational memories (Ref: 665039.jpg)
-        const responseText = await this._dispatchToIsolatedLLM(promptString, session);
+        // Module operational checkpoint (e.g., finance.read scope validation verification checks)
+        if (module.toLowerCase() === "finance" && !Permissions.check("finance.read")) {
+            throw new Error(`🚫 Access Blocked: Operational request context missing required 'finance.read' scope token validation profile.`);
+        }
 
-        // 6. Audit Log (Ref: 665036.jpg)
-        await AuditLogger.log("AI request", `Prompt: "${promptString.substring(0, 30)}..." -> Action complete.`);
+        // 4. Handle Offline Execution Scopes
+        if (!navigator.onLine) {
+            if (window.CozyOS.SyncEngine?.enqueueMutation) {
+                await window.CozyOS.SyncEngine.enqueueMutation("queued_ai_jobs", "SET", {
+                    id: `ai_${Date.now()}`, module, action, payload, processed: false
+                });
+                return "Task cached locally. Synchronization will process automatically when network connectivity returns.";
+            }
+            throw new Error("🚨 Connectivity Intercept: Offline. Request dropped because storage queues are disconnected.");
+        }
 
-        // 7. Return Response
-        return responseText;
-    },
+        // 5. Fire Request with Isolated Context Variables
+        try {
+            const resultText = await this._dispatchToIsolatedLLM(module, action, payload, session);
 
-    async _dispatchToIsolatedLLM(prompt, session) {
-        // Structuring system instruction limits to lock out foreign data sets entirely
-        const systemInstruction = `
-            You are the dedicated CozyOS AI Assistant for ${session.organizationId}. 
-            Your operational industry domain is strictly: [${session.industry.toUpperCase()}].
-            You have absolutely no knowledge of or access to other organizations, schools, or hotels.
-            Current user identifier: ${session.userId} operating with Role: ${session.role}.
-            Respond natively in the user's preferred language code: "${session.language}".
-        `;
+            // 6. Record Ledger Entry Trail (Audit System Hook)
+            await AuditLogger.log("AI request", `Executed [${module}:${action}] for Session ID: ${session.sessionId}`);
 
-        const targetApiKey = Config.apiKeys?.gemini;
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${targetApiKey}`;
-
-        const payload = {
-            contents: [{ role: "user", parts: [{ text: `${systemInstruction}\n\nUser Query: ${prompt}` }] }]
-        };
-
-        const response = await fetch(endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) throw new Error("AI Runtime infrastructure experienced a connection interruption.");
-        const resultJson = await response.json();
-        return resultJson?.candidates?.[0]?.content?.parts?.[0]?.text || "No output generated.";
+            return resultText;
+        } catch (fault) {
+            console.error("AI Node Execution Defect Trace:", fault);
+            throw fault;
+        }
     }
 };
+
+// Bind directly into system core global context array maps
+window.CozyOS.AI = {
+    execute: async (argsObject) => {
+        const moduleInstance = await import('./ai.js');
+        return await moduleInstance.default.execute(argsObject);
+    }
+};        
+
+        
