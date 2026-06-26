@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CozyOS Print Center — Academic Document Generation Gateway</title>
+    <link rel="stylesheet" href="css/theme.css"> <!-- Uses existing CozyOS Premium Emerald/Gold Theme Structure -->
+    <style>
+        :root { --emerald: #002B1B; --gold: #C5A059; --onyx: #111111; }
+        body { margin: 0; background-color: var(--onyx); color: #fff; font-family: 'Inter', system-ui, sans-serif; }
+        .cozy-print-dashboard { display: grid; grid-template-columns: 350px 1fr; min-height: 100vh; }
+        .control-pane { background: #161616; padding: 25px; border-right: 1px solid rgba(197, 160, 89, 0.15); }
+        .preview-pane { padding: 40px; background: #222; display: flex; justify-content: center; overflow-y: auto; }
+        .paper-canvas { background: #fff; box-shadow: 0 10px 30px rgba(0,0,0,0.5); transform-origin: top center; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .paper-canvas.a4.portrait { width: 210mm; height: 297mm; }
+        .paper-canvas.a4.landscape { width: 297mm; height: 210mm; }
+        .paper-canvas.a5 { width: 148mm; height: 210mm; }
+        .interactive-input { width: 100%; padding: 12px; background: #0b0b0b; border: 1px solid #333; border-radius: 6px; color: #fff; margin-bottom: 15px; box-sizing: border-box; }
+        .interactive-input:focus { border-color: var(--gold); outline: none; }
+        .cozy-btn-gold { width: 100%; padding: 14px; background: var(--gold); border: none; font-weight: bold; color: #000; text-transform: uppercase; letter-spacing: 1px; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
+        .cozy-btn-gold:hover { background: #e0b86c; }
+        
+        @media print {
+            body, .cozy-print-dashboard { background: #fff; color: #000; display: block; }
+            .control-pane { display: none !important; }
+            .preview-pane { padding: 0; background: #fff; overflow: visible; }
+            .paper-canvas { box-shadow: none; width: 100% !important; height: auto !important; transform: none !important; margin: 0; padding: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="cozy-print-dashboard">
+    <!-- Controls Configurator Panel Left -->
+    <div class="control-pane">
+        <h2 style="color: var(--gold); margin-top:0;">🖨️ Academic Print Center</h2>
+        <p style="font-size:12px; color:#aaa;">Generate secure verified certificates, report sheets, and admission matrices.</p>
+        <hr style="border:0; border-top:1px solid #222; margin:20px 0;">
+
+        <label style="font-size:12px; font-weight:bold; color:var(--gold);">DOCUMENT TEMPLATE SELECTOR</label>
+        <select id="docTemplate" class="interactive-input" onchange="refreshPreview()">
+            <option value="admission_form">Admission Entry Form</option>
+            <option value="report_card">Report Performance Card</option>
+            <option value="fee_statement">Financial Fee Statement</option>
+        </select>
+
+        <label style="font-size:12px; font-weight:bold; color:var(--gold);">PAGE LAYOUT SPECIFICATION</label>
+        <select id="docLayout" class="interactive-input" onchange="applyLayoutChange()">
+            <option value="a4-portrait">A4 Paper (Portrait Orientation)</option>
+            <option value="a4-landscape">A4 Paper (Landscape Orientation)</option>
+            <option value="a5-portrait">A5 Paper (Compact Form Factor)</option>
+        </select>
+
+        <label style="font-size:12px; font-weight:bold; color:var(--gold);">TARGET STUDENT NAME</label>
+        <input type="text" id="studentName" class="interactive-input" value="Abdi Ibrahim" oninput="refreshPreview()" />
+
+        <label style="font-size:12px; font-weight:bold; color:var(--gold);">ADMISSION NUMBER / ID</label>
+        <input type="text" id="admNumber" class="interactive-input" value="KFI-2026-8891" oninput="refreshPreview()" />
+
+        <label style="font-size:12px; font-weight:bold; color:var(--gold);">ACADEMIC MEMO REMARKS</label>
+        <textarea id="remarksData" class="interactive-input" style="height:80px;" oninput="refreshPreview()">Top proficiency displayed in regional coding and algorithmic thinking modules.</textarea>
+
+        <button class="cozy-btn-gold" onclick="window.print()">Spool Batch Print Job</button>
+    </div>
+
+    <!-- Active Template Canvas Display Right -->
+    <div class="preview-pane">
+        <div id="printCanvas" class="paper-canvas a4 portrait">
+            <!-- Dynamic Document Template Core Spreads Here -->
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import TemplateEngine from './core/templates.js';
+
+    window.refreshPreview = function() {
+        const type = document.getElementById("docTemplate").value;
+        const studentName = document.getElementById("studentName").value;
+        const admNumber = document.getElementById("admNumber").value;
+        const remarks = document.getElementById("remarksData").value;
+
+        // Fetch School profile context parameters safely from active global school configurations
+        const currentSchoolConfig = {
+            name: "Kilifi High Engineering Academy",
+            motto: "In Elimu We Trust and Innovate",
+            address: "Mombasa-Malindi Highway, Kilifi",
+            phone: "+254 711 000000",
+            email: "registrar@kilifihigh.ac.ke",
+            principalName: "Dr. Evans Mwangi, PhD",
+            boardChair: "Hon. Aisha Jumwa",
+            logo: "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&w=120&q=80",
+            watermark: "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&w=120&q=80",
+            stamp: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><circle cx='50' cy='50' r='40' stroke='red' stroke-width='2' fill='none' stroke-dasharray='4'/><text x='23' y='55' fill='red' font-size='10' font-family='sans-serif' font-weight='bold'>APPROVED</text></svg>"
+        };
+
+        const compiledMarkup = TemplateEngine.compile(type, {
+            studentName, admNumber, remarks, grade: "Form 4 Emerald"
+        }, currentSchoolConfig);
+
+        document.getElementById("printCanvas").innerHTML = compiledMarkup;
+    };
+
+    window.applyLayoutChange = function() {
+        const layout = document.getElementById("docLayout").value;
+        const canvas = document.getElementById("printCanvas");
+        
+        canvas.className = "paper-canvas"; // Flush
+        if (layout === "a4-portrait") canvas.classList.add("a4", "portrait");
+        if (layout === "a4-landscape") canvas.classList.add("a4", "landscape");
+        if (layout === "a5-portrait") canvas.classList.add("a5", "portrait");
+    };
+
+    // Auto boot initialization phase sequence
+    document.addEventListener("DOMContentLoaded", () => {
+        window.refreshPreview();
+    });
+</script>
+</body>
+</html>
