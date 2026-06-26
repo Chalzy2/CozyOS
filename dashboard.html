@@ -3,654 +3,135 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cozy Dashboard · Cozycabin</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.29.0/feather.min.js"></script>
-    <script src="./cozyos.js"></script>
-
+    <title>CozyOS Executive Workspace Shell</title>
+    <link rel="stylesheet" href="css/theme.css">
     <style>
-        :root {
-            --bg-base: #060807;
-            --bg-glass: rgba(18, 22, 20, 0.8);
-            --bg-glass-hover: rgba(27, 33, 30, 0.9);
-            --gold: #F59E0B;
-            --gold-glow: rgba(245, 158, 11, 0.12);
-            --emerald: #10B981;
-            --emerald-dark: #059669;
-            --emerald-glow: rgba(16, 185, 129, 0.12);
-            --text-main: #F1F5F3;
-            --text-muted: #8A9A93;
-            --border-color: rgba(36, 44, 40, 0.5);
-            --sidebar-width: 260px;
-            --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-            --radius-lg: 20px;
-            --radius-md: 12px;
-            --radius-sm: 8px;
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background-color: var(--bg-base);
-            color: var(--text-main);
-            overflow-x: hidden;
-            display: flex;
-            height: 100vh;
-            background-image: 
-                radial-gradient(circle at 5% 40%, var(--emerald-glow), transparent 30%),
-                radial-gradient(circle at 95% 20%, var(--gold-glow), transparent 30%);
-        }
-
-        /* ── AUTH GATE LAYER ── */
-        #authGate { position: fixed; inset: 0; background: var(--bg-base); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        #authGate.hidden { display: none !important; }
-        #appRoot { display: none; width: 100vw; height: 100vh; }
-        #appRoot.visible { display: flex; }
-
-        .auth-card { width: 100%; max-width: 380px; background: #121614; border-radius: var(--radius-lg); border: 1px solid var(--border-color); overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.6); }
-        .auth-header { background: linear-gradient(135deg, #090B0A, #121614); border-bottom: 1px solid var(--border-color); padding: 32px 28px 28px; text-align: center; }
-        .auth-logo { width: 60px; height: 60px; background: rgba(16, 185, 129, 0.08); border: 2px solid var(--emerald); border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; font-size: 26px; box-shadow: 0 0 15px rgba(16, 185, 129, 0.2); }
-        .auth-title { font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; color: #fff; letter-spacing: .5px; }
-        .auth-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
-        .auth-tabs { display: flex; background: #1B211E; border-radius: var(--radius-sm); padding: 3px; margin: 20px 24px 0; gap: 2px; border: 1px solid var(--border-color); }
-        .auth-tab { flex: 1; padding: 8px; text-align: center; font-size: 12px; font-weight: 700; border-radius: 8px; cursor: pointer; color: var(--text-muted); transition: .2s; }
-        .auth-tab.active { background: #121614; color: var(--gold); border: 1px solid var(--border-color); }
-        .auth-body { padding: 24px; }
-        .form-group { margin-bottom: 14px; }
-        .form-label { display: block; font-size: 11px; font-weight: 700; color: var(--gold); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 6px; }
-        .form-inp { width: 100%; background: #1B211E; border: 1.5px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px 14px; font-size: 13px; color: var(--text-main); outline: none; transition: .2s; }
-        .form-inp:focus { border-color: var(--emerald); box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15); }
-        .btn-primary { width: 100%; background: linear-gradient(135deg, var(--emerald), var(--emerald-dark)); color: #fff; font-weight: 700; font-size: 14px; padding: 13px; border-radius: var(--radius-sm); border: none; cursor: pointer; transition: .2s; letter-spacing: .3px; }
-        .btn-primary:hover { opacity: .92; }
-        .btn-google { width: 100%; background: #1B211E; color: var(--text-main); border: 1.5px solid var(--border-color); font-weight: 600; font-size: 13px; padding: 12px; border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: .2s; margin-top: 10px; }
-        .btn-google:hover { border-color: var(--gold); color: var(--gold); }
-        .auth-divider { display: flex; align-items: center; gap: 10px; margin: 14px 0; color: var(--text-muted); font-size: 11px; }
-        .auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--border-color); }
-        .auth-err { font-size: 12px; color: #ef4444; text-align: center; min-height: 16px; font-weight: 600; margin-top: 8px; }
-        .auth-link { font-size: 12px; color: var(--emerald); text-align: center; margin-top: 12px; cursor: pointer; font-weight: 600; }
-
-        /* ── STRUCTURAL FRAMEWORK PANEL SHELLS ── */
-        .glass-panel {
-            background: var(--bg-glass);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-lg);
-        }
-
-        .sidebar {
-            width: var(--sidebar-width);
-            height: 100vh;
-            border-right: 1px solid var(--border-color);
-            padding: 24px;
-            display: flex;
-            flex-direction: column;
-            background: rgba(6, 8, 7, 0.95);
-            z-index: 100;
-        }
-        .brand {
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 22px;
-            font-weight: 700;
-            color: var(--text-main);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 40px;
-        }
-        .brand span { color: var(--gold); }
-
-        .nav-section { margin-bottom: 24px; }
-        .nav-label {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 1.2px;
-            color: var(--text-muted);
-            margin-bottom: 12px;
-            font-weight: 600;
-        }
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 16px;
-            color: var(--text-muted);
-            text-decoration: none;
-            border-radius: var(--radius-md);
-            transition: var(--transition);
-            font-weight: 500;
-            font-size: 14px;
-            cursor: pointer;
-            margin-bottom: 4px;
-        }
-        .nav-item:hover, .nav-item.active {
-            background: var(--bg-glass-hover);
-            color: var(--text-main);
-        }
-        .nav-item.active {
-            background: var(--emerald-glow);
-            color: var(--emerald);
-            border: 1px solid rgba(16, 185, 129, 0.2);
-        }
-
-        .main-content { flex: 1; padding: 32px 40px 60px; overflow-y: auto; display: flex; flex-direction: column; gap: 24px; }
-        .header { display: flex; justify-content: space-between; align-items: center; }
+        .cozy-app-layout { display: flex; min-height: 100vh; background: #0b0b0b; color: #ffffff; font-family: system-ui, sans-serif; }
+        .cozy-sidebar { width: 280px; background: #111111; border-right: 1px solid rgba(195, 160, 89, 0.15); padding: 25px 20px; }
+        .cozy-main-viewport { flex-grow: 1; padding: 40px; background: #161616; overflow-y: auto; }
+        .cozy-grid-matrix { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 30px; }
+        .cozy-dashboard-card { background: #1c1c1c; border-radius: 8px; padding: 25px; border: 1px solid #222222; }
         
-        .search-trigger {
-            display: flex; align-items: center; gap: 12px; background: var(--bg-glass);
-            border: 1px solid var(--border-color); padding: 10px 20px; border-radius: var(--radius-sm);
-            color: var(--text-muted); cursor: pointer; width: 320px; transition: var(--transition);
-        }
-        .search-trigger:hover { border-color: var(--emerald); }
-        .cmd-key { background: rgba(255, 255, 255, 0.06); padding: 2px 6px; border-radius: 4px; font-size: 11px; color: var(--text-muted); }
-
-        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
-        .widget { padding: 24px; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 4px; }
-        .widget::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 3px; }
-        .widget.emerald::before { background: var(--emerald); }
-        .widget.gold::before { background: var(--gold); }
-        .widget-title { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-        
-        /* COZY ID IDENTITY SECTION */
-        .cozy-identity-banner {
-            padding: 24px; background: linear-gradient(135deg, #091a11 0%, #112e1f 100%);
-            border: 1px solid rgba(16, 185, 129, 0.15); display: flex; justify-content: space-between; align-items: center;
-        }
-        .id-meta-labels { display: flex; flex-direction: column; gap: 4px; }
-        .id-token-title { font-family: 'Space Grotesk'; font-size: 26px; font-weight: 700; color: #fff; letter-spacing: 1px; }
-        .role-badge-container { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
-        .role-tag { background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.2); padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; color: var(--emerald); }
-
-        .quick-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 16px; }
-        .action-card { padding: 20px; text-align: center; cursor: pointer; transition: var(--transition); text-decoration: none; color: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;}
-        .action-card:hover { transform: translateY(-4px); border-color: var(--gold); background: var(--gold-glow); }
-        .action-card i { color: var(--gold); }
-        .action-card p { font-size: 12px; font-weight: 700; color: var(--text-main); }
-
-        /* Command Palette Overlay */
-        .cmd-palette-overlay {
-            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px);
-            display: none; justify-content: center; align-items: flex-start;
-            padding-top: 10vh; z-index: 1000; opacity: 0; transition: opacity 0.2s;
-        }
-        .cmd-palette-overlay.active { display: flex; opacity: 1; }
-        .cmd-palette {
-            width: 600px; background: #0c0f0d; border: 1px solid var(--border-color);
-            border-radius: var(--radius-lg); overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.7);
-        }
-        .cmd-input {
-            width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--border-color);
-            padding: 20px; color: var(--text-main); font-size: 16px; outline: none; font-family: inherit;
-        }
-        .cmd-results { max-height: 300px; overflow-y: auto; padding: 10px 0; }
-        .cmd-result-item { padding: 12px 20px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: var(--transition); }
-        .cmd-result-item:hover { background: var(--bg-glass-hover); }
-
-        /* Floating AI Concierge */
-        .ai-concierge-btn {
-            position: fixed; bottom: 46px; right: 30px; width: 56px; height: 56px; border-radius: 50%;
-            background: linear-gradient(135deg, var(--gold), #d48806); color: #000;
-            display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(249, 168, 37, 0.3);
-            cursor: pointer; z-index: 500; transition: var(--transition); border: none;
-        }
-        .ai-chat-window {
-            position: fixed; bottom: 114px; right: 30px; width: 360px; height: 480px;
-            display: none; flex-direction: column; z-index: 499; opacity: 0; transform: translateY(20px); transition: all 0.3s ease;
-        }
-        .ai-chat-window.active { display: flex; opacity: 1; transform: translateY(0); }
-        .ai-header { padding: 16px; border-bottom: 1px solid var(--border-color); font-weight: 600; display:flex; justify-content: space-between; background: #121614; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
-        .ai-body { flex: 1; padding: 16px; overflow-y: auto; font-size: 13px; color: var(--text-muted); display: flex; flex-direction: column; gap: 12px; }
-        .ai-input { padding: 16px; border-top: 1px solid var(--border-color); display: flex; gap: 10px; background: #121614; border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
-        .ai-input input { flex: 1; background: var(--bg-base); border: 1px solid var(--border-color); border-radius: 20px; padding: 10px 16px; color: var(--text-main); outline: none; }
-
-        .system-status-bar {
-            background: #020302; border-top: 1px solid var(--border-color);
-            position: fixed; bottom: 0; left: 0; width: 100vw; height: 26px;
-            z-index: 999; display: flex; align-items: center; padding: 0 20px;
-            font-size: 11px; font-family: monospace; color: var(--text-muted); justify-content: space-between;
-        }
-        #cc-toast { position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%) translateY(20px); background: #121614; border: 1px solid var(--gold); color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 12px; font-weight: 700; opacity: 0; transition: .25s; z-index: 9999; white-space: nowrap; pointer-events: none; }
-        #cc-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .sync-badge { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; padding: 4px 12px; border-radius: 20px; font-weight: 600; }
+        .online { background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); }
+        .offline { background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.2); }
     </style>
 </head>
 <body>
 
-    <!-- ── AUTH GATE SUBSYSTEM ── -->
-    <div id="authGate">
-      <div class="auth-card">
-        <div class="auth-header">
-          <div class="auth-logo">🏡</div>
-          <div class="auth-title">Cozy<span>cabin</span></div>
-          <div class="auth-sub">Smart Living · Trusted Connections</div>
-          <div class="auth-tabs">
-            <div class="auth-tab active" id="tab-login" onclick="switchTab('login')">Sign In</div>
-            <div class="auth-tab" id="tab-signup" onclick="switchTab('signup')">Sign Up</div>
-          </div>
+<div class="cozy-app-layout">
+    <aside class="cozy-sidebar">
+        <div class="cozy-brand-header">
+            <h3 style="color: #C5A059; margin: 0; font-weight: 600;" id="org-name-string">CozyOS Shell</h3>
         </div>
-        <div class="auth-body">
-          <!-- LOGIN CONTAINER -->
-          <div id="form-login">
-            <div class="form-group"><label class="form-label">Email</label><input class="form-inp" id="li-email" type="email" placeholder="you@email.com"/></div>
-            <div class="form-group"><label class="form-label">Password</label><input class="form-inp" id="li-pass" type="password" placeholder="••••••••"/></div>
-            <button class="btn-primary" id="li-btn" onclick="doLogin()">Sign In</button>
-            <div class="auth-divider">or</div>
-            <button class="btn-google" onclick="doGoogle()"><svg width="14" height="14" viewBox="0 0 24 24" style="margin-right:4px;"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Continue with Google</button>
-            <div class="auth-link" onclick="switchTab('reset')">Forgot password?</div>
-            <div class="auth-err" id="li-err"></div>
-          </div>
-          <!-- SIGNUP CONTAINER -->
-          <div id="form-signup" style="display:none">
-            <div class="form-group"><label class="form-label">Full Name</label><input class="form-inp" id="su-name" type="text" placeholder="Charles Owuor"/></div>
-            <div class="form-group"><label class="form-label">Phone Number</label><input class="form-inp" id="su-phone" type="tel" placeholder="0712 345 678"/></div>
-            <div class="form-group"><label class="form-label">Email</label><input class="form-inp" id="su-email" type="email" placeholder="you@email.com"/></div>
-            <div class="form-group"><label class="form-label">Password</label><input class="form-inp" id="su-pass" type="password" placeholder="Min 6 characters"/></div>
-            <button class="btn-primary" id="su-btn" onclick="doSignup()">Create Cozy ID</button>
-            <div class="auth-err" id="su-err"></div>
-          </div>
-          <!-- RESET CONTAINER -->
-          <div id="form-reset" style="display:none">
-            <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">Enter email to receive reset link.</p>
-            <div class="form-group"><label class="form-label">Email</label><input class="form-inp" id="rs-email" type="email" placeholder="you@email.com"/></div>
-            <button class="btn-primary" onclick="doReset()">Send Reset Link</button>
-            <div class="auth-link" onclick="switchTab('login')">← Back to Sign In</div>
-            <div class="auth-err" id="rs-err"></div>
-          </div>
+        <hr style="border: 0; border-top: 1px solid rgba(195,160,89,0.1); margin: 20px 0;">
+        <ul id="cozy-sidebar-nav" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;">
+            <!-- Modules populate dynamically based on active security authorization rules -->
+        </ul>
+    </aside>
+
+    <main class="cozy-main-viewport">
+        <header style="margin-bottom: 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #222; padding-bottom: 20px;">
+            <div>
+                <h1 style="margin: 0; font-weight: 500; font-size: 26px;" id="welcome-string">Loading Session Monitor...</h1>
+                <p style="margin: 6px 0 0 0; font-size: 11px; color: #888; font-family: monospace;" id="tenancy-trace-string">Validating cryptographic access profiles...</p>
+            </div>
+            <div>
+                <span id="network-sync-badge" class="sync-badge online">Checking Core Link State...</span>
+            </div>
+        </header>
+
+        <div class="cozy-grid-matrix" id="cozy-dashboard-grid">
+            <!-- Unauthorized panel metric widgets are completely skipped during generation steps -->
         </div>
-      </div>
-    </div>
+    </main>
+</div>
 
-    <!-- ── APPLICATION SHELL ROOT ── -->
-    <div id="appRoot">
-        <nav class="sidebar">
-            <div class="brand"><i data-feather="hexagon"></i> Cozy<span>OS</span></div>
-            <div class="nav-section">
-                <div class="nav-label">Ecosystem Modules</div>
-                <a href="#" class="nav-item active"><i data-feather="grid"></i> Dashboard Shell</a>
-                <a href="identity.html" class="nav-item"><i data-feather="shield"></i> Identity Studio</a>
-                <a href="index.html" class="nav-item"><i data-feather="shopping-bag"></i> Cozy Shop</a>
-                <a href="rentals.html" class="nav-item"><i data-feather="home"></i> Rentals Module</a>
-                <a href="services.html" class="nav-item"><i data-feather="tool"></i> Service Engine</a>
-                <a href="wallet.html" class="nav-item"><i data-feather="credit-card"></i> Core Wallet</a>
-            </div>
-            <div class="nav-section" style="margin-top:auto;">
-                <a href="#" class="nav-item" onclick="signOut(auth)"><i data-feather="log-out"></i> Termination Sequence</a>
-            </div>
-        </nav>
+<script type="module">
+    import { auth } from './core/firebase.js';
+    import Permissions from './core/permissions.js';
+    import DashboardShell from './core/dashboard.js';
+    import AuditLogger from './core/audit.js';
 
-        <main class="main-content">
-            <header class="header">
-                <div class="search-trigger" onclick="toggleCommandPalette()">
-                    <i data-feather="search" style="width: 16px;"></i>
-                    <span>Search system arrays...</span>
-                    <span class="cmd-key" style="margin-left: auto;">Ctrl K</span>
-                </div>
-                <div style="display:flex; align-items:center; gap:16px;">
-                    <i data-feather="refresh-cw" style="color: var(--text-muted); cursor:pointer;" onclick="CozyOS.Diagnostics.triggerSelfTest()"></i>
-                    <div style="width:40px; height:40px; background:var(--gold); border-radius:50%; display:flex; align-items:center; justify-content:center; color:#000; font-weight:700; cursor:pointer;" id="userAvatar" onclick="location.href='profile.html'">?</div>
-                </div>
-            </header>
+    // Localized Native Language Greetings Map Matrix Reference
+    const GREETINGS = {
+        en: "Welcome", sw: "Habari", luo: "Amosi", kik: "Wanyua",
+        kam: "Wakya", kal: "Chamgei", fr: "Bienvenue", ar: "Ahlan wa sahlan",
+        pt: "Bem-vindo", es: "Bienvenido"
+    };
 
-            <!-- COZY ID LAYER CONTAINER -->
-            <div class="glass-panel cozy-identity-banner" id="cozyIdCard">
-                <div class="id-meta-labels">
-                    <span style="font-size:10px; font-weight:800; text-transform:uppercase; color:var(--gold); letter-spacing:1px;">Active Workspace Anchor</span>
-                    <div class="id-token-title" id="cozyIdValue">CZ-•••••</div>
-                    <div style="font-size:14px; color:var(--text-main); font-weight:500; margin-top:2px;" id="cozyIdName">Loading Core Profile...</div>
-                    <div class="role-badge-container" id="cozyIdRoles"></div>
-                </div>
-                 <button class="btn-primary" style="width:auto; padding:10px 20px; background:var(--bg-glass-hover); border:1px solid var(--border-color);" onclick="shareCozyId()">📤 Export Link</button>
-            </div>
+    document.addEventListener("DOMContentLoaded", () => {
+        // 1. Establish Real-time Network Operational State Change Hooks
+        window.addEventListener("online", handleNetworkStateTransition);
+        window.addEventListener("offline", handleNetworkStateTransition);
+        handleNetworkStateTransition();
 
-            <!-- SYSTEM METRIC HOOKS -->
-            <div class="dashboard-grid">
-                <div class="widget glass-panel emerald">
-                    <span class="widget-title">Core Balance Ledger</span>
-                    <div style="font-family:'Space Grotesk'; font-size:32px; font-weight:700; margin-top:8px;" id="walletBadge">KES 0</div>
-                </div>
-                <div class="widget glass-panel gold">
-                    <span class="widget-title">Workspace Indexing</span>
-                    <div style="font-family:'Space Grotesk'; font-size:32px; font-weight:700; margin-top:8px;" id="contactsBadge">0 Active Nodes</div>
-                </div>
-            </div>
-
-            <!-- AI DAILY AGGREGATION BUFFER -->
-            <div class="glass-panel widget emerald" style="gap:8px;">
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <i data-feather="cpu" style="color:var(--emerald); width:16px;"></i>
-                    <span class="widget-title" style="color:var(--emerald)">Cozy AI · Operational Summary Stream</span>
-                </div>
-                <div id="aiSummary" style="font-size:13px; color:var(--text-muted); line-height:1.6; white-space:pre-line;">Parsing system contexts...</div>
-            </div>
-
-            <!-- ROUTING ARCHITECTURE MATRIX -->
-            <h3 style="font-size: 14px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Global Integration Routing Vectors</h3>
-            <div class="quick-actions">
-                <a href="index.html" class="action-card glass-panel"><i data-feather="shopping-bag"></i><p>Cozy Shop</p></a>
-                <a href="rentals.html" class="action-card glass-panel"><i data-feather="home"></i><p>Rentals</p></a>
-                <a href="services.html" class="action-card glass-panel"><i data-feather="tool"></i><p>Services</p></a>
-                <a href="transport.html" class="action-card glass-panel"><i data-feather="truck"></i><p>Transport</p></a>
-                <a href="wallet.html" class="action-card glass-panel"><i data-feather="credit-card"></i><p>Wallet</p></a>
-                <a href="profile.html" class="action-card glass-panel"><i data-feather="user"></i><p>Identity Profile</p></a>
-            </div>
-
-            <!-- RECENT SYSTEM ACTIVITY LEDGER -->
-            <h3 style="font-size: 14px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Live Operations Log</h3>
-            <div id="activityFeed" class="glass-panel" style="padding:10px 20px; display:flex; flex-direction:column;">
-                <div style="text-align:center; padding:20px; color:var(--text-muted); font-size:13px;">Polling telemetry buffers...</div>
-            </div>
-        </main>
-    </div>
-
-    <!-- Command Palette Overlay -->
-    <div class="cmd-palette-overlay" id="cmdOverlay" onclick="closeCommandPalette(event)">
-        <div class="cmd-palette" onclick="event.stopPropagation()">
-            <input type="text" class="cmd-input" id="cmdInput" placeholder="Type data query or systemic command..." oninput="CozyOS.SearchEngine.query(this.value)">
-            <div class="cmd-results" id="searchResults">
-                <div style="padding:16px 20px; font-size:13px; color:var(--text-muted);">Enter tokens to run live telemetry match queries.</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Floating AI Concierge -->
-    <button class="ai-concierge-btn" onclick="toggleAIWindow()">
-        <i data-feather="message-square"></i>
-    </button>
-    
-    <div class="ai-chat-window glass-panel" id="aiWindow">
-        <div class="ai-header">
-            <span>✨ Cozy AI Engine Core</span>
-            <i data-feather="x" style="cursor: pointer;" onclick="toggleAIWindow()"></i>
-        </div>
-        <div class="ai-body" id="aiChatBody">
-            <p><strong>System:</strong> Identity array authenticated. Ready to execute natural speech parameter bindings.</p>
-        </div>
-        <div class="ai-input">
-            <input type="text" id="aiInput" placeholder="Issue instruction..." onkeypress="handleAIKeyPress(event)">
-            <button style="background:transparent; border:none; cursor:pointer; color:var(--gold);" onclick="sendAIMessage()">
-                <i data-feather="send"></i>
-            </button>
-        </div>
-    </div>
-
-    <footer class="system-status-bar">
-        <span id="osStatusIndicator">⚡ CozyOS Core Node: Operational</span>
-        <span id="osDbTelemetry">IDB Alloc: Bound | Sync Lifecycle: Steady</span>
-    </footer>
-
-    <div id="cc-toast"></div>
-
-    <!-- CozyOS Kernel Script Block Matrix -->
-    <script type="module">
-        import {
-          auth, db, ADMIN_EMAILS,
-          GoogleAuthProvider, signInWithPopup,
-          signInWithEmailAndPassword, createUserWithEmailAndPassword,
-          sendPasswordResetEmail, signOut, onAuthStateChanged,
-          collection, doc, setDoc, getDoc, getDocs,
-          updateDoc, query, where, orderBy, limit,
-          serverTimestamp
-        } from './firebase.js';
-
-        // High Performance Isolated Architecture Kernel Namespace Engine
-        const CozyOS = (function() {
-            const EventBus = {
-                topics: {},
-                subscribe(topic, listener) {
-                    if(!this.topics[topic]) this.topics[topic] = [];
-                    this.topics[topic].push(listener);
-                },
-                publish(topic, data) {
-                    if(!this.topics[topic]) return;
-                    this.topics[topic].forEach(listener => {
-                        try { listener(data); } catch(e) { console.error(`Bus execution crash:`, e); }
-                    });
-                }
-            };
-
-            let dbInstance = null;
-            const IndexedDBEngine = {
-                init() {
-                    const req = indexedDB.open("CozyOS_Local_Storage", 1);
-                    req.onupgradeneeded = (e) => {
-                        let db = e.target.result;
-                        if(!db.objectStoreNames.contains("telemetry_store")) {
-                            db.createObjectStore("telemetry_store", { keyPath: "id", autoIncrement: true });
-                        }
-                    };
-                    req.onsuccess = (e) => {
-                        dbInstance = e.target.result;
-                        EventBus.publish('db:ready', true);
-                    };
-                },
-                saveData(payload) {
-                    if(!dbInstance) return false;
-                    const tx = dbInstance.transaction("telemetry_store", "readwrite");
-                    tx.objectStore("telemetry_store").add({ timestamp: Date.now(), data: payload });
-                }
-            };
-
-            const SearchEngineMatrix = {
-                async query(q) {
-                    const target = document.getElementById('searchResults');
-                    if(!q.trim()) { target.innerHTML = '<div style="padding:16px 20px; font-size:13px; color:var(--text-muted);">Enter tokens to run live telemetry match queries.</div>'; return; }
-                    target.innerHTML = '<div style="padding:16px 20px; font-size:13px; color:var(--text-muted);">Running database scan...</div>';
-                    let matches = '';
-                    try {
-                        const items = await getDocs(collection(db, 'cozyItems'));
-                        items.forEach(d => {
-                            const data = d.data();
-                            if((data.title||'').toLowerCase().includes(q.toLowerCase())) {
-                                matches += `<div class="cmd-result-item" onclick="location.href='index.html'"><i data-feather="box"></i><span>${data.title} - KES ${data.price}</span></div>`;
-                            }
-                        });
-                    } catch(err) {}
-                    target.innerHTML = matches || `<div style="padding:16px 20px; font-size:13px; color:var(--text-muted);">No records found matching "${q}"</div>`;
-                    feather.replace();
-                }
-            };
-
-            const DiagnosticsEngine = {
-                triggerSelfTest() {
-                    document.getElementById('osStatusIndicator').innerText = "⚡ CozyOS Core Node: Diagnostics Running...";
-                    setTimeout(() => {
-                        document.getElementById('osStatusIndicator').innerText = "⚡ CozyOS Core Node: Operational";
-                        CozyOS.Interface.toast("✅ Diagnostics Complete: Framework Stable");
-                    }, 800);
-                }
-            };
-
-            const InterfaceHelpers = {
-                toast(msg) {
-                    const t = document.getElementById('cc-toast');
-                    t.textContent = msg; t.className = 'show';
-                    setTimeout(() => t.className = '', 2600);
-                }
-            };
-
-            return {
-                Bus: EventBus,
-                DB: IndexedDBEngine,
-                SearchEngine: SearchEngineMatrix,
-                Diagnostics: DiagnosticsEngine,
-                Interface: InterfaceHelpers
-            };
-        })();
-
-        // Map Global Object for Inline HTML Execution Actions
-        window.CozyOS = CozyOS;
-
-        // ── Auth Framework Mappings ──
-        function genCozyId(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let id='CZ-';for(let i=0;i<5;i++)id+=c[Math.floor(Math.random()*c.length)];return id;}
-        async function uniqueCozyId(){let id,ex=true;while(ex){id=genCozyId();const s=await getDocs(query(collection(db,'cozyUsers'),where('cozyId','==',id)));ex=!s.empty;}return id;}
-
-        window.switchTab = function(tab){
-          ['login','signup','reset'].forEach(t=>{
-            document.getElementById('form-'+t).style.display='none';
-            if(document.getElementById('tab-'+t)) document.getElementById('tab-'+t).classList.remove('active');
-          });
-          document.getElementById('form-'+tab).style.display='block';
-          if(document.getElementById('tab-'+tab)) document.getElementById('tab-'+tab).classList.add('active');
-        };
-
-        window.doLogin = async function(){
-          const email=document.getElementById('li-email').value.trim();
-          const pass=document.getElementById('li-pass').value;
-          document.getElementById('li-err').textContent='';
-          try{ await signInWithEmailAndPassword(auth,email,pass); }
-          catch(e){ document.getElementById('li-err').textContent=e.message; }
-        };
-
-        window.doSignup = async function(){
-          const name=document.getElementById('su-name').value.trim();
-          const phone=document.getElementById('su-phone').value.trim();
-          const email=document.getElementById('su-email').value.trim();
-          const pass=document.getElementById('su-pass').value;
-          document.getElementById('su-err').textContent='';
-          if(!name||!phone||!email||!pass){document.getElementById('su-err').textContent='All parameters mandatory.';return;}
-          try{
-            const dup=await getDocs(query(collection(db,'cozyUsers'),where('phone','==',phone)));
-            if(!dup.empty){document.getElementById('su-err').textContent='Telemetry collision: Phone active.';return;}
-            const cred=await createUserWithEmailAndPassword(auth,email,pass);
-            const cozyId=await uniqueCozyId();
-            await setDoc(doc(db,'cozyUsers',cred.user.uid),{
-              uid:cred.user.uid,cozyId,name,phone,email,photo:'',
-              joinedDate:new Date().toISOString(),roles:['customer'],
-              verified:ADMIN_EMAILS.includes(email),isAdmin:ADMIN_EMAILS.includes(email),
-              createdAt:serverTimestamp(),updatedAt:serverTimestamp()
-            });
-          }catch(e){document.getElementById('su-err').textContent=e.message;}
-        };
-
-        window.doGoogle = async function(){
-          try{
-            const cred=await signInWithPopup(auth,new GoogleAuthProvider());
-            const ref=doc(db,'cozyUsers',cred.user.uid);
-            const snap=await getDoc(ref);
-            if(!snap.exists()){
-              const cozyId=await uniqueCozyId();
-              await setDoc(ref,{
-                uid:cred.user.uid,cozyId,name:cred.user.displayName||'',
-                phone:'',email:cred.user.email||'',photo:cred.user.photoURL||'',
-                joinedDate:new Date().toISOString(),roles:['customer'],
-                verified:ADMIN_EMAILS.includes(cred.user.email),
-                isAdmin:ADMIN_EMAILS.includes(cred.user.email),
-                createdAt:serverTimestamp(),updatedAt:serverTimestamp()
-              });
+        // 2. Fire Live Authentication Pipeline Hook Sequence (onAuthStateChanged)
+        auth.onAuthStateChanged(async (userAccount) => {
+            if (userAccount) {
+                await processCoreWorkspaceMount(userAccount);
+            } else {
+                console.warn("Authorization missing. Returning viewport context to Login Entry gate.");
+                window.location.href = "login.html";
             }
-          }catch(e){document.getElementById('li-err').textContent=e.message;}
-        };
-
-        window.doReset = async function(){
-          const email=document.getElementById('rs-email').value.trim();
-          try{await sendPasswordResetEmail(auth,email);CozyOS.Interface.toast('⚙️ Reset transponder sent!');switchTab('login');}
-          catch(e){document.getElementById('rs-err').textContent=e.message;}
-        };
-
-        // ── Pipeline Mount Processes ──
-        onAuthStateChanged(auth, async user => {
-          if(!user){
-            document.getElementById('authGate').classList.remove('hidden');
-            document.getElementById('appRoot').classList.remove('hidden');
-            document.getElementById('appRoot').classList.remove('visible');
-            return;
-          }
-          document.getElementById('authGate').classList.add('hidden');
-          document.getElementById('appRoot').classList.add('visible');
-          await loadProfile(user);
         });
+    });
 
-        async function loadProfile(user){
-          const ref=doc(db,'cozyUsers',user.uid);
-          const snap=await getDoc(ref);
-          if(!snap.exists()) return;
-          const p=snap.data();
+    /**
+     * Orchestrates steps 1 through 8 to securely compile the application workspace environment on successful auth
+     */
+    async function processCoreWorkspaceMount(userAccount) {
+        try {
+            // Generate the secure, centralized session data object matrix globally
+            const session = await Permissions.initializeUserSession(userAccount, "client_browser_viewport");
 
-          const av=document.getElementById('userAvatar');
-          if(p.photo){av.innerHTML=`<img src="${p.photo}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;} 
-          else {av.textContent=(p.name||p.email||'?')[0].toUpperCase();}
+            // Execute dynamic user-specific layout rendering runs
+            await DashboardShell.bootstrapDashboardShell(session);
 
-          document.getElementById('cozyIdValue').textContent=p.cozyId||'—';
-          document.getElementById('cozyIdName').textContent=p.name||p.email||'—';
+            // Fetch contextual translations for current profile view nodes
+            const userLang = session.language || "en";
+            const greetingPhrase = GREETINGS[userLang] || GREETINGS.en;
 
-          const ROLE_META={customer:{i:'🛒',l:'Customer'},affiliate:{i:'💰',l:'Affiliate'},seller:{i:'🏪',l:'Seller'},landlord:{i:'🏠',l:'Landlord'}};
-          document.getElementById('cozyIdRoles').innerHTML=(p.roles||['customer']).map(r=>{const m=ROLE_META[r]||{i:'👤',l:r};return`<span class="role-tag">${m.i} ${m.l}</span>`;}).join('');
+            // Apply text variables safely across core view layout nodes
+            document.getElementById("org-name-string").textContent = session.organizationName;
+            document.getElementById("welcome-string").textContent = `${greetingPhrase}, ${session.profile.name || 'Operator'}`;
+            document.getElementById("tenancy-trace-string").textContent = 
+                `TENANT: ${session.tenantId.toUpperCase()} // WORKSPACE: ${session.workspaceId.toUpperCase()} // ROLE: ${session.role.toUpperCase()}`;
 
-          try{
-            const ws=await getDoc(doc(db,'cozyWalletTotals',p.cozyId));
-            if(ws.exists()) document.getElementById('walletBadge').textContent='KES '+Number(ws.data().balance||0).toLocaleString();
-          }catch(_){}
+            await AuditLogger.log("Session Mount", `Executive workspace shell successfully loaded for Session: ${session.sessionId}`);
 
-          try{
-            const cs=await getDocs(query(collection(db,'cozyContacts'),where('addedBy','==',p.cozyId)));
-            document.getElementById('contactsBadge').textContent=cs.size+' Operational Nodes';
-          }catch(_){}
-
-          if(p.cozyId) loadActivity(p.cozyId);
-          loadAISummary(p);
+        } catch (fault) {
+            handleSevereKernelHalt(fault);
         }
+    }
 
-        async function loadAISummary(p) {
-          const el = document.getElementById('aiSummary');
-          if (!el) return;
-          const lines = [`Workspace environment parsed successfully. Welcome back, ${p.name ? p.name.split(' ')[0] : 'Operator'}. 👋`];
-          try {
-            const ls = await getDocs(query(collection(db,'cozyLeads'), where('addedBy','==', p.cozyId||''), where('status','==','new')));
-            if (ls.size > 0) lines.push(`📋 Telemetry Alert: ${ls.size} raw pipeline routing objects require processing confirmation.`);
-          } catch(_) {}
-          lines.push(`\nAll integrated local services are functional. Systems ready to register new transactional vectors.`);
-          el.textContent = lines.join('\n');
+    function handleNetworkStateTransition() {
+        const badge = document.getElementById("network-sync-badge");
+        if (!badge) return;
+
+        const isOnline = navigator.onLine;
+        badge.className = `sync-badge ${isOnline ? 'online' : 'offline'}`;
+        badge.textContent = isOnline ? "Online • Active" : "Offline • Queueing Enabled";
+
+        // Push state directly into the global execution session variable container frame context if active
+        if (window.CozyOS?.Session) {
+            window.CozyOS.Session.onlineStatus = isOnline ? "online" : "offline";
+            window.CozyOS.Session.lastSyncTime = new Date().toISOString();
         }
+    }
 
-        async function loadActivity(cozyId){
-          const feed=document.getElementById('activityFeed');
-          const items=[];
-          try {
-            const ws=await getDocs(query(collection(db,'cozyWallet'),where('cozyId','==',cozyId),orderBy('createdAt','desc'),limit(3)));
-            ws.docs.forEach(d=>{const w=d.data();items.push({text:`Wallet Ledger: KES ${w.amount} added via structural transaction sequence.`});});
-          }catch(_){}
-          if(!items.length){feed.innerHTML='<div style="padding:16px; color:var(--text-muted); font-size:13px; text-align:center;">No recent structural ledger inputs located.</div>';return;}
-          feed.innerHTML=items.map(i=>`<div style="padding:12px 0; border-bottom:1px solid var(--border-color); font-size:13px;">${i.text}</div>`).join('');
-        }
-
-        window.shareCozyId = function(){
-          const id=document.getElementById('cozyIdValue').textContent;
-          const url=`https://cozycabin.co.ke/?ref=${id}`;
-          navigator.clipboard.writeText(url).then(()=>CozyOS.Interface.toast('🌐 Reference link copied to system buffer'));
-        };
-
-        // Initialize Native Framework Utilities
-        feather.replace();
-        document.addEventListener('DOMContentLoaded', () => { CozyOS.DB.init(); });
-    </script>
-
-    <!-- UI Interaction Logic Script -->
-    <script>
-        const cmdOverlay = document.getElementById('cmdOverlay');
-        const cmdInput = document.getElementById('cmdInput');
-        const aiWindow = document.getElementById('aiWindow');
-        const aiChatBody = document.getElementById('aiChatBody');
-        const aiInput = document.getElementById('aiInput');
-
-        document.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); toggleCommandPalette(); }
-            if (e.key === 'Escape' && cmdOverlay.classList.contains('active')) cmdOverlay.classList.remove('active');
-        });
-        function toggleCommandPalette() { cmdOverlay.classList.toggle('active'); if (cmdOverlay.classList.contains('active')) cmdInput.focus(); }
-        function closeCommandPalette(e) { if(e.target === cmdOverlay) cmdOverlay.classList.remove('active'); }
-        function toggleAIWindow() { aiWindow.classList.toggle('active'); if(aiWindow.classList.contains('active')) aiInput.focus(); }
-        function handleAIKeyPress(e) { if(e.key === 'Enter') sendAIMessage(); }
-        function sendAIMessage() {
-            const txt = aiInput.value.trim(); if(!txt) return;
-            aiChatBody.innerHTML += `<p style="color: var(--text-main);"><strong>You:</strong> ${txt}</p>`;
-            aiInput.value = '';
-            setTimeout(() => {
-                aiChatBody.innerHTML += `<p style="color: var(--gold);">strong>AI:</strong> Instruction stream compiled. Processing contextual data vector inside Core...</p>`;
-                aiChatBody.scrollTop = aiChatBody.scrollHeight;
-            }, 400);
-        }
-    </script>
-    
-    
+    function handleSevereKernelHalt(error) {
+        console.error("🚨 Critical System Initialization Defect Captured:", error);
+        document.body.innerHTML = `
+            <div style="background: #090909; color: #ff4444; padding: 40px; font-family: monospace; text-align: center; height: 100vh; display: flex; align-items: center; justify-content: center;">
+                <div style="border: 1px solid rgba(255,68,68,0.2); background: rgba(255,68,68,0.03); padding: 35px; border-radius: 8px; max-width: 550px;">
+                    <h3 style="margin: 0 0 10px 0; color: #ff5555; letter-spacing: 0.5px;">🚫 COZYOS SYSTEM BOOT COMPILATION FAILURE</h3>
+                    <p style="color: #999; font-size: 13px; line-height: 1.6;">Cryptographic isolation pipeline checks rejected this initialization sequence. This happens if authorization keys are invalid or tenant mapping records are missing.</p>
+                    <p style="color: #555; font-size: 11px; margin-top: 20px; text-transform: uppercase; word-break: break-all;">Diagnostic String: ${error.message || "Execution Interrupt"}</p>
+                </div>
+            </div>
+        `;
+    }
+</script>
 </body>
-    </html>
+</html>
