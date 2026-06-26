@@ -126,7 +126,67 @@ export default {
         }
     }
 };
+/**
+ * ── COZYOS DYNAMIC INTERFACE CONTROLLER ──
+ * FILE: core/dashboard.js
+ */
 
+function updateDashboardTelemetry() {
+    // Queries memory space objects populated by the frozen kernel manager
+    const plugins = window.CozyOS?.PluginMetadata || new Map();
+    const enabledCount = Array.from(plugins.values()).filter(m => m.status === 'enabled').length;
+    
+    const countEl = document.getElementById('plugin-count');
+    if (countEl) {
+        countEl.innerText = `${enabledCount} Active`;
+    }
+}
+
+async function executeDashboardIntent() {
+    const inputEl = document.getElementById('terminal-input');
+    const outputEl = document.getElementById('terminal-output');
+    if (!inputEl || !outputEl) return;
+
+    const query = inputEl.value.trim();
+    if (!query) return;
+
+    // Log the user's input line immediately inside the viewport console
+    outputEl.innerHTML += `<div style="color: #ffffff; margin-top: 6px;">&gt; ${query}</div>`;
+    inputEl.value = '';
+
+    try {
+        // Enforces secure pipeline entry by communicating directly with the centralized global layers
+        if (window.CozyOS && typeof window.CozyOS.executeVoiceIntent === 'function') {
+            const response = await window.CozyOS.executeVoiceIntent(query);
+            outputEl.innerHTML += `<div style="color: var(--accent-gold); margin-top: 2px;">${response.responseText}</div>`;
+        } else {
+            // Development fallback log lines if running without a live kernel session attachment
+            outputEl.innerHTML += `<div style="color: var(--text-secondary); margin-top: 2px;">💡 Kernel Gateway Sandbox: Intent captured successfully. App running decoupled from central cluster layers.</div>`;
+        }
+    } catch (e) {
+        outputEl.innerHTML += `<div style="color: #dc3545; margin-top: 2px;">🚨 Core Exception Fault: ${e.message}</div>`;
+    }
+    
+    // Auto-scroll screen down smoothly to track fast metrics lookups
+    outputEl.scrollTop = outputEl.scrollHeight;
+}
+
+// Attach listeners safely to DOM element triggers once loaded
+window.addEventListener('DOMContentLoaded', () => {
+    updateDashboardTelemetry();
+
+    const executeBtn = document.getElementById('execute-btn');
+    const inputEl = document.getElementById('terminal-input');
+
+    if (executeBtn) executeBtn.addEventListener('click', executeDashboardIntent);
+    if (inputEl) {
+        inputEl.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                executeDashboardIntent();
+            }
+        });
+    }
+});
 window.CozyOS.DashboardShell = {
     bootstrap: async () => { return await module.exports.default.bootstrapDashboardShell(); },
     populateRetailMetrics: () => { module.exports.default.populateRetailMetrics(); }
