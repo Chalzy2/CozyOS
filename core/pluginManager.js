@@ -1,11 +1,11 @@
 /**
- * ── COZYOS PRODUCTION PLUGIN MANAGER HUB ──
+ * ── COZYOS REVOLUTIONARY PLATFORM PLUGIN MANAGER ──
  * FILE: core/pluginManager.js
  * 
- * VERTICAL STATUS: PRODUCTION FROZEN | IMMUTABLE
+ * SPECIFIED SPEC REFERENCES: Capability Manifest Layout & Sandbox Injection Model
  */
 
-import { CozyCoreAPI } from './api.js';
+import { CoreAPIFactory } from './api.js';
 import AuditTrail from './audit.js';
 
 window.CozyOS = window.CozyOS || {};
@@ -14,46 +14,70 @@ window.CozyOS.PluginMetadata = window.CozyOS.PluginMetadata || new Map();
 
 export const PluginManager = {
     /**
-     * Ingests and initializes a marketplace extension plugin, injecting isolated API controls
-     * @param {Object} manifest - Official Plugin Manifest Standard Specification
-     * @param {Function} stateLessHandlerFunc - Plugin functional execution closure
-     * @param {Object} activeKernelSession - Session state payload derived from core auth runtime
+     * Integrates an industry plugin after running comprehensive structural compatibility validations
+     * @param {Object} manifest - Official Capability Manifest specification
+     * @param {Function} stateLessHandler - Functional intelligence plugin entrypoint script execution closure
+     * @param {Object} session - Active authenticated multi-tenant user profile session context from Firebase
      */
-    async installMarketplacePlugin(manifest, stateLessHandlerFunc, activeKernelSession) {
-        // 1. Structural Validation Checklist Integration
-        this._verifyManifestStructure(manifest);
-        const systemKey = manifest.id.toLowerCase();
+    async install(manifest, stateLessHandler, session) {
+        const targetId = manifest.id.toLowerCase();
 
-        // 2. Multi-Tenant Sandbox Environment Setup
-        // Each industry sub-handler receives an isolated interface tailored to its active tenant profile
-        const isolatedCoreAPI = new CozyCoreAPI(manifest, activeKernelSession);
+        try {
+            // 1. Run Automated Capability Validation Engine Checks
+            this._runCapabilityValidation(manifest);
 
-        // 3. Register the encapsulated execution loop
-        window.CozyOS.KernelPlugins.set(systemKey, async (query) => {
-            // Check that the plugin layout is enabled before attempting code execution
-            const meta = window.CozyOS.PluginMetadata.get(systemKey);
-            if (!meta || meta.status !== 'enabled') {
-                return { responseText: "⚠️ Subsystem currently unavailable.", pipelineState: "offline" };
-            }
-            // Execute the module, providing the context-bound API layer
-            return await stateLessHandlerFunc(query, isolatedCoreAPI);
-        });
+            // 2. Resolve the isolated Core API version wrapper matching the declared SDK version
+            const versionedAPIContext = CoreAPIFactory.buildContextSandbox(manifest, session);
 
-        window.CozyOS.PluginMetadata.set(systemKey, {
-            ...manifest,
-            status: 'enabled',
-            certified: true,
-            installedAt: new Date().toISOString()
-        });
+            // 3. Mount the functional execution pipeline closure inside active kernel memory
+            window.CozyOS.KernelPlugins.set(targetId, async (query) => {
+                const stateMeta = window.CozyOS.PluginMetadata.get(targetId);
+                if (!stateMeta || stateMeta.status !== 'enabled') {
+                    return { responseText: "⚠️ Subsystem currently down.", pipelineState: "offline" };
+                }
+                return await stateLessHandler(query, versionedAPIContext);
+            });
 
-        await AuditTrail.log(activeKernelSession, "MARKETPLACE_PLUGIN_MOUNTED", `Plugin [${manifest.name}] integrated and running on tenant workspace.`);
-        return true;
+            // 4. Update the marketplace tracking ledger
+            window.CozyOS.PluginMetadata.set(targetId, {
+                ...manifest,
+                status: 'enabled',
+                certified: true,
+                loadedAt: new Date().toISOString()
+            });
+
+            await AuditTrail.log(session, "SDK_PLUGIN_MOUNT_SUCCESS", `Subsystem module [${manifest.id}] deployed under SDK version criteria v${manifest.sdk}`);
+            return true;
+
+        } catch (validationError) {
+            console.error(`🚨 [PluginManager] Installation aborted for [${targetId.toUpperCase()}]: ${validationError.message}`);
+            await AuditTrail.log(session, "SDK_PLUGIN_MOUNT_REJECTED", `Installation rejected: ${validationError.message}`);
+            return false;
+        }
     },
 
-    _verifyManifestStructure(manifest) {
-        const structuralKeys = ['id', 'name', 'version', 'industryScope', 'requiredPermissions'];
-        structuralKeys.forEach(k => {
-            if (!manifest[k]) throw new Error(`[Manifest Validation] Missing key definition component: ${k}`);
+    /**
+     * Automated Compatibility Testing Suite Interceptor
+     */
+    _runCapabilityValidation(manifest) {
+        // Enforce required tracking variables
+        const baseKeys = ['id', 'version', 'sdk', 'permissions', 'requires'];
+        baseKeys.forEach(k => {
+            if (!manifest[k]) throw new Error(`Compatibility Fault: Missing mandatory root specification tag: "${k}"`);
         });
+
+        // Verify kernel framework dependency capability match vectors
+        const recognizedServices = ['storage', 'audit', 'notifications', 'localization', 'licensing', 'billing', 'offlineSync'];
+        manifest.requires.forEach(service => {
+            if (!recognizedServices.includes(service)) {
+                throw new Error(`Ecosystem Mismatch: Requested kernel capability service [${service}] is not verified on this system build.`);
+            }
+        });
+
+        // Verify core SDK ecosystem operational capabilities
+        const supportedSDKs = ["1.0"];
+        if (!supportedSDKs.includes(manifest.sdk)) {
+            throw new Error(`Unsupported Framework: Plugin targeting SDK version v${manifest.sdk} is incompatible with this kernel version layer.`);
+        }
     }
 };
