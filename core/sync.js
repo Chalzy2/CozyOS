@@ -1,118 +1,121 @@
 /**
- * ── COZYOS IDEMPOTENT OFFLINE SYNCHRONIZATION MATRIX ──
- * SERVICE DOMAIN: core/sync.js
- * REFERENCES: 665037.jpg, 665038.jpg
+ * ── COZYOS MUTATION SYNC ENGINE & CACHE CONTROLLER ──
+ * DOMAIN: core/sync.js
+ * REFERENCE: CozyOS_Universal_Session_Identity_Kernel_Production_Upgrade.pdf
  */
 
-import { db, doc, setDoc } from './firebase.js';
+import { db } from './firebase.js';
+import { doc, setDoc } from 'https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js';
 import AuditLogger from './audit.js';
 
-export default {
-    _indexedDbInstance: null,
+const CACHE_DB_NAME = "CozyOS_Kernel_Cache";
+const CACHE_VERSION = 1;
+let indexedDBInstance = null;
 
+export default {
+    /**
+     * OPEN STORAGE CONTAINER LABELS
+     */
     async initializeSyncSubsystem() {
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open("cozyos_kernel_offline_db", 1);
-            
-            request.onupgradeneeded = (event) => {
+            const openRequest = indexedDB.open(CACHE_DB_NAME, CACHE_VERSION);
+
+            openRequest.onupgradeneeded = (event) => {
                 const dbInstance = event.target.result;
                 if (!dbInstance.objectStoreNames.contains("mutation_queue")) {
-                    dbInstance.createObjectStore("mutation_queue", { keyPath: "transactionHashId" });
+                    dbInstance.createObjectStore("mutation_queue", { keyPath: "id" });
                 }
             };
 
-            request.onsuccess = (event) => {
-                this._indexedDbInstance = event.target.result;
-                this._registerNetworkOnlineTriggers();
+            openRequest.onsuccess = (event) => {
+                indexedDBInstance = event.target.result;
+                console.log("📦 Idempotent Storage: Queue database structures confirmed online.");
                 resolve(true);
             };
 
-            request.onerror = (err) => reject(err);
+            openRequest.onerror = (err) => reject(err);
         });
     },
 
     /**
-     * Saves data locally and generates unique transaction hashes to prevent duplication.
-     * Maps precisely to requirements in 665038.jpg.
+     * STASH OPERATIONAL INSTRUCTIONS LOCALLY WHEN OFFLINE[span_13](start_span)[span_13](end_span)
      */
-    async enqueueMutation(targetCollection, operationalAction, documentPayload) {
-        // Generate a deterministic transaction hash based on payloads to maintain structural uniqueness
-        const payloadString = JSON.stringify(documentPayload);
-        const transactionHashId = `tx_${this._generateSimpleHash(payloadString + operationalAction + Date.now())}`;
+    async enqueueMutation(targetCollection, actionType, payloadData) {
+        if (!indexedDBInstance) throw new Error("Storage Core Error: Database offline.");
 
-        const mutationTask = {
-            transactionHashId,
-            targetCollection,
-            operationalAction, // SET, UPDATE, DELETE
-            documentPayload,
-            capturedTimestamp: new Date().toISOString()
+        // Pull active tenant tags from the global execution layer context[span_14](start_span)[span_14](end_span)
+        const session = window.CozyOS?.Session;
+        const tenantId = session ? session.tenantId : "unmapped_tenant";
+
+        const executionItem = {
+            id: `mutation_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            collection: targetCollection,
+            action: actionType,
+            tenantId: tenantId, // Enforce tenant tracking on all cached transactions[span_15](start_span)[span_15](end_span)
+            payload: payloadData,
+            timestamp: new Date().toISOString()
         };
 
-        // Write immediately to the local IndexedDB system
-        await this._writeToLocalStore("mutation_queue", mutationTask);
-        await AuditLogger.log("Local Mutation Stored", `Tracking ID: ${transactionHashId} locked locally.`);
+        return new Promise((resolve, reject) => {
+            const transaction = indexedDBInstance.transaction(["mutation_queue"], "readwrite");
+            const store = transaction.objectStore("mutation_queue");
+            const appendQuery = store.add(executionItem);
 
-        // Trigger an automatic background push sequence if online
-        if (navigator.onLine) {
-            this.flushOfflineMutationQueue();
-        }
+            appendQuery.onsuccess = () => {
+                console.warn(` Stashed instruction line [${actionType}] for tenant [${tenantId}] inside IndexedDB.`);
+                resolve(executionItem.id);
+            };
+
+            appendQuery.onerror = (err) => reject(err);
+        });
     },
 
+    /**
+     * FLUSH PENDING QUEUES TO FIREBASE WHEN CONNECTION RESTORES[span_16](start_span)[span_16](end_span)
+     */
     async flushOfflineMutationQueue() {
-        if (!navigator.onLine || !this._indexedDbInstance) return;
+        if (!navigator.onLine || !indexedDBInstance) return;
 
-        const tx = this._indexedDbInstance.transaction("mutation_queue", "readwrite");
-        const store = tx.objectStore("mutation_queue");
-        const getAllRequest = store.getAll();
+        const transaction = indexedDBInstance.transaction(["mutation_queue"], "readwrite");
+        const store = transaction.objectStore("mutation_queue");
+        const getAllQuery = store.getAll();
 
-        getAllRequest.onsuccess = async (event) => {
-            const queuedTasks = event.target.result;
-            if (queuedTasks.length === 0) return;
+        getAllQuery.onsuccess = async (event) => {
+            const items = event.target.result;
+            if (items.length === 0) return;
 
-            console.log(`[COZYOS SYNC KERNEL] Processing [${queuedTasks.length}] queued transaction mutations.`);
+            console.log(`🚀 Storage Sync: Syncing ${items.length} pending mutations to the cloud...`);
 
-            for (const task of queuedTasks) {
+            for (const item of items) {
                 try {
-                    const targetCloudRef = doc(db, task.targetCollection, task.documentPayload.id);
-                    
-                    // Push changes to cloud infrastructure safely
-                    await setDoc(targetCloudRef, task.documentPayload, { merge: true });
-                    
-                    // Remove item from IndexedDB queue upon successful synchronization
-                    const cleanupTx = this._indexedDbInstance.transaction("mutation_queue", "readwrite");
-                    cleanupTx.objectStore("mutation_queue").delete(task.transactionHashId);
-                    
-                    await AuditLogger.log("Sync Complete", `Transaction hash synced: ${task.transactionHashId}`);
-                } catch (connectionError) {
-                    console.error("Sync batch cycle paused due to connection limits.", connectionError);
-                    break;
+                    // Double-check isolation rules against the active session[span_17](start_span)[span_17](end_span)
+                    if (window.CozyOS?.Session && item.tenantId !== window.CozyOS.Session.tenantId) {
+                        console.error(`🚨 Security Intercept: Aborted syncing data across boundaries for ID: ${item.id}`);
+                        continue; 
+                    }
+
+                    const targetDocumentRef = doc(db, item.collection, item.payload.id || item.id);
+                    await setDoc(targetDocumentRef, {
+                        ...item.payload,
+                        syncedAt: new Date().toISOString(),
+                        originatingSessionId: window.CozyOS?.Session?.sessionId || "offline_shell"
+                    }, { merge: true });
+
+                    // Remove processed transaction from local storage
+                    const cleanTransaction = indexedDBInstance.transaction(["mutation_queue"], "readwrite");
+                    cleanTransaction.objectStore("mutation_queue").delete(item.id);
+
+                } catch (syncFault) {
+                    console.error(`❌ Failed processing transaction item node ID: ${item.id}`, syncFault);
                 }
             }
+
+            await AuditLogger.log("Storage Sync", `Successfully synced mutation queue items.`);
         };
-    },
-
-    _writeToLocalStore(storeName, dataObject) {
-        return new Promise((resolve) => {
-            const tx = this._indexedDbInstance.transaction(storeName, "readwrite");
-            const store = tx.objectStore(storeName);
-            store.put(dataObject);
-            tx.oncomplete = () => resolve(true);
-        });
-    },
-
-    _generateSimpleHash(stringSource) {
-        let hashValue = 0;
-        for (let idx = 0; idx < stringSource.length; idx++) {
-            hashValue = (hashValue << 5) - hashValue + stringSource.charCodeAt(idx);
-            hashValue |= 0;
-        }
-        return Math.abs(hashValue).toString(36);
-    },
-
-    _registerNetworkOnlineTriggers() {
-        window.addEventListener("online", () => {
-            console.log("🌐 Network state change captured: Online. Triggering synchronization sync processing cycles...");
-            this.flushOfflineMutationQueue();
-        });
     }
+};
+
+window.CozyOS.SyncEngine = {
+    enqueue: async (col, act, pay) => { return await module.exports.default.enqueueMutation(col, act, pay); },
+    flush: async () => { return await module.exports.default.flushOfflineMutationQueue(); }
 };
