@@ -1,37 +1,101 @@
-/**
- * REFINED INTEGRATED MOUNT IN: dashboard.html
- * Scope: processCoreWorkspaceMount(userAccount)
- * Reference: CozyOS_Universal_Session_Identity_Kernel_Production_Upgrade.pdf
- */
-
-// Define all small business, micro-retail, and agent industry types[span_0](start_span)[span_0](end_span)
-const businessTypes = ["school", "hotel", "church", "shop", "general", "restaurant", "retail"];
-
-if (window.CozyOS?.Session && businessTypes.includes(window.CozyOS.Session.industry.toLowerCase())) {
-    console.log(`🎯 CozyOS Workspace Core: Bootstrapping All-Inclusive Small Biz & M-Pesa Agent Canvas for [${window.CozyOS.Session.industry}]...`);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CozyOS Workspace Shell</title>
     
-    // 1. First, initialize the main business module metrics data layer[span_1](start_span)[span_1](end_span)
-    if (window.CozyOS.SmallBiz?.init) {
-        await window.CozyOS.SmallBiz.init();
-    }
-
-    // 2. Render the M-Pesa Agent Assistant & Core Peripheral Inputs Matrix layout cards[span_2](start_span)[span_2](end_span)
-    if (window.CozyOS.MpesaAgent?.renderAgentDashboard) {
-        await window.CozyOS.MpesaAgent.renderAgentDashboard("cozy-dashboard-grid");
-    }
-
-    // 3. Populate and overlay the dynamic retail sales counters, profit metrics, and low stock warnings
-    if (typeof populateSmallBizDashboardUiValues === "function") {
-        await populateSmallBizDashboardUiValues();
-    } else if (window.CozyOS.DashboardShell?.populateRetailMetrics) {
-        await window.CozyOS.DashboardShell.populateRetailMetrics();
-}        // Push state directly into the global execution session variable container frame context if active
-        if (window.CozyOS?.Session) {
-            window.CozyOS.Session.onlineStatus = isOnline ? "online" : "offline";
-            window.CozyOS.Session.lastSyncTime = new Date().toISOString();
+    <!-- Premium Workspace UI Theme Tokens Mapping -->
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #06080a;
+            color: #e2e8f0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
+        .cozy-app-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+        .cozy-sidebar {
+            width: 260px;
+            background-color: #0b0d0f;
+            border-right: 1px solid #1f242b;
+            padding: 20px 0;
+        }
+        .cozy-sidebar h2 {
+            padding: 0 20px;
+            font-size: 18px;
+            color: #C5A059; /* Premium Gold Signature Accent Token */
+            margin-bottom: 20px;
+        }
+        .cozy-sidebar ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .cozy-main-content {
+            flex: 1;
+            padding: 30px;
+        }
+        /* Unified Responsive Flex Matrix Grid Layout Grid system */
+        .cozy-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        /* Global Framework Card Styling Blocks */
+        .cozy-dashboard-card {
+            background-color: #0b0d0f;
+            border: 1px solid #1f242b;
+            border-radius: 6px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .cozy-dashboard-card:hover {
+            border-color: #C5A059;
+        }
+    </style>
+</head>
+<body>
 
+    <div class="cozy-app-layout">
+        <!-- Sidebar Shell Node Elements Insertion Target -->
+        <aside class="cozy-sidebar">
+            <h2>CozyOS Workspace</h2>
+            <ul id="cozy-sidebar-nav">
+                <!-- JavaScript automatically populates sidebar navigation entries here -->
+            </ul>
+        </aside>
 
+        <!-- Dynamic Grid Matrix Interface Window Pane View Target -->
+        <main class="cozy-main-content">
+            <header style="margin-bottom: 20px;">
+                <h1 style="margin: 0; font-size: 24px; font-weight: 500;">Control Dashboard</h1>
+            </header>
+            
+            <div id="cozy-dashboard-grid" class="cozy-grid">
+                <!-- JavaScript automatically mounts dynamic architecture modules here -->
+            </div>
+        </main>
+    </div>
 
-
-  
+    <!-- BOOTSTRAP OPERATIONAL CONSOLE WRAPPERS -->
+    <script type="module">
+        import DashboardShell from './core/dashboard.js';
+        
+        // Bootstraps modules and populates the UI once components settle safely
+        document.addEventListener("DOMContentLoaded", async () => {
+            console.log("⚙️ CozyOS Interface Core: Initializing dynamic view matrices compilation...");
+            try {
+                await DashboardShell.bootstrap();
+            } catch (error) {
+                console.error("Initialization Fault:", error);
+            }
+        });
+    </script>
+</body>
+</html>  
