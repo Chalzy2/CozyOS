@@ -1,9 +1,8 @@
 /**
  * ── COZYOS CENTRAL BOOTSTRAP MICROKERNEL ──
- * VERSION: 9.0.0 (Production Architecture Complete)
+ * VERSION: 9.1.0 (Production Architecture Complete)
  */
 (function() {
-    // 1. Establish early-stage namespace maps to shield dashboard templates from file load latency
     const CozyOS = { _isReady: false, _initPromise: null };
     const subsystems = [
         'AI', 'Storage', 'Auth', 'Security', 'Notifications', 'Analytics', 'Router', 
@@ -20,8 +19,8 @@
         this._initPromise = (async () => {
             console.log("🌌 [CozyOS Kernel] Initializing microkernel architecture layers...");
             try {
-                // Parallel asynchronous import allocation
-                const [config, logger, events, storage, sync, permissions, scheduler, telemetry, router, modules, services] = await Promise.all([
+                // Parallel asynchronous import allocation — now including core/ai.js
+                const [config, logger, events, storage, sync, permissions, scheduler, telemetry, router, modules, services, ai] = await Promise.all([
                     import('./core/config.js'),
                     import('./core/logger.js'),
                     import('./core/events.js'),
@@ -32,7 +31,8 @@
                     import('./core/telemetry.js'),
                     import('./core/router.js'),
                     import('./core/modules.js'),
-                    import('./core/services.js')
+                    import('./core/services.js'),
+                    import('./core/ai.js') // <── Added here
                 ]);
 
                 // Register Core Subsystems
@@ -46,17 +46,15 @@
                 CozyOS.Telemetry = telemetry.default;
                 CozyOS.Router = router.default;
                 CozyOS.Plugins = modules.default;
+                CozyOS.AI = ai.default; // <── Mounted safely to window.CozyOS.AI
 
-                // Spread extended proxy capabilities (AI, Wallet, CRM) onto global layout frame API
+                // Spread extended capability business drivers (Wallet, CRM, etc.)
                 Object.assign(CozyOS, services.default);
 
-                // Initialize local database clusters
+                // Run system initialization hook routines
                 await CozyOS.Storage.initInternal();
-                
-                // Fire dynamic background transaction flushes
                 CozyOS.Sync.startSyncOrchestrator();
 
-                // Allocate systemic resource telemetry loops using the scheduler engine
                 CozyOS.Scheduler.createJob("kernel_health_heartbeat", 15000, () => {
                     const dbInstance = CozyOS.Storage.getRawInstance();
                     if (dbInstance) {
@@ -81,29 +79,16 @@
         return this._initPromise;
     };
 
-    /**
-     * Centralized Process Fault-Isolation Boundary Protocol
-     * Wraps background errors to keep your dashboard running smoothly even if an individual module fails.
-     */
     CozyOS.handleFault = function(sourceContext, errorPayload) {
         if (CozyOS.Logger && CozyOS.Logger.error) {
             CozyOS.Logger.error(`FAULT_ISOLATION [${sourceContext}]`, errorPayload?.message || errorPayload, errorPayload);
-        } else {
-            console.error(`🚨 [Kernel Fault Isolation] ${sourceContext} ->`, errorPayload);
         }
-        
-        // Push a non-blocking UI alert notification toast
-        if (CozyOS.Notifications && CozyOS.Notifications.dispatchSystemToast) {
-            CozyOS.Notifications.dispatchSystemToast(`⚠️ Isolated Process Alert: ${sourceContext}`);
-        } else {
-            let toastEl = document.getElementById('cc-toast');
-            if (toastEl) {
-                toastEl.textContent = `⚠️ Isolated Process Alert: ${sourceContext}`;
-                toastEl.className = 'show';
-                setTimeout(() => toastEl.className = '', 3000);
-            }
+        let toastEl = document.getElementById('cc-toast');
+        if (toastEl) {
+            toastEl.textContent = `⚠️ Isolated Process Alert: ${sourceContext}`;
+            toastEl.className = 'show';
+            setTimeout(() => toastEl.className = '', 3000);
         }
-        
         if (CozyOS.Telemetry && CozyOS.Telemetry.updateMetrics) {
             CozyOS.Telemetry.updateMetrics({ lastErrorContext: sourceContext });
         }
@@ -111,4 +96,3 @@
 
     window.CozyOS = CozyOS;
 })();
-                    
