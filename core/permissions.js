@@ -1,41 +1,46 @@
 /**
- * ── COZYOS UNIVERSAL SESSION & PERMISSION ENGINE ──
+ * ── COZYOS CENTRAL USER SESSION & SECURITY KERNEL ──
  * DOMAIN: core/permissions.js
- * REFERENCE: [source: 1]
+ * REFERENCE: CozyOS_Universal_Session_Identity_Kernel_Production_Upgrade.pdf
  */
 
-import { db, doc, getDoc } from './firebase.js';
+import { db } from './firebase.js';
+import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js';
 import AuditLogger from './audit.js';
 
-// Initialize the root Global Object Namespace safely
+// Initialize the root namespace safely
 window.CozyOS = window.CozyOS || {};
 window.CozyOS.Session = window.CozyOS.Session || null;
 
 export default {
     /**
-     * ATOMIC LIFECYCLE INITIALIZER (Steps 1-8)
-     * Compiles the comprehensive enterprise session matrix from [source: 1].
+     * CENTRAL LIFECYCLE INITIALIZER (Steps 1-8)
+     * Compiles the comprehensive multi-tenant session matrix[span_3](start_span)[span_3](end_span).
      */
-    async initializeUserSession(authUserData, deviceId = "unknown_device") {
+    async initializeUserSession(authUserData, deviceId = "client_browser_shell") {
         const startTime = Date.now();
         
         try {
-            // Fetch configuration matrix from Cloud Firestore
+            // Read deep corporate metadata records from Cloud Firestore
             const userRef = doc(db, 'users', authUserData.uid);
             const userSnap = await getDoc(userRef);
-            if (!userSnap.exists()) throw new Error("Security Exception: Core registration metadata missing.");
+            
+            if (!userSnap.exists()) {
+                throw new Error("Security Exception: Core registration metadata missing.");
+            }
+            
             const profileData = userSnap.data();
 
-            // Setup step-by-step production session tracking parameters
+            // Establish the definitive Global Session Object Schema[span_4](start_span)[span_4](end_span)
             window.CozyOS.Session = {
                 authenticated: true,
                 userId: authUserData.uid,
                 organizationId: profileData.organizationId || "",
                 workspaceId: profileData.workspaceId || "",
-                industry: profileData.industry || "general", // e.g., school, hotel, church, hospital
+                industry: profileData.industry || "general", // e.g., 'school', 'hotel', 'shop'
                 organizationName: profileData.organizationName || "CozyOS Workspace",
                 role: profileData.role || "guest",
-                permissions: profileData.permissions || [], // Array of granular scope strings
+                permissions: profileData.permissions || [], // Array of fine-grained scope strings
                 language: profileData.language || "en",
                 timezone: profileData.timezone || "Africa/Nairobi",
                 currency: profileData.currency || "KES",
@@ -54,36 +59,44 @@ export default {
                 metadata: { initializationLatencyMs: Date.now() - startTime }
             };
 
-            // Propagate language preferences across core engine modules dynamically
+            // Hook into external UI translation mechanisms if present
             if (window.CozyOS.LanguageEngine?.setLocale) {
                 window.CozyOS.LanguageEngine.setLocale(window.CozyOS.Session.language);
             }
 
-            await AuditLogger.log("Login", "CozyOS Global Session generated and actively cached.");
+            await AuditLogger.log("Login", "CozyOS Global Session initialized and actively cached.");
             return window.CozyOS.Session;
             
         } catch (error) {
-            console.error("🚨 Kernel Error: Global session initialization trace failed.", error);
+            console.error("🚨 Kernel Boot Failure: Session compilation tracing failed.", error);
             throw error;
         }
     },
 
     /**
-     * UNIVERSAL SCOPE EXPLICIT VERIFICATION
-     * Maps precisely to CozyOS.Permissions.check() requirement from [source: 1].
+     * CLEAR OPERATOR SESSION STATE
+     */
+    async clearSession() {
+        await AuditLogger.log("Logout", "Terminating active global session context safely.");
+        window.CozyOS.Session = null;
+    },
+
+    /**
+     * FINE-GRAINED ACTION SCOPE CHECKER
+     * Enforces explicit permission rules globally across layout files[span_5](start_span)[span_5](end_span).
      */
     check(scopeToken) {
         if (!window.CozyOS.Session || !window.CozyOS.Session.authenticated) return false;
         
-        // Root override capability rule
+        // Root developer override configuration
         if (window.CozyOS.Session.permissions.includes("admin.all")) return true;
         
-        // Evaluate granular string tokens matching requirement (e.g., 'finance.write', 'students.read')
+        // Match fine-grained string tokens (e.g., 'finance.write', 'students.read')[span_6](start_span)[span_6](end_span)
         return window.CozyOS.Session.permissions.includes(scopeToken);
     }
 };
 
-// Bind checker explicitly to global namespace map for runtime visibility
+// Expose verification endpoints globally to satisfy the universal specification[span_7](start_span)[span_7](end_span)
 window.CozyOS.Permissions = {
     check: (token) => {
         if (!window.CozyOS.Session) return false;
