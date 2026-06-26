@@ -1,137 +1,37 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CozyOS Executive Workspace Shell</title>
-    <link rel="stylesheet" href="css/theme.css">
-    <style>
-        .cozy-app-layout { display: flex; min-height: 100vh; background: #0b0b0b; color: #ffffff; font-family: system-ui, sans-serif; }
-        .cozy-sidebar { width: 280px; background: #111111; border-right: 1px solid rgba(195, 160, 89, 0.15); padding: 25px 20px; }
-        .cozy-main-viewport { flex-grow: 1; padding: 40px; background: #161616; overflow-y: auto; }
-        .cozy-grid-matrix { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 30px; }
-        .cozy-dashboard-card { background: #1c1c1c; border-radius: 8px; padding: 25px; border: 1px solid #222222; }
-        
-        .sync-badge { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; padding: 4px 12px; border-radius: 20px; font-weight: 600; }
-        .online { background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); }
-        .offline { background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.2); }
-    </style>
-</head>
-<body>
+/**
+ * REFINED INTEGRATED MOUNT IN: dashboard.html
+ * Scope: processCoreWorkspaceMount(userAccount)
+ * Reference: CozyOS_Universal_Session_Identity_Kernel_Production_Upgrade.pdf
+ */
 
-<div class="cozy-app-layout">
-    <aside class="cozy-sidebar">
-        <div class="cozy-brand-header">
-            <h3 style="color: #C5A059; margin: 0; font-weight: 600;" id="org-name-string">CozyOS Shell</h3>
-        </div>
-        <hr style="border: 0; border-top: 1px solid rgba(195,160,89,0.1); margin: 20px 0;">
-        <ul id="cozy-sidebar-nav" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;">
-            <!-- Modules populate dynamically based on active security authorization rules -->
-        </ul>
-    </aside>
+// Define all small business, micro-retail, and agent industry types[span_0](start_span)[span_0](end_span)
+const businessTypes = ["school", "hotel", "church", "shop", "general", "restaurant", "retail"];
 
-    <main class="cozy-main-viewport">
-        <header style="margin-bottom: 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #222; padding-bottom: 20px;">
-            <div>
-                <h1 style="margin: 0; font-weight: 500; font-size: 26px;" id="welcome-string">Loading Session Monitor...</h1>
-                <p style="margin: 6px 0 0 0; font-size: 11px; color: #888; font-family: monospace;" id="tenancy-trace-string">Validating cryptographic access profiles...</p>
-            </div>
-            <div>
-                <span id="network-sync-badge" class="sync-badge online">Checking Core Link State...</span>
-            </div>
-        </header>
-
-        <div class="cozy-grid-matrix" id="cozy-dashboard-grid">
-            <!-- Unauthorized panel metric widgets are completely skipped during generation steps -->
-        </div>
-    </main>
-</div>
-
-<script type="module">
-    import { auth } from './core/firebase.js';
-    import Permissions from './core/permissions.js';
-    import DashboardShell from './core/dashboard.js';
-    import AuditLogger from './core/audit.js';
-
-    // Localized Native Language Greetings Map Matrix Reference
-    const GREETINGS = {
-        en: "Welcome", sw: "Habari", luo: "Amosi", kik: "Wanyua",
-        kam: "Wakya", kal: "Chamgei", fr: "Bienvenue", ar: "Ahlan wa sahlan",
-        pt: "Bem-vindo", es: "Bienvenido"
-    };
-
-    document.addEventListener("DOMContentLoaded", () => {
-        // 1. Establish Real-time Network Operational State Change Hooks
-        window.addEventListener("online", handleNetworkStateTransition);
-        window.addEventListener("offline", handleNetworkStateTransition);
-        handleNetworkStateTransition();
-
-        // 2. Fire Live Authentication Pipeline Hook Sequence (onAuthStateChanged)
-        auth.onAuthStateChanged(async (userAccount) => {
-            if (userAccount) {
-                await processCoreWorkspaceMount(userAccount);
-            } else {
-                console.warn("Authorization missing. Returning viewport context to Login Entry gate.");
-                window.location.href = "login.html";
-            }
-        });
-    });
-
-    /**
-     * Orchestrates steps 1 through 8 to securely compile the application workspace environment on successful auth
-     */
-    async function processCoreWorkspaceMount(userAccount) {
-        try {
-            // Generate the secure, centralized session data object matrix globally
-            const session = await Permissions.initializeUserSession(userAccount, "client_browser_viewport");
-
-            // Execute dynamic user-specific layout rendering runs
-            await DashboardShell.bootstrapDashboardShell(session);
-
-            // Fetch contextual translations for current profile view nodes
-            const userLang = session.language || "en";
-            const greetingPhrase = GREETINGS[userLang] || GREETINGS.en;
-
-            // Apply text variables safely across core view layout nodes
-            document.getElementById("org-name-string").textContent = session.organizationName;
-            document.getElementById("welcome-string").textContent = `${greetingPhrase}, ${session.profile.name || 'Operator'}`;
-            document.getElementById("tenancy-trace-string").textContent = 
-                `TENANT: ${session.tenantId.toUpperCase()} // WORKSPACE: ${session.workspaceId.toUpperCase()} // ROLE: ${session.role.toUpperCase()}`;
-
-            await AuditLogger.log("Session Mount", `Executive workspace shell successfully loaded for Session: ${session.sessionId}`);
-
-        } catch (fault) {
-            handleSevereKernelHalt(fault);
-        }
+if (window.CozyOS?.Session && businessTypes.includes(window.CozyOS.Session.industry.toLowerCase())) {
+    console.log(`🎯 CozyOS Workspace Core: Bootstrapping All-Inclusive Small Biz & M-Pesa Agent Canvas for [${window.CozyOS.Session.industry}]...`);
+    
+    // 1. First, initialize the main business module metrics data layer[span_1](start_span)[span_1](end_span)
+    if (window.CozyOS.SmallBiz?.init) {
+        await window.CozyOS.SmallBiz.init();
     }
 
-    function handleNetworkStateTransition() {
-        const badge = document.getElementById("network-sync-badge");
-        if (!badge) return;
+    // 2. Render the M-Pesa Agent Assistant & Core Peripheral Inputs Matrix layout cards[span_2](start_span)[span_2](end_span)
+    if (window.CozyOS.MpesaAgent?.renderAgentDashboard) {
+        await window.CozyOS.MpesaAgent.renderAgentDashboard("cozy-dashboard-grid");
+    }
 
-        const isOnline = navigator.onLine;
-        badge.className = `sync-badge ${isOnline ? 'online' : 'offline'}`;
-        badge.textContent = isOnline ? "Online • Active" : "Offline • Queueing Enabled";
-
-        // Push state directly into the global execution session variable container frame context if active
+    // 3. Populate and overlay the dynamic retail sales counters, profit metrics, and low stock warnings
+    if (typeof populateSmallBizDashboardUiValues === "function") {
+        await populateSmallBizDashboardUiValues();
+    } else if (window.CozyOS.DashboardShell?.populateRetailMetrics) {
+        await window.CozyOS.DashboardShell.populateRetailMetrics();
+}        // Push state directly into the global execution session variable container frame context if active
         if (window.CozyOS?.Session) {
             window.CozyOS.Session.onlineStatus = isOnline ? "online" : "offline";
             window.CozyOS.Session.lastSyncTime = new Date().toISOString();
         }
-    }
 
-    function handleSevereKernelHalt(error) {
-        console.error("🚨 Critical System Initialization Defect Captured:", error);
-        document.body.innerHTML = `
-            <div style="background: #090909; color: #ff4444; padding: 40px; font-family: monospace; text-align: center; height: 100vh; display: flex; align-items: center; justify-content: center;">
-                <div style="border: 1px solid rgba(255,68,68,0.2); background: rgba(255,68,68,0.03); padding: 35px; border-radius: 8px; max-width: 550px;">
-                    <h3 style="margin: 0 0 10px 0; color: #ff5555; letter-spacing: 0.5px;">🚫 COZYOS SYSTEM BOOT COMPILATION FAILURE</h3>
-                    <p style="color: #999; font-size: 13px; line-height: 1.6;">Cryptographic isolation pipeline checks rejected this initialization sequence. This happens if authorization keys are invalid or tenant mapping records are missing.</p>
-                    <p style="color: #555; font-size: 11px; margin-top: 20px; text-transform: uppercase; word-break: break-all;">Diagnostic String: ${error.message || "Execution Interrupt"}</p>
-                </div>
-            </div>
-        `;
-    }
-</script>
-</body>
-</html>
+
+
+
+  
