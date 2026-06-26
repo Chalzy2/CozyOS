@@ -2,46 +2,71 @@
  * ── COZYOS CENTRAL INTELLIGENCE GATEWAY CONTROLLER ──
  * FILE: core/ai.js
  * 
- * CRITICAL RULE: This is the single entry point for all AI intent processing.
- * Industry modules inherit services entirely from the Kernel.
+ * DESIGN PRINCIPLE: Kernel-First Plugin Architecture
+ * Enforces dynamic runtime hot-swapping without modifying base kernel logic.
  */
 
 import SecurityGuard from './permissions.js';
 import AuditTrail from './audit.js';
 
-// Dynamic Strategy Map for Industry Handlers
-const SECTOR_REGISTRY = {
-    school: () => import('./ai/schoolHandler.js'),
-    business: () => import('./ai/businessHandler.js'),
-    retail: () => import('./ai/businessHandler.js'), // Alias for shop/duka contexts
-    mpesa: () => import('./ai/mpesaHandler.js'),
-    agent: () => import('./ai/mpesaHandler.js'), // Alias
-    church: () => import('./ai/churchHandler.js'),
-    hospital: () => import('./ai/hospitalHandler.js'),
-    hotel: () => import('./ai/hotelHandler.js'),
-    sacco: () => import('./ai/saccoHandler.js'),
-    chama: () => import('./ai/saccoHandler.js'), // Alias
-    agritech: () => import('./ai/agritechHandler.js'),
-    agrovet: () => import('./ai/agritechHandler.js'), // Alias
+// Setup global namespace registry if not already mounted by the system core bootloader
+window.CozyOS = window.CozyOS || {};
+window.CozyOS.IndustryRegistry = window.CozyOS.IndustryRegistry || new Map();
 
-    /* Future Scalability Extension Vectors */
-    county: () => import('./ai/countyHandler.js'),
-    pharmacy: () => import('./ai/pharmacyHandler.js'),
-    manufacturing: () => import('./ai/manufacturingHandler.js'),
-    transport: () => import('./ai/transportHandler.js'),
-    ngo: () => import('./ai/ngoHandler.js'),
-    tourism: () => import('./ai/tourismHandler.js'),
-    legal: () => import('./ai/legalHandler.js')
+/**
+ * Baseline Core Dynamic Registry Interface Architecture
+ */
+export const CoreIndustryRegistry = {
+    /**
+     * Registers a new industry module sub-handler into the active kernel memory map.
+     * Can be invoked dynamically during runtime initialization or script lazy-loading.
+     * @param {string} industryKey - Unique domain identifier (e.g., 'pharmacy', 'county')
+     * @param {Function} handlerFunc - Stateless resolution handler matching architectural specs
+     */
+    register(industryKey, handlerFunc) {
+        const key = industryKey.toLowerCase();
+        window.CozyOS.IndustryRegistry.set(key, handlerFunc);
+        console.log(`🔌 CozyOS Kernel: Dynamically mounted industry handler link -> [${key.toUpperCase()}]`);
+    },
+
+    /**
+     * Removes an operational target safely from system routing configurations
+     */
+    unregister(industryKey) {
+        window.CozyOS.IndustryRegistry.delete(industryKey.toLowerCase());
+    }
 };
+
+// Seed our baseline architecture handlers directly into the dynamic registry matrix
+// This maps our certified Stage 3 portfolio onto the new hot-registration model
+const BASELINE_HANDLERS = {
+    school: () => import('./ai/schoolHandler.js').then(m => m.processSchoolVoiceIntent || Object.values(m)[0]),
+    business: () => import('./ai/businessHandler.js').then(m => m.processBusinessVoiceIntent || Object.values(m)[0]),
+    retail: () => import('./ai/businessHandler.js').then(m => m.processBusinessVoiceIntent || Object.values(m)[0]),
+    mpesa: () => import('./ai/mpesaHandler.js').then(m => m.processMpesaVoiceIntent || Object.values(m)[0]),
+    church: () => import('./ai/churchHandler.js').then(m => m.processChurchVoiceIntent || Object.values(m)[0]),
+    hospital: () => import('./ai/hospitalHandler.js').then(m => m.processHospitalVoiceIntent || Object.values(m)[0]),
+    hotel: () => import('./ai/hotelHandler.js').then(m => m.processHotelVoiceIntent || Object.values(m)[0]),
+    sacco: () => import('./ai/saccoHandler.js').then(m => m.processSaccoVoiceIntent || Object.values(m)[0]),
+    agritech: () => import('./ai/agritechHandler.js').then(m => m.processAgritechVoiceIntent || Object.values(m)[0])
+};
+
+// Initialize foundational registry allocation blocks
+Object.entries(BASELINE_HANDLERS).forEach(([key, factory]) => {
+    CoreIndustryRegistry.register(key, async (query, context, security) => {
+        const activeTargetFunction = await factory();
+        return activeTargetFunction(query, context, security);
+    });
+});
 
 export default {
     /**
-     * Centralized Natural Language Orchestration Pipeline
-     * @param {string} rawPromptText - User spoken or typed prompt string
-     * @param {Object} session - Authenticated execution profile context from Firebase
+     * Single Entry Point Natural Language Processing Routing Engine Interceptor
+     * @param {string} rawPromptText - Raw user language input string
+     * @param {Object} session - Authenticated execution context parameters from Firebase
      */
     async processVoiceIntent(rawPromptText, session) {
-        // 1. Kernel Security Safeguard Guardrail
+        // 1. Kernel Security Safeguard Guardrail & Tenant Isolation Enforcements
         if (!session || !session.tenantId || !session.profile?.role) {
             return { responseText: "🔒 Access Refused: Invalid context or missing token parameters.", pipelineState: "blocked" };
         }
@@ -49,7 +74,7 @@ export default {
         const normalizedQuery = rawPromptText.toLowerCase();
         const activeIndustry = session.industry?.toLowerCase();
 
-        // 2. Automated Language Detection Hook
+        // 2. Automated Language Detection Vector
         const context = {
             tenantId: session.tenantId,
             role: session.profile.role,
@@ -57,41 +82,36 @@ export default {
                       /tinde|pesa|nyisa|omiyoyo/.test(normalizedQuery) ? "luo" : "en"
         };
 
-        // 3. Dynamic Strategy Resolver
-        const loader = SECTOR_REGISTRY[activeIndustry];
-        if (!loader) {
+        // 3. Dynamic Registry Resolution Handshake
+        const targetHandler = window.CozyOS.IndustryRegistry.get(activeIndustry);
+        if (!targetHandler) {
             return {
-                responseText: `⚠️ Error: The active subsystem workspace profile [${activeIndustry.toUpperCase()}] is not mapped to this kernel cluster core.`,
+                responseText: `⚠️ System Notification: Industry configuration block [${activeIndustry.toUpperCase()}] is not registered in this kernel context space.`,
                 pipelineState: "unsupported"
             };
         }
 
         try {
-            // 4. Lazy-load Industry Handler on demand to preserve low memory overhead
-            const module = await loader();
-            const handlerName = `process${activeIndustry.charAt(0).toUpperCase() + activeIndustry.slice(1)}VoiceIntent`;
-            const sectorTargetFunction = module[handlerName] || Object.values(module)[0];
-
-            // 5. Handshake Execution via Kernel Access and Isolation Layers
-            // Sub-handlers expect security data passed directly from the Kernel
-            const outcome = await sectorTargetFunction(normalizedQuery, context, SecurityGuard);
+            // 4. Invoke the stateless sub-handler function block
+            // Passes down shared verification parameters directly from the system core
+            const outcome = await targetHandler(normalizedQuery, context, SecurityGuard);
 
             if (!outcome) {
                 return {
-                    responseText: "💡 Core AI Engine: Intent could not be confidently mapped to a module action mutation script.",
+                    responseText: "💡 Dynamic AI Engine: Core matching rules returned no matching intent routines.",
                     pipelineState: "ambiguous"
                 };
             }
 
-            // 6. Immutable Kernel Audit Logger Push
-            await AuditTrail.log(session, "AI_REQUEST_PROCESSED", `Query parsed via [${activeIndustry}Handler.js]. State: ${outcome.pipelineState}`);
+            // 5. Immutable Core Audit Logging Integration Loop
+            await AuditTrail.log(session, "AI_DYNAMIC_REQUEST_PASSED", `Query routed successfully to dynamic space handler: [${activeIndustry}]`);
 
             return outcome;
 
         } catch (error) {
-            await AuditTrail.log(session, "AI_EXCEPTION_FAULT", `System fault in sector handler: ${error.message}`);
+            await AuditTrail.log(session, "AI_DYNAMIC_REGISTRY_FAULT", `System exception thrown in routing runtime: ${error.message}`);
             return {
-                responseText: "🚨 Kernel Exception: Intermittent processing fault inside the industry application layer loop.",
+                responseText: "🚨 Kernel Exception: Intermittent failure inside the industry plugin block.",
                 pipelineState: "fault"
             };
         }
