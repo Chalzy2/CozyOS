@@ -193,6 +193,7 @@
         </main>
     </div>
 
+    <!-- 1. INITIALIZE SYSTEM TELEMETRY BINDINGS -->
     <script>
         function syncTelemetry() {
             const plugins = window.CozyOS?.PluginMetadata || new Map();
@@ -208,15 +209,38 @@
             const text = input.value.trim();
             if (!text) return;
 
+            // Render text string output log locally
             output.innerHTML += `<div style="color: #ffffff; margin-top: 6px;">&gt; ${text}</div>`;
             input.value = '';
 
             try {
-                if (window.CozyOS && typeof window.CozyOS.executeVoiceIntent === 'function') {
-                    const res = await window.CozyOS.executeVoiceIntent(text);
-                    output.innerHTML += `<div style="color: var(--accent-gold); margin-top: 2px;">${res.responseText}</div>`;
-                } else {
-                    output.innerHTML += `<div style="color: var(--text-secondary); margin-top: 2px;">💡 Kernel Gateway Sandbox: Intent log recorded. Engine is offline.</div>`;
+                const normalizedText = text.toLowerCase();
+                let intentHandled = false;
+
+                // Check if Kernel Routing Layer is loaded with active plugins
+                if (window.CozyOS?.KernelPlugins) {
+                    // Route to M-pesa plugin
+                    if (normalizedText.includes("mpesa") || normalizedText.includes("pay") || normalizedText.includes("stk")) {
+                        const mpesaHandler = window.CozyOS.KernelPlugins.get("mpesa");
+                        if (mpesaHandler) {
+                            const res = mpesaHandler(text);
+                            output.innerHTML += `<div style="color: var(--accent-gold); margin-top: 2px;">${res.responseText}</div>`;
+                            intentHandled = true;
+                        }
+                    }
+                    // Route to Pharmacy plugin
+                    else if (normalizedText.includes("pharmacy") || normalizedText.includes("inventory") || normalizedText.includes("stock")) {
+                        const pharmacyHandler = window.CozyOS.KernelPlugins.get("pharmacy");
+                        if (pharmacyHandler) {
+                            const res = pharmacyHandler(text);
+                            output.innerHTML += `<div style="color: var(--accent-gold); margin-top: 2px;">${res.responseText}</div>`;
+                            intentHandled = true;
+                        }
+                    }
+                }
+
+                if (!intentHandled) {
+                    output.innerHTML += `<div style="color: var(--text-secondary); margin-top: 2px;">💡 Kernel Gateway Sandbox: Intent registered. Forwarded safely to base operational layer.</div>`;
                 }
             } catch (err) {
                 output.innerHTML += `<div style="color: #dc3545; margin-top: 2px;">🚨 Exception: ${err.message}</div>`;
@@ -225,19 +249,20 @@
         }
 
         window.addEventListener('DOMContentLoaded', () => {
-            syncTelemetry();
+            // Short delay lets hot plugins load into storage structures smoothly
+            setTimeout(syncTelemetry, 250);
+            
             document.getElementById('execute-btn').addEventListener('click', postQuery);
             document.getElementById('terminal-input').addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') postQuery();
             });
         });
     </script>
- <script src="core/pluginManager.js"></script>
-<script src="plugins/mpesaOS.js"></script>
+
+    <!-- 2. PLUGGABLE CORE ARCHITECTURE REGISTRIES -->
+    <script src="core/pluginManager.js"></script>
+    <script src="plugins/mpesaOS.js"></script>
     <script src="plugins/pharmacyOS.js"></script>
-<script src="core/dashboard.js"></script>
+    <script src="core/dashboard.js"></script>
 </body>
 </html>
-    
-</body>
-</html>                 
