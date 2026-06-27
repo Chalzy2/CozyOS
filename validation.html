@@ -262,18 +262,36 @@
 
         window.addEventListener('DOMContentLoaded', renderInterfaceLayout);
     </script>
-    <script>
-        if (!window.CozyOS) window.CozyOS = {};
-        if (!window.CozyOS.KernelPlugins) window.CozyOS.KernelPlugins = new Map();
-        if (!window.CozyOS.PluginMetadata) window.CozyOS.PluginMetadata = new Map();
-        if (!window.CozyOS.TenantContext) {
-            window.CozyOS.TenantContext = { getActiveId: () => "sandbox_test_tenant" };
-        }
-    </script>
+</script>
 
-    <script src="core/storage.js"></script> <script src="core/pluginManager.js"></script>
-    <script src="core/languageImporter.js"></script>
-    <script src="core/plugins/mpesaOS.js"></script>
-    <script src="core/plugins/pharmacyOS.js"></script>
+<!-- ── INITIALIZATION & SEEDING LIFECYCLE ── -->
+<script>
+    window.addEventListener('DOMContentLoaded', async () => {
+        try {
+            // 1. Initialize the storage engine gateway
+            if (window.CozyStorage) {
+                await window.CozyStorage.init();
+                console.log("[Sandbox Engine] Storage initialized successfully.");
+                
+                // 2. Trigger the multi-lingual pack influx for your tenant
+                if (window.CozyLanguageImporter) {
+                    await window.CozyLanguageImporter.seedAllLanguages("sandbox_test_tenant");
+                }
+            }
+            
+            // 3. Fire your core sandbox validation checks automatically
+            if (typeof runAllValidations === 'function') {
+                await runAllValidations();
+            }
+        } catch (error) {
+            console.error("[Sandbox Engine] Boot error:", error);
+        }
+    });
+</script>
+
+<!-- Core Extension Scripts (Loaded after framework orchestration mocks) -->
+<script src="core/plugins/mpesaOS.js"></script>
+<script src="core/plugins/pharmacyOS.js"></script>
+
 </body>
 </html>
