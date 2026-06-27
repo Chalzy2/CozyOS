@@ -1,12 +1,11 @@
 /**
  * ── COZYOS CENTRAL CORE STORAGE ARCHITECTURE ──
- * FILE: core/storage.js (Refactored ES Module)
+ * FILE: core/storage.js
  */
 
 let _dbInstance = null;
 const SCHEMA_META = { name: "CozyOS_Storage_Cluster", version: 8 };
 
-// The 9 mandatory core system data stores
 const REQUIRED_STORES = [
     "users", 
     "settings", 
@@ -19,7 +18,7 @@ const REQUIRED_STORES = [
     "plugins"
 ];
 
-export default {
+const CozyStorage = {
     /**
      * Initializes IndexedDB and safely sets up all architectural object stores
      */
@@ -29,11 +28,8 @@ export default {
             
             req.onupgradeneeded = (e) => {
                 const db = e.target.result;
-                
-                // Automatically verify and construct all required stores dynamically
                 REQUIRED_STORES.forEach(storeName => {
                     if (!db.objectStoreNames.contains(storeName)) {
-                        // Using autoIncrement ensures generic data insertion works out-of-the-box
                         db.createObjectStore(storeName, { keyPath: "id", autoIncrement: true });
                     }
                 });
@@ -48,9 +44,6 @@ export default {
         });
     },
 
-    /**
-     * Returns raw database link for core engine escapes
-     */
     getRawInstance() { 
         return _dbInstance; 
     },
@@ -126,7 +119,7 @@ export default {
     },
 
     /**
-     * Storage Telemetry: Reports current usage metrics and storage allocation boundaries
+     * Storage Telemetry: Reports current usage metrics
      */
     async reportStorageUsage() {
         if (navigator.storage && navigator.storage.estimate) {
@@ -140,3 +133,12 @@ export default {
         return { usedMB: "0.00", quotaMB: "0.00", percentage: "0" };
     }
 };
+
+// ── CONNECTION GATEWAY WIREUP ──
+// 1. Expose to standard global browser context for easy <script src="..."> access
+if (typeof window !== "undefined") {
+    window.CozyStorage = CozyStorage;
+}
+
+// 2. Keep standard ES module export support alive simultaneously
+export default CozyStorage;
