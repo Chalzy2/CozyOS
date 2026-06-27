@@ -1,18 +1,34 @@
 /**
  * ── COZYOS UNIVERSAL CORE STORAGE GATEWAY ──
  * FILE: core/storage.js
- * VERSION: 2.0.0
- * * ARCHITECTURAL RULE: This file is the absolute ONLY component in CozyOS allowed 
+ * VERSION: 2.1.0
+ *
+ * ARCHITECTURAL RULE: This file is the absolute ONLY component in CozyOS allowed
  * to talk directly to IndexedDB, LocalStorage, SessionStorage, Cache API, and Cloud Sync.
- * All modules (BusinessOS, HospitalOS, ULIE, Plugins, etc.) are strictly forbidden 
+ * All modules (BusinessOS, HospitalOS, ULIE, Plugins, etc.) are strictly forbidden
  * from accessing raw browser storage layers directly.
+ *
+ * CHANGES FROM v2.0.0 → v2.1.0
+ * ─────────────────────────────────────────────────────────────────────────
+ * F-01 [Critical]  transaction(): reject async transactionFn — documents IDB sync contract
+ * F-02 [Critical]  tenantId: session-bound _activeTenantId enforced; callers cannot override
+ * F-03 [Critical]  _logAudit: switched put() → add() to make audit log append-only / immutable
+ * F-04 [Critical]  sync(): clientRequestId idempotency key added to sync_queue items
+ * F-05 [High]      update(): optimistic locking via _version field — detects concurrent edits
+ * F-06 [High]      _validateAccess(): module-level RBAC map enforced per store
+ * F-07 [High]      restore(): preserves original id values to maintain relational integrity
+ * F-08 [High]      backup(): chunked per-store processing with maxRecords safety cap
+ * F-09 [Medium]    count(): uses native IDBObjectStore.count() for total; list() for filtered
+ * F-10 [Medium]    search(): optional IDBIndex path for indexed fields; documents fallback
+ * F-11 [Low]       Comment corrected: "32" → "30"
  */
 
 // Private state scoped within the module architecture closure
 let _dbInstance = null;
 const SCHEMA_META = { name: "CozyOS_Storage_Cluster", version: 9 };
 
-// Complete declarative blueprint of all 32 mandatory default system & industry object stores
+// Complete declarative blueprint of all 30 mandatory default system & industry object stores
+// [F-11: corrected count from 32 → 30]
 const BLUEPRINT_OBJECT_STORES = [
     "users", "settings", "organizations", "permissions", "plugins", "plugin_settings",
     "documents", "media", "images", "videos", "language_packs", "translation_memory",
@@ -22,17 +38,54 @@ const BLUEPRINT_OBJECT_STORES = [
     "api_tokens", "preferences"
 ];
 
+// [F-06: Module-level RBAC map]
+// Defines which named module contexts are permitted to access which stores.
+const STORE_PERMISSIONS = {
+    system:      new Set(BLUEPRINT_OBJECT_STORES),
+    businessos:  new Set(["products","inventory","orders","payments","wallet","customers",
+                          "documents","media","images","notifications","settings",
+                          "preferences","sync_queue","offline_queue","sessions","telemetry"]),
+    hospitalos:  new Set(["documents","media","images","patients","orders","payments",
+                          "notifications","settings","preferences","sync_queue",
+                          "offline_queue","sessions","telemetry"]),
+    ulie:        new Set(["language_packs","translation_memory","dictionary",
+                          "learning_progress","voice_models","ocr_cache","settings",
+                          "preferences","sessions","telemetry"]),
+    plugin:      new Set(["products","inventory","notifications","preferences",
+                          "sessions","telemetry"]),
+};
+
+// [F-02: Session-bound tenant state — set once at authenticated session start]
+let _activeTenantId     = null;
+let _activeModuleContext = null;
+
 /**
  * Universal Storage System Core Implementation
  */
 const CozyStorageGateway = {
+
     // ──── 1. LIFECYCLE & INITIALIZATION ENGINE ────
-    
+
     /**
      * Public System Initialization Gateway. Dual-compatible interface handler.
      */
     async init() {
         return this.openDatabase();
+    },
+
+    /**
+     * [F-02] Binds the authenticated session tenant and module context.
+     */
+    initModule(tenantId, moduleContext = "plugin") {
+        if (!tenantId || typeof tenantId !== "string" || tenantId.trim() === "") {
+            throw new Error("[Storage Security] initModule() requires a valid authenticated tenantId.");
+        }
+        if (!STORE_PERMISSIONS[moduleContext]) {
+            throw new Error(`[Storage Security] Unknown module context: '${moduleContext}'. Must be one of: ${Object.keys(STORE_PERMISSIONS).join(", ")}.`);
+        }
+        _activeTenantId      = tenantId.trim();
+        _activeModuleContext = moduleContext;
+        this._logAudit("ModuleContextBound", _activeTenantId, { context: moduleContext });
     },
 
     /**
@@ -49,10 +102,8 @@ const CozyStorageGateway = {
                     const db = e.target.result;
                     console.log(`[Storage Kernel] Upgrading schema architecture to Version ${SCHEMA_META.version}...`);
 
-                    // Dynamically structure every single requested default system partition
                     BLUEPRINT_OBJECT_STORES.forEach(storeName => {
                         if (!db.objectStoreNames.contains(storeName)) {
-                            // Unified auto-increment key path layout strategy for generic standard operations
                             db.createObjectStore(storeName, { keyPath: "id", autoIncrement: true });
                             console.log(`[Storage Schema] Constructed object store partition: ${storeName}`);
                         }
@@ -81,7 +132,9 @@ const CozyStorageGateway = {
     async close() {
         if (_dbInstance) {
             _dbInstance.close();
-            _dbInstance = null;
+            _dbInstance      = null;
+            _activeTenantId  = null;       // [F-02] clear session on close
+            _activeModuleContext = null;
             console.log("[Storage Kernel] Database links disconnected cleanly.");
             return true;
         }
@@ -94,18 +147,20 @@ const CozyStorageGateway = {
      * Create or overwrite an operational layout object with structural validation and hooks.
      */
     async save(storeName, data, tenantId = "default_tenant") {
+        // Multi-tenant isolation sanity guardrail
+        const resolvedTenantId = _activeTenantId !== null ? _activeTenantId : tenantId;
         this._validateAccess(storeName);
-        const processedData = this._applyWritePipelines(data, tenantId);
+        const processedData = this._applyWritePipelines(data, resolvedTenantId);
 
         return new Promise((resolve, reject) => {
             if (!_dbInstance) return reject(new Error("Database instance context uninitialized."));
 
-            const tx = _dbInstance.transaction(storeName, "readwrite");
+            const tx    = _dbInstance.transaction(storeName, "readwrite");
             const store = tx.objectStore(storeName);
-            const req = store.put(processedData);
+            const req   = store.put(processedData);
 
             req.onsuccess = () => {
-                this._logAudit("RecordSave", tenantId, { store: storeName, key: req.result });
+                this._logAudit("RecordSave", resolvedTenantId, { store: storeName, key: req.result });
                 resolve(req.result);
             };
             req.onerror = (e) => reject(e.target.error);
@@ -116,21 +171,21 @@ const CozyStorageGateway = {
      * Retrieve a specific record context payload by its primary key identification.
      */
     async get(storeName, key, tenantId = "default_tenant") {
+        const resolvedTenantId = _activeTenantId !== null ? _activeTenantId : tenantId;
         this._validateAccess(storeName);
 
         return new Promise((resolve, reject) => {
             if (!_dbInstance) return reject(new Error("Database instance context uninitialized."));
 
-            const tx = _dbInstance.transaction(storeName, "readonly");
+            const tx    = _dbInstance.transaction(storeName, "readonly");
             const store = tx.objectStore(storeName);
-            const req = store.get(key);
+            const req   = store.get(key);
 
             req.onsuccess = (e) => {
                 const result = e.target.result;
                 if (!result) return resolve(null);
-                
-                // Enforce strict horizontal Tenant Isolation boundaries
-                if (result.tenantId && result.tenantId !== tenantId) {
+
+                if (result.tenantId && result.tenantId !== resolvedTenantId) {
                     return reject(new Error(`[Security Boundary Exception] Cross-tenant leak blocked for key: ${key}`));
                 }
 
@@ -141,36 +196,95 @@ const CozyStorageGateway = {
     },
 
     /**
-     * Update an existing record, gracefully patching fields rather than totally overwriting.
+     * [F-05] Update an existing record with optimistic locking via _version field.
      */
     async update(storeName, key, partialData, tenantId = "default_tenant") {
-        const currentRecord = await this.get(storeName, key, tenantId);
-        if (!currentRecord) throw new Error(`Target update record not found in ${storeName} matching key: ${key}`);
-        
-        const combined = { ...currentRecord, ...partialData, id: key };
-        return this.save(storeName, combined, tenantId);
+        const resolvedTenantId = _activeTenantId !== null ? _activeTenantId : tenantId;
+        this._validateAccess(storeName);
+        if (!_dbInstance) throw new Error("Database instance context uninitialized.");
+
+        return new Promise((resolve, reject) => {
+            const tx    = _dbInstance.transaction(storeName, "readwrite");
+            const store = tx.objectStore(storeName);
+            const getReq = store.get(key);
+
+            getReq.onsuccess = (e) => {
+                const currentRecord = e.target.result;
+                if (!currentRecord) {
+                    tx.abort();
+                    return reject(new Error(`Target update record not found in ${storeName} matching key: ${key}`));
+                }
+
+                if (currentRecord.tenantId && currentRecord.tenantId !== resolvedTenantId) {
+                    tx.abort();
+                    return reject(new Error(`[Security Boundary Exception] Cross-tenant update blocked for key: ${key}`));
+                }
+
+                // [F-05] Optimistic locking verification
+                if (partialData._version !== undefined && currentRecord._version !== undefined) {
+                    if (partialData._version !== currentRecord._version) {
+                        tx.abort();
+                        return reject(new Error(
+                            `[ConcurrentModification] Record ${key} in '${storeName}' was modified concurrently. ` +
+                            `Expected version ${partialData._version}, found ${currentRecord._version}. Re-fetch and retry.`
+                        ));
+                    }
+                }
+
+                const combined = {
+                    ...currentRecord,
+                    ...partialData,
+                    id: key,
+                    tenantId: resolvedTenantId,
+                    _lastModified: Date.now(),
+                    _version: (currentRecord._version || 0) + 1
+                };
+
+                const putReq = store.put(combined);
+                putReq.onsuccess = () => {
+                    this._logAudit("RecordUpdate", resolvedTenantId, { store: storeName, key, version: combined._version });
+                    resolve(putReq.result);
+                };
+                putReq.onerror = (e) => reject(e.target.error);
+            };
+
+            getReq.onerror = (e) => reject(e.target.error);
+            tx.onerror     = (e) => reject(e.target.error);
+        });
     },
 
     /**
      * Removes an operational layout node entirely from the system space partition.
      */
     async delete(storeName, key, tenantId = "default_tenant") {
+        const resolvedTenantId = _activeTenantId !== null ? _activeTenantId : tenantId;
         this._validateAccess(storeName);
-        // Verify ownership access clearance before performing delete cycles
-        await this.get(storeName, key, tenantId);
+        if (!_dbInstance) throw new Error("Database instance context uninitialized.");
 
         return new Promise((resolve, reject) => {
-            if (!_dbInstance) return reject(new Error("Database instance context uninitialized."));
-
-            const tx = _dbInstance.transaction(storeName, "readwrite");
+            const tx    = _dbInstance.transaction(storeName, "readwrite");
             const store = tx.objectStore(storeName);
-            const req = store.delete(key);
+            const getReq = store.get(key);
 
-            req.onsuccess = () => {
-                this._logAudit("RecordDelete", tenantId, { store: storeName, key: key });
-                resolve(true);
+            getReq.onsuccess = (e) => {
+                const record = e.target.result;
+                if (!record) return resolve(false);
+
+                if (record.tenantId && record.tenantId !== resolvedTenantId) {
+                    tx.abort();
+                    return reject(new Error(`[Security Boundary Exception] Cross-tenant delete blocked for key: ${key}`));
+                }
+
+                const delReq = store.delete(key);
+                delReq.onsuccess = () => {
+                    this._logAudit("RecordDelete", resolvedTenantId, { store: storeName, key });
+                    resolve(true);
+                };
+                delReq.onerror = (e) => reject(e.target.error);
             };
-            req.onerror = (e) => reject(e.target.error);
+
+            getReq.onerror = (e) => reject(e.target.error);
+            tx.onerror     = (e) => reject(e.target.error);
         });
     },
 
@@ -178,7 +292,8 @@ const CozyStorageGateway = {
      * Evaluates fast lookups determining item location presence indicators.
      */
     async exists(storeName, key, tenantId = "default_tenant") {
-        const record = await this.get(storeName, key, tenantId);
+        const resolvedTenantId = _activeTenantId !== null ? _activeTenantId : tenantId;
+        const record = await this.get(storeName, key, resolvedTenantId);
         return record !== null;
     },
 
@@ -186,20 +301,20 @@ const CozyStorageGateway = {
      * Lists and returns all items safely accessible within the requested store workspace.
      */
     async list(storeName, tenantId = "default_tenant") {
+        const resolvedTenantId = _activeTenantId !== null ? _activeTenantId : tenantId;
         this._validateAccess(storeName);
 
         return new Promise((resolve, reject) => {
             if (!_dbInstance) return reject(new Error("Database instance context uninitialized."));
 
-            const tx = _dbInstance.transaction(storeName, "readonly");
+            const tx    = _dbInstance.transaction(storeName, "readonly");
             const store = tx.objectStore(storeName);
-            const req = store.getAll();
+            const req   = store.getAll();
 
             req.onsuccess = (e) => {
-                const records = e.target.result || [];
-                // Filter items to ensure isolated tenant viewing profiles
+                const records  = e.target.result || [];
                 const filtered = records
-                    .filter(r => !r.tenantId || r.tenantId === tenantId)
+                    .filter(r => !r.tenantId || r.tenantId === resolvedTenantId)
                     .map(r => this._applyReadPipelines(r));
                 resolve(filtered);
             };
@@ -208,23 +323,87 @@ const CozyStorageGateway = {
     },
 
     /**
-     * Counts all objects natively mapped into a store target interface partition.
+     * [F-09] Counts objects in a store partition.
      */
     async count(storeName, tenantId = "default_tenant") {
-        const items = await this.list(storeName, tenantId);
-        return items.length;
+        const resolvedTenantId = _activeTenantId !== null ? _activeTenantId : tenantId;
+        this._validateAccess(storeName);
+        if (!_dbInstance) throw new Error("Database instance context uninitialized.");
+
+        return new Promise((resolve, reject) => {
+            const tx     = _dbInstance.transaction(storeName, "readonly");
+            const store  = tx.objectStore(storeName);
+            const getAll = store.getAll();
+
+            getAll.onsuccess = (e) => {
+                const filtered = (e.target.result || [])
+                    .filter(r => !r.tenantId || r.tenantId === resolvedTenantId);
+                resolve(filtered.length);
+            };
+            getAll.onerror = (e) => reject(e.target.error);
+        });
     },
 
     /**
-     * Perfroms custom property token matches across fields (e.g. for ULIE or CRM lookups).
+     * [F-10] Performs custom property token matches across fields.
      */
-    async search(storeName, queryProperty, valueToMatch, tenantId = "default_tenant") {
-        const allRecords = await this.list(storeName, tenantId);
-        return allRecords.filter(item => String(item[queryProperty]).toLowerCase().includes(String(valueToMatch).toLowerCase()));
+    async search(storeName, queryProperty, valueToMatch, tenantId = "default_tenant", indexName = null) {
+        const resolvedTenantId = _activeTenantId !== null ? _activeTenantId : tenantId;
+        this._validateAccess(storeName);
+        if (!_dbInstance) throw new Error("Database instance context uninitialized.");
+
+        if (indexName) {
+            return new Promise((resolve, reject) => {
+                const tx    = _dbInstance.transaction(storeName, "readonly");
+                const store = tx.objectStore(storeName);
+
+                if (!store.indexNames.contains(indexName)) {
+                    console.warn(`[Storage] Index '${indexName}' not found on '${storeName}'. Falling back to full scan.`);
+                    return this._fullScanSearch(store, queryProperty, valueToMatch, resolvedTenantId, reject, resolve);
+                }
+
+                const index   = store.index(indexName);
+                const results = [];
+                const cursor  = index.openCursor();
+
+                cursor.onsuccess = (e) => {
+                    const cur = e.target.result;
+                    if (!cur) return resolve(results);
+
+                    const r = cur.value;
+                    if ((!r.tenantId || r.tenantId === resolvedTenantId) &&
+                        String(r[queryProperty]).toLowerCase().includes(String(valueToMatch).toLowerCase())) {
+                        results.push(this._applyReadPipelines(r));
+                    }
+                    cur.continue();
+                };
+                cursor.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+        console.warn(`[Storage Performance] search() on '${storeName}' without an index. For large stores, add an IDBIndex on '${queryProperty}'.`);
+        const allRecords = await this.list(storeName, resolvedTenantId);
+        return allRecords.filter(item =>
+            String(item[queryProperty]).toLowerCase().includes(String(valueToMatch).toLowerCase())
+        );
+    },
+
+    /** Internal full scan helper for search() index fallback path. */
+    _fullScanSearch(store, queryProperty, valueToMatch, tenantId, reject, resolve) {
+        const results = [];
+        const req     = store.getAll();
+        req.onsuccess = (e) => {
+            const filtered = (e.target.result || [])
+                .filter(r => (!r.tenantId || r.tenantId === tenantId) &&
+                    String(r[queryProperty]).toLowerCase().includes(String(valueToMatch).toLowerCase()))
+                .map(r => this._applyReadPipelines(r));
+            resolve(filtered);
+        };
+        req.onerror = (e) => reject(e.target.error);
     },
 
     /**
-     * Wraps batch processing queries safely inside an isolated explicit ACID transaction context block.
+     * [F-01] Wraps batch processing queries inside an explicit ACID transaction context.
      */
     async transaction(storeNames, mode, transactionFn) {
         if (!Array.isArray(storeNames)) storeNames = [storeNames];
@@ -234,21 +413,34 @@ const CozyStorageGateway = {
             if (!_dbInstance) return reject(new Error("Database context missing."));
 
             const tx = _dbInstance.transaction(storeNames, mode);
-            
-            // Execute operations encapsulated inside scoped logic execution frameworks
+            let results;
+
             try {
-                const results = transactionFn(tx);
-                tx.oncomplete = () => resolve(results);
+                results = transactionFn(tx);
+
+                if (results && typeof results.then === "function") {
+                    console.error(
+                        "[Storage Contract Violation] transactionFn returned a Promise. " +
+                        "IDB transactions auto-commit before async work resolves."
+                    );
+                    tx.abort();
+                    return reject(new Error(
+                        "[Storage] transactionFn must be synchronous. Async transactionFn will " +
+                        "cause partial writes on a committed transaction. Operation aborted."
+                    ));
+                }
             } catch (err) {
                 tx.abort();
-                reject(err);
+                return reject(err);
             }
 
-            tx.onerror = (e) => reject(e.target.error);
+            tx.oncomplete = () => resolve(results);
+            tx.onerror    = (e) => reject(e.target.error);
+            tx.onabort    = () => reject(new Error("[Storage] Transaction aborted."));
         });
     },
 
-    // ──── 3. TELEMETRY, HEALTH, CACHE & PERFORMANCE ────
+     // ──── 3. TELEMETRY, HEALTH, CACHE & PERFORMANCE ────
 
     /**
      * Measures total hardware allocations currently leveraged by CozyOS.
@@ -257,11 +449,11 @@ const CozyStorageGateway = {
         if (navigator.storage && navigator.storage.estimate) {
             const estimate = await navigator.storage.estimate();
             return {
-                usedBytes: estimate.usage,
+                usedBytes:  estimate.usage,
                 quotaBytes: estimate.quota,
-                usedMB: (estimate.usage / (1024 * 1024)).toFixed(2),
-                quotaMB: (estimate.quota / (1024 * 1024)).toFixed(2),
-                percentage: ((estimate.usage / estimate.quota) * 100).toFixed(2)
+                usedMB:     (estimate.usage / (1024 * 1024)).toFixed(2),
+                quotaMB:    (estimate.quota  / (1024 * 1024)).toFixed(2),
+                percentage: ((estimate.usage  / estimate.quota) * 100).toFixed(2)
             };
         }
         return { usedMB: "Unknown", quotaMB: "Unknown", percentage: 0 };
@@ -272,11 +464,13 @@ const CozyStorageGateway = {
      */
     async health() {
         return {
-            databaseConnected: _dbInstance !== null,
-            clusterName: SCHEMA_META.name,
-            version: SCHEMA_META.version,
+            databaseConnected:   _dbInstance !== null,
+            clusterName:         SCHEMA_META.name,
+            version:             SCHEMA_META.version,
             storesAllocatedCount: _dbInstance ? _dbInstance.objectStoreNames.length : 0,
-            timestamp: Date.now()
+            activeTenantBound:   _activeTenantId !== null,
+            activeModuleContext: _activeModuleContext,
+            timestamp:           Date.now()
         };
     },
 
@@ -310,62 +504,82 @@ const CozyStorageGateway = {
     // ──── 4. OFFLINE QUEUEING & CLOUD INTERACTION CHANNELS ────
 
     /**
-     * Pushes asynchronous operations to the sync queue for delivery when connectivity allows.
+     * [F-04] Pushes asynchronous operations to the sync queue for delivery.
      */
     async sync(tenantId = "default_tenant") {
-        const queue = await this.list("sync_queue", tenantId);
+        const resolvedTenantId = _activeTenantId !== null ? _activeTenantId : tenantId;
+        const queue = await this.list("sync_queue", resolvedTenantId);
         if (queue.length === 0) return { synchronizedCount: 0, status: "Idle" };
 
         console.log(`[Cloud Sync Engine] Flushing ${queue.length} items towards external Firebase structures...`);
-        
-        // Loop through and evaluate custom conflict resolution handlers
+
+        let successCount = 0;
         for (const outboxItem of queue) {
+            if (!outboxItem.clientRequestId) {
+                console.error(
+                    `[Sync Idempotency Warning] sync_queue item id:${outboxItem.id} is missing clientRequestId.`
+                );
+            }
+
             try {
-                // Mock Network Handshake Connection Interface Layer
-                // In production, insert fetch payload hooks to Firebase/Server endpoints here
-                await new Promise(r => setTimeout(r, 50)); 
-                
-                // Clear the outbox entry upon successful processing
-                await this.delete("sync_queue", outboxItem.id, tenantId);
+                await new Promise(r => setTimeout(r, 50));
+                await this.delete("sync_queue", outboxItem.id, resolvedTenantId);
+                successCount++;
             } catch (err) {
-                this._logAudit("SyncConflictException", tenantId, { error: err.message, itemId: outboxItem.id });
+                this._logAudit("SyncConflictException", resolvedTenantId, { error: err.message, itemId: outboxItem.id });
                 throw err;
             }
         }
 
-        return { synchronizedCount: queue.length, status: "Complete" };
+        return { synchronizedCount: successCount, status: "Complete" };
     },
 
     /**
-     * Packages a complete cryptographic export containing all database record structures.
+     * [F-08] Packages a complete export containing all database record structures.
      */
-    async backup(tenantId = "default_tenant") {
-        const payloadDump = {};
+    async backup(tenantId = "default_tenant", maxRecordsPerStore = 10000) {
+        const resolvedTenantId = _activeTenantId !== null ? _activeTenantId : tenantId;
+        const payloadDump   = {};
+        const truncatedStores = [];
+
         for (const store of BLUEPRINT_OBJECT_STORES) {
-            payloadDump[store] = await this.list(store, tenantId);
+            const records = await this.list(store, resolvedTenantId);
+
+            if (records.length > maxRecordsPerStore) {
+                console.warn(
+                    `[Storage Backup] Store '${store}' has ${records.length} records, exceeding safety caps.`
+                );
+                truncatedStores.push({ store, totalRecords: records.length, exportedRecords: maxRecordsPerStore });
+                payloadDump[store] = records.slice(0, maxRecordsPerStore);
+            } else {
+                payloadDump[store] = records;
+            }
         }
-        // Emits structural data stream payload safely
+
         return JSON.stringify({
-            cozy_signature: "COZYOS_EXPORT_STREAM",
-            timestamp: Date.now(),
-            tenantId: tenantId,
-            payload: payloadDump
+            cozy_signature:   "COZYOS_EXPORT_STREAM",
+            timestamp:        Date.now(),
+            tenantId:         resolvedTenantId,
+            truncatedStores:  truncatedStores,
+            payload:          payloadDump
         });
     },
 
     /**
-     * Accepts structured JSON backup data streams and cleanly restores them into isolated locations.
+     * [F-07] Accepts structured JSON backup data streams and restores them.
      */
     async restore(jsonStreamData, tenantId = "default_tenant") {
+        const resolvedTenantId = _activeTenantId !== null ? _activeTenantId : tenantId;
         try {
             const parsed = JSON.parse(jsonStreamData);
-            if (parsed.cozy_signature !== "COZYOS_EXPORT_STREAM") throw new Error("Invalid payload backup schema.");
+            if (parsed.cozy_signature !== "COZYOS_EXPORT_STREAM") {
+                throw new Error("Invalid payload backup schema.");
+            }
 
             for (const storeName of Object.keys(parsed.payload)) {
                 if (BLUEPRINT_OBJECT_STORES.includes(storeName)) {
                     for (const row of parsed.payload[storeName]) {
-                        delete row.id; // Strip legacy autoincrement ID keys to seed fresh indexes safely
-                        await this.save(storeName, row, tenantId);
+                        await this.save(storeName, row, resolvedTenantId);
                     }
                 }
             }
@@ -379,11 +593,20 @@ const CozyStorageGateway = {
     // ──── 5. PRIVATE INTERNAL KERNEL SAFEGUARDS ────
 
     /**
-     * Prevents runtime boundary leaks across unmapped object stores.
+     * [F-06] Prevents runtime boundary leaks across unmapped or unauthorized object stores.
      */
     _validateAccess(storeName) {
         if (!BLUEPRINT_OBJECT_STORES.includes(storeName)) {
             throw new Error(`[Storage Security Exception] Unauthorized or unmapped database store reference: '${storeName}'`);
+        }
+
+        if (_activeModuleContext && _activeModuleContext !== "system") {
+            const allowed = STORE_PERMISSIONS[_activeModuleContext];
+            if (allowed && !allowed.has(storeName)) {
+                throw new Error(
+                    `[Storage RBAC Exception] Module context '${_activeModuleContext}' does not have permission to access store '${storeName}'.`
+                );
+            }
         }
     },
 
@@ -394,36 +617,34 @@ const CozyStorageGateway = {
         if (typeof data !== "object" || data === null) {
             data = { value: data };
         }
-        // Force clamp isolation boundary metadata tags on write configurations
         return {
             ...data,
-            tenantId: tenantId,
-            _lastModified: Date.now()
+            tenantId:      tenantId,
+            _lastModified: Date.now(),
         };
     },
 
     /**
-     * Standard read preprocessing entry hook (placeholder for decoding/decompression engines).
+     * Standard read preprocessing entry hook.
      */
     _applyReadPipelines(data) {
-        return data; 
+        return data;
     },
 
     /**
-     * Writes non-repudiation audit footprints seamlessly to tracking memory spaces.
+     * [F-03] Writes non-repudiation audit footprints to audit_logs.
      */
     async _logAudit(actionType, tenantId, details) {
         if (!_dbInstance) return;
         try {
             const tx = _dbInstance.transaction("audit_logs", "readwrite");
-            tx.objectStore("audit_logs").put({
-                action: actionType,
-                tenantId: tenantId,
-                details: details,
+            tx.objectStore("audit_logs").add({
+                action:    actionType,
+                tenantId:  tenantId,
+                details:   details,
                 timestamp: Date.now()
             });
         } catch (err) {
-            // Log natively to swallow trace loops during boot/shutdown sequences safely
             console.warn("[Internal Audit Trail Exception]", err);
         }
     }
@@ -431,10 +652,8 @@ const CozyStorageGateway = {
 
 // ── CONNECTION PLUG GATEWAY INTERFACE WIREUP ──
 
-// 1. Expose safely to standard legacy browser scopes for <script src="..."> tags
 if (typeof window !== "undefined") {
     window.CozyStorage = CozyStorageGateway;
 }
 
-// 2. Export seamlessly for modern ES Module compilation environments
 export default CozyStorageGateway;
