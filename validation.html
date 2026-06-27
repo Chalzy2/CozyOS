@@ -166,6 +166,11 @@
         <div class="test-grid" id="validation-target-container">
             </div>
     </div>
+    // Ensure base window namespaces exist before plugins try to register
+if (!window.CozyOS) window.CozyOS = {};
+if (!window.CozyOS.TenantContext) {
+    window.CozyOS.TenantContext = { getActiveId: () => "sandbox_test_tenant" };
+}
 
     <script>
         
