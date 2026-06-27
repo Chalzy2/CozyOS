@@ -168,20 +168,34 @@
     </div>
 
     <script>
-        // Declarative schema matching specification requirements from 665056.jpg & 665057.jpg
-        const validationRegistry = [
-            { id: "auth", name: "Authentication", desc: "Verifies isolated active token presence constraints." },
-            { id: "isolation", name: "Tenant Isolation", desc: "Validates horizontal schema indexing boundaries across partitions." },
-            { id: "permissions", name: "Role Permissions", desc: "Tests token layout node ACL validation restrictions." },
-            { id: "language", name: "Language Switching", desc: "Verifies translation dictionaries string swapping performance." },
-            { id: "ai", name: "AI Routing Engine", desc: "Tests system fallback pipeline performance during natural language intent parsing." },
-            { id: "offline", name: "Offline Data Queue", desc: "Validates local synchronization layer execution states." },
-            { id: "sync", name: "Synchronization Engine Status", desc: "Tests structural payload delivery metrics." },
-            { id: "audit", name: "Audit Trail Ledger", desc: "Confirms non-repudiation log tracking persistence features." },
-            { id: "mpesa", name: "M-Pesa Transaction Bridge", desc: "Validates transactional callbacks and channel parameters securely." },
-            { id: "inventory", name: "Global Inventory Store", desc: "Checks schema layout indices for structural accuracy." },
-            { id: "performance", name: "Ecosystem Frame Processing", desc: "Monitors rendering times for lag spikes." }
-        ];
+        
+        // Complete declarative schema matching specification requirements
+const validationRegistry = [
+    // Core Infrastructure System Validations
+    { id: "auth", name: "Authentication", desc: "Verifies isolated active token presence constraints." },
+    { id: "isolation", name: "Tenant Isolation", desc: "Validates horizontal schema indexing boundaries across partitions." },
+    { id: "permissions", name: "Role Permissions", desc: "Tests token layout node ACL validation restrictions." },
+    { id: "language", name: "Language Switching", desc: "Verifies translation dictionaries string swapping performance." },
+    { id: "ai", name: "AI Routing Engine", desc: "Tests system fallback pipeline performance during natural language intent parsing." },
+    { id: "offline", name: "Offline Data Queue", desc: "Validates local synchronization layer execution states." },
+    { id: "sync", name: "Synchronization Engine Status", desc: "Tests structural payload delivery metrics." },
+    { id: "audit", name: "Audit Trail Ledger", desc: "Confirms non-repudiation log tracking persistence features." },
+    
+    // Core Platform Integrations
+    { id: "mpesa", name: "M-Pesa Transaction Bridge", desc: "Validates transactional callbacks and channel parameters securely." },
+    { id: "inventory", name: "Global Inventory Store", desc: "Checks schema layout indices for structural accuracy." },
+    
+    // Cross-Industry Extension Modules
+    { id: "business", name: "BusinessOS Core", desc: "Validates corporate asset profiles and B2B ledger hooks." },
+    { id: "school", name: "SchoolOS Core", desc: "Tests student registration metrics and multi-class distribution lists." },
+    { id: "church", name: "ChurchOS Core", desc: "Validates tithe allocation structures and congregation record limits." },
+    { id: "hotel", name: "HotelOS Core", desc: "Checks real-time room availability indexes and booking engines." },
+    { id: "hospital", name: "HospitalOS Core", desc: "Validates secure diagnostic chart encryptions and emergency triage pipelines." },
+    { id: "subscription", name: "Subscription Engine", desc: "Verifies automated periodic billing iterations and user lease parameters." },
+    
+    // Global Telemetry
+    { id: "performance", name: "Ecosystem Frame Processing", desc: "Monitors rendering times for UI rendering lag spikes." }
+];
 
         function renderInterfaceLayout() {
             const container = document.getElementById('validation-target-container');
