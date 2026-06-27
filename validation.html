@@ -264,6 +264,19 @@
     </script>
 </script>
 
+<!-- ── COZYOS ENVIRONMENT CONFIGURATION ── -->
+<script>
+    if (!window.CozyOS) window.CozyOS = {};
+    if (!window.CozyOS.KernelPlugins) window.CozyOS.KernelPlugins = new Map();
+    if (!window.CozyOS.PluginMetadata) window.CozyOS.PluginMetadata = {};
+    if (!window.CozyOS.TenantContext) {
+        window.CozyOS.TenantContext = {
+            tenantIsolation: () => "sandbox_test_tenant",
+            auditLogging: (event, data) => console.log(`[Audit Log] ${event}`, data)
+        };
+    }
+</script>
+
 <!-- ── INITIALIZATION & SEEDING LIFECYCLE ── -->
 <script>
     window.addEventListener('DOMContentLoaded', async () => {
@@ -287,11 +300,13 @@
             console.error("[Sandbox Engine] Boot error:", error);
         }
     });
-    <!-- Mobile DevTools Console Support -->
+</script>
+
+<!-- ── MOBILE DEVTOOLS CONSOLE SUPPORT ── -->
 <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
 <script>eruda.init();</script>
 
-<!-- Core Extension Scripts (Loaded after framework orchestration mocks) -->
+<!-- ── CORE EXTENSION SCRIPTS ── -->
 <script src="core/plugins/mpesaOS.js"></script>
 <script src="core/plugins/pharmacyOS.js"></script>
 <script src="core/plugins/hospitalOS.js"></script>
