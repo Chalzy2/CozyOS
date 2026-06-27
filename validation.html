@@ -277,29 +277,44 @@
     }
 </script>
 
-<!-- ── INITIALIZATION & SEEDING LIFECYCLE ── -->
+<!-- ── COZYOS ENVIRONMENT CONFIGURATION ── -->
 <script>
-    window.addEventListener('DOMContentLoaded', async () => {
-        try {
-            // 1. Initialize the storage engine gateway
-            if (window.CozyStorage) {
-                await window.CozyStorage.init();
-                console.log("[Sandbox Engine] Storage initialized successfully.");
-                
-                // 2. Trigger the multi-lingual pack influx for your tenant
-                if (window.CozyLanguageImporter) {
-                    await window.CozyLanguageImporter.seedAllLanguages("sandbox_test_tenant");
-                }
+    if (!window.CozyOS) window.CozyOS = {};
+    
+    // Fallback collection maps
+    if (!window.CozyOS.KernelPlugins) window.CozyOS.KernelPlugins = new Map();
+    if (!window.CozyOS.PluginMetadata) window.CozyOS.PluginMetadata = {};
+    
+    // ── CREATE MOCK PLUGIN MANAGER LAYER TO CAPTURE EXTENSIONS ──
+    if (!window.CozyOS.PluginManager) {
+        window.CozyOS.PluginManager = {
+            plugins: new Map(),
+            register: function(manifest, executionCore) {
+                this.plugins.set(manifest.id, {
+                    manifest: manifest,
+                    execute: executionCore
+                });
+                // Sync with the KernelPlugins map just in case both styles are checked
+                window.CozyOS.KernelPlugins.set(manifest.id, {
+                    name: manifest.name,
+                    version: manifest.version,
+                    handler: executionCore
+                });
+                console.log(`[PluginManager] Successfully registered: ${manifest.id}`);
+            },
+            getPlugins: function() {
+                return Array.from(this.plugins.values()).map(p => p.manifest);
             }
-            
-            // 3. Fire your core sandbox validation checks automatically
-            if (typeof runAllValidations === 'function') {
-                await runAllValidations();
-            }
-        } catch (error) {
-            console.error("[Sandbox Engine] Boot error:", error);
-        }
-    });
+        };
+    }
+
+    if (!window.CozyOS.TenantContext) {
+        window.CozyOS.TenantContext = {
+            tenantIsolation: () => "sandbox_test_tenant",
+            auditLogging: (event, data) => console.log(`[Audit Log] ${event}`, data)
+        };
+    }
+</script>
 </script>
 
 <!-- ── MOBILE DEVTOOLS CONSOLE SUPPORT ── -->
