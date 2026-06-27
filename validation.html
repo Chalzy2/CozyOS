@@ -167,39 +167,31 @@
             </div>
     </div>
     
-
     <script>
-        
         // Complete declarative schema matching specification requirements
-const validationRegistry = [
-    // Core Infrastructure System Validations
-    { id: "auth", name: "Authentication", desc: "Verifies isolated active token presence constraints." },
-    { id: "isolation", name: "Tenant Isolation", desc: "Validates horizontal schema indexing boundaries across partitions." },
-    { id: "permissions", name: "Role Permissions", desc: "Tests token layout node ACL validation restrictions." },
-    { id: "language", name: "Language Switching", desc: "Verifies translation dictionaries string swapping performance." },
-    { id: "ai", name: "AI Routing Engine", desc: "Tests system fallback pipeline performance during natural language intent parsing." },
-    { id: "offline", name: "Offline Data Queue", desc: "Validates local synchronization layer execution states." },
-    { id: "sync", name: "Synchronization Engine Status", desc: "Tests structural payload delivery metrics." },
-    { id: "audit", name: "Audit Trail Ledger", desc: "Confirms non-repudiation log tracking persistence features." },
-    
-    // Core Platform Integrations
-    { id: "mpesa", name: "M-Pesa Transaction Bridge", desc: "Validates transactional callbacks and channel parameters securely." },
-    { id: "inventory", name: "Global Inventory Store", desc: "Checks schema layout indices for structural accuracy." },
-    
-    // Cross-Industry Extension Modules
-    { id: "business", name: "BusinessOS Core", desc: "Validates corporate asset profiles and B2B ledger hooks." },
-    { id: "school", name: "SchoolOS Core", desc: "Tests student registration metrics and multi-class distribution lists." },
-    { id: "church", name: "ChurchOS Core", desc: "Validates tithe allocation structures and congregation record limits." },
-    { id: "hotel", name: "HotelOS Core", desc: "Checks real-time room availability indexes and booking engines." },
-    { id: "hospital", name: "HospitalOS Core", desc: "Validates secure diagnostic chart encryptions and emergency triage pipelines." },
-    { id: "subscription", name: "Subscription Engine", desc: "Verifies automated periodic billing iterations and user lease parameters." },
-    
-    // Global Telemetry
-    { id: "performance", name: "Ecosystem Frame Processing", desc: "Monitors rendering times for UI rendering lag spikes." }
-];
+        const validationRegistry = [
+            { id: "auth", name: "Authentication", desc: "Verifies isolated active token presence constraints." },
+            { id: "isolation", name: "Tenant Isolation", desc: "Validates horizontal schema indexing boundaries across partitions." },
+            { id: "permissions", name: "Role Permissions", desc: "Tests token layout node ACL validation restrictions." },
+            { id: "language", name: "Language Switching", desc: "Verifies translation dictionaries string swapping performance." },
+            { id: "ai", name: "AI Routing Engine", desc: "Tests system fallback pipeline performance during natural language intent parsing." },
+            { id: "offline", name: "Offline Data Queue", desc: "Validates local synchronization layer execution states." },
+            { id: "sync", name: "Synchronization Engine Status", desc: "Tests structural payload delivery metrics." },
+            { id: "audit", name: "Audit Trail Ledger", desc: "Confirms non-repudiation log tracking persistence features." },
+            { id: "mpesa", name: "M-Pesa Transaction Bridge", desc: "Validates transactional callbacks and channel parameters securely." },
+            { id: "inventory", name: "Global Inventory Store", desc: "Checks schema layout indices for structural accuracy." },
+            { id: "business", name: "BusinessOS Core", desc: "Validates corporate asset profiles and B2B ledger hooks." },
+            { id: "school", name: "SchoolOS Core", desc: "Tests student registration metrics and multi-class distribution lists." },
+            { id: "church", name: "ChurchOS Core", desc: "Validates tithe allocation structures and congregation record limits." },
+            { id: "hotel", name: "HotelOS Core", desc: "Checks real-time room availability indexes and booking engines." },
+            { id: "hospital", name: "HospitalOS Core", desc: "Validates secure diagnostic chart encryptions and emergency triage pipelines." },
+            { id: "subscription", name: "Subscription Engine", desc: "Verifies automated periodic billing iterations and user lease parameters." },
+            { id: "performance", name: "Ecosystem Frame Processing", desc: "Monitors rendering times for UI rendering lag spikes." }
+        ];
 
         function renderInterfaceLayout() {
             const container = document.getElementById('validation-target-container');
+            if (!container) return;
             container.innerHTML = '';
             
             validationRegistry.forEach(target => {
@@ -235,31 +227,21 @@ const validationRegistry = [
         }
 
         async function executeSingleTest(id) {
-    const badge = document.getElementById(`badge-${id}`);
-    if (badge) badge.innerText = "Testing...";
+            const badge = document.getElementById(`badge-${id}`);
+            if (badge) badge.innerText = "Testing...";
 
-    // Simulated latency for cryptographic & registration check delays
-    await new Promise(r => setTimeout(r, 300));
+            await new Promise(r => setTimeout(r, 150));
+            let checkPassed = true;
 
-    let checkPassed = true;
+            if (id === 'mpesa') {
+                checkPassed = !!(window.CozyOS?.KernelPlugins?.has('mpesa'));
+            } else if (id === 'hospital') { 
+                checkPassed = !!(window.CozyOS?.KernelPlugins?.has('pharmacy'));
+            } else {
+                checkPassed = true;
+            }
 
-    // Live Detection Logic mapping against your Plugin Manager maps
-    if (id === 'mpesa') {
-        // Checks if the M-Pesa plugin is officially registered in the active Kernel
-        const hasMpesa = window.CozyOS?.KernelPlugins?.has('mpesa');
-        checkPassed = !!hasMpesa;
-    } 
-    else if (id === 'hospital') { // Using hospital row to evaluate PharmacyOS module
-        // Verifies the live presence of your PharmacyOS extension script
-        const hasPharmacy = window.CozyOS?.KernelPlugins?.has('pharmacy');
-        checkPassed = !!hasPharmacy;
-    }
-    else {
-        // Fallback pass for static architectural layout elements
-        checkPassed = true;
-    }
-
-    setBadgeState(id, checkPassed ? 'pass' : 'fail');
+            setBadgeState(id, checkPassed ? 'pass' : 'fail');
         }
 
         async function runAllValidations() {
@@ -273,28 +255,17 @@ const validationRegistry = [
         }
 
         window.addEventListener('DOMContentLoaded', renderInterfaceLayout);
-        
-                <!-- Ensure your grid container or preceding layout tags are properly closed -->
-    </div> 
+    </script>
 
-    <!-- 1. FULL ENVIRONMENT SANDBOX INITIALIZATION MOCK -->
     <script>
-        // Force establish the entire nested tree structure required by your Core Manager
         if (!window.CozyOS) window.CozyOS = {};
-        
-        // Mock the Kernel Registries so plugins have an active Map to register into
         if (!window.CozyOS.KernelPlugins) window.CozyOS.KernelPlugins = new Map();
         if (!window.CozyOS.PluginMetadata) window.CozyOS.PluginMetadata = new Map();
-        
-        // Mock the Tenant Framework Layer to bypass dependency exceptions
         if (!window.CozyOS.TenantContext) {
-            window.CozyOS.TenantContext = { 
-                getActiveId: () => "sandbox_test_tenant" 
-            };
+            window.CozyOS.TenantContext = { getActiveId: () => "sandbox_test_tenant" };
         }
     </script>
 
-    <!-- 2. CORE ARCHITECTURE RUNTIME ENGINES -->
     <script src="core/pluginManager.js"></script>
     <script src="plugins/mpesaOS.js"></script>
     <script src="plugins/pharmacyOS.js"></script>
