@@ -1,36 +1,40 @@
 /**
- * ── COZYOS HOT-PLUG EXTENSION SUBSYSTEM ──
- * PACKAGED SOURCE: plugins/pharmacyOS.js
+ * ── PHARMACYOS HOT-PLUG EXTENSION INDUSTRY HANDLER ──
+ * FILE: plugins/pharmacyOS.js
  */
 
-// 1. Mandatory Manifest Specification
-export const PharmacyManifest = {
-    id: "pharmacy",
-    name: "PharmacyOS Enterprise Subsystem",
-    version: "1.0.0",
-    industryScope: "pharmacy",
-    developer: "CozyOS Ecosystem Contributor"
-};
+(function() {
+    // 1. Define Module Identity Specification Structure
+    const manifest = {
+        id: "pharmacy",
+        name: "PharmacyOS Industry Module",
+        version: "1.0.0",
+        description: "Handles cross-tenant prescription routing indices securely."
+    };
 
-// 2. Pure Stateless Resolution Handler
-export async function PharmacyAIHandler(query, context, SecurityGuard) {
-    // Access core security services directly through arguments passed from the kernel
-    if (query.includes("dangerous compounds") || query.includes("narcotics")) {
-        if (!SecurityGuard.check(context, "pharmacy.drugs.restricted")) {
+    // 2. Objective 6: Define Pure Stateless Functional Handler Core
+    function pharmacyExecutionCore(query, kernelContext) {
+        // Write to core non-repudiation ledger via kernel abstraction wrapper
+        kernelContext.auditLogging("IntentReceived", { query });
+
+        // Enforce safe multi-tenant schema isolation boundaries
+        const activeTenantId = kernelContext.tenantIsolation();
+
+        if (query.includes("inventory")) {
             return {
-                responseText: "🔒 Access Refused: Your profile configuration lacks authorization clearance parameters for scheduled controlled items.",
-                pipelineState: "blocked"
+                responseText: `💊 [PharmacyOS under Tenant: ${activeTenantId}] Checking prescription stock limits... All items synchronized.`
             };
         }
-    }
 
-    if (query.includes("stock") || query.includes("dawa zilizopo")) {
         return {
-            responseText: "💊 <b>PharmacyOS:</b> System scan completed. Local medicine stock records look stable across all 4 dispensing cabinets.",
-            pipelineState: "processed",
-            targetModule: "PharmacyOS"
+            responseText: `📋 [PharmacyOS] Context acknowledged. Request forwarded securely through fallback pipeline: ${kernelContext.aiContext.getFallbackPipeline()}.`
         };
     }
 
-    return null; // Return null if intent doesn't match this industry module
-}
+    // 3. Automated Discovery Trigger Hook
+    if (window.CozyOS && window.CozyOS.PluginManager) {
+        window.CozyOS.PluginManager.register(manifest, pharmacyExecutionCore);
+    } else {
+        console.error("Critical: CozyOS PluginManager subsystem was not discovered in execution context.");
+    }
+})();
