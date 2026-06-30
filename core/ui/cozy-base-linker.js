@@ -2,18 +2,10 @@
  * CozyOS Enterprise Framework - Base UI Orchestration Engine
  * File Reference: /core/ui/cozy-base-linker.js
  * Architectural Standard for all CozyOS Modules (Quarry, Hotel, School, Pharmacy, etc.)
- * v2.4.0 — aligns engine.handle() calls with the standard route/authContext/payload
- * contract. Shared system routes (queue sync, exception logging) are sourced
- * from the module-agnostic window.CozyOS.SystemRoutes namespace, with an
- * inline string fallback if that namespace isn't loaded yet — this base
- * class intentionally has no dependency on any business module's constants
- * (e.g. QuarryConstants), so it stays reusable across Quarry, Hotel, School,
- * Pharmacy, Hospital, etc. Security uses CozyOS.Auth.getCurrentIdentity() in
- * place of the legacy session/permission routes. Identity/tenant/language
- * context is cached (tenant prefers identity.tenantId, language defaults to
- * "en"), and a Router-aware redirectToLogin() helper is included. Public
- * API, lifecycle, autosave, destroy(), updateKPI(), notification system, and
- * routing logic are unchanged.
+ * v2.4.1 — Single source of truth. route/authContext/payload engine contract only.
+ * Identity via CozyOS.Auth.getCurrentIdentity(); tenant/language context cached;
+ * Router-aware redirectToLogin(); SystemRoutes fallback pattern for shared
+ * system routes (queue sync, exception logging).
  */
 
 class CozyBaseLinker {
@@ -37,7 +29,7 @@ class CozyBaseLinker {
         this._boundListeners = [];
         this.engine = window.CozyOS?.Modules?.[this.moduleName] || null;
 
-        // v2.4 context cache — populated in evaluateSecurityContext()
+        // Context cache — populated in evaluateSecurityContext()
         this.currentIdentity = null;
         this.currentTenant = null;
         this.currentLanguage = null;
@@ -80,6 +72,65 @@ class CozyBaseLinker {
     }
 
     /**
+     * Helper to pull identity cleanly from the native CozyOS Auth Module
+     */
+    getCurrentIdentity() {
+        return window.CozyOS?.Auth?.getCurrentIdentity?.() || null;
+    }
+
+    /**
+     * Security & Context Mapping Pipeline
+     * Identity comes exclusively from CozyOS.Auth.getCurrentIdentity().
+     * Tenant and language context are cached alongside identity for use
+     * by child linkers. View gating reads identity.permissions (falling
+     * back to identity.allowedViews for compatibility with either
+     * Auth-layer shape) — an empty/absent list means "no restriction".
+     */
+    async evaluateSecurityContext() {
+        const identity = this.getCurrentIdentity();
+
+        if (!identity) {
+            this.redirectToLogin();
+            return;
+        }
+
+        this.currentIdentity = identity;
+        this.currentTenant = identity.tenantId || window.CozyOS?.ActiveTenantId || null;
+        this.currentLanguage = window.CozyOS?.Language?.getCurrentLanguage?.() || "en";
+
+        if (this.DOM.rolePill) {
+            this.DOM.rolePill.innerText = identity.role || "Guest";
+        }
+
+        const allowedViews = identity.permissions || identity.allowedViews;
+        if (Array.isArray(allowedViews)) {
+            this.applyUIVisibilityRules(allowedViews);
+        }
+    }
+
+    /**
+     * Routes to the login view via CozyOS.Router when available, falling
+     * back to a hard navigation only if the Router service isn't mounted.
+     */
+    redirectToLogin() {
+        const redirect = String(this.moduleName).toLowerCase();
+        if (window.CozyOS?.Router?.navigate) {
+            window.CozyOS.Router.navigate("login", { redirect });
+        } else {
+            window.location.href = `/login?redirect=${redirect}`;
+        }
+    }
+
+    applyUIVisibilityRules(allowedViews) {
+        document.querySelectorAll('[data-view]').forEach(item => {
+            const targetView = item.getAttribute('data-view');
+            if (allowedViews.length > 0 && !allowedViews.includes(targetView)) {
+                item.style.display = 'none';
+            }
+        });
+    }
+
+    /**
      * Centralized Native Event Bus Binding Framework
      */
     bindCoreGlobalEventListeners() {
@@ -93,7 +144,7 @@ class CozyBaseLinker {
             this.showToastNotification("Network connection re-established. Synchronizing local database engines...", "info");
             try {
                 const syncResponse = await this.engine.handle({
-                    route: window.CozyOS?.SystemRoutes?.EXECUTE_LOCAL_QUEUE_SYNC || "EXECUTE_LOCAL_QUEUE_SYNC",
+                    route: window.CozyOS?.SystemRoutes?.EXECUTE_LOCAL_QUEUE_SYNC || "execute_local_queue_sync",
                     authContext: this.currentIdentity,
                     payload: {}
                 });
@@ -136,59 +187,6 @@ class CozyBaseLinker {
     updateActiveNavigationUI(activeElement) {
         document.querySelectorAll('[data-view]').forEach(item => item.classList.remove('active'));
         activeElement.classList.add('active');
-    }
-
-    /**
-     * Security & Context Mapping Pipeline (v2.4)
-     * Identity now comes from CozyOS.Auth.getCurrentIdentity() rather than
-     * the legacy GET_CURRENT_SESSION / EVALUATE_PERMISSIONS engine routes,
-     * which no longer exist on the v2.4 engine. Tenant and language context
-     * are cached alongside identity for use by child linkers.
-     */
-    async evaluateSecurityContext() {
-        const identity = window.CozyOS?.Auth?.getCurrentIdentity
-            ? window.CozyOS.Auth.getCurrentIdentity()
-            : null;
-
-        if (!identity) {
-            this.redirectToLogin();
-            return;
-        }
-
-        this.currentIdentity = identity;
-        this.currentTenant =
-            identity.tenantId ||
-            window.CozyOS?.ActiveTenantId ||
-            null;
-        this.currentLanguage =
-            window.CozyOS?.Language?.getCurrentLanguage?.() ||
-            "en";
-
-        if (this.DOM.rolePill) this.DOM.rolePill.innerText = identity.role;
-
-        if (Array.isArray(identity.allowedViews)) {
-            this.applyUIVisibilityRules(identity.allowedViews);
-        }
-    }
-
-    /**
-     * Routes to the login view via CozyOS.Router when available, falling
-     * back to a hard navigation only if the Router service isn't mounted.
-     */
-    redirectToLogin() {
-        const redirect = this.moduleName;
-        if (window.CozyOS?.Router?.navigate) {
-            window.CozyOS.Router.navigate("login", { redirect });
-        } else {
-            window.location.href = `/login?redirect=${redirect}`;
-        }
-    }
-
-    applyUIVisibilityRules(allowedViews) {
-        document.querySelectorAll('[data-view]').forEach(item => {
-            const target = item.getAttribute('data-view');
-            if (!allowedViews.includes(target)) item.style.display = 'none';
-        });
     }
 
     /**
@@ -258,7 +256,7 @@ class CozyBaseLinker {
 
         if (this.engine) {
             this.engine.handle({
-                route: window.CozyOS?.SystemRoutes?.LOG_SYSTEM_EXCEPTION || "LOG_SYSTEM_EXCEPTION",
+                route: window.CozyOS?.SystemRoutes?.LOG_SYSTEM_EXCEPTION || "log_system_exception",
                 authContext: this.currentIdentity,
                 payload: { context, errorMessage: nativeException.message, timestamp: new Date().toISOString() }
             }).catch(() => {});
