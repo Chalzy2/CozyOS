@@ -20,3 +20,13 @@ Widgets
 ✅ Business rules
 ✅ "Critical bug exception" policy
 ✅ Current version (v2.4.0)
+
+BaseLinker CAN:
+call SystemServices
+call engine.handle()
+manage UI lifecycle
+route events
+❌ BaseLinker MUST NEVER:
+import QuarryConstants directly (you already fixed this ✔)
+contain business logic
+know about stone types / payroll / production
