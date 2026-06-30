@@ -26,7 +26,7 @@ export class PerformanceMetrics {
         this.minimumLatencyMs = null;
     }
 
-    recordInboundRequest(p) {
+    recordInboundRequest(_request) {
         this.totalRequestsDispatched++;
         this.lastRequestTime = Date.now();
     }
@@ -43,10 +43,12 @@ export class PerformanceMetrics {
             return;
         }
 
-        // Existing business logic preserved exactly
-        this.averageInsertionLatencyMs = (this.averageInsertionLatencyMs + latency) / 2;
-
+        // True running average
         this.totalQueueInsertions++;
+        this.averageInsertionLatencyMs =
+            ((this.averageInsertionLatencyMs * (this.totalQueueInsertions - 1)) + latency)
+            / this.totalQueueInsertions;
+
         this.lastInsertionTime = Date.now();
         this.lastError = null;
 
@@ -71,6 +73,10 @@ export class PerformanceMetrics {
             ? this.totalCacheHits / this.totalRequestsDispatched
             : 0;
 
+        const cacheHitPercentage = this.totalRequestsDispatched > 0
+            ? (this.totalCacheHits / this.totalRequestsDispatched) * 100
+            : 0;
+
         return Object.freeze({
             kernelBootTime: this.kernelBootTime,
             lastRequestTime: this.lastRequestTime,
@@ -79,9 +85,10 @@ export class PerformanceMetrics {
             lastError: this.lastError,
             totalQueueInsertions: this.totalQueueInsertions,
             cacheHitRatio,
+            cacheHitPercentage,
             averageLatencyMs: this.averageInsertionLatencyMs,
             peakLatencyMs: this.peakLatencyMs,
             minimumLatencyMs: this.minimumLatencyMs
         });
     }
-    }
+}            
