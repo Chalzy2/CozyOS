@@ -107,9 +107,9 @@ export class SyncEngine {
     /**
      * Public method, signature unchanged. Synchronizes a single task:
      * compress delta, select transport, send, resolve conflict or evict.
-     * Defensive checks added around router/compressor/resolver/queue;
-     * existing control flow and error handling (incrementFailureCount on
-     * send failure) preserved exactly.
+     * Defensive checks added around router/compressor/resolver/queue/
+     * transport driver; existing control flow and error handling
+     * (incrementFailureCount on send failure) preserved exactly.
      */
     async synchronizeTaskItem(task) {
         if (!this.compressor || typeof this.compressor.generateDeltaPayload !== "function") {
@@ -126,11 +126,14 @@ export class SyncEngine {
         }
 
         const bestTransport = await this.kernel.router.resolveBestAvailableTransport(task.priority);
-        if (!bestTransport) return;
+        if (!bestTransport || typeof bestTransport.send !== "function") {
+            console.warn(`[SYNC ENGINE] Invalid transport driver for task ${task.taskId}.`);
+            return;
+        }
 
         try {
             const networkResponse = await bestTransport.send(compressedDelta);
-            if (networkResponse.hasConflict) {
+            if (networkResponse && networkResponse.hasConflict) {
                 if (!this.resolver || typeof this.resolver.handleMergeAnomaly !== "function") {
                     console.warn(`[SYNC ENGINE] Conflict resolver is unavailable — cannot resolve conflict for task ${task.taskId}.`);
                     return;
@@ -159,10 +162,10 @@ export class SyncEngine {
     }
 
     /**
-     * Returns a snapshot of sync engine runtime diagnostics.
+     * Returns a frozen snapshot of sync engine runtime diagnostics.
      */
     getSyncStatus() {
-        return {
+        return Object.freeze({
             isSyncing: this.isSyncing,
             startedAt: this._statistics.startedAt,
             completedAt: this._statistics.completedAt,
@@ -172,7 +175,7 @@ export class SyncEngine {
             tasksFailed: this._statistics.tasksFailed,
             conflictsResolved: this._statistics.conflictsResolved,
             lastError: this._statistics.lastError
-        };
+        });
     }
 
     // ── Internal helpers ─────────────────────────────────────────────────
@@ -191,4 +194,4 @@ export class SyncEngine {
         if (!task.status || typeof task.status !== "string") return false;
         return true;
     }
-                        }
+    }
