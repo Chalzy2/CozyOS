@@ -1,65 +1,144 @@
 /**
- * CozyOS UNIVERSAL CONNECTIVITY KERNEL ── SMART ROUTER ENGINE
- * FILE: core/connectivity/routing.js
- * VERSION: 1.0.0-CORE
- */
 
-"use strict";
+CozyOS Enterprise Framework - Central Connectivity Router
 
-import { TransportRegistry } from "./transport.js";
+File Reference: /core/connectivity/routing.js
 
-export class SmartRouter {
-    constructor(kernel) {
-        this.kernel = kernel;
-        this.transports = new TransportRegistry(this.kernel);
-        
-        // Routing priority matrix tailored for African networking profiles
-        this.routingPriorityOrder = [
-            "LOCAL_MEMORY",
-            "LOCAL_DB",
-            "NEARBY_DEVICE",
-            "BLUETOOTH",
-            "USB",
-            "LAN",
-            "WIFI",
-            "MOBILE_DATA",
-            "SATELLITE",
-            "CLOUD"
-        ];
-    }
+Architectural Standard for Framework Route Resolution and Transaction Dispatch
 
-    async route(payload) {
-        const targetTransportKey = await this.resolveBestAvailableTransport(payload.priority || "NORMAL");
-        const interfaceDriver = this.transports.getDriver(targetTransportKey);
+v2.4.2 — Fixes state mutation consistency and exports unified global aliases.
+*/
 
-        if (!interfaceDriver) {
-            throw new Error(`[ROUTING ERROR] Critical transport driver instance absent for key: [${targetTransportKey}]`);
-        }
 
-        console.log(`🔀 [SMART ROUTER] Dispatched data transaction [${payload.id}] via interface driver layer: [${targetTransportKey}]`);
-        return await interfaceDriver.execute(payload);
-    }
+(function () {
+'use strict';
 
-    async resolveBestAvailableTransport(priority) {
-        const currentPolicy = this.kernel.policy.evaluateDynamicConstraints();
-        const networkMetrics = this.kernel.diagnostics.getNetworkTopology();
+class CozyOSConnectivityRouter {  
+    constructor() {  
+        // Memory registry map separating routes by absolute key strings  
+        this._routes = new Map();  
+        this._interceptors = [];  
+    }  
 
-        // Check local caching layers before processing networking stacks
-        if (currentPolicy.allowCacheLookup) {
-            return "LOCAL_MEMORY";
-        }
+    /**  
+     * 1. Register a single or batch profile of execution routes  
+     */  
+    register(routeName, handlerReference, metadata = {}) {  
+        if (!routeName || typeof routeName !== 'string') {  
+            throw new TypeError("[CozyOS Router] Registration rejected: Route path designation must be a non-empty string.");  
+        }  
+          
+        const normalizedRoute = routeName.trim();  
+        if (this._routes.has(normalizedRoute)) {  
+            throw new Error(`[CozyOS Router] Collision detection: Route '${normalizedRoute}' is already allocated inside the registry.`);  
+        }  
 
-        // Loop through the optimized physical routing matrix hierarchy
-        if (networkMetrics.lanConnected) return "LAN";
-        if (networkMetrics.wifiConnected && !currentPolicy.restrictWifi) return "WIFI";
-        if (networkMetrics.cellularConnected && currentPolicy.allowCellularTraffic) return "MOBILE_DATA";
-        if (networkMetrics.satelliteConnected) return "SATELLITE";
+        if (!handlerReference) {  
+            throw new TypeError(`[CozyOS Router] Registration rejected: Endpoint target for route '${normalizedRoute}' cannot be null or undefined.`);  
+        }  
 
-        return "LOCAL_DB"; // Default baseline storage fallback path
-    }
+        this._routes.set(normalizedRoute, {  
+            handler: handlerReference,  
+            metadata: { ...metadata, registeredAt: new Date().toISOString() }  
+        });  
 
-    async triggerImmediateFailback() {
-        console.log("🔀 [SMART ROUTER] Uplink recovery verified. Dispatching sync process pipeline updates.");
-        await this.kernel.sync.triggerBackgroundSync();
-    }
-}
+        return true;  
+    }  
+
+    /**  
+     * 2. Unregister or tear-down a runtime execution route dynamically  
+     */  
+    unregister(routeName) {  
+        if (!routeName || typeof routeName !== 'string') return false;  
+        return this._routes.delete(routeName.trim());  
+    }  
+
+    /**  
+     * 3. Check for structural existence of an endpoint within the active routing mesh  
+     */  
+    exists(routeName) {  
+        if (!routeName || typeof routeName !== 'string') return false;  
+        return this._routes.has(routeName.trim());  
+    }  
+
+    /**  
+     * 4. Resolve a route payload definition configuration state  
+     */  
+    resolve(routeName) {  
+        if (!routeName || typeof routeName !== 'string') return null;  
+        return this._routes.get(routeName.trim()) || null;  
+    }  
+
+    /**  
+     * 5. Dispatch Requests utilizing the modern v2.4.1 uniform payload contract  
+     * Enforces strict delivery matching: { route, authContext, payload }  
+     */  
+    async dispatch(transactionEnvelope) {  
+        if (!transactionEnvelope || typeof transactionEnvelope !== 'object') {  
+            throw new TypeError("[CozyOS Router] Dispatch failed: Transaction envelope must be a valid configuration object.");  
+        }  
+
+        const { route, authContext, payload } = transactionEnvelope;  
+
+        if (!route || typeof route !== 'string') {  
+            throw new Error("[CozyOS Router] Contract Violation: Missing string parameter 'route' within message frame.");  
+        }  
+
+        const normalizedRoute = route.trim();  
+        const targetedRoute = this._routes.get(normalizedRoute);  
+
+        if (!targetedRoute) {  
+            throw new ReferenceError(`[CozyOS Router] Route Execution Fault: Target destination '${normalizedRoute}' is not registered within this cluster.`);  
+        }  
+
+        const standardizedEnvelope = {  
+            route: normalizedRoute,  
+            authContext: authContext || null,  
+            payload: payload || {}  
+        };  
+
+        for (const interceptor of this._interceptors) {  
+            await interceptor(standardizedEnvelope);  
+        }  
+
+        const endpoint = targetedRoute.handler;  
+
+        if (typeof endpoint === 'function') {  
+            return await endpoint(standardizedEnvelope);  
+        } else if (endpoint && typeof endpoint.handle === 'function') {  
+            return await endpoint.handle(standardizedEnvelope);  
+        }  
+
+        throw new TypeError(`[CozyOS Router] Engine Invocation Error: Handler bound to route '${normalizedRoute}' missing structural invocation point (.handle or executable function).`);  
+    }  
+
+    /**  
+     * Pipeline hook enabling non-invasive tracing across the transaction plane  
+     */  
+    use(interceptorFn) {  
+        if (typeof interceptorFn === 'function') {  
+            this._interceptors.push(interceptorFn);  
+        }  
+    }  
+
+    /**  
+     * Flushes the routing table during complete framework runtime recycles  
+     */  
+    flush() {  
+        this._routes.clear();  
+        this._interceptors = [];  
+    }  
+}  
+
+// Initialize global namespace layers safely  
+window.CozyOS = window.CozyOS || {};  
+  
+// Fix #2: Preserve an existing Router instance to protect internal Map states  
+if (!window.CozyOS.Router) {  
+    window.CozyOS.Router = new CozyOSConnectivityRouter();  
+}  
+
+// Fix #1: Export consistent referencing pointers across modular execution contexts  
+window.CozyOS.SmartRouter = window.CozyOS.Router;
+
+})();
