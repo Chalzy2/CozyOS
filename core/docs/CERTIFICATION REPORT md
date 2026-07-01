@@ -1,1 +1,35 @@
 
+CozyOS Quarry Manager — Certification Hardening Report
+Module: Business Module #001 (Quarry Manager) · Version: 1.4.0 → 1.4.1
+Scope: Audit coverage, validation coverage, compensation audit, event coverage.
+No new subsystems introduced. No route, permission, storage schema, or finance path changed.
+1. Validation
+Before: 10 of 40 execute* methods called _validate().
+After: all 40 call _validate() on entry, with required fields matched to what each method actually uses.
+Important caveat carried over from the existing architecture: _validate() only enforces if window.CozyOS.Shared.QuarryValidation is loaded — otherwise it no-ops (this was true before this pass too). Where a method already had a manual if (!x) throw ... guard, that guard was kept, since it's the only enforcement that's guaranteed to run regardless of whether the shared validator exists. _validate() calls were added on top for consistency and forward-compatibility, not as a replacement.
+2. Audit Coverage
+Correction to my earlier assessment: audit logging was not fully absent. It already existed via window.CozyOS.Shared.QuarryAudit, wired into (a) every financial mutation through _routeExternalFinancialLegger, and (b) executeStockAdjustment. My initial grep missed this because it dismissed a real (but buggy) call as dead code.
+Added a shared _auditLog() helper (same underlying adapter, DRY wrapper) and used it to close the actual gaps:
+executeEmployeeUpdate, executeEmployeeStatusChange, executeEmployeeTransfer
+executeDriverUpdate
+executeParcelRegistration
+executeMaintenanceUpdate
+Stock deductions triggered from executeSaleRecord (previously the only stock-mutating path with zero audit trail)
+Fixed a real bug in the existing stock-adjustment audit call: collection: C?.COLLECTIONS?.AUDIT_LOG ? "quarry_stock_adjustments" : "quarry_stock_adjustments" resolved to the same collection either way regardless of the condition. Now correctly targets C?.COLLECTIONS?.AUDIT_LOG || "quarry_audit_log".
+3. Transaction Compensation
+Audited all 9 call sites of _routeExternalFinancialLegger. Every one was already wrapped in _withCompensation. No gap found — no change was necessary here.
+4. Event Coverage
+Added the 6 previously-missing domain events, using the existing _publishEvent() / CustomEvent mechanism (no new event bus):
+customer.registered, stock.adjusted (both manual adjustment and sale-driven deduction), fuel.issued, maintenance.logged, delivery.confirmed, expense.logged.
+5. Incidental fix
+The file's header comment began with ** instead of /** — a latent syntax error that would break on node --check. Fixed. Confirmed the full file now parses cleanly.
+Explicitly deferred (out of scope for this pass)
+These require a new subsystem or broader change, not a hardening pass, and were intentionally left for a future release:
+Universal collection-name constants migration (QuarryConstants.COLLECTIONS everywhere)
+Localization / language engine (no such engine exists elsewhere in the code as currently visible — activeLanguage is set but unused)
+Offline sync scope expansion beyond quarry_production
+Manifest auto-generation from a single route registry
+Health diagnostics (storage/finance latency, queue size, memory)
+Unit test suite
+Architectural invariants preserved
+Module ID, public handle(context) surface, switch/case routing pattern, role permission model, Seven-Key header structure, finance adapter, offline sync architecture, AI Advisor interface, and kernel registration block are all unchanged.
