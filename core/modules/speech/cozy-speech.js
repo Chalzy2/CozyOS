@@ -1409,44 +1409,47 @@ const _kernel = {
     listPlugins() {
         return Object.freeze(Array.from(_plugins.values()));
     },
-
-    // ── § 3.23  INTEGRATION REGISTRY  [V2-12 / V2.1-21] ──────────────────────
+    // ── § 3.23  INTEGRATION REGISTRY (CLOSED)  [V2.1] ────────────────────────
 
     /**
-     * Known/anticipated integration names — see KNOWN_INTEGRATIONS.
-     * No implementation lives here — contracts only. Registering an
-     * integration simply reserves/documents that CozySpeech is aware
-     * of it; it never loads, calls, or depends on the named kernel.
+     * CozySpeech Integration Registry.
      *
-     * @param {{
-     *   integrationId?: string,
-     *   name:           string,   — e.g. "CozyAI", "CozyEmergency"
-     *   status?:        string,   — "planned"|"available"|"disabled"
-     *   version?:       string,
-     * }} config
-     * @returns {string} integrationId
+     * This registry is CLOSED.
+     *
+     * Unlike the Plugin Registry, integrations are official CozyOS kernel
+     * contracts and cannot be added or removed at runtime by applications.
+     *
+     * CozySpeech never instantiates, executes, or depends on these modules.
+     * The registry simply documents the official kernels that CozySpeech is
+     * designed to coordinate with.
+     *
+     * Future CozyOS kernel integrations are added only through official
+     * CozyOS releases, not application code.
+     *
+     * @returns {ReadonlyArray<string>}
      */
-    registerIntegration(config) {
-        _requireString(config?.name, "name");
-        const integrationId = config.integrationId || _uid("integration");
-        _integrations.set(integrationId, Object.freeze({
-            integrationId,
-            name:         config.name,
-            status:       config.status  ?? "planned",
-            version:      config.version ?? "unknown",
-            registeredAt: _now(),
-            ..._syncMeta(config),
-        }));
-        return integrationId;
-    },
-
-    removeIntegration(integrationId) {
-        _requireString(integrationId, "integrationId");
-        return _integrations.delete(integrationId);
-    },
-
     listIntegrations() {
-        return Object.freeze(Array.from(_integrations.values()));
+        return Object.freeze([
+            "OurCozyLive",
+            "CozyNetwork",
+            "CozyIdentity",
+            "CozyStorage",
+            "CozySync",
+            "CozyTranslate",
+            "CozyVision",
+            "CozyAttendance",
+            "CozyAccessibility",
+            "CozyRecording",
+            "CozyAnalytics",
+            "CozyEmergency",
+            "CozyMarketplace",
+            "CozyEducation",
+            "CozyHealth",
+            "CozyJustice",
+            "CozyFinance",
+            "CozyCloud",
+            "CozyAI"
+        ]);
     },
 
     // ── § 3.24  AUDIO PROFILE REGISTRY  [V2.1-22, NEW] ───────────────────────
