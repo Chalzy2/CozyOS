@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CozyOS Certification Center</title>
+<link rel="stylesheet" href="certification-dashboard.css" />
+
+<!--
+  This is the ONLY place PDF generation capability is added, and it's purely
+  additive: jsPDF is a layout library (turns text/shapes into a real PDF
+  binary) — it does not execute anything, and the dashboard never feeds it
+  anything except already-generated report text. If this CDN is unreachable
+  (offline install), PDF export degrades to "use your browser's Print ->
+  Save as PDF on the HTML report" instead of failing silently — see
+  certification-dashboard.js's exportAs("pdf") path.
+-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+
+<!--
+  Required: the actual certification engine. This dashboard is a pure
+  consumer of its public API and never modifies or reimplements it.
+-->
+<script src="cozy-certification.js" defer></script>
+
+<!--
+  This dashboard does NOT load Service Registry / Workspace Shell scripts
+  itself (their real path depends on how this page is deployed within a
+  given CozyOS install, and guessing wrong would silently break rather than
+  degrade gracefully). If this page is embedded/served alongside a page that
+  already loaded window.CozyOS.ServiceRegistry / window.CozyOS.WorkspaceShell,
+  the Workspace/Service Registry sections below pick them up automatically.
+  Otherwise those sections honestly show "Not Connected".
+-->
+
+<script src="certification-dashboard.js" defer></script>
+</head>
+<body>
+    <div id="cozy-cert-dashboard-root">
+        <noscript>The CozyOS Certification Center requires JavaScript.</noscript>
+    </div>
+</body>
+</html>
