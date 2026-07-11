@@ -52,7 +52,34 @@
     "use strict";
 
     window.CozyOS = window.CozyOS || {};
-    const SHELL_VERSION = "3.1.1-ENTERPRISE-CONTROL-CENTER";
+    const SHELL_VERSION = "3.2.0-ENTERPRISE-CONTROL-CENTER";
+    const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+    const PROTECTED_FILE_PATTERNS = Object.freeze([
+        /^cozy-certification\.js$/i, /^cozy-workspace\.js$/i,
+        /^cozy-identity\.js$/i, /^cozy-security\.js$/i, /^cozy-registry\.js$/i
+    ]);
+
+    const SUSPICIOUS_PATTERNS = Object.freeze([
+        { id: "EVAL_USAGE", pattern: /\beval\s*\(/, description: "Contains eval()." },
+        { id: "FUNCTION_CTOR", pattern: /\bnew\s+Function\s*\(/, description: "Contains new Function()." },
+        { id: "DOCUMENT_WRITE", pattern: /document\s*\.\s*write\s*\(/, description: "Uses the document.write DOM API." },
+        { id: "PROTO_POLLUTION_LITERAL", pattern: /__proto__\s*[:=]/, description: "Contains a literal __proto__ assignment/key." }
+    ]);
+
+    function isProtectedFile(filename) {
+        return PROTECTED_FILE_PATTERNS.some(p => p.test(filename));
+    }
+
+    function scanForSuspiciousPatterns(source) {
+        return SUSPICIOUS_PATTERNS.filter(p => p.pattern.test(source)).map(p => ({ id: p.id, description: p.description }));
+    }
+
+    async function sha256Hex(text) {
+        if (typeof crypto === "undefined" || !crypto.subtle) throw new Error("[WorkspaceShell] crypto.subtle unavailable — cannot compute a checksum.");
+        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+        return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
+    }
 
     // Suggested display order/labels for coordinators that are expected to
     // exist eventually. This is NOT a source of truth about what's installed
@@ -111,6 +138,19 @@
         // ---- shell-local operational pointer, not certification data ----
         #currentReleaseId = null;
 
+        // ---- file registry: the "Upload to Workspace" / "central file hub"
+        // data layer. Each entry is metadata ONLY (filename, category,
+        // moduleId if it maps to a known coordinator, and either the raw
+        // source text or — when available — a real File System Access API
+        // handle). This shell never opens, reads, or writes any file beyond
+        // what's registered here; there is no folder-browsing capability. ----
+        #fileRegistry = new Map(); // fileId -> full record, see #buildFileRecord
+        #fileBackups = new Map(); // fileId -> [{ backupId, source, hash, timestamp }], bounded
+
+        // ---- WorkspaceShell's own public event bus state ----
+        #ownListeners = new Map();
+        #onceWrapped = new Map();
+
         #auditLogs = [];
         #diagnostics = {
             renderCycles: 0,
@@ -153,6 +193,47 @@
         #logAudit(action, msg) {
             this.#auditLogs.push(Object.freeze({ id: "aud_" + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + "-" + Math.random()), timestamp: new Date().toISOString(), action, msg }));
             if (this.#auditLogs.length > 500) this.#auditLogs.shift();
+        }
+
+        // ---- WorkspaceShell's OWN public event bus — distinct from
+        // #recordEvent below, which observes events emitted BY discovered
+        // coordinators. This bus is for events WorkspaceShell itself
+        // raises (file:registered, etc.) that external code can subscribe
+        // to directly. ----
+        on(eventName, handler) {
+            if (typeof eventName !== "string" || !eventName.trim()) throw new TypeError("[WorkspaceShell] on(): eventName must be a non-empty string.");
+            if (typeof handler !== "function") throw new TypeError("[WorkspaceShell] on(): handler must be a function.");
+            if (!this.#ownListeners.has(eventName)) this.#ownListeners.set(eventName, new Set());
+            this.#ownListeners.get(eventName).add(handler);
+            return () => this.off(eventName, handler);
+        }
+
+        off(eventName, handler) {
+            const set = this.#ownListeners.get(eventName);
+            if (!set) return false;
+            const wrapped = this.#onceWrapped.get(handler);
+            const removed = set.delete(handler) || (wrapped ? set.delete(wrapped) : false);
+            if (set.size === 0) this.#ownListeners.delete(eventName);
+            return removed;
+        }
+
+        once(eventName, handler) {
+            if (typeof handler !== "function") throw new TypeError("[WorkspaceShell] once(): handler must be a function.");
+            const wrapper = (payload) => { this.off(eventName, handler); this.#onceWrapped.delete(handler); handler(payload); };
+            this.#onceWrapped.set(handler, wrapper);
+            this.on(eventName, wrapper);
+        }
+
+        emit(eventName, payload) {
+            if (typeof eventName !== "string" || !eventName.trim()) { this.#diagnostics.errorsHidden++; return false; }
+            const set = this.#ownListeners.get(eventName);
+            if (!set || set.size === 0) return false;
+            let safePayload = payload;
+            try { safePayload = this.#deepClone(payload); } catch (_err) { safePayload = payload; }
+            for (const fn of Array.from(set)) {
+                try { fn(safePayload); } catch (_err) { this.#diagnostics.errorsHidden++; }
+            }
+            return true;
         }
 
         #recordEvent(source, eventName, payload) {
@@ -1011,6 +1092,402 @@
 
         getTenantCenterData() {
             return { connected: false, message: "No tenant/multi-org coordinator exists yet in CozyOS. Nothing to show until one is built and registers tenants with a documented API." };
+        }
+
+        // =====================================================================
+        // ─── FILE REGISTRY (Upload / central file hub) ────────────────────────
+        // Data layer only — no rendering here (that belongs to whatever
+        // dashboard builds the actual Developer Actions menu / Upload
+        // Center UI on top of these methods). Auto-classifies by extension;
+        // never guesses at a moduleId beyond a plain filename match against
+        // discovered coordinators.
+        // =====================================================================
+
+        #classifyFile(filename) {
+            const ext = (filename.split(".").pop() || "").toLowerCase();
+            const kindByExt = { js: "javascript", html: "html", css: "css", json: "json", md: "markdown" };
+            const category = kindByExt[ext] || "unknown";
+            // Best-effort moduleId guess from this project's OWN naming
+            // convention ("cozy-customer.js" -> "Customer") — derived from
+            // the filename alone, not gated on the coordinator already
+            // being live. A just-uploaded, not-yet-loaded file is exactly
+            // the case this needs to work for; this is a naming-convention
+            // match, not a claim that the module is confirmed loaded.
+            let moduleId = null;
+            const m = /^cozy-([a-z0-9-]+)\.js$/i.exec(filename);
+            if (m) moduleId = m[1].split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join("");
+            return { category, moduleId };
+        }
+
+        /**
+         * registerFile({ filename, filePath, source, handle })
+         *   Either source (plain text) or handle (a real
+         *   FileSystemFileHandle) — or both. Returns a fileId. This is the
+         *   entry point for "Upload to Workspace" / drag-and-drop.
+         */
+        registerFile({ filename, filePath = null, source = null, handle = null } = {}) {
+            if (typeof filename !== "string" || !filename.trim()) throw new TypeError("[WorkspaceShell] registerFile(): filename is required.");
+            if (FORBIDDEN_KEYS.has(filename)) throw new Error(`[WorkspaceShell] registerFile(): rejected filename "${filename}".`);
+            if (source === null && !handle) throw new TypeError("[WorkspaceShell] registerFile(): either source text or a real file handle is required.");
+            const { category, moduleId } = this.#classifyFile(filename);
+            const fileId = "wsfile_" + (crypto.randomUUID ? crypto.randomUUID() : Date.now());
+            const applicationId = this.#applicationOwning(moduleId);
+            const record = {
+                fileId, filename, filePath: filePath || filename, category,
+                coordinator: moduleId, application: applicationId,
+                source, handle,
+                workspaceStatus: "REGISTERED",
+                builderStatus: null, bugFixStatus: null, certificationStatus: null, repairStatus: null,
+                goldenVersion: null, productionVersion: null,
+                lastModified: new Date().toISOString(), lastCertification: null, lastRepair: null,
+                sha256Checksum: null,
+                protectionLevel: isProtectedFile(filename) ? "PROTECTED" : "STANDARD",
+                registeredAt: new Date().toISOString()
+            };
+            this.#fileRegistry.set(fileId, Object.freeze(record));
+            this.#logAudit("FILE_REGISTERED", `${filename} registered (category: ${category}${moduleId ? `, matched module: ${moduleId}` : ""}).`);
+            this.emit("file:registered", { fileId, filename, category, moduleId });
+            if (source) this.#refreshFileStatus(fileId).catch(() => { this.#diagnostics.errorsHidden++; });
+            return fileId;
+        }
+
+        #applicationOwning(moduleId) {
+            if (!moduleId || !window.CozyOS.Certification) return null;
+            try {
+                for (const app of window.CozyOS.Certification.listApplications()) {
+                    if (Array.isArray(app.modules) && app.modules.includes(moduleId)) return app.id;
+                }
+            } catch (_err) { /* ignore */ }
+            return null;
+        }
+
+        /**
+         * #refreshFileStatus(fileId)
+         *   Recomputes every derived status field from real state —
+         *   checksum, certification status/score, Golden/Production
+         *   version, and workflow status (Builder -> Needs Repair ->
+         *   Awaiting Certification -> Certified -> Golden -> Production ->
+         *   Released). Called after registerFile(), saveFile(), and
+         *   openWithCertification() so the registry never goes stale.
+         */
+        async #refreshFileStatus(fileId) {
+            const record = this.#fileRegistry.get(fileId);
+            if (!record) return;
+            const checksum = record.source ? await sha256Hex(record.source) : record.sha256Checksum;
+
+            let certificationStatus = null, goldenVersion = null, productionVersion = null, lastCertification = record.lastCertification;
+            if (record.coordinator && window.CozyOS.Certification) {
+                const history = window.CozyOS.Certification.listRecords(record.coordinator);
+                if (history.length > 0) {
+                    const latest = history[history.length - 1];
+                    const golden = history.reduce((best, r) => (r.summary.scorePercent > best.summary.scorePercent ? r : best), history[0]);
+                    certificationStatus = latest.verdict;
+                    goldenVersion = golden.version;
+                    lastCertification = latest.timestamp;
+                    if (this.#currentReleaseId) {
+                        const release = window.CozyOS.Certification.getRelease(this.#currentReleaseId);
+                        const inRelease = release && release.coreModules.modules.find(m => m.moduleId === record.coordinator);
+                        if (inRelease) productionVersion = inRelease.version;
+                    }
+                }
+            }
+
+            let builderStatus = record.builderStatus;
+            if (window.CozyOS.Builder && record.coordinator && window.CozyOS.Builder.getBuildHistory().some(b => b.exportName === record.coordinator)) {
+                builderStatus = "BUILT";
+            }
+
+            let workspaceStatus = "REGISTERED";
+            if (builderStatus === "BUILT" && !certificationStatus) workspaceStatus = "IN_BUILDER";
+            else if (record.repairStatus === "REPAIRED" && !certificationStatus) workspaceStatus = "NEEDS_RECERTIFICATION";
+            else if (!certificationStatus) workspaceStatus = "AWAITING_CERTIFICATION";
+            else if (certificationStatus === "CERTIFICATION_FAILED") workspaceStatus = "FAILED_CERTIFICATION";
+            else if (certificationStatus === "CERTIFIED_WITH_WARNINGS") workspaceStatus = "NEEDS_REPAIR";
+            else if (productionVersion) workspaceStatus = "PRODUCTION";
+            else if (goldenVersion && record.coordinator && certificationStatus === "ENTERPRISE_CERTIFIED") workspaceStatus = "GOLDEN";
+            else if (certificationStatus === "ENTERPRISE_CERTIFIED") workspaceStatus = "CERTIFIED";
+
+            this.#fileRegistry.set(fileId, Object.freeze({
+                ...record, sha256Checksum: checksum, certificationStatus, goldenVersion, productionVersion,
+                lastCertification, builderStatus, workspaceStatus
+            }));
+        }
+
+        getFile(fileId) {
+            const record = this.#fileRegistry.get(fileId);
+            if (!record) return null;
+            const { handle, ...rest } = record;
+            return Object.freeze({ ...rest, hasHandle: !!handle });
+        }
+
+        listFiles(filter = {}) {
+            let results = Array.from(this.#fileRegistry.values());
+            if (filter.category) results = results.filter(f => f.category === filter.category);
+            if (filter.coordinator) results = results.filter(f => f.coordinator === filter.coordinator);
+            return Object.freeze(results.map(({ handle, ...rest }) => ({ ...rest, hasHandle: !!handle })));
+        }
+
+        // =====================================================================
+        // ─── DEVELOPER ACTIONS ────────────────────────────────────────────────
+        // Returns which actions genuinely apply to a registered file right
+        // now, based on real state (file category, which coordinators are
+        // actually connected, whether certification history exists) — never
+        // a static list shown regardless of context.
+        // =====================================================================
+
+        getDeveloperActionRegistry(fileId) {
+            const record = this.#fileRegistry.get(fileId);
+            if (!record) throw new Error(`[WorkspaceShell] getDeveloperActionRegistry(): unknown fileId "${fileId}".`);
+            const actions = ["viewSource", "duplicate", "rename", "move", "export", "download", "properties", "uploadToWorkspace", "uploadFolder", "uploadZip"];
+            if (record.category === "javascript") {
+                if (window.CozyOS.Builder) actions.push("openWithBuilder", "shareToBuilder");
+                if (window.CozyOS.BugFixer) actions.push("openWithBugFixer", "shareToBugFixer");
+                if (window.CozyOS.Certification) {
+                    actions.push("openWithCertification", "shareToCertification", "quickCertification", "fullCertification", "viewCertificationHistory");
+                    if (record.coordinator) {
+                        const history = window.CozyOS.Certification.listRecords(record.coordinator);
+                        if (history.length > 0) actions.push("compareVersions", "lockRelease");
+                        if (window.CozyOS.BugFixer) { actions.push("repair"); if (history.length > 0) actions.push("repairAndRecertify"); }
+                    }
+                }
+                if (window.CozyOS.BugFixer) actions.push("viewRepairHistory");
+                if (window.CozyOS.ServiceRegistry) actions.push("registerToServiceRegistry");
+                actions.push("registerToWorkspace");
+            }
+            return Object.freeze({ fileId, filename: record.filename, category: record.category, coordinator: record.coordinator, availableActions: actions });
+        }
+
+        /** Backward-compatible alias. */
+        getDeveloperActions(fileId) { return this.getDeveloperActionRegistry(fileId); }
+
+        /** Hands the file's REAL source to CozyBuilder's planner — no copy/paste. */
+        openWithBuilder(fileId) {
+            const record = this.#fileRegistry.get(fileId);
+            if (!record) throw new Error(`[WorkspaceShell] openWithBuilder(): unknown fileId "${fileId}".`);
+            if (!window.CozyOS.Builder) throw new Error("[WorkspaceShell] openWithBuilder(): CozyOS.Builder is not connected.");
+            this.#fileRegistry.set(fileId, Object.freeze({ ...record, builderStatus: "OPENED_IN_BUILDER" }));
+            this.#logAudit("OPENED_WITH_BUILDER", `${record.filename} handed to CozyBuilder.`);
+            return { filename: record.filename, coordinator: record.coordinator, source: record.source, dependencies: record.coordinator ? this.#dependencyMetadataFor(record.coordinator) : [] };
+        }
+
+        /** Registers the file's REAL source (or handle) directly into CozyBugFixer — no re-upload. */
+        async openWithBugFixer(fileId) {
+            const record = this.#fileRegistry.get(fileId);
+            if (!record) throw new Error(`[WorkspaceShell] openWithBugFixer(): unknown fileId "${fileId}".`);
+            if (!window.CozyOS.BugFixer) throw new Error("[WorkspaceShell] openWithBugFixer(): CozyOS.BugFixer is not connected.");
+            const bugfixerFileId = record.handle
+                ? await window.CozyOS.BugFixer.registerFileHandle(record.handle)
+                : await window.CozyOS.BugFixer.registerSourceText(record.filename, record.source);
+            this.#fileRegistry.set(fileId, Object.freeze({ ...record, bugFixStatus: "IN_BUGFIXER" }));
+            this.#logAudit("OPENED_WITH_BUGFIXER", `${record.filename} registered into CozyBugFixer (id ${bugfixerFileId}).`);
+            return bugfixerFileId;
+        }
+
+        /** Alias — "Share to CozyBugFixer" from a Developer Actions menu is the same real handoff as "Open with CozyBugFixer". */
+        async shareToBugFixer(fileId) { return this.openWithBugFixer(fileId); }
+
+        /** Hands the file's real source to CozyBuilder — same handoff whether "Open with" or "Share to". */
+        async shareToBuilder(fileId) { return this.openWithBuilder(fileId); }
+
+        /** Runs a real quickCertification() using the file's real source — no copy/paste, no re-typing a moduleId. */
+        async openWithCertification(fileId) {
+            const record = this.#fileRegistry.get(fileId);
+            if (!record) throw new Error(`[WorkspaceShell] openWithCertification(): unknown fileId "${fileId}".`);
+            if (!window.CozyOS.Certification) throw new Error("[WorkspaceShell] openWithCertification(): CozyOS.Certification is not connected.");
+            if (!record.source) throw new Error("[WorkspaceShell] openWithCertification(): no source text available for this file (handle-only files must be read first).");
+            const moduleId = record.coordinator || record.filename;
+            const result = window.CozyOS.Certification.quickCertification(record.source, { moduleId, moduleName: moduleId, version: "workspace-triggered" });
+            if (!record.coordinator) {
+                this.#fileRegistry.set(fileId, Object.freeze({ ...this.#fileRegistry.get(fileId), coordinator: moduleId }));
+            }
+            await this.#refreshFileStatus(fileId);
+            return result;
+        }
+
+        /** Alias — "Share to CozyCertification" is the same handoff as "Open with CozyCertification". */
+        async shareToCertification(fileId) { return this.openWithCertification(fileId); }
+
+        // =====================================================================
+        // ─── FILE PROTECTION / SAVE (the ONLY write-gate in CozyOS) ───────────
+        // Builder -> Workspace -> Protection Check -> Backup -> Checksum ->
+        // Save. Neither CozyBuilder nor CozyBugFixer ever calls
+        // createWritable() themselves — this is the single place that does.
+        // =====================================================================
+
+        async #createFileBackup(fileId) {
+            const record = this.#fileRegistry.get(fileId);
+            const backupId = "wsbak_" + (crypto.randomUUID ? crypto.randomUUID() : Date.now());
+            const hash = record.source ? await sha256Hex(record.source) : record.sha256Checksum;
+            const backup = Object.freeze({ backupId, fileId, source: record.source, hash, timestamp: new Date().toISOString() });
+            if (!this.#fileBackups.has(fileId)) this.#fileBackups.set(fileId, []);
+            const list = this.#fileBackups.get(fileId);
+            list.push(backup);
+            if (list.length > 20) list.shift();
+            return backup;
+        }
+
+        listFileBackups(fileId) { return Object.freeze((this.#fileBackups.get(fileId) || []).map(b => this.#deepClone(b))); }
+
+        /**
+         * saveFile(fileId, { proposedSource, approve, enforcedProtectedOverride })
+         *   The single write-gate for the whole platform. Requires
+         *   approve:true. A Protected File additionally requires
+         *   enforcedProtectedOverride:true. Always backs up first, always
+         *   computes a checksum, writes to disk ONLY if a real handle
+         *   exists — this is the only method in CozyOS that calls
+         *   createWritable().
+         */
+        async saveFile(fileId, { proposedSource, approve = false, enforcedProtectedOverride = false } = {}) {
+            const record = this.#fileRegistry.get(fileId);
+            if (!record) throw new Error(`[WorkspaceShell] saveFile(): unknown fileId "${fileId}".`);
+            if (typeof proposedSource !== "string" || !proposedSource.trim()) throw new TypeError("[WorkspaceShell] saveFile(): proposedSource is required.");
+            if (!approve) throw new Error("[WorkspaceShell] saveFile(): requires approve:true.");
+            if (record.protectionLevel === "PROTECTED" && !enforcedProtectedOverride) {
+                throw new Error(`[WorkspaceShell] saveFile(): "${record.filename}" is Protected — requires enforcedProtectedOverride:true.`);
+            }
+            const suspicious = scanForSuspiciousPatterns(proposedSource);
+            if (suspicious.length > 0) {
+                throw new Error(`[WorkspaceShell] saveFile(): refusing to save — suspicious pattern(s) found: ${suspicious.map(s => s.description).join("; ")}.`);
+            }
+
+            const backup = await this.#createFileBackup(fileId);
+            const beforeHash = record.sha256Checksum;
+            const afterHash = await sha256Hex(proposedSource);
+
+            if (record.handle && typeof record.handle.createWritable === "function") {
+                const writable = await record.handle.createWritable();
+                await writable.write(proposedSource);
+                await writable.close();
+            }
+
+            this.#fileRegistry.set(fileId, Object.freeze({
+                ...record, source: proposedSource, sha256Checksum: afterHash,
+                lastModified: new Date().toISOString(), repairStatus: "REPAIRED"
+            }));
+            this.#logAudit("FILE_SAVED", `${record.filename} saved. Checksum ${beforeHash ? beforeHash.slice(0, 8) + "…" : "?"} -> ${afterHash.slice(0, 8)}….`);
+            this.emit("file:saved", { fileId, filename: record.filename, backupId: backup.backupId, previousHash: beforeHash, newHash: afterHash, writtenToDisk: !!(record.handle && typeof record.handle.createWritable === "function") });
+            await this.#refreshFileStatus(fileId);
+            return { fileId, backupId: backup.backupId, previousHash: beforeHash, newHash: afterHash, writtenToDisk: !!(record.handle && typeof record.handle.createWritable === "function") };
+        }
+
+        /**
+         * Runs CozyBugFixer's repair() preview, has BugFixer.save() log the
+         * repair (rules fixed, hash pair, before/after certification score
+         * — BugFixer's save() never calls createWritable()), then this
+         * shell's OWN saveFile() performs the actual protected write. Two
+         * distinct responsibilities, one real disk write.
+         */
+        async repairAndRecertify(fileId, { approve = false } = {}) {
+            const record = this.#fileRegistry.get(fileId);
+            if (!record) throw new Error(`[WorkspaceShell] repairAndRecertify(): unknown fileId "${fileId}".`);
+            if (!window.CozyOS.BugFixer) throw new Error("[WorkspaceShell] repairAndRecertify(): CozyOS.BugFixer is not connected.");
+            const bfFileId = await this.shareToBugFixer(fileId);
+            const preview = window.CozyOS.BugFixer.repair(bfFileId);
+            if (!preview.changed) return { changed: false, preview };
+            if (approve) {
+                const repairLogEntry = await window.CozyOS.BugFixer.save(bfFileId, {
+                    proposedSource: preview.proposedSource, approve: true, ruleIdsFixed: preview.appliedFixes.map(f => f.ruleId)
+                });
+                await this.saveFile(fileId, { proposedSource: preview.proposedSource, approve: true });
+                const certResult = record.source ? await this.openWithCertification(fileId) : null;
+                return { changed: true, preview, repairLogEntry, certResult };
+            }
+            return { changed: true, preview, savedYet: false };
+        }
+
+        /** Compares two of a module's real certification records — never re-evaluates rules. */
+        compareVersions(fileId, { fromCertificationId, toCertificationId } = {}) {
+            const record = this.#fileRegistry.get(fileId);
+            if (!record || !record.coordinator) throw new Error(`[WorkspaceShell] compareVersions(): file "${fileId}" isn't matched to a known module.`);
+            if (!window.CozyOS.Certification) throw new Error("[WorkspaceShell] compareVersions(): CozyOS.Certification is not connected.");
+            const history = window.CozyOS.Certification.listRecords(record.coordinator);
+            const from = fromCertificationId ? history.find(r => r.certificationId === fromCertificationId) : history[0];
+            const to = toCertificationId ? history.find(r => r.certificationId === toCertificationId) : history[history.length - 1];
+            if (!from || !to) throw new Error("[WorkspaceShell] compareVersions(): could not resolve both certification records to compare.");
+            const passA = from.rulePassMap || {}, passB = to.rulePassMap || {};
+            return {
+                from: { certificationId: from.certificationId, version: from.version, score: from.summary.scorePercent },
+                to: { certificationId: to.certificationId, version: to.version, score: to.summary.scorePercent },
+                scoreDifference: Math.round((to.summary.scorePercent - from.summary.scorePercent) * 10) / 10,
+                rulesFixed: Object.keys(passB).filter(id => passA[id] === false && passB[id] === true),
+                newRegressions: Object.keys(passB).filter(id => passA[id] === true && passB[id] === false)
+            };
+        }
+
+        viewCertificationHistory(fileId) {
+            const record = this.#fileRegistry.get(fileId);
+            if (!record || !record.coordinator) throw new Error(`[WorkspaceShell] viewCertificationHistory(): file "${fileId}" isn't matched to a known module.`);
+            if (!window.CozyOS.Certification) throw new Error("[WorkspaceShell] viewCertificationHistory(): CozyOS.Certification is not connected.");
+            return window.CozyOS.Certification.listRecords(record.coordinator);
+        }
+
+        viewRepairHistory(fileId) {
+            if (!window.CozyOS.BugFixer) throw new Error("[WorkspaceShell] viewRepairHistory(): CozyOS.BugFixer is not connected.");
+            const record = this.#fileRegistry.get(fileId);
+            if (!record) throw new Error(`[WorkspaceShell] viewRepairHistory(): unknown fileId "${fileId}".`);
+            return window.CozyOS.BugFixer.getRepairLog(r => r.filename === record.filename);
+        }
+
+        #dependencyMetadataFor(moduleId) {
+            const coord = this.#coordinators.get(moduleId);
+            if (!coord || !coord.diagnostics || !Array.isArray(coord.diagnostics.dependencies)) return [];
+            return coord.diagnostics.dependencies;
+        }
+
+        // =====================================================================
+        // ─── DEVELOPER QUEUE ──────────────────────────────────────────────────
+        // Per-module status derived ENTIRELY from real state across
+        // Certification/Builder/BugFixer — never a fabricated status. The
+        // "Golden Version" concept mirrors the Certification Dashboard's own
+        // computation (highest score in a module's real, permanent history)
+        // since WorkspaceShell has no separate storage of its own for this.
+        // =====================================================================
+
+        getDeveloperQueue() {
+            if (!window.CozyOS.Certification) {
+                return { connected: false, message: "CozyCertification not connected — Developer Queue needs it to know each module's real status." };
+            }
+            const cert = window.CozyOS.Certification;
+            // Union of every source this shell can honestly derive a module
+            // name from: live-discovered coordinators, files registered in
+            // the workspace file hub (even if not yet loaded), and
+            // CozyBuilder's own build history (the "just built, not yet
+            // loaded" case) — not live coordinators alone, or a module
+            // that's only ever been built or uploaded never shows up.
+            const names = new Set(this.#coordinators.keys());
+            for (const file of this.#fileRegistry.values()) {
+                if (file.coordinator) { names.add(file.coordinator); continue; }
+                const m = /^cozy-([a-z0-9-]+)\.js$/i.exec(file.filename);
+                if (m) names.add(m[1].split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(""));
+            }
+            if (window.CozyOS.Builder) {
+                for (const build of window.CozyOS.Builder.getBuildHistory()) names.add(build.exportName);
+            }
+            const moduleNames = Array.from(names);
+            const entries = moduleNames.map((name) => {
+                const history = cert.listRecords(name);
+                const latest = history.length ? history[history.length - 1] : null;
+                const golden = history.length ? history.reduce((best, r) => (r.summary.scorePercent > best.summary.scorePercent ? r : best), history[0]) : null;
+
+                let status = "WAITING"; // 🔵-equivalent default: nothing has happened with this module yet
+                if (window.CozyOS.Builder && window.CozyOS.Builder.getBuildHistory().some(b => b.exportName === name)) status = "IN_BUILDER";
+                if (!latest) status = status === "WAITING" ? "AWAITING_CERTIFICATION" : status;
+                else if (latest.verdict === "CERTIFICATION_FAILED") status = "FAILED_CERTIFICATION";
+                else if (latest.verdict === "CERTIFIED_WITH_WARNINGS") status = "NEEDS_REPAIR";
+                else if (latest.verdict === "ENTERPRISE_CERTIFIED") status = "CERTIFIED";
+
+                return Object.freeze({
+                    moduleId: name, status,
+                    latestScore: latest ? latest.summary.scorePercent : null,
+                    goldenScore: golden ? golden.summary.scorePercent : null,
+                    verdict: latest ? latest.verdict : null,
+                    recommendedTool: {
+                        IN_BUILDER: "CozyBuilder", NEEDS_REPAIR: "CozyBugFixer", FAILED_CERTIFICATION: "CozyBugFixer",
+                        AWAITING_CERTIFICATION: "CozyCertification", CERTIFIED: "CertificationReport", WAITING: null
+                    }[status]
+                });
+            });
+            return { connected: true, entries };
         }
 
         getDiagnosticsReport() {
