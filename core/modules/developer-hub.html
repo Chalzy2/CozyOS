@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CozyOS Developer Hub</title>
+<link rel="stylesheet" href="developer-hub.css" />
+
+<!-- Optional PDF export support for reports generated elsewhere in CozyOS. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+
+<!-- Optional: real offline OCR provider for CozyOCR. Without this,
+     CozyOCR (and anything that calls it) honestly reports no provider
+     loaded rather than fabricating extracted text. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js" defer></script>
+
+<!--
+  Developer Hub orchestrates every existing coordinator — it duplicates
+  none of their logic, so all of them must actually be loaded for their
+  respective sections/actions to do anything. Load order does not matter
+  for correctness (every coordinator here self-registers with retry, and
+  Developer Hub resolves each one live rather than capturing it once) —
+  but every file below being MISSING means that section honestly reports
+  "not connected" rather than silently pretending to work.
+-->
+
+<script src="../certification/cozy-certification.js" defer></script>
+<script src="../../registry/cozy-registry.js" defer></script>
+<script src="../../shell/cozy-workspace.js" defer></script>
+<script src="../builder/builder-rules.js" defer></script>
+<script src="../builder/builder-templates.js" defer></script>
+<script src="../builder/builder-ai.js" defer></script>
+<script src="../builder/cozy-builder.js" defer></script>
+<script src="../bugfixer/cozy-bugfixer.js" defer></script>
+<script src="../ocr/cozy-ocr.js" defer></script>
+<script src="../builder/understanding-engine.js" defer></script>
+<script src="../aimode/cozy-ai-mode.js" defer></script>
+
+<!-- The orchestration layer itself, then the UI that renders it. -->
+<script src="cozy-developer.js" defer></script>
+<script src="developer-hub.js" defer></script>
+</head>
+<body>
+    <div id="cozy-developer-hub-root">
+        <noscript>The CozyOS Developer Hub requires JavaScript.</noscript>
+    </div>
+</body>
+</html>
