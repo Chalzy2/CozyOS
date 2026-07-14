@@ -1164,11 +1164,17 @@
          *   FileSystemFileHandle) — or both. Returns a fileId. This is the
          *   entry point for "Upload to Workspace" / drag-and-drop.
          */
-        registerFile({ filename, filePath = null, source = null, handle = null } = {}) {
+        registerFile({ filename, filePath = null, source = null, handle = null, moduleId: explicitModuleId = null } = {}) {
             if (typeof filename !== "string" || !filename.trim()) throw new TypeError("[WorkspaceShell] registerFile(): filename is required.");
             if (FORBIDDEN_KEYS.has(filename)) throw new Error(`[WorkspaceShell] registerFile(): rejected filename "${filename}".`);
             if (source === null && !handle) throw new TypeError("[WorkspaceShell] registerFile(): either source text or a real file handle is required.");
-            const { category, moduleId } = this.#classifyFile(filename);
+            const classified = this.#classifyFile(filename);
+            const category = classified.category;
+            // An explicit moduleId (e.g. from Builder's plan.exportName,
+            // which preserves exact internal casing like "VendorX") always
+            // wins over the filename-derived guess — kebab-case filenames
+            // are lossy for camelCase identifiers and can't recover them.
+            const moduleId = explicitModuleId || classified.moduleId;
             const fileId = "wsfile_" + (crypto.randomUUID ? crypto.randomUUID() : Date.now());
             const applicationId = this.#applicationOwning(moduleId);
             const resolvedPath = filePath || filename;
