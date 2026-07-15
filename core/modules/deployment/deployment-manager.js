@@ -100,6 +100,31 @@
         }
 
         /**
+         * queueProjectDeployment({ name, version, files, moduleIds })
+         *   Phase 4 — Project Deployment. The DeploymentProvider interface
+         *   is completely unchanged (still the same 8 methods) — files is
+         *   simply an additional, optional property on the same
+         *   deployment object every provider's validate()/deploy() already
+         *   receives. moduleIds (the .js files' derived identities) still
+         *   drive the real readiness check, same as single-file deploys.
+         */
+        queueProjectDeployment({ name, version = "1.0.0", files, moduleIds }) {
+            if (!files || typeof files !== "object") throw new TypeError("[Deployment] queueProjectDeployment(): files must be a {path: content} object.");
+            const readiness = this.checkDeploymentReadiness(moduleIds || []);
+            if ((moduleIds || []).length > 0 && !readiness.ready) throw new Error(`[Deployment] queueProjectDeployment(): not deployment-ready — uncertified module(s): ${readiness.notReady.join(", ")}.`);
+            const id = this.#generateId("deploy");
+            const deployment = {
+                id, name: this.#escapeHtml(name), version, moduleIds: moduleIds || [], files, isProject: true,
+                status: "READY", attempts: 0, queuedAt: new Date().toISOString(), releaseId: null
+            };
+            this.#queue.set(id, deployment);
+            this.#diagnostics.deploymentsQueued++;
+            this.#logAudit("PROJECT_DEPLOYMENT_QUEUED", `${name}: ${Object.keys(files).length} file(s).`);
+            this.emit("deployment:queued", { id, isProject: true });
+            return this.#deepClone(deployment);
+        }
+
+        /**
          * registerProvider(name, providerImpl)
          *   providerImpl must implement the full DeploymentProvider
          *   interface: initialize, isConfigured, validate, deploy,
@@ -225,8 +250,12 @@
                 // target is optional and reported by the provider itself —
                 // never invented here. null when the provider doesn't
                 // report one, exactly what Workspace expects to see as
-                // "Deployment Target: None".
-                this.#recordHistory(deployment, providerName, "SUCCESS", null, result.target || null);
+                // "Deployment Target: None". Same real, provider-reported
+                // rule applies to filesDeployed/filesUpdated/filesUnchanged —
+                // null for a single-file deploy, real counts for a project.
+                this.#recordHistory(deployment, providerName, "SUCCESS", null, result.target || null, {
+                    filesDeployed: result.filesDeployed ?? null, filesUpdated: result.filesUpdated ?? null, filesUnchanged: result.filesUnchanged ?? null
+                });
                 this.#logAudit("DEPLOYMENT_COMPLETED", `${id} -> ${providerName} release ${result.releaseId}`);
                 this.emit("deployment:completed", { id, releaseId: result.releaseId, provider: providerName, target: result.target || null });
             } catch (err) {
@@ -255,18 +284,20 @@
         }
 
         /**
-         * #recordHistory(deployment, providerName, result, failureReason, target)
-         *   target is optional and comes ONLY from the provider's own
-         *   deploy()/validate() result (e.g. "Development", "main branch",
-         *   "Production") — this file never assumes or invents a
-         *   provider-specific target. null when the provider didn't
-         *   report one; Workspace displays that as "None".
+         * #recordHistory(deployment, providerName, result, failureReason, target, fileCounts)
+         *   target and fileCounts are optional and come ONLY from the
+         *   provider's own deploy()/validate() result (e.g. "Development",
+         *   "main branch", real per-file counts for a project deploy) —
+         *   this file never assumes or invents any of them. null when the
+         *   provider didn't report them; Workspace displays that honestly.
          */
-        #recordHistory(deployment, providerName, result, failureReason, target = null) {
+        #recordHistory(deployment, providerName, result, failureReason, target = null, fileCounts = {}) {
             this.#history.push({
                 id: deployment.id, moduleIds: deployment.moduleIds, version: deployment.name, provider: providerName, target,
+                projectName: deployment.isProject ? deployment.name : null,
                 date: new Date().toISOString(), result, failureReason, releaseId: deployment.releaseId || null,
-                rollbackAvailable: result === "SUCCESS" && !!this.#providers.get(providerName)?.isConfigured()
+                rollbackAvailable: result === "SUCCESS" && !!this.#providers.get(providerName)?.isConfigured(),
+                filesDeployed: fileCounts.filesDeployed ?? null, filesUpdated: fileCounts.filesUpdated ?? null, filesUnchanged: fileCounts.filesUnchanged ?? null
             });
             if (this.#history.length > 500) this.#history.shift();
         }
@@ -334,6 +365,7 @@
         async initialize() { return { success: true, configured: true }; },
         isConfigured() { return true; },
         async validate(deployment) {
+            if (!deployment.moduleIds || deployment.moduleIds.length === 0) return { success: true }; // nothing certifiable (e.g. an asset-only project) — not a failure
             const cert = window.CozyOS.Certification;
             if (!cert) return { success: false, reason: "CozyCertification is not connected." };
             const notReady = deployment.moduleIds.filter(id => {
@@ -346,7 +378,21 @@
             const cert = window.CozyOS.Certification;
             if (!cert) return { success: false, reason: "CozyCertification is not connected." };
             const release = cert.lockRelease({ name: deployment.name, moduleIds: deployment.moduleIds });
-            return { success: true, releaseId: release.releaseId, provider: "Local Workspace" };
+
+            // Phase 4: when this deployment carries a real project file map
+            // (queueProjectDeployment), register every file in Workspace —
+            // reusing WorkspaceShell.registerProject() entirely, never
+            // duplicating file-registration logic here. Structure/paths
+            // are preserved exactly because registerProject() itself
+            // preserves them.
+            let filesDeployed = null, filesUpdated = null, filesUnchanged = null;
+            if (deployment.files && window.CozyOS.WorkspaceShell) {
+                const projectResult = window.CozyOS.WorkspaceShell.registerProject(deployment.name, deployment.files);
+                filesDeployed = projectResult.totalFiles;
+                filesUpdated = projectResult.filesUpdated;
+                filesUnchanged = projectResult.filesUnchanged;
+            }
+            return { success: true, releaseId: release.releaseId, provider: "Local Workspace", filesDeployed, filesUpdated, filesUnchanged };
         },
         async verify(deploymentResult) {
             const cert = window.CozyOS.Certification;
@@ -367,10 +413,25 @@
     });
 
     // ── Future providers — architecturally complete, honestly unconfigured ──
-    window.CozyOS.DeploymentManager.registerProvider("GitHub", makeUnconfiguredProvider("GitHub", [
+    // GitHub gets one real, additional, disclosed extension beyond the
+    // standard 8-method interface: mapToRepositoryPaths(). This performs
+    // no commit/push/network call of any kind — it only computes which
+    // repository path each project file WOULD map to, real path-string
+    // logic only, so a future real GitHub connector has an actual mapping
+    // to build on rather than starting from nothing. Never a fabricated
+    // commit or deployment.
+    const githubProvider = makeUnconfiguredProvider("GitHub", [
         "Repository selection", "Branch selection", "Commit", "Commit message", "Push",
         "Verify commit", "Pull latest", "Deployment history", "Rollback", "Token validation"
-    ]));
+    ]);
+    githubProvider.mapToRepositoryPaths = function (files, { repositoryRoot = "" } = {}) {
+        const mapping = {};
+        for (const path of Object.keys(files)) {
+            mapping[path] = repositoryRoot ? `${repositoryRoot.replace(/\/$/, "")}/${path}` : path;
+        }
+        return { available: true, mapping, note: "Real path mapping only — no commit, push, or network call performed. Requires a real GitHub connector to actually deploy." };
+    };
+    window.CozyOS.DeploymentManager.registerProvider("GitHub", githubProvider);
     window.CozyOS.DeploymentManager.registerProvider("GitLab", makeUnconfiguredProvider("GitLab", []));
     window.CozyOS.DeploymentManager.registerProvider("Cloudflare Pages", makeUnconfiguredProvider("Cloudflare Pages", [
         "Project selection", "Production deploy", "Preview deploy", "Verify"
