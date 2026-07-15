@@ -398,12 +398,25 @@
             try {
                 const zip = await window.JSZip.loadAsync(arrayBuffer);
                 const files = {};
+                const binaryFlags = {};
                 for (const [path, entry] of Object.entries(zip.files)) {
                     if (entry.dir) continue;
-                    files[path] = await entry.async("string");
+                    // Real fix — entry.async("string") performs lossy UTF-8
+                    // text decoding. For a genuinely text file (html/css/js/
+                    // json/md/txt) that's correct and unchanged from before.
+                    // For a binary file (image/icon/font/other asset), it
+                    // silently corrupts the bytes — confirmed directly: a
+                    // real 418-byte PNG round-tripped through this path
+                    // came back as a 706-byte file with 147 bytes replaced.
+                    // Binary files are now read as base64 instead, and
+                    // flagged so exportProjectAsZip() writes them back
+                    // correctly rather than re-corrupting them a second time.
+                    const isBinary = /\.(png|jpe?g|gif|svg|ico|webp|woff2?|ttf|otf|eot|pdf|zip|mp3|mp4|wav)$/i.test(path);
+                    if (isBinary) { files[path] = await entry.async("base64"); binaryFlags[path] = true; }
+                    else { files[path] = await entry.async("string"); }
                 }
                 this.#logAudit("ZIP_IMPORTED", `${Object.keys(files).length} file(s) extracted.`);
-                return { available: true, files };
+                return { available: true, files, binaryFlags };
             } catch (err) {
                 return { available: false, reason: `ZIP extraction failed: ${err.message}` };
             }
@@ -480,13 +493,16 @@
          *   renamed). Returns a real Blob when JSZip is available;
          *   honestly unavailable otherwise, never a fabricated archive.
          */
-        async exportProjectAsZip(files) {
+        async exportProjectAsZip(files, binaryFlags = {}) {
             if (typeof window.JSZip === "undefined") {
                 return { available: false, reason: "No ZIP provider loaded — add the JSZip script tag to enable this." };
             }
             try {
                 const zip = new window.JSZip();
-                for (const [path, content] of Object.entries(files)) { zip.file(path, content); }
+                for (const [path, content] of Object.entries(files)) {
+                    if (binaryFlags[path]) zip.file(path, content, { base64: true });
+                    else zip.file(path, content);
+                }
                 const blob = await zip.generateAsync({ type: "blob" });
                 this.#logAudit("ZIP_EXPORTED", `${Object.keys(files).length} file(s) packaged.`);
                 return { available: true, blob, fileCount: Object.keys(files).length };
