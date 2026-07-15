@@ -393,6 +393,7 @@
                     </div>` : ""}
                     <button class="cz-btn cz-btn-primary" data-action="hub-analyze">Analyze</button>
                 </div>
+                ${this.#currentProjectFiles ? this.#renderProjectExplorer() : ""}
                 ${this.#lastAnalysis ? this.#renderAnalysisResult(this.#lastAnalysis) : ""}
                 ${this.#lastBuildResult ? this.#renderBuildResult(this.#lastBuildResult) : ""}
                 <div class="cz-panel cz-dev-action-output-panel" id="cz-hub-output"></div>`;
@@ -1041,6 +1042,66 @@
          *   RequirementReader analysis) — original paths and filenames
          *   preserved exactly, never flattened, never renamed.
          */
+        /**
+         * #renderProjectExplorer()
+         *   Minimal, reproduced-defect fix: after a ZIP upload,
+         *   #currentProjectFiles/#currentProjectModel were already being
+         *   stored in memory but nothing let the user see, open, preview,
+         *   or download an individual extracted file. This renders that
+         *   real, already-extracted data — no new extraction logic, no
+         *   duplicated ZIP handling. Deliberately minimal: Open/Preview/
+         *   Download only. No bookmarks, tags, compare, rename, or
+         *   history — those aren't justified by this reproduction.
+         */
+        #renderProjectExplorer() {
+            const model = this.#currentProjectModel;
+            if (!model) return "";
+            const byFolder = new Map();
+            for (const f of model.files) { const key = f.folder || "(root)"; if (!byFolder.has(key)) byFolder.set(key, []); byFolder.get(key).push(f); }
+            const TEXT_CATEGORIES = new Set(["markup", "style", "script", "data", "documentation"]);
+
+            return `<div class="cz-panel">
+                <h3>Project Explorer</h3>
+                <p class="cz-muted">${model.fileCount} file(s) across ${model.folderStructure.length} folder(s)</p>
+                ${Array.from(byFolder.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([folder, files]) => `
+                    <div class="cz-row"><b>📁 ${escapeHtml(folder)}</b></div>
+                    ${files.map(f => `<div class="cz-row" style="padding-left:1.5em;">
+                        <span>📄 ${escapeHtml(f.filename)}</span>
+                        <span class="cz-muted">${escapeHtml(f.category)}</span>
+                        <button class="cz-btn" data-action="hub-project-file-open" data-path="${escapeHtml(f.path)}">Open</button>
+                        ${TEXT_CATEGORIES.has(f.category) ? `<button class="cz-btn" data-action="hub-project-file-preview" data-path="${escapeHtml(f.path)}">Preview</button>` : ""}
+                        <button class="cz-btn" data-action="hub-project-file-download" data-path="${escapeHtml(f.path)}">Download</button>
+                    </div>`).join("")}
+                `).join("")}
+            </div>`;
+        }
+
+        /** Open — loads the selected file's real content into Method 2's editor, so every existing single-file Builder tool (Split/Merge/Convert/Optimize, Analyze) works on it, same as any other upload. */
+        #hubProjectFileOpen(path) {
+            const content = this.#currentProjectFiles?.[path];
+            if (content === undefined) { this.#devOutput('<p class="cz-muted">File not found in the loaded project.</p>'); return; }
+            const pasteEl = document.getElementById("cz-hub-builder-code-paste");
+            if (pasteEl) pasteEl.value = content;
+            this.#uploadedFileOriginal = { name: path.split("/").pop(), text: content, loadedAt: new Date().toISOString() };
+            this.#uploadedFileMeta = this.#detectFileMetadata(path.split("/").pop(), content);
+            this.#devOutput(`<p>Loaded <b>${escapeHtml(path)}</b> into the editor above.</p>`);
+            this.#renderMain();
+        }
+
+        /** Preview — real, read-only content display. Binary files are never previewed as text (they were already excluded from the button per category above). */
+        #hubProjectFilePreview(path) {
+            const content = this.#currentProjectFiles?.[path];
+            if (content === undefined) { this.#devOutput('<p class="cz-muted">File not found in the loaded project.</p>'); return; }
+            this.#devOutput(`<h3>${escapeHtml(path)}</h3><textarea class="cz-input" rows="16" readonly>${escapeHtml(content)}</textarea>`);
+        }
+
+        /** Download — real, individual file download, reusing the same established downloadTextFile()/downloadBlob() utility used everywhere else in this file. */
+        #hubProjectFileDownload(path) {
+            const content = this.#currentProjectFiles?.[path];
+            if (content === undefined) { this.#devOutput('<p class="cz-muted">File not found in the loaded project.</p>'); return; }
+            downloadTextFile(path.split("/").pop(), content);
+        }
+
         async #handleZipProjectUpload(file) {
             const refactor = window.CozyOS.ProjectRefactor;
             if (!refactor) { this.#devOutput('<p class="cz-muted">ProjectRefactor is not connected.</p>'); return; }
@@ -2384,6 +2445,9 @@
                 case "hub-open-bugfixer": this.#hubOpenBugFixer(moduleId); return;
                 case "hub-repair": this.#hubRepair(moduleId); return;
                 case "hub-download-repaired-project": this.#hubDownloadRepairedProjectZip(); return;
+                case "hub-project-file-open": this.#hubProjectFileOpen(actionEl.getAttribute("data-path")); return;
+                case "hub-project-file-preview": this.#hubProjectFilePreview(actionEl.getAttribute("data-path")); return;
+                case "hub-project-file-download": this.#hubProjectFileDownload(actionEl.getAttribute("data-path")); return;
                 case "hub-bugfixer-repair-pasted": this.#hubBugFixerRepairPasted(); return;
                 case "hub-download-repaired": this.#hubDownloadRepaired(moduleId, actionEl.getAttribute("data-filename")); return;
                 case "hub-copy-package": this.#hubCopyPackage(); return;
