@@ -56,6 +56,46 @@
         { keywords: ["category", "type", "classification"], fields: { category: null } }
     ]);
 
+    /**
+     * classifyIntent(text)
+     *   Real, deterministic classification — never a fabricated NLP
+     *   judgment. Distinguishes a genuine build request from a
+     *   requirements/planning document BEFORE any name extraction or
+     *   code-plan generation happens. Root-cause fix for: a requirements
+     *   document with no clearly-capitalized application name would
+     *   otherwise fall through to a word-guessing fallback that could
+     *   pick up filler phrases ("as another user...") as if they were
+     *   the module name.
+     *
+     *   Categories: "requirements_document", "build_request",
+     *   "existing_source_code" (handled upstream by the code-paste/
+     *   upload path, not this function), "unclassified" (low
+     *   confidence — treated the same as a build request, preserving
+     *   existing behavior for ordinary short descriptions).
+     */
+    function classifyIntent(text) {
+        const signals = [];
+        let requirementsScore = 0, buildScore = 0;
+
+        // Real user-story pattern: "As a/an/another <role>, I want ..."
+        const userStoryMatches = text.match(/\bas\s+(a|an|another)\s+[a-z][a-z\s]{2,30},?\s+i\s+want\b/gi) || [];
+        if (userStoryMatches.length > 0) { requirementsScore += userStoryMatches.length * 2; signals.push(`${userStoryMatches.length} user-story sentence(s) ("As a/an ___, I want ___")`); }
+
+        // Real requirements-document header/section signals
+        const REQUIREMENTS_HEADERS = [/\brequirements?\s+document\b/i, /\bacceptance\s+criteria\b/i, /\buser\s+stor(y|ies)\b/i, /\bbusiness\s+requirements\b/i, /\bfunctional\s+requirements\b/i, /\brequirements?\s+discovery\b/i];
+        for (const pattern of REQUIREMENTS_HEADERS) { if (pattern.test(text)) { requirementsScore += 2; signals.push(`Matched header pattern: ${pattern}`); } }
+
+        // Real build-request signals — the existing, already-working pattern, plus an explicit label
+        if (/\bbuild\s+[a-z][a-z\s]*?\s+(coordinator|management|module|system)\b/i.test(text)) { buildScore += 3; signals.push("Matched \"Build X Coordinator/Module/System\" pattern"); }
+        if (/(?:application name|module|app name)\s*:\s*[A-Za-z]/i.test(text)) { buildScore += 2; signals.push("Explicit Application Name/Module label present"); }
+
+        let type = "unclassified";
+        if (requirementsScore > buildScore && requirementsScore >= 2) type = "requirements_document";
+        else if (buildScore > 0) type = "build_request";
+
+        return { type, requirementsScore, buildScore, signals };
+    }
+
     function toPascalCase(words) {
         return words.map(w => {
             // Defense-in-depth: strip anything that isn't a letter/digit
@@ -192,6 +232,9 @@
          *   Returns a build plan shaped exactly like generateCoordinator()'s
          *   spec parameter — inspect/edit it before generating anything.
          */
+        /** classifyIntent(text) — real, public. Callers (Developer Hub's Analyze step) use this BEFORE deciding whether to call planBuild() at all. */
+        classifyIntent(text) { return classifyIntent(text); }
+
         planBuild(request) {
             if (!request || typeof request.description !== "string" || !request.description.trim()) {
                 throw new TypeError("[BuilderAI] planBuild(): request.description is required.");
