@@ -448,24 +448,95 @@
             <div class="cz-panel cz-dev-action-output-panel" id="cz-hub-output"></div>`;
         }
 
+        /**
+         * #routeForIntent(type)
+         *   Routing table only — classification (classifyIntent) and
+         *   routing are deliberately separate, so adding a future intent
+         *   type never requires touching BuilderAI again. destination
+         *   is a real, honest label; setSectionAction is only present
+         *   when a genuine navigation target exists in this UI today —
+         *   otherwise the panel discloses that no automatic handoff is
+         *   wired yet rather than pretending one does.
+         */
+        #routeForIntent(type) {
+            const TABLE = {
+                BUSINESS_REQUIREMENTS: { destination: "Requirement Analyzer", note: "Prose requirements text — analyzed by RequirementAnalyzer, not RequirementReader (which reads existing code files). Not yet wired to a Developer Hub section." },
+                USER_STORY: { destination: "Requirement Analyzer", note: "Same as Business Requirements — RequirementAnalyzer is built for this, not yet wired to a section here." },
+                ARCHITECTURE: { destination: "Understanding Engine", section: "understanding" },
+                SOURCE_CODE: { destination: "Builder Analysis (Method 2/3)", note: "Already the default path when code is pasted/uploaded — no extra routing needed." },
+                BUG_REPORT: { destination: "BugFixer", section: "bugfixer" },
+                CERTIFICATION_REPORT: { destination: "Certification", section: "quickCert" },
+                REFACTOR_REQUEST: { destination: "Project Refactor", note: "Builder's own Split/Merge/Convert/Optimize sub-tabs — use Method 2/3 there directly." },
+                BUILD_REQUEST: { destination: "Builder", note: "This screen — no redirect needed." },
+                PROJECT_SPECIFICATION: { destination: "Requirement Analyzer", note: "Same as Business Requirements — a structured spec still describes requirements, not finished code." },
+                UNKNOWN: { destination: "Show analysis only", note: "Confidence too low to route automatically — review the Understanding Preview below and decide manually." }
+            };
+            return TABLE[type] || TABLE.UNKNOWN;
+        }
+
+        /** #intentLabel(type) — pure display label derived from the already-frozen classifyIntent() enum. Not a new classification. */
+        #intentLabel(type) {
+            const LABELS = {
+                BUSINESS_REQUIREMENTS: "Requirements Discovery", USER_STORY: "Requirements Discovery",
+                PROJECT_SPECIFICATION: "Requirements Discovery", ARCHITECTURE: "Architecture Review",
+                SOURCE_CODE: "Code Analysis", BUG_REPORT: "Defect Resolution",
+                CERTIFICATION_REPORT: "Certification Review", REFACTOR_REQUEST: "Refactor Request",
+                BUILD_REQUEST: "Code Generation", UNKNOWN: "Unclassified"
+            };
+            return LABELS[type] || "Unclassified";
+        }
+
+        /** #phaseLabel(type) — pure display label; a real, deterministic mapping from intent.type, not a new tracked project-phase field. */
+        #phaseLabel(type) {
+            if (["BUSINESS_REQUIREMENTS", "USER_STORY", "PROJECT_SPECIFICATION"].includes(type)) return "Phase 1 — Discovery";
+            if (type === "ARCHITECTURE") return "Phase 2 — Architecture";
+            if (["BUILD_REQUEST", "SOURCE_CODE"].includes(type)) return "Phase 3 — Implementation";
+            if (["BUG_REPORT", "REFACTOR_REQUEST"].includes(type)) return "Maintenance";
+            if (type === "CERTIFICATION_REPORT") return "Verification";
+            return "Unclassified";
+        }
+
+        /** #actionButtonsForIntent(type) — real, adapted buttons per intent, matching the requested examples exactly. Routing destinations still come from the existing, untouched #routeForIntent(). */
+        #actionButtonsForIntent(type) {
+            const route = this.#routeForIntent(type);
+            const goto = route.section ? `<button class="cz-btn cz-btn-primary" data-action="hub-goto-section" data-section-target="${escapeHtml(route.section)}">Open ${escapeHtml(route.destination)}</button>` : "";
+            switch (type) {
+                case "BUSINESS_REQUIREMENTS": case "USER_STORY": case "PROJECT_SPECIFICATION":
+                    return `${goto || `<button class="cz-btn cz-btn-primary" data-action="hub-goto-section" data-section-target="understanding">Proceed to Architecture</button>`}
+                        <button class="cz-btn" data-action="hub-build-plan">Generate Code Anyway</button>`;
+                case "SOURCE_CODE": return `<button class="cz-btn cz-btn-primary" data-action="hub-build-plan">Continue to Builder</button>`;
+                case "BUG_REPORT": return goto || `<button class="cz-btn cz-btn-primary" data-action="hub-build-plan">Generate Anyway</button>`;
+                case "CERTIFICATION_REPORT": return goto || `<button class="cz-btn cz-btn-primary" data-action="hub-build-plan">Generate Anyway</button>`;
+                case "REFACTOR_REQUEST": return `<button class="cz-btn cz-btn-primary" data-action="hub-builder-subtab" data-tab="refactor-split">Open Project Refactor</button><button class="cz-btn" data-action="hub-build-plan">Generate Anyway</button>`;
+                case "BUILD_REQUEST": return `<button class="cz-btn cz-btn-primary" data-action="hub-build-plan">Continue → Generate</button>`;
+                default: return `<button class="cz-btn" data-action="hub-build-plan">Generate Anyway</button>`;
+            }
+        }
+
         #renderAnalysisResult(a) {
             const intent = a.intent;
-            const isRequirementsDoc = intent && intent.type === "requirements_document";
-            const classificationPanel = intent && intent.type !== "unclassified" ? `<div class="cz-panel" style="border-left:3px solid ${isRequirementsDoc ? "#d97706" : "#16a34a"};">
-                <h3>Input Classification</h3>
-                <p><b>Type:</b> ${isRequirementsDoc ? "Business Requirements Document" : "Build Request"}</p>
-                <p><b>Intent:</b> ${isRequirementsDoc ? "Requirements Discovery" : "Code Generation"}</p>
-                <p><b>Expected Output:</b> ${isRequirementsDoc ? "Business Requirements Document" : "Generated source code"}</p>
-                <p><b>Code Generation:</b> ${isRequirementsDoc ? "NOT REQUIRED" : "Expected"}</p>
-                <p class="cz-muted">Detected from: ${escapeHtml(intent.signals.join("; "))}</p>
-                ${isRequirementsDoc ? '<p class="cz-muted">RequirementAnalyzer\'s full Requirements Book generation is not yet wired into this screen — this classification only prevents silently generating code from what looks like a planning document. Review the input before proceeding.</p>' : ""}
-            </div>` : "";
+            const isBuildReady = intent && (intent.type === "BUILD_REQUEST" || intent.type === "SOURCE_CODE");
+            const applicationName = a.understanding?.plan?.exportName || "Not detected";
+            const classificationPanel = intent && intent.type !== "UNKNOWN" ? (() => {
+                const route = this.#routeForIntent(intent.type);
+                return `<div class="cz-panel" style="border-left:3px solid ${isBuildReady ? "#16a34a" : "#d97706"};">
+                    <h3>Input Classification</h3>
+                    <p><b>Input Type:</b> ${escapeHtml(intent.type)}</p>
+                    <p><b>Intent:</b> ${escapeHtml(this.#intentLabel(intent.type))}</p>
+                    <p><b>Application Name:</b> ${escapeHtml(applicationName)}</p>
+                    <p><b>Current Phase:</b> ${escapeHtml(this.#phaseLabel(intent.type))}</p>
+                    <p><b>Expected Output:</b> ${escapeHtml(route.destination)}</p>
+                    <p><b>Recommended Next Action:</b> ${escapeHtml(isBuildReady ? "Proceed with generation." : `Review with ${route.destination} before generating code.`)}</p>
+                    <p class="cz-muted">Detected from: ${escapeHtml(intent.signals.join("; ") || "no strong signal")}</p>
+                    <div class="cz-row">${this.#actionButtonsForIntent(intent.type)}</div>
+                </div>`;
+            })() : "";
             return `${classificationPanel}<div class="cz-panel">
                 <h3>Understanding Preview</h3>
                 <p><b>Application Type:</b> ${escapeHtml(a.understanding.applicationType)}</p>
                 <p><b>Detected Features:</b> ${escapeHtml((a.understanding.detectedFeatures || []).join(", ") || "none")}</p>
                 <p><b>Missing (Gap Detector):</b> ${escapeHtml(a.gaps.missing.map(g => g.label).join(", ") || "none")}</p>
-                <button class="cz-btn ${isRequirementsDoc ? "" : "cz-btn-primary"}" data-action="hub-build-plan">${isRequirementsDoc ? "Generate Code Anyway" : "Continue → Generate"}</button>
+                ${!intent || intent.type === "UNKNOWN" ? `<button class="cz-btn ${isBuildReady ? "cz-btn-primary" : ""}" data-action="hub-build-plan">${isBuildReady ? "Continue → Generate" : "Generate Anyway"}</button>` : ""}
             </div>`;
         }
 
@@ -2274,6 +2345,7 @@
                 case "select-module": this.#selectModule(moduleId); return;
                 case "hub-analyze": this.#hubAnalyze(); return;
                 case "hub-build-plan": this.#hubBuildPlan(); return;
+                case "hub-goto-section": this.#setSection(actionEl.getAttribute("data-section-target")); return;
                 case "hub-force-generate": this.#hubBuildPlan(true); return;
                 case "hub-download-file": this.#hubDownloadFile(actionEl.getAttribute("data-file")); return;
                 case "hub-builder-subtab": this.#hubSetBuilderSubTab(actionEl.getAttribute("data-tab")); return;
