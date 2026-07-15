@@ -287,6 +287,68 @@
         listDeterministicFixerRuleIds() { return Object.keys(DETERMINISTIC_FIXERS); }
 
         /**
+         * repairProject(files, { ruleIds, autoApprove })
+         *   Phase 2 — BugFixer Project Mode. files is the same flat
+         *   {path: content} shape ProjectRefactor's importFromZip()/
+         *   buildProjectModel() produce — a genuinely separate feature
+         *   from Builder's Project Mode (Phase 1), reusing only
+         *   BugFixer's own existing single-file registerSourceText()/
+         *   repair() path per real JS file, never a new repair engine.
+         *
+         *   Real guarantees:
+         *   - Every original path is preserved in the output, whether or
+         *     not it changed.
+         *   - Only .js files are ever candidates for repair (matches
+         *     DETERMINISTIC_FIXERS' actual scope — CSS/HTML/JSON/docs
+         *     are never touched here).
+         *   - A JS file with no applicable fixes comes back byte-
+         *     identical to its input — never rewritten for its own sake.
+         *   - autoApprove (default false) only controls whether changes
+         *     are written into the returned project files map as a
+         *     PREVIEW; it never touches Workspace/disk on its own —
+         *     saving remains the caller's explicit action, same as the
+         *     single-file path.
+         */
+        async repairProject(files, { ruleIds, autoApprove = false } = {}) {
+            if (!files || typeof files !== "object") throw new TypeError("[CozyBugFixer] repairProject(): files must be a {path: content} object.");
+            const resultFiles = {};
+            const report = {};
+            let modifiedCount = 0, unchangedCount = 0, skippedCount = 0;
+
+            for (const [path, content] of Object.entries(files)) {
+                if (!/\.js$/i.test(path)) {
+                    resultFiles[path] = content; // non-JS files are never candidates for repair — preserved exactly
+                    skippedCount++;
+                    continue;
+                }
+                try {
+                    const fileId = await this.registerSourceText(path, content);
+                    const preview = this.repair(fileId, { ruleIds });
+                    if (preview.changed) {
+                        resultFiles[path] = preview.proposedSource;
+                        report[path] = { changed: true, appliedFixes: preview.appliedFixes, skippedFixes: preview.skippedFixes };
+                        modifiedCount++;
+                    } else {
+                        resultFiles[path] = content; // no applicable fix — byte-identical, never rewritten for its own sake
+                        report[path] = { changed: false, appliedFixes: [], skippedFixes: preview.skippedFixes };
+                        unchangedCount++;
+                    }
+                } catch (err) {
+                    resultFiles[path] = content; // real failure to parse/repair this file — preserved exactly, never silently dropped
+                    report[path] = { changed: false, error: err.message };
+                    unchangedCount++;
+                }
+            }
+
+            this.#logAudit("PROJECT_REPAIR_RUN", `${Object.keys(files).length} file(s): ${modifiedCount} modified, ${unchangedCount} unchanged, ${skippedCount} non-JS preserved as-is.`);
+            return {
+                files: resultFiles, report,
+                fileCount: Object.keys(files).length, modifiedCount, unchangedCount, skippedCount,
+                method: "reuses the existing single-file registerSourceText()/repair() path per real JS file — no separate repair engine"
+            };
+        }
+
+        /**
          * #checkMemoryForPriorFixes(ruleIds)
          *   Memory Read Rule: searches CozyMemory's real "Builder"
          *   namespace repair history for the SAME rule IDs this repair is
