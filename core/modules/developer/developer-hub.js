@@ -93,6 +93,7 @@
         #lastBuildResult = null;
         #pendingBuilderFiles = null;
         #currentProjectFiles = null;
+        #currentProjectBinaryFlags = null;
         #currentProjectModel = null;
         #uploadedFileOriginal = null;
         #uploadedFileMeta = null;
@@ -103,6 +104,7 @@
         #bugfixerUploadedMeta = null;
         #bugfixerRequirementReading = null;
         #lastProjectRepairResult = null;
+        #lastProjectRepairBinaryFlags = null;
         #builderSubTab = "generate";
         #lastRefactorResult = null;
         #lastRefactorFinalJs = null;
@@ -1099,7 +1101,17 @@
         #hubProjectFileDownload(path) {
             const content = this.#currentProjectFiles?.[path];
             if (content === undefined) { this.#devOutput('<p class="cz-muted">File not found in the loaded project.</p>'); return; }
-            downloadTextFile(path.split("/").pop(), content);
+            const filename = path.split("/").pop();
+            if (this.#currentProjectBinaryFlags?.[path]) {
+                // Real binary content — decode the base64 back to actual
+                // bytes rather than saving the base64 text itself.
+                const binaryString = atob(content);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+                downloadBlob(filename, bytes, "application/octet-stream");
+            } else {
+                downloadTextFile(filename, content);
+            }
         }
 
         async #handleZipProjectUpload(file) {
@@ -1112,6 +1124,7 @@
 
                 const model = refactor.buildProjectModel(imported.files);
                 this.#currentProjectFiles = imported.files;
+                this.#currentProjectBinaryFlags = imported.binaryFlags || {};
                 this.#currentProjectModel = model;
 
                 if (model.requirementSummary) {
@@ -1494,6 +1507,7 @@
 
                 const result = await bugfixer.repairProject(imported.files);
                 this.#lastProjectRepairResult = result;
+                this.#lastProjectRepairBinaryFlags = imported.binaryFlags || {};
 
                 const changedList = Object.entries(result.report).filter(([, r]) => r.changed).map(([path]) => path);
                 const unchangedList = Object.entries(result.report).filter(([, r]) => !r.changed && !r.error).map(([path]) => path);
@@ -1511,7 +1525,7 @@
         async #hubDownloadRepairedProjectZip() {
             const refactor = window.CozyOS.ProjectRefactor;
             if (!refactor || !this.#lastProjectRepairResult) return;
-            const exported = await refactor.exportProjectAsZip(this.#lastProjectRepairResult.files);
+            const exported = await refactor.exportProjectAsZip(this.#lastProjectRepairResult.files, this.#lastProjectRepairBinaryFlags || {});
             if (!exported.available) { this.#devOutput(`<p class="cz-muted">${escapeHtml(exported.reason)}</p>`); return; }
             downloadBlob("repaired-project.zip", exported.blob, "application/zip");
         }
