@@ -444,13 +444,22 @@
             const rr = window.CozyOS.RequirementReader;
             let requirementSummary = null;
             const readableEntries = entries.filter(e => e.category === "script" && e.isText);
+
+            // Real manifest.json detection — the same authoritative-source
+            // principle already used for Certification's manifest
+            // consistency check (Phase 3). Only ever used when it's
+            // actually present and actually valid JSON; never fabricated.
+            const manifestEntry = entries.find(e => /manifest\.json$/i.test(e.path));
+            let manifest = null;
+            if (manifestEntry) { try { manifest = JSON.parse(manifestEntry.content); } catch (_err) { /* real parse failure — proceed without manifest data rather than guessing at it */ } }
+
             if (rr && readableEntries.length > 0) {
                 const readings = [];
                 for (const e of readableEntries) {
                     try { readings.push(rr.readFile(e.path, e.content)); } catch (_err) { /* not parseable as CozyOS-style code — still listed as a real project file above */ }
                 }
                 if (readings.length === 1) requirementSummary = rr.generateRequirementSummary(readings[0].id);
-                else if (readings.length > 1) requirementSummary = rr.generateProjectRequirementSummary(readings);
+                else if (readings.length > 1) requirementSummary = rr.generateProjectRequirementSummary(readings, { manifest, totalProjectFileCount: entries.length });
             }
 
             this.#logAudit("PROJECT_MODEL_BUILT", `${entries.length} file(s) across ${folderStructure.length} folder(s).`);

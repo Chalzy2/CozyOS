@@ -244,7 +244,23 @@
          *   combined documentation text — never a new, undisclosed
          *   classifier.
          */
-        synthesizeProjectRequirement(readings) {
+        /**
+         * synthesizeProjectRequirement(readings, { manifest, totalProjectFileCount })
+         *   manifest (optional) — the real, already-parsed manifest.json
+         *   object, when one exists in the project. Its name/short_name/
+         *   description become the authoritative project identity and
+         *   purpose — a manifest is a genuine, human-authored source of
+         *   truth, more reliable than inferring identity from a single
+         *   JS file's internal class name (which may legitimately differ
+         *   from the application's public name, e.g. an internal engine
+         *   class vs. the app's branded name).
+         *   totalProjectFileCount (optional) — the real total file count
+         *   from the whole uploaded project (e.g. from
+         *   ProjectRefactor.buildProjectModel()), so the summary can
+         *   honestly report "N JavaScript file(s) analyzed of M total"
+         *   instead of implying the JS count IS the whole project.
+         */
+        synthesizeProjectRequirement(readings, { manifest = null, totalProjectFileCount = null } = {}) {
             if (!Array.isArray(readings) || readings.length === 0) throw new TypeError("[RequirementReader] synthesizeProjectRequirement(): readings array is required.");
             const ue = this.#ue();
 
@@ -272,29 +288,38 @@
             const allConstants = Array.from(new Set(readings.flatMap(r => r.internalStructure.constants)));
             const combinedDocs = readings.flatMap(r => r.documentation).join(" ");
 
-            let purpose = null;
-            if (ue && combinedDocs.trim()) { try { purpose = ue.analyzeText(combinedDocs).applicationType; } catch (_err) { /* optional */ } }
+            // Manifest is the authoritative source when present — a real,
+            // human-declared name/purpose beats inferring one from a
+            // single JS class name or generic keyword matching.
+            const projectName = manifest && (manifest.short_name || manifest.name) ? (manifest.short_name || manifest.name) : null;
+            let purpose = manifest && manifest.description ? manifest.description : null;
+            if (!purpose && ue && combinedDocs.trim()) { try { purpose = ue.analyzeText(combinedDocs).applicationType; } catch (_err) { /* optional */ } }
 
             const synthesis = {
-                fileCount: readings.length,
-                purpose,
+                projectName, jsFileCount: readings.length, totalProjectFileCount,
+                purpose, purposeSource: manifest && manifest.description ? "manifest.json" : (purpose ? "keyword heuristic on JS header comments" : null),
                 modules: Array.from(classNames),
                 coordinators: Array.from(new Set(coordinators)),
                 entryPoints: Array.from(new Set(entryPoints)),
                 sharedUtilities, missingModules,
                 events: allEvents, constants: allConstants,
                 assets: readings.filter(r => !r.identity.className).map(r => r.filename),
-                method: "real cross-file aggregation over readFile() results — not a new analysis pass"
+                manifestVersion: manifest && manifest.version ? manifest.version : null,
+                method: "real cross-file aggregation over readFile() results, plus real manifest.json fields when present — not a new analysis pass"
             };
-            this.#logAudit("PROJECT_SYNTHESIZED", `${readings.length} file(s), ${synthesis.modules.length} module(s)`);
+            this.#logAudit("PROJECT_SYNTHESIZED", `${readings.length} JS file(s)${totalProjectFileCount ? ` of ${totalProjectFileCount} total` : ""}, ${synthesis.modules.length} module(s)${projectName ? `, project="${projectName}"` : ""}`);
             return this.#deepClone(synthesis);
         }
 
-        /** generateProjectRequirementSummary(readings) — real, editable text built from synthesizeProjectRequirement(), replacing plain per-file concatenation. */
-        generateProjectRequirementSummary(readings) {
-            const synthesis = this.synthesizeProjectRequirement(readings);
-            const lines = [`Project: ${synthesis.fileCount} file(s)`];
-            if (synthesis.purpose) lines.push(`Purpose: ${synthesis.purpose}`);
+        /** generateProjectRequirementSummary(readings, options) — real, editable text built from synthesizeProjectRequirement(), replacing plain per-file concatenation. Same optional {manifest, totalProjectFileCount} as synthesizeProjectRequirement(). */
+        generateProjectRequirementSummary(readings, options = {}) {
+            const synthesis = this.synthesizeProjectRequirement(readings, options);
+            const lines = [`Project: ${synthesis.projectName || "(name not declared in manifest.json — inferred from analyzed files below)"}`];
+            lines.push(synthesis.totalProjectFileCount
+                ? `Files: ${synthesis.totalProjectFileCount} total in project — ${synthesis.jsFileCount} JavaScript file(s) analyzed`
+                : `JavaScript files analyzed: ${synthesis.jsFileCount}`);
+            if (synthesis.manifestVersion) lines.push(`Version (from manifest.json): ${synthesis.manifestVersion}`);
+            if (synthesis.purpose) lines.push(`Purpose: ${synthesis.purpose} (source: ${synthesis.purposeSource})`);
             if (synthesis.modules.length) lines.push("", "Modules:", ...synthesis.modules.map(m => `- ${m}`));
             if (synthesis.coordinators.length) lines.push("", "Coordinators (Service Registry integration detected):", ...synthesis.coordinators.map(m => `- ${m}`));
             if (synthesis.entryPoints.length) lines.push("", "Entry Points:", ...synthesis.entryPoints.map(m => `- ${m}`));
