@@ -58,42 +58,86 @@
 
     /**
      * classifyIntent(text)
-     *   Real, deterministic classification — never a fabricated NLP
-     *   judgment. Distinguishes a genuine build request from a
-     *   requirements/planning document BEFORE any name extraction or
-     *   code-plan generation happens. Root-cause fix for: a requirements
-     *   document with no clearly-capitalized application name would
-     *   otherwise fall through to a word-guessing fallback that could
-     *   pick up filler phrases ("as another user...") as if they were
-     *   the module name.
+     *   Real, deterministic classification only — never routing, and
+     *   never a fabricated NLP judgment. Answers exactly one question:
+     *   "what kind of document is this?" What happens next (send to
+     *   RequirementReader, BugFixer, Certification, Project Refactor,
+     *   Builder, or just show the analysis) is entirely the caller's
+     *   decision — kept in Developer Hub, not here, so adding a future
+     *   document type never requires touching planBuild() or the rest
+     *   of the Builder pipeline.
      *
-     *   Categories: "requirements_document", "build_request",
-     *   "existing_source_code" (handled upstream by the code-paste/
-     *   upload path, not this function), "unclassified" (low
-     *   confidence — treated the same as a build request, preserving
-     *   existing behavior for ordinary short descriptions).
+     *   Returns one of: BUSINESS_REQUIREMENTS, USER_STORY, ARCHITECTURE,
+     *   SOURCE_CODE, BUG_REPORT, CERTIFICATION_REPORT, REFACTOR_REQUEST,
+     *   BUILD_REQUEST, PROJECT_SPECIFICATION, UNKNOWN.
+     *
+     *   Honest confidence note: BUILD_REQUEST vs. PROJECT_SPECIFICATION
+     *   is the least reliably distinguishable pair here — both
+     *   legitimately contain "build" language. PROJECT_SPECIFICATION is
+     *   only claimed when real structural markers (Entities:/Fields:/
+     *   Dependencies:/API: labels) are present; a plain "Build X
+     *   Coordinator" phrase alone is BUILD_REQUEST.
      */
     function classifyIntent(text) {
+        const scores = {
+            BUSINESS_REQUIREMENTS: 0, USER_STORY: 0, ARCHITECTURE: 0, SOURCE_CODE: 0,
+            BUG_REPORT: 0, CERTIFICATION_REPORT: 0, REFACTOR_REQUEST: 0, BUILD_REQUEST: 0, PROJECT_SPECIFICATION: 0
+        };
         const signals = [];
-        let requirementsScore = 0, buildScore = 0;
+        const add = (type, points, why) => { scores[type] += points; signals.push(`[${type}] ${why}`); };
 
-        // Real user-story pattern: "As a/an/another <role>, I want ..."
+        // USER_STORY — real, specific sentence pattern
         const userStoryMatches = text.match(/\bas\s+(a|an|another)\s+[a-z][a-z\s]{2,30},?\s+i\s+want\b/gi) || [];
-        if (userStoryMatches.length > 0) { requirementsScore += userStoryMatches.length * 2; signals.push(`${userStoryMatches.length} user-story sentence(s) ("As a/an ___, I want ___")`); }
+        if (userStoryMatches.length > 0) add("USER_STORY", userStoryMatches.length * 2, `${userStoryMatches.length} "As a/an ___, I want ___" sentence(s)`);
 
-        // Real requirements-document header/section signals
-        const REQUIREMENTS_HEADERS = [/\brequirements?\s+document\b/i, /\bacceptance\s+criteria\b/i, /\buser\s+stor(y|ies)\b/i, /\bbusiness\s+requirements\b/i, /\bfunctional\s+requirements\b/i, /\brequirements?\s+discovery\b/i];
-        for (const pattern of REQUIREMENTS_HEADERS) { if (pattern.test(text)) { requirementsScore += 2; signals.push(`Matched header pattern: ${pattern}`); } }
+        // BUSINESS_REQUIREMENTS — real header/section signals
+        for (const pattern of [/\brequirements?\s+document\b/i, /\bacceptance\s+criteria\b/i, /\bbusiness\s+requirements\b/i, /\bfunctional\s+requirements\b/i, /\brequirements?\s+discovery\b/i]) {
+            if (pattern.test(text)) add("BUSINESS_REQUIREMENTS", 2, `matched ${pattern}`);
+        }
+        if (/\buser\s+stor(y|ies)\b/i.test(text)) add("BUSINESS_REQUIREMENTS", 1, "mentions \"user stories\" as a section label");
 
-        // Real build-request signals — the existing, already-working pattern, plus an explicit label
-        if (/\bbuild\s+[a-z][a-z\s]*?\s+(coordinator|management|module|system)\b/i.test(text)) { buildScore += 3; signals.push("Matched \"Build X Coordinator/Module/System\" pattern"); }
-        if (/(?:application name|module|app name)\s*:\s*[A-Za-z]/i.test(text)) { buildScore += 2; signals.push("Explicit Application Name/Module label present"); }
+        // ARCHITECTURE — real header signals
+        for (const pattern of [/\barchitecture\b/i, /\bsystem\s+design\b/i, /\bmodule\s+relationships?\b/i, /\bcomponent\s+diagram\b/i, /\bdata\s+flow\b/i, /\bdependency\s+graph\b/i]) {
+            if (pattern.test(text)) add("ARCHITECTURE", 2, `matched ${pattern}`);
+        }
 
-        let type = "unclassified";
-        if (requirementsScore > buildScore && requirementsScore >= 2) type = "requirements_document";
-        else if (buildScore > 0) type = "build_request";
+        // SOURCE_CODE — real structural code signals (the code-paste/upload
+        // path already handles real parseable code upstream; this exists so
+        // the enum is complete and callers relying on classifyIntent() alone
+        // still get a real answer, e.g. pasted code accompanied by prose).
+        const codeSignalCount = (text.match(/\bfunction\s+\w+\s*\(|\bclass\s+\w+\s*\{|=>\s*\{|;\s*$/gm) || []).length;
+        if (codeSignalCount >= 3) add("SOURCE_CODE", Math.min(codeSignalCount, 6), `${codeSignalCount} code-structure marker(s) (function/class/arrow/semicolon-terminated lines)`);
 
-        return { type, requirementsScore, buildScore, signals };
+        // BUG_REPORT — real signals
+        for (const pattern of [/\bsteps?\s+to\s+reproduce\b/i, /\bexpected\s+(result|behavio(u)?r)\b/i, /\bactual\s+(result|behavio(u)?r)\b/i, /\bstack\s+trace\b/i]) {
+            if (pattern.test(text)) add("BUG_REPORT", 2, `matched ${pattern}`);
+        }
+        if (/\bat\s+[\w.$]+\s*\([^)]*:\d+:\d+\)/.test(text)) add("BUG_REPORT", 3, "contains a real stack-trace-shaped line (at ...:line:col)");
+        if (/\berror\s*:/i.test(text)) add("BUG_REPORT", 1, "contains an \"Error:\" line");
+
+        // CERTIFICATION_REPORT — real verdict/severity signals, matching CozyCertification's actual vocabulary
+        for (const pattern of [/\bENTERPRISE_CERTIFIED\b/, /\bCERTIFICATION_FAILED\b/, /\bCERTIFIED_WITH_WARNINGS\b/]) {
+            if (pattern.test(text)) add("CERTIFICATION_REPORT", 3, `contains the real verdict string ${pattern}`);
+        }
+        if (/\bcritical\s*:\s*\d+/i.test(text) && /\bhigh\s*:\s*\d+/i.test(text)) add("CERTIFICATION_REPORT", 2, "contains real Critical:/High: severity counts");
+
+        // REFACTOR_REQUEST — real signals, matching ProjectRefactor's own vocabulary
+        for (const pattern of [/\brefactor\b/i, /\bsplit\s+(this|the)\s+file\b/i, /\bmerge\s+project\b/i, /\bmodulari[sz]e\b/i, /\boptimi[sz]e\s+(this|the)\s+(project|module|file)\b/i]) {
+            if (pattern.test(text)) add("REFACTOR_REQUEST", 2, `matched ${pattern}`);
+        }
+
+        // PROJECT_SPECIFICATION — real structural markers only (see honesty note above)
+        const specFieldCount = [/\bentities?\s*:/i, /\bfields?\s*:/i, /\bdependenc(y|ies)\s*:/i, /\bapi\s*:/i, /\bfolder\s*:/i].filter(p => p.test(text)).length;
+        if (specFieldCount >= 2) add("PROJECT_SPECIFICATION", specFieldCount * 2, `${specFieldCount} structural spec label(s) (Entities:/Fields:/Dependencies:/API:/Folder:)`);
+
+        // BUILD_REQUEST — the existing, already-working pattern, plus an explicit label
+        if (/\bbuild\s+[a-z][a-z\s]*?\s+(coordinator|management|module|system)\b/i.test(text)) add("BUILD_REQUEST", 3, "matched \"Build X Coordinator/Module/System\" pattern");
+        if (/(?:application name|module|app name)\s*:\s*[A-Za-z]/i.test(text)) add("BUILD_REQUEST", 2, "explicit Application Name/Module label present");
+
+        const best = Object.entries(scores).reduce((top, [type, score]) => score > top.score ? { type, score } : top, { type: "UNKNOWN", score: 0 });
+        const type = best.score >= 2 ? best.type : "UNKNOWN";
+
+        return { type, scores, signals: signals.filter(s => s.startsWith(`[${type}]`)) };
     }
 
     function toPascalCase(words) {
