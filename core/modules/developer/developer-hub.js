@@ -449,12 +449,23 @@
         }
 
         #renderAnalysisResult(a) {
-            return `<div class="cz-panel">
+            const intent = a.intent;
+            const isRequirementsDoc = intent && intent.type === "requirements_document";
+            const classificationPanel = intent && intent.type !== "unclassified" ? `<div class="cz-panel" style="border-left:3px solid ${isRequirementsDoc ? "#d97706" : "#16a34a"};">
+                <h3>Input Classification</h3>
+                <p><b>Type:</b> ${isRequirementsDoc ? "Business Requirements Document" : "Build Request"}</p>
+                <p><b>Intent:</b> ${isRequirementsDoc ? "Requirements Discovery" : "Code Generation"}</p>
+                <p><b>Expected Output:</b> ${isRequirementsDoc ? "Business Requirements Document" : "Generated source code"}</p>
+                <p><b>Code Generation:</b> ${isRequirementsDoc ? "NOT REQUIRED" : "Expected"}</p>
+                <p class="cz-muted">Detected from: ${escapeHtml(intent.signals.join("; "))}</p>
+                ${isRequirementsDoc ? '<p class="cz-muted">RequirementAnalyzer\'s full Requirements Book generation is not yet wired into this screen — this classification only prevents silently generating code from what looks like a planning document. Review the input before proceeding.</p>' : ""}
+            </div>` : "";
+            return `${classificationPanel}<div class="cz-panel">
                 <h3>Understanding Preview</h3>
                 <p><b>Application Type:</b> ${escapeHtml(a.understanding.applicationType)}</p>
                 <p><b>Detected Features:</b> ${escapeHtml((a.understanding.detectedFeatures || []).join(", ") || "none")}</p>
                 <p><b>Missing (Gap Detector):</b> ${escapeHtml(a.gaps.missing.map(g => g.label).join(", ") || "none")}</p>
-                <button class="cz-btn cz-btn-primary" data-action="hub-build-plan">Continue → Generate</button>
+                <button class="cz-btn ${isRequirementsDoc ? "" : "cz-btn-primary"}" data-action="hub-build-plan">${isRequirementsDoc ? "Generate Code Anyway" : "Continue → Generate"}</button>
             </div>`;
         }
 
@@ -529,7 +540,15 @@
                     this.#lastAnalysis = await hub.analyzeRequirement(description);
                     this.#lastAnalysis.codeAnalyses = codeAnalyses;
                 } else if (text) {
+                    // Real, deterministic intent classification — root-cause
+                    // fix for a requirements/planning document being silently
+                    // treated as a build request. Never blocks; surfaces the
+                    // classification so the developer can make an informed
+                    // choice, same "always allow override" pattern as Rule 16.
+                    const ai = window.CozyOS.BuilderAI;
+                    const intent = ai && typeof ai.classifyIntent === "function" ? ai.classifyIntent(text) : null;
                     this.#lastAnalysis = await hub.analyzeRequirement(text);
+                    this.#lastAnalysis.intent = intent;
                 } else {
                     this.#devOutput('<p class="cz-muted">Describe what you want, paste existing code, or upload a file first.</p>');
                     return;
@@ -804,6 +823,26 @@
             if (!ue) return `<h1>Understanding Engine</h1><div class="cz-not-connected">Not connected.</div>`;
             const p = ue.listProviders();
             const row = (label, info) => `<div class="cz-row"><span>${escapeHtml(label)}</span><span class="cz-badge ${info.available ? "cz-badge-ready" : "cz-badge-neutral"}">${info.available ? "Ready" : "Not installed"}</span><span class="cz-muted">${escapeHtml(info.note)}</span></div>`;
+
+            // Language Engine — real status card. Every value below is read
+            // directly from the live LanguageEngine, never fabricated: real
+            // count of loaded languages, the real current default, and a
+            // real check of whether any loaded language is actually RTL
+            // (not just whether the isRTL() method exists).
+            const lang = window.CozyOS.LanguageEngine;
+            const languageCard = lang ? (() => {
+                const languages = lang.listLanguages();
+                const currentCode = lang.getCurrentLanguage();
+                const current = languages.find(l => l.code === currentCode);
+                const rtlSupported = languages.some(l => l.rtl);
+                return `<div class="cz-panel">
+                    <div class="cz-row"><span>Language Engine</span><span class="cz-badge cz-badge-ready">Ready</span><span class="cz-muted">${escapeHtml(lang.getVersion())}</span></div>
+                    <div class="cz-row"><span>Languages Loaded</span><span>${languages.length}</span><span class="cz-muted">${escapeHtml(languages.map(l => l.name).join(", "))}</span></div>
+                    <div class="cz-row"><span>Default Language</span><span>${escapeHtml(current ? current.name : currentCode)}</span></div>
+                    <div class="cz-row"><span>RTL Support</span><span class="cz-badge ${rtlSupported ? "cz-badge-ready" : "cz-badge-neutral"}">${rtlSupported ? "Ready" : "None loaded"}</span></div>
+                </div>`;
+            })() : `<div class="cz-panel"><div class="cz-row"><span>Language Engine</span><span class="cz-badge cz-badge-neutral">Not installed</span></div></div>`;
+
             return `<h1>Understanding Engine</h1>
                 <div class="cz-panel">
                     ${row("Text Analyzer", p.textAnalyzer)}
@@ -812,6 +851,7 @@
                     ${row("Image Analyzer", p.imageAnalyzer)}
                     ${row("OCR Engine", p.ocrEngine)}
                 </div>
+                ${languageCard}
                 <div class="cz-panel">
                     <h3>Requirement Gap Checklist</h3>
                     ${ue.listChecklist().map(c => `<span class="cz-badge cz-badge-neutral">${escapeHtml(c.label)}</span>`).join(" ")}
