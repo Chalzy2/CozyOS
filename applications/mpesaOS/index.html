@@ -1,1 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MpesaOS — CozyOS BusinessOS Enterprise Core</title>
+<meta name="description" content="MpesaOS — Autonomous AI-driven agent business engine for M-Pesa style transaction workflows, built on the CozyOS BusinessOS Enterprise Core.">
+<meta name="theme-color" content="#0b8a3d">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/favicon.ico">
+<link rel="stylesheet" href="mpesaOS.css">
+</head>
+<body>
 
+<!-- Loading Screen -->
+<div id="mp-loading-screen">
+    <div class="mp-spinner" role="status" aria-label="Loading MpesaOS"></div>
+    <div class="mp-loading-label">Starting MpesaOS Enterprise Core…</div>
+</div>
+
+<!-- Startup Error Screen -->
+<div id="mp-error-screen" role="alert">
+    <div class="mp-error-card">
+        <h2>MpesaOS failed to start</h2>
+        <p id="mp-error-message">An unknown startup error occurred.</p>
+        <button class="mp-btn mp-btn-primary" onclick="location.reload()">Reload</button>
+    </div>
+</div>
+
+<!-- Application Shell -->
+<main class="mp-app" id="mp-app" role="main">
+
+    <div class="mp-topbar">
+        <div class="mp-brand-cluster">
+            <div class="mp-brand-badge">M</div>
+            <div>
+                <div class="mp-brand-name">MpesaOS</div>
+                <div class="mp-brand-sub">CozyOS BusinessOS Enterprise Core</div>
+            </div>
+        </div>
+        <div class="mp-topbar-actions">
+            <span class="mp-status-pill" id="mp-engine-status">● Engine Ready</span>
+            <button class="mp-btn" id="mp-theme-toggle" type="button">Toggle Theme</button>
+            <button class="mp-btn" id="mp-print-btn" type="button">Print</button>
+        </div>
+    </div>
+
+    <section class="mp-grid" aria-label="Engine diagnostics summary">
+        <div class="mp-card">
+            <div class="mp-card-title">Engine Version</div>
+            <div class="mp-card-value" id="mp-stat-version">—</div>
+        </div>
+        <div class="mp-card">
+            <div class="mp-card-title">Workflows Completed</div>
+            <div class="mp-card-value" id="mp-stat-completed">0</div>
+        </div>
+        <div class="mp-card">
+            <div class="mp-card-title">Workflows Failed</div>
+            <div class="mp-card-value" id="mp-stat-failed">0</div>
+        </div>
+        <div class="mp-card">
+            <div class="mp-card-title">Active In-Flight Locks</div>
+            <div class="mp-card-value" id="mp-stat-inflight">0</div>
+        </div>
+    </section>
+
+    <section class="mp-section" aria-label="Automated workflow demo">
+        <h3>Run Automated Workflow</h3>
+        <p class="mp-empty-note">Executes the engine's public plugin entry point — no business logic lives in this page.</p>
+        <button class="mp-btn mp-btn-primary" id="mp-run-workflow-btn" type="button">Run Demo Withdrawal Workflow</button>
+        <div class="mp-response-box" id="mp-response-box" style="margin-top:12px;">Awaiting execution…</div>
+    </section>
+
+    <section class="mp-section" aria-label="Engine timeline">
+        <h3>Engine Timeline</h3>
+        <div class="mp-timeline" id="mp-timeline">
+            <div class="mp-empty-note">No timeline events yet.</div>
+        </div>
+    </section>
+
+    <section class="mp-section" aria-label="Active workflow locks">
+        <h3>Active Workflow Locks</h3>
+        <div id="mp-active-locks">
+            <div class="mp-empty-note">No active locks.</div>
+        </div>
+    </section>
+
+    <footer class="mp-footer">
+        MpesaOS Application Shell · Engine v<span id="mp-footer-version">—</span> · CozyOS Enterprise
+    </footer>
+</main>
+
+<!-- Development-only storage fallback. No-op if the platform's real
+     window.CozyStorage is already present. Load BEFORE the engine. -->
+<script src="development/dev-storage-shim.js"></script>
+
+<!-- Business Engine — untouched, loaded as-is -->
+<script src="mpesaOS.js"></script>
+
+<!-- Application Shell Script — UI wiring only. Calls the engine's public
+     API exclusively (getVersion, getDiagnosticsReport, getTimeline,
+     listActiveWorkflows, on/off/once, and the registered plugin handler).
+     Contains no tariff, ledger, or transaction business logic. -->
+<script>
+(function () {
+    "use strict";
+
+    const loadingScreen = document.getElementById("mp-loading-screen");
+    const errorScreen = document.getElementById("mp-error-screen");
+    const errorMessage = document.getElementById("mp-error-message");
+    const app = document.getElementById("mp-app");
+
+    function showError(message) {
+        loadingScreen.classList.add("mp-hidden");
+        errorMessage.textContent = message;
+        errorScreen.classList.add("mp-visible");
+    }
+
+    function showApp() {
+        loadingScreen.classList.add("mp-hidden");
+        app.classList.add("mp-ready");
+    }
+
+    // ── Theme handling (presentation only) ──────────────────────────────
+    const themeToggleBtn = document.getElementById("mp-theme-toggle");
+    function applyStoredTheme() {
+        const saved = window.localStorage ? window.localStorage.getItem("mpesaos-theme") : null;
+        if (saved === "light" || saved === "dark") {
+            document.documentElement.setAttribute("data-theme", saved);
+        }
+    }
+    themeToggleBtn.addEventListener("click", function () {
+        const current = document.documentElement.getAttribute("data-theme");
+        const next = current === "dark" ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", next);
+        try { window.localStorage.setItem("mpesaos-theme", next); } catch (_e) { /* storage unavailable */ }
+    });
+    applyStoredTheme();
+
+    document.getElementById("mp-print-btn").addEventListener("click", function () {
+        window.print();
+    });
+
+    // ── Dashboard rendering — reads only from the engine's public API ───
+    function renderDiagnostics(engine) {
+        const report = engine.getDiagnosticsReport();
+        document.getElementById("mp-stat-version").textContent = report.pluginVersion || engine.getVersion();
+        document.getElementById("mp-footer-version").textContent = report.pluginVersion || engine.getVersion();
+        document.getElementById("mp-stat-completed").textContent = report.workflowsCompleted;
+        document.getElementById("mp-stat-failed").textContent = report.workflowsFailed;
+        document.getElementById("mp-stat-inflight").textContent = report.inflightWorkflowCount;
+    }
+
+    function renderTimeline(engine) {
+        const timeline = engine.getTimeline();
+        const container = document.getElementById("mp-timeline");
+        if (!timeline.length) {
+            container.innerHTML = '<div class="mp-empty-note">No timeline events yet.</div>';
+            return;
+        }
+        container.innerHTML = timeline.slice(-25).reverse().map(function (entry) {
+            return '<div class="mp-timeline-row"><span>' + entry.label + '</span><span>' + entry.time + '</span></div>';
+        }).join("");
+    }
+
+    function renderActiveLocks(engine) {
+        const locks = engine.listActiveWorkflows();
+        const container = document.getElementById("mp-active-locks");
+        if (!locks.length) {
+            container.innerHTML = '<div class="mp-empty-note">No active locks.</div>';
+            return;
+        }
+        container.innerHTML = locks.map(function (lock) {
+            return '<div class="mp-timeline-row"><span>' + lock.lockKey + '</span><span>' + lock.ageMs + 'ms</span></div>';
+        }).join("");
+    }
+
+    function refreshDashboard(engine) {
+        renderDiagnostics(engine);
+        renderTimeline(engine);
+        renderActiveLocks(engine);
+    }
+
+    // ── Resolves the plugin handler through whichever registration path ──
+    // mpesaOS.js actually used (PluginManager preferred, KernelPlugins map
+    // fallback) — mirrors the same lookup convention used elsewhere in
+    // CozyOS, without reaching into engine internals.
+    function resolvePluginHandler() {
+        if (window.CozyOS && window.CozyOS.PluginManager && typeof window.CozyOS.PluginManager.invoke === "function") {
+            return function (query, ctx) { return window.CozyOS.PluginManager.invoke("mpesa", query, ctx); };
+        }
+        if (window.CozyOS && window.CozyOS.KernelPlugins && window.CozyOS.KernelPlugins.has("mpesa")) {
+            const entry = window.CozyOS.KernelPlugins.get("mpesa");
+            return entry.handler;
+        }
+        return null;
+    }
+
+    function runDemoWorkflow() {
+        const responseBox = document.getElementById("mp-response-box");
+        const handler = resolvePluginHandler();
+        if (!handler) {
+            responseBox.textContent = "MpesaOS plugin handler is not registered on this page.";
+            return;
+        }
+        responseBox.textContent = "Running…";
+        Promise.resolve(handler("execute workflow", { tenantIsolation: function () { return "shell_demo_tenant"; } }))
+            .then(function (result) {
+                responseBox.textContent = (result && result.responseText) || JSON.stringify(result);
+            })
+            .catch(function (err) {
+                responseBox.textContent = "Workflow error: " + (err && err.message ? err.message : String(err));
+            });
+    }
+
+    document.getElementById("mp-run-workflow-btn").addEventListener("click", runDemoWorkflow);
+
+    // ── Startup sequence ──────────────────────────────────────────────────
+    function initialize() {
+        try {
+            const engine = window.CozyEnterpriseBusinessEngine;
+            if (!engine || typeof engine.getVersion !== "function") {
+                throw new Error("CozyEnterpriseBusinessEngine did not initialize. Check that mpesaOS.js loaded successfully.");
+            }
+
+            refreshDashboard(engine);
+
+            // Live-wire real engine lifecycle events — no polling required
+            // for state changes, only for periodic lock-age refresh.
+            engine.on("workflow:started", function () { refreshDashboard(engine); });
+            engine.on("workflow:completed", function () { refreshDashboard(engine); });
+            engine.on("workflow:failed", function () { refreshDashboard(engine); });
+            engine.on("workflow:doubleTapBlocked", function () { refreshDashboard(engine); });
+            engine.on("workflow:idempotentReturn", function () { refreshDashboard(engine); });
+
+            window.setInterval(function () { renderActiveLocks(engine); }, 5000);
+
+            // Signals to the platform kernel (and to mpesaOS.js's own
+            // listener, which safely no-ops if already registered) that
+            // the shell has finished mounting.
+            window.dispatchEvent(new Event("kernel:ready"));
+
+            showApp();
+        } catch (err) {
+            console.error("[MpesaOS Shell] Startup failure:", err);
+            showError(err && err.message ? err.message : "Unknown startup error.");
+        }
+    }
+
+    if (document.readyState === "complete" || document.readyState === "interactive") {
+        initialize();
+    } else {
+        document.addEventListener("DOMContentLoaded", initialize);
+    }
+})();
+</script>
+
+</body>
+</html>
