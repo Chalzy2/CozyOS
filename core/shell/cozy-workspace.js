@@ -103,7 +103,7 @@
         automation: "CozyAutomation",
         live: "CozyLive",
         speech: "CozySpeech",
-        translation: "CozyTranslate",
+        translation: "LanguageEngine",
         notification: "CozyNotification",
         ai: "CozyAI",
         plugin: null // no single coordinator convention exists for plugins yet
