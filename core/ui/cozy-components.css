@@ -1,0 +1,79 @@
+/**
+ * CozyOS Enterprise Design System — Component Library
+ * File Reference: core/ui/cozy-components.css
+ */
+
+/* Glass Panel */
+.cozy-glass-card {
+    background: var(--cozy-glass-bg);
+    backdrop-filter: var(--cozy-glass-blur);
+    -webkit-backdrop-filter: var(--cozy-glass-blur);
+    border: var(--cozy-glass-border);
+    box-shadow: var(--cozy-glass-shadow);
+    border-radius: var(--cozy-radius-md);
+    padding: 24px;
+    transition: transform var(--cozy-transition-fast), border-color var(--cozy-transition-fast);
+}
+
+.cozy-glass-card:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* System Form Controls */
+.cozy-input {
+    background: rgba(255, 255, 255, 0.03);
+    border: var(--cozy-glass-border);
+    border-radius: var(--cozy-radius-sm);
+    padding: 10px 14px;
+    color: #fff;
+    font-family: var(--cozy-font-sans);
+    font-size: 13px;
+    transition: border-color var(--cozy-transition-fast);
+}
+
+.cozy-input:focus {
+    outline: none;
+    border-color: var(--cozy-brand-primary);
+}
+
+/* Application Selection Tile */
+.cozy-app-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.02);
+    border: var(--cozy-glass-border);
+    border-radius: var(--cozy-radius-md);
+    cursor: pointer;
+    transition: all var(--cozy-transition-normal);
+}
+
+.cozy-app-tile:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--cozy-brand-primary);
+    box-shadow: 0 0 20px var(--cozy-brand-glow);
+    transform: scale(1.02);
+}
+
+/* Premium Control Room Live Pill */
+.cozy-live-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--cozy-glass-bg);
+    border: var(--cozy-glass-border);
+    padding: 10px 24px;
+    border-radius: var(--cozy-radius-xl);
+    font-weight: 600;
+    font-size: 13px;
+    color: #fff;
+    cursor: pointer;
+    box-shadow: var(--cozy-glass-shadow);
+    transition: all var(--cozy-transition-normal);
+}
+
+.cozy-live-pill:hover {
+    border-color: var(--cozy-brand-accent);
+    transform: translateY(-1px);
+}
