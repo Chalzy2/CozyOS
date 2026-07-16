@@ -1,83 +1,39 @@
 /**
- * CozyOS Enterprise Design System — Core Theme Registry
+ * CozyOS Enterprise Design System — Core Theme Registry & Ambient Rules
  * File Reference: core/ui/cozy-theme.css
+ * * Applies dynamic gradient foundations and smooth element highlights.
  */
-
-/* ==========================================================================
-   1. DEVELOPER HUB — Cozy Green + Gold (Default)
-   ========================================================================== */
-html[data-cozy-app="developer"], [data-cozy-app="developer"] {
-    --cozy-brand-primary: #10b981; /* Cozy Green */
-    --cozy-brand-accent: #fbbf24;  /* Gold */
-    --cozy-brand-glow: rgba(16, 185, 129, 0.15);
-    --cozy-bg-gradient: radial-gradient(circle at 50% 0%, #0c1514 0%, #06080c 100%);
-    --cozy-muted: #64748b;
-    --cozy-text: #f1f5f9;
-    --cozy-border: rgba(255, 255, 255, 0.08);
+body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--cozy-font-sans);
+    background: var(--cozy-bg-gradient);
+    color: var(--cozy-text);
+    overflow-x: hidden;
+    min-height: 100vh;
+    transition: background 0.8s cubic-bezier(0.16, 1, 0.3, 1), color 0.4s ease;
+    -webkit-font-smoothing: antialiased;
 }
 
-/* ==========================================================================
-   2. SHOPOS — Green + Orange
-   ========================================================================== */
-html[data-cozy-app="shopos"], [data-cozy-app="shopos"] {
-    --cozy-brand-primary: #22c55e; /* Green */
-    --cozy-brand-accent: #f97316;  /* Orange */
-    --cozy-brand-glow: rgba(34, 197, 94, 0.15);
-    --cozy-bg-gradient: radial-gradient(circle at 50% 0%, #061c0f 0%, #04070a 100%);
-    --cozy-muted: #6b7280;
-    --cozy-text: #f9fafb;
-    --cozy-border: rgba(255, 255, 255, 0.07);
+/* Dynamic glow elements that inherit active theme variables */
+.cozy-theme-accent-text {
+    color: var(--cozy-brand-primary);
+    text-shadow: 0 0 12px var(--cozy-brand-glow);
+    transition: var(--cozy-transition-smooth);
 }
 
-/* ==========================================================================
-   3. QUARRYOS — Stone Grey + Sand Gold
-   ========================================================================== */
-html[data-cozy-app="quarryos"], [data-cozy-app="quarryos"] {
-    --cozy-brand-primary: #78716c; /* Stone Grey */
-    --cozy-brand-accent: #eab308;  /* Sand Gold */
-    --cozy-brand-glow: rgba(120, 113, 108, 0.2);
-    --cozy-bg-gradient: radial-gradient(circle at 50% 0%, #1c1917 0%, #0c0a09 100%);
-    --cozy-muted: #a8a29e;
-    --cozy-text: #fafaf9;
-    --cozy-border: rgba(255, 255, 255, 0.06);
+.cozy-theme-accent-border {
+    border-color: var(--cozy-brand-primary) !important;
+    transition: var(--cozy-transition-smooth);
 }
 
-/* ==========================================================================
-   4. MPESAOS — Emerald + White
-   ========================================================================== */
-html[data-cozy-app="mpesaos"], [data-cozy-app="mpesaos"] {
-    --cozy-brand-primary: #059669; /* Emerald */
-    --cozy-brand-accent: #ffffff;  /* White */
-    --cozy-brand-glow: rgba(5, 150, 105, 0.2);
-    --cozy-bg-gradient: radial-gradient(circle at 50% 0%, #022c22 0%, #020617 100%);
-    --cozy-muted: #94a3b8;
-    --cozy-text: #f8fafc;
-    --cozy-border: rgba(255, 255, 255, 0.09);
+.cozy-theme-accent-bg {
+    background-color: var(--cozy-brand-primary);
+    box-shadow: 0 4px 14px var(--cozy-brand-glow);
+    transition: var(--cozy-transition-smooth);
 }
 
-/* ==========================================================================
-   5. HOSPITALOS — Medical Blue
-   ========================================================================== */
-html[data-cozy-app="hospitalos"], [data-cozy-app="hospitalos"] {
-    --cozy-brand-primary: #0ea5e9; /* Medical Blue */
-    --cozy-brand-accent: #38bdf8;  /* Sky Accent */
-    --cozy-brand-glow: rgba(14, 165, 233, 0.15);
-    --cozy-bg-gradient: radial-gradient(circle at 50% 0%, #071e2e 0%, #030712 100%);
-    --cozy-muted: #78716c;
-    --cozy-text: #f0f9ff;
-    --cozy-border: rgba(255, 255, 255, 0.08);
-}
-
-/* ==========================================================================
-   6. EDUCATIONOS / SCHOOLOS — Blue + Purple
-   ========================================================================== */
-html[data-cozy-app="schoolos"], html[data-cozy-app="educationos"], 
-[data-cozy-app="schoolos"], [data-cozy-app="educationos"] {
-    --cozy-brand-primary: #3b82f6; /* Blue */
-    --cozy-brand-accent: #a855f7;  /* Purple */
-    --cozy-brand-glow: rgba(59, 130, 246, 0.15);
-    --cozy-bg-gradient: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #030712 100%);
-    --cozy-muted: #94a3b8;
-    --cozy-text: #f8fafc;
-    --cozy-border: rgba(255, 255, 255, 0.08);
+.cozy-muted-text {
+    color: var(--cozy-muted);
+    transition: var(--cozy-transition-smooth);
 }
