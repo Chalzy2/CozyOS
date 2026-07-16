@@ -1,21 +1,18 @@
-init() {
-    this.setApplicationTheme(this.activeApp);
-    
-    // Mount the plugin content
+mountApplication(viewName) {
     const root = document.getElementById("cozy-app-root");
-    if (root && window.CozyOS.DeveloperHub) {
-        // Build the dashboard HTML from your hub data
-        const data = window.CozyOS.DeveloperHub.getHomeDashboardData();
+    if (!root) return;
+
+    // Based on the button clicked, fetch the correct view from DeveloperHub
+    // Example: if viewName is 'builder', we show the Builder interface
+    if (viewName === 'builder') {
         root.innerHTML = `
-            <div class="developer-dashboard">
-                <h2>Developer Hub</h2>
-                <p>Status: ${data.workspaceStatus}</p>
-                <!-- Add your other hub elements here -->
+            <div class="cozy-workspace-content">
+                <h1>Builder — Refactor Existing Project</h1>
+                <!-- Insert your Builder HTML here -->
             </div>
         `;
-    }
-    
-    if (window.CozyOS.Live) {
-        window.CozyOS.Live.registerLivePillEvents();
+    } else {
+        // Default to Dashboard
+        root.innerHTML = `<h1>Dashboard</h1>`;
     }
 }
