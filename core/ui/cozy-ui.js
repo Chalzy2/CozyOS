@@ -1,46 +1,29 @@
-/**
- * CozyOS Enterprise Design System — Global UI Core Dispatcher
- * File Reference: core/ui/cozy-ui.js
- */
+// ... inside class CozyCoreUIDispatcher
 
-(function () {
-    "use strict";
+    mountApplication(appName) {
+        const root = document.getElementById("cozy-app-root");
+        if (!root) return;
 
-    window.CozyOS = window.CozyOS || {};
+        // Clear existing content
+        root.innerHTML = "";
 
-    class CozyCoreUIDispatcher {
-        constructor() {
-            this.activeApp = "developer";
-        }
-
-        init() {
-            // Apply structural startup layouts
-            this.setApplicationTheme(this.activeApp);
-            
-            if (window.CozyOS.Live) {
-                window.CozyOS.Live.registerLivePillEvents();
-            }
-        }
-
-        /**
-         * Global application theme updater
-         * Triggers cascade mutations tracked by the visual Background system
-         * @param {string} appName 
-         */
-        setApplicationTheme(appName) {
-            this.activeApp = appName;
-            document.documentElement.setAttribute("data-cozy-app", appName);
-            
-            // Soft-toast feedback for app transitions
-            if (window.CozyOS.Toast) {
-                window.CozyOS.Toast.show(`Environment scaled: ${appName.toUpperCase()}`);
-            }
+        // Route logic: if app is 'developer', trigger the Hub renderer
+        if (appName === "developer" && window.CozyOS.DeveloperHub) {
+            // This assumes your Hub has a render method or you build the UI here
+            const hubUI = document.createElement("div");
+            hubUI.className = "cozy-developer-hub-container";
+            hubUI.innerHTML = `<h1>Developer Hub Initialized</h1>`; 
+            // In reality, call your rendering logic here
+            root.appendChild(hubUI);
         }
     }
 
-    window.CozyOS.UI = new CozyCoreUIDispatcher();
-    
-    document.addEventListener("DOMContentLoaded", () => {
-        window.CozyOS.UI.init();
-    });
-})();
+    init() {
+        this.setApplicationTheme(this.activeApp);
+        this.mountApplication(this.activeApp); // <--- Add this call
+        
+        if (window.CozyOS.Live) {
+            window.CozyOS.Live.registerLivePillEvents();
+        }
+    }
+// ...
