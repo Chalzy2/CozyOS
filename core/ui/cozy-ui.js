@@ -1,7 +1,6 @@
 /**
- * CozyOS Enterprise Design System — Bootstrap Orchestrator
+ * CozyOS Enterprise Design System — Global UI Core Dispatcher
  * File Reference: core/ui/cozy-ui.js
- * (Static registration only — no dynamic loading to prevent collisions)
  */
 
 (function () {
@@ -9,35 +8,39 @@
 
     window.CozyOS = window.CozyOS || {};
 
-    class CozyUIBootstrap {
+    class CozyCoreUIDispatcher {
         constructor() {
-            this.version = "3.1.1-STATIC";
-            console.log(`[CozyOS UI] Bootstrap loaded. Version: ${this.version}`);
+            this.activeApp = "developer";
         }
 
-        switchTheme(appName) {
-            if (window.CozyOS.Theme) {
-                window.CozyOS.Theme.setTheme(appName);
-            } else {
-                document.documentElement.setAttribute("data-cozy-app", appName);
-            }
-        }
-
-        triggerToast(message) {
-            if (window.CozyOS.Toast) {
-                window.CozyOS.Toast.show(message);
-            } else {
-                console.warn("[CozyOS UI] Fallback: ", message);
-            }
-        }
-
-        refreshLiveComponents() {
+        init() {
+            // Apply structural startup layouts
+            this.setApplicationTheme(this.activeApp);
+            
             if (window.CozyOS.Live) {
                 window.CozyOS.Live.registerLivePillEvents();
             }
         }
+
+        /**
+         * Global application theme updater
+         * Triggers cascade mutations tracked by the visual Background system
+         * @param {string} appName 
+         */
+        setApplicationTheme(appName) {
+            this.activeApp = appName;
+            document.documentElement.setAttribute("data-cozy-app", appName);
+            
+            // Soft-toast feedback for app transitions
+            if (window.CozyOS.Toast) {
+                window.CozyOS.Toast.show(`Environment scaled: ${appName.toUpperCase()}`);
+            }
+        }
     }
 
-    // Safely assign without overwriting other modules
-    window.CozyOS.UI = new CozyUIBootstrap();
+    window.CozyOS.UI = new CozyCoreUIDispatcher();
+    
+    document.addEventListener("DOMContentLoaded", () => {
+        window.CozyOS.UI.init();
+    });
 })();
