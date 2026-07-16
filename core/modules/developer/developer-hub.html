@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CozyOS Developer Hub</title>
+<link rel="stylesheet" href="developer-hub.css" />
+
+<!--
+  CozyOS Phase 3 UI Architecture — Shell integration hooks.
+  These files are owned by Gemini (core/ui/) and are NOT fabricated
+  here — if any is missing, the browser simply reports a 404 for that
+  script/link and Developer Hub continues to function using its own
+  existing rendering, exactly as it did before this file existed.
+  Nothing in developer-hub.js or developer-hub.css assumes these are
+  present.
+-->
+<script src="../ui/cozy-ui.js" defer></script>
+<script src="../ui/cozy-background.js" defer></script>
+<script src="../ui/cozy-live.js" defer></script>
+<script src="../ui/cozy-navigation.js" defer></script>
+<script src="../ui/cozy-toast.js" defer></script>
+
+<!-- Optional PDF export support for reports generated elsewhere in CozyOS. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+
+<!-- Optional: real offline OCR provider for CozyOCR. Without this,
+     CozyOCR (and anything that calls it) honestly reports no provider
+     loaded rather than fabricating extracted text. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js" defer></script>
+
+<!-- Optional: real ZIP read/write provider for ProjectRefactor's
+     importFromZip()/exportProjectAsZip(). Without this, both honestly
+     report {available:false} rather than fabricating extraction. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+
+<!--
+  Developer Hub orchestrates every existing coordinator — it duplicates
+  none of their logic, so all of them must actually be loaded for their
+  respective sections/actions to do anything. Load order does not matter
+  for correctness (every coordinator here self-registers with retry, and
+  Developer Hub resolves each one live rather than capturing it once) —
+  but every file below being MISSING means that section honestly reports
+  "not connected" rather than silently pretending to work.
+-->
+
+<script src="../certification/cozy-certification.js" defer></script>
+<script src="../../registry/cozy-registry.js" defer></script>
+<script src="../../shell/cozy-workspace.js" defer></script>
+<script src="../builder/builder-rules.js" defer></script>
+<script src="../builder/builder-templates.js" defer></script>
+<script src="../builder/builder-ai.js" defer></script>
+<script src="../builder/cozy-builder.js" defer></script>
+<script src="../bugfixer/cozy-bugfixer.js" defer></script>
+<script src="../ocr/cozy-ocr.js" defer></script>
+<script src="../builder/understanding-engine.js" defer></script>
+<script src="../builder/requirement-reader.js" defer></script>
+<script src="../builder/project-refactor.js" defer></script>
+<script src="../research/cozy-research-engine.js" defer></script>
+<script src="../memory/cozy-memory-engine.js" defer></script>
+<script src="../aimode/cozy-ai-mode.js" defer></script>
+<script src="../language/language-engine.js" defer></script>
+
+<!-- The orchestration layer itself, then the UI that renders it. -->
+<script src="cozy-developer.js" defer></script>
+<script src="developer-hub.js" defer></script>
+</head>
+<body data-cozy-app="developer">
+
+    <!-- Shell-owned: Top Navigation. Structure/styling per Gemini's
+         core/ui design — Developer Hub's JS never modifies this. -->
+    <header class="cozy-top-navigation">
+        <div class="cozy-brand-block">
+            <span class="cozy-logo-mark">◈</span>
+            <span class="cozy-app-title">CozyOS Developer Hub</span>
+        </div>
+        <div class="cozy-top-actions">
+            <div class="cozy-live-pill" id="universal-live-pill">
+                <span class="cozy-pulse-indicator"></span>
+                <span class="cozy-pill-text">SYS_STATUS: ACTIVE</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Shell-owned: Left Navigation. Contains all 22 real Developer Hub
+         sections as static markup — Developer Hub's JS attaches click
+         behavior via event delegation but never rebuilds this list. -->
+    <aside id="cozy-sidebar" class="cozy-side-navigation">
+        <nav class="cozy-nav-menu" id="cozy-hub-nav-menu">
+            <a href="#" class="cozy-nav-item active" data-section="dashboard"><span class="icon">⌂</span> Dashboard</a>
+            <a href="#" class="cozy-nav-item" data-section="builder"><span class="icon">🔨</span> Builder</a>
+            <a href="#" class="cozy-nav-item" data-section="understanding"><span class="icon">🧠</span> Understanding Engine</a>
+            <a href="#" class="cozy-nav-item" data-section="ocr"><span class="icon">📷</span> OCR</a>
+            <a href="#" class="cozy-nav-item" data-section="quickCert"><span class="icon">⚡</span> Quick Certification</a>
+            <a href="#" class="cozy-nav-item" data-section="fullCert"><span class="icon">✔</span> Full Certification</a>
+            <a href="#" class="cozy-nav-item" data-section="bugfixer"><span class="icon">🐛</span> BugFixer</a>
+            <a href="#" class="cozy-nav-item" data-section="workspace"><span class="icon">🗂</span> Workspace</a>
+            <a href="#" class="cozy-nav-item" data-section="moduleExplorer"><span class="icon">🧩</span> Module Explorer</a>
+            <a href="#" class="cozy-nav-item" data-section="applicationExplorer"><span class="icon">📱</span> Application Explorer</a>
+            <a href="#" class="cozy-nav-item" data-section="serviceRegistry"><span class="icon">📇</span> Service Registry</a>
+            <a href="#" class="cozy-nav-item" data-section="releaseCenter"><span class="icon">🚀</span> Release Center</a>
+            <a href="#" class="cozy-nav-item" data-section="goldenVault"><span class="icon">🏆</span> Golden Vault</a>
+            <a href="#" class="cozy-nav-item" data-section="certHistory"><span class="icon">📜</span> Certification History</a>
+            <a href="#" class="cozy-nav-item" data-section="repairHistory"><span class="icon">🛠</span> Repair History</a>
+            <a href="#" class="cozy-nav-item" data-section="reviewQueue"><span class="icon">📥</span> Knowledge Review Queue</a>
+            <a href="#" class="cozy-nav-item" data-section="patternLibrary"><span class="icon">📚</span> Enterprise Pattern Library</a>
+            <a href="#" class="cozy-nav-item" data-section="developerQueue"><span class="icon">🧑‍💻</span> Developer Queue</a>
+            <a href="#" class="cozy-nav-item" data-section="research"><span class="icon">🔍</span> Research</a>
+            <a href="#" class="cozy-nav-item" data-section="memory"><span class="icon">💾</span> Memory</a>
+            <a href="#" class="cozy-nav-item" data-section="search"><span class="icon">🔎</span> Search</a>
+            <a href="#" class="cozy-nav-item" data-section="settings"><span class="icon">⚙</span> Settings</a>
+        </nav>
+    </aside>
+
+    <!-- Shell-owned: Main Workspace container. Developer Hub's JS
+         populates ONLY the inner #cozy-developer-hub-root div — never
+         the <main> element itself. -->
+    <main class="cozy-main-workspace">
+        <div id="cozy-developer-hub-root">
+            <noscript>The CozyOS Developer Hub requires JavaScript.</noscript>
+        </div>
+    </main>
+
+    <!-- Shell-owned: Status Bar. Developer Hub's JS does not modify
+         this element. -->
+    <footer class="cozy-bottom-statusbar">
+        <div class="cozy-status-left"><span>LOC_NODE: 1.002.AFR</span></div>
+        <div class="cozy-status-center"></div>
+        <div class="cozy-status-right"><span>_RUNTIME: ACTIVE</span></div>
+    </footer>
+
+</body>
+</html>
