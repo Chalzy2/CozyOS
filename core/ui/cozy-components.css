@@ -76,4 +76,12 @@
 .cozy-live-pill:hover {
     border-color: var(--cozy-brand-accent);
     transform: translateY(-1px);
+}    cursor: pointer;
+    box-shadow: var(--cozy-glass-shadow);
+    transition: all var(--cozy-transition-normal);
+}
+
+.cozy-live-pill:hover {
+    border-color: var(--cozy-brand-accent);
+    transform: translateY(-1px);
 }
