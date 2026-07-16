@@ -1,1 +1,31 @@
+/**
+ * CozyOS Developer Hub — Application Specific Styles
+ * File Reference: apps/developer-hub/developer-hub.css
+ * STRICT RULE: No page layout, z-index, body properties, or sidebar positioning rules allowed here!
+ */
 
+.cozy-dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+    margin-top: 16px;
+}
+
+.cozy-action-group {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+/* Custom styling specific to Developer components only */
+.cozy-console-output {
+    background: rgba(0, 0, 0, 0.4);
+    font-family: var(--cozy-font-mono);
+    font-size: 12px;
+    padding: 16px;
+    border-radius: var(--cozy-radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--cozy-brand-primary);
+    overflow-x: auto;
+    margin-top: 12px;
+}
