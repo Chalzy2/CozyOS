@@ -47,3 +47,14 @@
   text-align: left;
   border-radius: 4px;
 }
+/* Add these to your existing classes in cozy-layout.css */
+
+.cozy-main-content {
+    /* ... your other styles ... */
+    pointer-events: auto; /* Ensure content can be clicked */
+}
+
+#cozy-sidebar {
+    position: relative;
+    z-index: 1000; /* This forces the sidebar to be physically ON TOP of the content area */
+}
