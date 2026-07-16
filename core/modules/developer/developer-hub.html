@@ -1,66 +1,50 @@
-<!DOCTYPE html>
-<html lang="en" data-cozy-app="developer">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CozyOS Developer Hub</title>
-
-<!-- CozyOS UI Framework -->
-<link rel="stylesheet" href="../../core/ui/cozy-tokens.css">
-<link rel="stylesheet" href="../../core/ui/cozy-theme.css">
-<link rel="stylesheet" href="../../core/ui/cozy-layout.css">
-<link rel="stylesheet" href="../../core/ui/cozy-components.css">
-<link rel="stylesheet" href="../../core/ui/cozy-animations.css">
-
-<!-- Developer Hub -->
-<link rel="stylesheet" href="developer-hub.css">
-
-<!-- Libraries -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
-
-<!-- CozyOS Core -->
-<script src="../certification/cozy-certification.js" defer></script>
-<script src="../../registry/cozy-registry.js" defer></script>
-<script src="../../shell/cozy-workspace.js" defer></script>
-
-<!-- Builder -->
-<script src="../builder/builder-rules.js" defer></script>
-<script src="../builder/builder-templates.js" defer></script>
-<script src="../builder/builder-ai.js" defer></script>
-<script src="../builder/cozy-builder.js" defer></script>
-<script src="../builder/understanding-engine.js" defer></script>
-<script src="../builder/requirement-reader.js" defer></script>
-<script src="../builder/project-refactor.js" defer></script>
-
-<!-- Other Modules -->
-<script src="../bugfixer/cozy-bugfixer.js" defer></script>
-<script src="../ocr/cozy-ocr.js" defer></script>
-<script src="../research/cozy-research-engine.js" defer></script>
-<script src="../memory/cozy-memory-engine.js" defer></script>
-<script src="../aimode/cozy-ai-mode.js" defer></script>
-<script src="../language/language-engine.js" defer></script>
-
-<!-- CozyOS UI (ORDER MATTERS) -->
-<script src="../../core/ui/cozy-theme.js" defer></script>
-<script src="../../core/ui/cozy-background.js" defer></script>
-<script src="../../core/ui/cozy-live.js" defer></script>
-<script src="../../core/ui/cozy-toast.js" defer></script>
-<script src="../../core/ui/cozy-navigation.js" defer></script>
-<script src="../../core/ui/cozy-ui.js" defer></script>
-
-<!-- Developer Hub -->
-<script src="cozy-developer.js" defer></script>
-<script src="developer-hub.js" defer></script>
-
-</head>
-
 <body data-cozy-app="developer">
 
-<div id="cozy-developer-hub-root">
-    <noscript>The CozyOS Developer Hub requires JavaScript.</noscript>
-</div>
+    <!-- 1. Unified CozyOS Top Brand & Action Bar -->
+    <header class="cozy-top-navigation">
+        <div class="cozy-brand-block">
+            <span class="cozy-logo-mark">◈</span>
+            <span class="cozy-app-title">CozyOS Developer Hub</span>
+        </div>
+        <div class="cozy-top-actions">
+            <div class="cozy-live-pill" id="universal-live-pill">
+                <span class="cozy-pulse-indicator"></span>
+                <span class="cozy-pill-text">SYS_STATUS: ACTIVE</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- 2. Universal Navigation Sidebar -->
+    <aside id="cozy-sidebar" class="cozy-side-navigation">
+        <nav class="cozy-nav-menu">
+            <a href="#" class="cozy-nav-item active" data-target-app="developer">
+                <span class="icon">⌂</span> Dashboard
+            </a>
+            <a href="#" class="cozy-nav-item" data-target-app="builder">
+                <span class="icon">🔨</span> Builder
+            </a>
+            <a href="#" class="cozy-nav-item" data-target-app="bugfixer">
+                <span class="icon">🐛</span> BugFixer
+            </a>
+            <a href="#" class="cozy-nav-item" data-target-app="ocr">
+                <span class="icon">📷</span> OCR
+            </a>
+        </nav>
+    </aside>
+
+    <!-- 3. Dynamic Workspace Viewport (Only this gets modified by developer-hub.js) -->
+    <main class="cozy-main-workspace">
+        <div id="cozy-developer-hub-root">
+            <!-- Your JS will render Dashboard cards, Builder elements, or OCR modules right here! -->
+            <noscript>The CozyOS Developer Hub requires JavaScript.</noscript>
+        </div>
+    </main>
+
+    <!-- 4. Universal Diagnostics Statusbar -->
+    <footer class="cozy-bottom-statusbar">
+        <div class="cozy-status-left"><span>LOC_NODE: 1.002.AFR</span></div>
+        <div class="cozy-status-center"></div>
+        <div class="cozy-status-right"><span>_RUNTIME: ACTIVE</span></div>
+    </footer>
 
 </body>
-</html>
