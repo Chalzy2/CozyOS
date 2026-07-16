@@ -1,0 +1,19 @@
+/**
+ * CozyOS Enterprise Design System — GPU-Accelerated Animations
+ * File Reference: core/ui/cozy-animations.css
+ */
+@keyframes cozyPulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+@keyframes staticFloat {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+    100% { transform: translateY(0px); }
+}
+
+.animate-float {
+    animation: staticFloat 8s ease-in-out infinite;
+}
