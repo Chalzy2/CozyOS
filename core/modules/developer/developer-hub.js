@@ -147,6 +147,8 @@
         #memoryExplorerNamespace = null;
         #eventsBound = false;
         #shellNavBound = false;
+        #documentNavHandler = null;
+        #retryMountIntervalId = null;
 
         // ---- this UI's OWN audit log / event bus — distinct from
         // DeveloperHub's business audit log, which already exists on
@@ -245,16 +247,52 @@
 
         #hub() { return (window.CozyOS && window.CozyOS.DeveloperHub) || null; }
 
-        mount(root) {
-            if (!root || typeof root.addEventListener !== "function") {
-                throw new Error("[DeveloperHubUI] mount(): a valid DOM container element is required.");
+        /**
+         * init(container)
+         *   The real entry point for CozyOS.UI.loadModule("developer-hub").
+         *   container is whatever element the shell's module loader hands
+         *   this application — Developer Hub never assumes or hardcodes
+         *   a specific element ID here; it renders into exactly what it's
+         *   given, matching the shell's own "#cozy-app-root" contract
+         *   without this file needing to know that name itself.
+         */
+        init(container) {
+            if (!container || typeof container.addEventListener !== "function") {
+                throw new Error("[DeveloperHubUI] init(): a valid DOM container element is required.");
             }
-            this.#root = root;
+            this.#root = container;
             this.#renderMain();
             this.#bindEvents();
             this.#bindShellNavigation();
             this.#shellToast("Developer Hub Ready");
             this.#shellNavigationAnnounce(this.#activeSection);
+        }
+
+        /** mount(root) — real alias for init(), kept for anything still calling the original method name directly (e.g. standalone/no-shell loading below). */
+        mount(root) { this.init(root); }
+
+        /**
+         * destroy()
+         *   Real lifecycle cleanup, per the module-loader contract. Removes
+         *   the one listener that would otherwise leak beyond this
+         *   element's lifetime (the document-level shell-nav delegation —
+         *   #root's own listeners are scoped to #root and are released
+         *   naturally when the shell discards that element), clears any
+         *   pending retry-mount interval, and drops internal references
+         *   so a later init() starts clean rather than accumulating state.
+         */
+        destroy() {
+            if (this.#documentNavHandler) {
+                document.removeEventListener("click", this.#documentNavHandler);
+                this.#documentNavHandler = null;
+            }
+            if (this.#retryMountIntervalId !== null) {
+                clearInterval(this.#retryMountIntervalId);
+                this.#retryMountIntervalId = null;
+            }
+            this.#shellNavBound = false;
+            this.#eventsBound = false;
+            this.#root = null;
         }
 
         #sections() {
@@ -283,12 +321,13 @@
         #bindShellNavigation() {
             if (this.#shellNavBound) return;
             this.#shellNavBound = true;
-            document.addEventListener("click", (evt) => {
+            this.#documentNavHandler = (evt) => {
                 const navEl = evt.target.closest(".cozy-nav-item[data-section]");
                 if (!navEl) return;
                 evt.preventDefault();
                 this.#setSection(navEl.getAttribute("data-section"));
-            });
+            };
+            document.addEventListener("click", this.#documentNavHandler);
         }
 
         /** #updateActiveNavItem(id) — real, targeted class toggle on the shell's own nav elements; never innerHTML, never rebuilds the list. */
@@ -2558,35 +2597,75 @@
      *   This assumes no shell API beyond the one documented workspace
      *   div ID — nothing here invents or duplicates shell behavior.
      */
-    function initMount() {
-        const root = document.getElementById("cozy-developer-hub-root");
-        if (!root) return false;
-        if (window.CozyDeveloperHubUI && typeof window.CozyDeveloperHubUI.getVersion === "function") {
-            const existingVersion = window.CozyDeveloperHubUI.getVersion();
-            if (existingVersion !== HUB_UI_VERSION) {
-                throw new Error(`[CozyOS Framework Execution Error] VERSION_CONFLICT: DeveloperHubUI existing v${existingVersion} conflicts with load target v${HUB_UI_VERSION}.`);
-            }
-            return true;
+    /**
+     * Module registration for CozyOS.UI.loadModule("developer-hub").
+     *
+     * HONEST DISCLOSURE: the exact contract loadModule() expects is not
+     * available to this file (cozy-ui.js is Gemini-owned and was not
+     * provided). This registration shape — a singleton exposing
+     * init(container)/destroy() under window.CozyOS.Modules["developer-hub"]
+     * — is the most reasonable, standard module-loader convention given
+     * the evidence: the explicit init()/destroy() lifecycle requirement,
+     * and the observed "System Alert: undefined" symptom, which is
+     * consistent with the loader looking up a registered module by name
+     * and finding nothing there. If the real loadModule() expects a
+     * different shape (a different registry object, a factory function
+     * instead of a singleton, etc.), this needs a small, disclosed
+     * correction once the real contract is confirmed — not a guess
+     * layered on a guess.
+     */
+    window.CozyOS = window.CozyOS || {};
+    window.CozyOS.Modules = window.CozyOS.Modules || {};
+
+    if (window.CozyOS.Modules["developer-hub"] && window.CozyOS.Modules["developer-hub"].version) {
+        const existingVersion = window.CozyOS.Modules["developer-hub"].version;
+        if (existingVersion !== HUB_UI_VERSION) {
+            throw new Error(`[CozyOS Framework Execution Error] VERSION_CONFLICT: developer-hub module existing v${existingVersion} conflicts with load target v${HUB_UI_VERSION}.`);
         }
-        const ui = new CozyDeveloperHubUI();
-        ui.mount(root);
-        window.CozyDeveloperHubUI = ui;
+        return;
+    }
+
+    let singletonInstance = null;
+    window.CozyOS.Modules["developer-hub"] = {
+        version: HUB_UI_VERSION,
+        init(container) {
+            if (!singletonInstance) singletonInstance = new CozyDeveloperHubUI();
+            singletonInstance.init(container);
+            window.CozyDeveloperHubUI = singletonInstance; // preserved for any existing code that reads this directly
+            return singletonInstance;
+        },
+        destroy() {
+            if (singletonInstance) { singletonInstance.destroy(); singletonInstance = null; }
+            window.CozyDeveloperHubUI = null;
+        }
+    };
+
+    /**
+     * Standalone fallback — only relevant when Developer Hub is opened
+     * directly (developer-hub.html on its own, without cozy-shell.html).
+     * Looks for either the current shell's real container ID
+     * ("cozy-app-root") or the original standalone root
+     * ("cozy-developer-hub-root"), so existing direct-load testing keeps
+     * working exactly as before. Never runs if the module was already
+     * mounted via the loadModule() path above.
+     */
+    function initStandaloneMount() {
+        if (singletonInstance) return true;
+        const root = document.getElementById("cozy-app-root") || document.getElementById("cozy-developer-hub-root");
+        if (!root) return false;
+        window.CozyOS.Modules["developer-hub"].init(root);
         return true;
     }
 
-    if (!initMount()) {
+    if (!initStandaloneMount()) {
         if (document.readyState === "complete" || document.readyState === "interactive") {
-            // DOMContentLoaded already fired (this script loaded late,
-            // e.g. dynamically inserted by a shell) — retry for the
-            // workspace root element specifically, bounded the same way
-            // registerCoordinator()'s retry is bounded elsewhere.
             let attempts = 0;
             const intervalId = setInterval(() => {
                 attempts++;
-                if (initMount() || attempts >= 40) clearInterval(intervalId);
+                if (initStandaloneMount() || attempts >= 40) clearInterval(intervalId);
             }, 250);
         } else {
-            window.addEventListener("DOMContentLoaded", () => { initMount(); });
+            window.addEventListener("DOMContentLoaded", () => { initStandaloneMount(); });
         }
     }
 })();
