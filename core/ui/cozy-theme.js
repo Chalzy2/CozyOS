@@ -1,7 +1,26 @@
-core/ui/
-├── cozy-theme.js        # Accent coloring, variable mappings, & style sheet management
-├── cozy-background.js   # GPU-friendly ambient living canvas transitions
-├── cozy-live.js         # Standard live button mechanics, glow, & pulse states
-├── cozy-toast.js        # Notification overlay stack & UI diagnostic reporting
-├── cozy-navigation.js   # Collapsible layouts, app switching, & workspace canvas routing
-└── cozy-ui.js           # Lightweight bootstrap orchestrator
+/**
+ * CozyOS Enterprise Design System — Theme Engine
+ * File Reference: core/ui/cozy-theme.js
+ */
+
+(function () {
+    "use strict";
+
+    window.CozyOS = window.CozyOS || {};
+
+    class CozyThemeController {
+        setTheme(appName) {
+            document.documentElement.setAttribute("data-cozy-app", appName);
+            
+            if (window.CozyOS.Background) {
+                window.CozyOS.Background.updateForTheme(appName);
+            }
+            
+            if (window.CozyOS.Toast) {
+                window.CozyOS.Toast.show(`Interface theme profile: ${appName.toUpperCase()}`);
+            }
+        }
+    }
+
+    window.CozyOS.Theme = new CozyThemeController();
+})();
