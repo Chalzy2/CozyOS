@@ -45,12 +45,11 @@
     --cz-mono: var(--cozy-font-mono);
 }
 
-/* 3. Inject Premium Enterprise Glassmorphism over Legacy Elements */
+/* 3. Global Styles (Stripped of conflicting layout rules) */
 html, body {
-    margin: 0; padding: 0; height: 100%;
+    /* No manual height or grid configurations here; handled by cozy-layout.css */
     font-family: var(--cz-font);
     color: var(--cz-text);
-    background: var(--cozy-bg-gradient);
     -webkit-font-smoothing: antialiased;
 }
 
@@ -61,7 +60,7 @@ html, body {
     -webkit-backdrop-filter: var(--cozy-glass-blur);
     border: var(--cozy-glass-border) !important;
     box-shadow: var(--cozy-glass-shadow) !important;
-    border-radius: var(--cozy-radius) !important;
+    border-radius: var(--cz-radius) !important;
     color: var(--cz-text) !important;
 }
 
