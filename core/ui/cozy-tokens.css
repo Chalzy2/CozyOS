@@ -1,30 +1,56 @@
 /**
- * CozyOS Enterprise Design System — System Tokens
+ * CozyOS Enterprise Design System — Global Tokens
  * File Reference: core/ui/cozy-tokens.css
  */
 :root {
-    /* Typographic System */
-    --cozy-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    --cozy-font-mono: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", Courier, monospace;
+  /* System Typography */
+  --cozy-font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --cozy-font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
-    /* Global Layout Metrics */
-    --cozy-sidebar-width: 260px;
-    --cozy-topbar-height: 56px;
-    --cozy-statusbar-height: 28px;
+  /* Premium Glassmorphic Attributes */
+  --cozy-glass-bg: rgba(18, 17, 20, 0.65);
+  --cozy-glass-blur: 16px;
+  --cozy-glass-border: 1px solid rgba(255, 255, 255, 0.08);
+  --cozy-glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 
-    /* Border Radii */
-    --cozy-radius-sm: 6px;
-    --cozy-radius-md: 12px;
-    --cozy-radius-lg: 18px;
-    --cozy-radius-xl: 28px;
+  /* Shared Radii */
+  --cozy-radius-sm: 8px;
+  --cozy-radius-md: 14px;
+  --cozy-radius-lg: 24px;
+  --cozy-radius-full: 9999px;
 
-    /* Premium Glassmorphic Attributes */
-    --cozy-glass-blur: blur(20px);
-    --cozy-glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-    --cozy-glass-border: 1px solid rgba(255, 255, 255, 0.08);
-    --cozy-glass-bg: rgba(10, 12, 22, 0.6);
+  /* Global Transitions */
+  --cozy-transition-smooth: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  --cozy-sidebar-width: 260px;
+}
 
-    /* Animation Constants */
-    --cozy-transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
-    --cozy-transition-normal: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+/* App-Specific Theme Overrides mapped dynamically to dataset changes */
+[data-cozy-app="developer"] {
+  --cozy-accent: #10b981;
+  --cozy-accent-glow: rgba(16, 185, 129, 0.15);
+}
+
+[data-cozy-app="quarryos"] {
+  --cozy-accent: #eab308;
+  --cozy-accent-glow: rgba(234, 179, 8, 0.15);
+}
+
+[data-cozy-app="schoolos"] {
+  --cozy-accent: #3b82f6;
+  --cozy-accent-glow: rgba(59, 130, 246, 0.15);
+}
+
+[data-cozy-app="sports"] {
+  --cozy-accent: #22c55e;
+  --cozy-accent-glow: rgba(34, 197, 94, 0.15);
+}
+
+[data-cozy-app="mpesaos"] {
+  --cozy-accent: #059669;
+  --cozy-accent-glow: rgba(5, 150, 105, 0.15);
+}
+
+[data-cozy-app="shopos"] {
+  --cozy-accent: #f97316;
+  --cozy-accent-glow: rgba(249, 115, 22, 0.15);
 }
