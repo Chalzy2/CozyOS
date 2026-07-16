@@ -1,18 +1,33 @@
-(function () {
-    const navMenu = document.getElementById("cozy-nav-menu");
-    const navItems = ["Dashboard", "Builder", "Understanding Engine", "OCR", "BugFixer"];
+/**
+ * CozyOS Navigation Dispatcher
+ * Dispatches shell navigation to the Lifecycle Manager.
+ */
 
-    navItems.forEach(item => {
-        const btn = document.createElement("button");
-        btn.innerText = item;
-        btn.className = "cozy-nav-button";
-        
-        // Add a click listener directly to the button
-        btn.addEventListener('click', function() {
-            console.log("Button clicked: " + item); // Check console for this!
-            window.CozyOS.UI.mountApplication(item.toLowerCase().replace(" ", "-"));
-        });
-        
-        navMenu.appendChild(btn);
+document.addEventListener("DOMContentLoaded", () => {
+
+    document.addEventListener("click", (event) => {
+
+        const button = event.target.closest("[data-module]");
+        if (!button) return;
+
+        event.preventDefault();
+
+        const moduleName = button.dataset.module;
+
+        if (!moduleName) {
+            console.warn("[CozyOS] Navigation item missing data-module.");
+            return;
+        }
+
+        if (!window.CozyOS?.UI?.loadModule) {
+            console.error("[CozyOS] Lifecycle Manager unavailable.");
+            return;
+        }
+
+        console.info(`[CozyOS] Opening module: ${moduleName}`);
+
+        window.CozyOS.UI.loadModule(moduleName);
+
     });
-})();
+
+});
