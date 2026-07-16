@@ -1,74 +1,30 @@
 /**
- * Cozy Navigation Controller
- * Provides buttery-smooth route transition handlers, dynamic accent indicators,
- * and warm, delightful screen navigation animations.
+ * CozyOS Enterprise Design System — Layout & Sidebar Navigation Controller
+ * File Reference: core/ui/cozy-navigation.js
  */
-class CozyNavigation {
-  constructor(options = {}) {
-    this.navElement = options.navElement || document.querySelector('.cozy-nav');
-    this.links = this.navElement ? this.navElement.querySelectorAll('a') : [];
-    this.indicator = null;
-    
-    this.init();
-  }
 
-  init() {
-    if (!this.navElement) return;
+(function () {
+    "use strict";
 
-    this.createIndicator();
-    this.setupListeners();
-    this.updateIndicatorPosition(this.navElement.querySelector('a.active') || this.links[0]);
-  }
+    window.CozyOS = window.CozyOS || {};
 
-  createIndicator() {
-    this.indicator = document.createElement('div');
-    this.indicator.className = 'cozy-nav-indicator';
-    this.indicator.style.cssText = `
-      position: absolute;
-      bottom: 0;
-      height: 3px;
-      background-color: var(--cozy-color-primary, #bd9589);
-      border-radius: 3px;
-      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-      transform-origin: left;
-    `;
-    this.navElement.style.position = 'relative';
-    this.navElement.appendChild(this.indicator);
-  }
+    class CozyNavigationController {
+        constructor() {
+            this.isCollapsed = false;
+        }
 
-  setupListeners() {
-    this.links.forEach(link => {
-      link.addEventListener('click', (e) => {
-        this.setActive(link);
-      });
+        toggleSidebar() {
+            const sidebar = document.getElementById("cozy-sidebar");
+            if (sidebar) {
+                this.isCollapsed = !this.isCollapsed;
+                sidebar.style.width = this.isCollapsed ? "0px" : "var(--cozy-sidebar-width)";
+                sidebar.style.padding = this.isCollapsed ? "0" : "16px 12px";
+            }
+        }
+    }
 
-      link.addEventListener('mouseenter', () => {
-        this.updateIndicatorPosition(link);
-      });
-    });
-
-    this.navElement.addEventListener('mouseleave', () => {
-      const activeLink = this.navElement.querySelector('a.active') || this.links[0];
-      this.updateIndicatorPosition(activeLink);
-    });
-  }
-
-  setActive(targetLink) {
-    this.links.forEach(link => link.classList.remove('active'));
-    targetLink.classList.add('active');
-    this.updateIndicatorPosition(targetLink);
-  }
-
-  updateIndicatorPosition(targetLink) {
-    if (!targetLink || !this.indicator) return;
-
-    const navRect = this.navElement.getBoundingClientRect();
-    const targetRect = targetLink.getBoundingClientRect();
-
-    const leftOffset = targetRect.left - navRect.left;
-    
-    this.indicator.style.width = `${targetRect.width}px`;
-    this.indicator.style.transform = `translateX(${leftOffset}px)`;
+    window.CozyOS.Navigation = new CozyNavigationController();
+})();    this.indicator.style.transform = `translateX(${leftOffset}px)`;
   }
 }
 
