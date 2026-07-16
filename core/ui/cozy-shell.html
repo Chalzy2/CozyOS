@@ -26,13 +26,20 @@
             </div>
         </div>
     </header>
-
-    <aside id="cozy-sidebar" class="cozy-side-navigation">
-    <div class="cozy-sidebar-header">Developer Hub</div>
-    <nav class="cozy-nav-menu" id="cozy-nav-menu">
-        <!-- Buttons will be injected here by cozy-navigation.js -->
-    </nav>
+<div class="cozy-app-container">
+    <!-- Sidebar -->
+    <aside id="cozy-sidebar">
+        <div class="cozy-sidebar-header">Developer Hub</div>
+        <nav id="cozy-nav-menu">
+            <!-- Your buttons go here -->
+        </nav>
     </aside>
+
+    <!-- Main Workspace -->
+    <main class="cozy-main-content" id="cozy-app-root">
+        <!-- The plugin content will be injected here -->
+    </main>
+</div>
 
     <main class="cozy-main-workspace">
         <div id="cozy-app-root">
