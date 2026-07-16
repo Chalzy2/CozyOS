@@ -1,6 +1,8 @@
 /**
- * CozyOS Enterprise Design System — Global Tokens
+ * CozyOS Enterprise Design System — Core Unified Token Registry
  * File Reference: core/ui/cozy-tokens.css
+ * * Maps all layout, glassmorphic variables, and premium active applications 
+ * directly to the master core theme color registry.
  */
 :root {
   /* System Typography */
@@ -8,10 +10,10 @@
   --cozy-font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
   /* Premium Glassmorphic Attributes */
-  --cozy-glass-bg: rgba(18, 17, 20, 0.65);
-  --cozy-glass-blur: 16px;
+  --cozy-glass-bg: rgba(10, 10, 12, 0.45);
+  --cozy-glass-blur: 20px;
   --cozy-glass-border: 1px solid rgba(255, 255, 255, 0.08);
-  --cozy-glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --cozy-glass-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
 
   /* Shared Radii */
   --cozy-radius-sm: 8px;
@@ -20,37 +22,97 @@
   --cozy-radius-full: 9999px;
 
   /* Global Transitions */
-  --cozy-transition-smooth: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  --cozy-transition-smooth: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   --cozy-sidebar-width: 260px;
 }
 
-/* App-Specific Theme Overrides mapped dynamically to dataset changes */
-[data-cozy-app="developer"] {
-  --cozy-accent: #10b981;
-  --cozy-accent-glow: rgba(16, 185, 129, 0.15);
+/* ==========================================================================
+   DEVELOPER HUB — Cozy Green + Gold (Default)
+   ========================================================================== */
+html[data-cozy-app="developer"], [data-cozy-app="developer"] {
+    --cozy-accent: #10b981; 
+    --cozy-accent-glow: rgba(16, 185, 129, 0.15);
+    --cozy-brand-primary: #10b981;
+    --cozy-brand-accent: #fbbf24; 
+    --cozy-brand-glow: rgba(16, 185, 129, 0.15);
+    --cozy-bg-gradient: radial-gradient(circle at 50% 0%, #0c1514 0%, #06080c 100%);
+    --cozy-muted: #64748b;
+    --cozy-text: #f1f5f9;
+    --cozy-border: rgba(255, 255, 255, 0.08);
 }
 
-[data-cozy-app="quarryos"] {
-  --cozy-accent: #eab308;
-  --cozy-accent-glow: rgba(234, 179, 8, 0.15);
+/* ==========================================================================
+   SHOPOS — Green + Orange
+   ========================================================================== */
+html[data-cozy-app="shopos"], [data-cozy-app="shopos"] {
+    --cozy-accent: #22c55e;
+    --cozy-accent-glow: rgba(34, 197, 94, 0.15);
+    --cozy-brand-primary: #22c55e;
+    --cozy-brand-accent: #f97316; 
+    --cozy-brand-glow: rgba(34, 197, 94, 0.15);
+    --cozy-bg-gradient: radial-gradient(circle at 50% 0%, #061c0f 0%, #04070a 100%);
+    --cozy-muted: #6b7280;
+    --cozy-text: #f9fafb;
+    --cozy-border: rgba(255, 255, 255, 0.07);
 }
 
-[data-cozy-app="schoolos"] {
-  --cozy-accent: #3b82f6;
-  --cozy-accent-glow: rgba(59, 130, 246, 0.15);
+/* ==========================================================================
+   QUARRYOS — Stone Grey + Sand Gold
+   ========================================================================== */
+html[data-cozy-app="quarryos"], [data-cozy-app="quarryos"] {
+    --cozy-accent: #78716c;
+    --cozy-accent-glow: rgba(120, 113, 108, 0.2);
+    --cozy-brand-primary: #78716c;
+    --cozy-brand-accent: #eab308; 
+    --cozy-brand-glow: rgba(120, 113, 108, 0.2);
+    --cozy-bg-gradient: radial-gradient(circle at 50% 0%, #1c1917 0%, #0c0a09 100%);
+    --cozy-muted: #a8a29e;
+    --cozy-text: #fafaf9;
+    --cozy-border: rgba(255, 255, 255, 0.06);
 }
 
-[data-cozy-app="sports"] {
-  --cozy-accent: #22c55e;
-  --cozy-accent-glow: rgba(34, 197, 94, 0.15);
+/* ==========================================================================
+   MPESAOS — Emerald + White
+   ========================================================================== */
+html[data-cozy-app="mpesaos"], [data-cozy-app="mpesaos"] {
+    --cozy-accent: #059669;
+    --cozy-accent-glow: rgba(5, 150, 105, 0.2);
+    --cozy-brand-primary: #059669;
+    --cozy-brand-accent: #ffffff; 
+    --cozy-brand-glow: rgba(5, 150, 105, 0.2);
+    --cozy-bg-gradient: radial-gradient(circle at 50% 0%, #022c22 0%, #020617 100%);
+    --cozy-muted: #94a3b8;
+    --cozy-text: #f8fafc;
+    --cozy-border: rgba(255, 255, 255, 0.09);
 }
 
-[data-cozy-app="mpesaos"] {
-  --cozy-accent: #059669;
-  --cozy-accent-glow: rgba(5, 150, 105, 0.15);
+/* ==========================================================================
+   HOSPITALOS — Medical Blue
+   ========================================================================== */
+html[data-cozy-app="hospitalos"], [data-cozy-app="hospitalos"] {
+    --cozy-accent: #0ea5e9;
+    --cozy-accent-glow: rgba(14, 165, 233, 0.15);
+    --cozy-brand-primary: #0ea5e9;
+    --cozy-brand-accent: #38bdf8; 
+    --cozy-brand-glow: rgba(14, 165, 233, 0.15);
+    --cozy-bg-gradient: radial-gradient(circle at 50% 0%, #071e2e 0%, #030712 100%);
+    --cozy-muted: #78716c;
+    --cozy-text: #f0f9ff;
+    --cozy-border: rgba(255, 255, 255, 0.08);
 }
 
-[data-cozy-app="shopos"] {
-  --cozy-accent: #f97316;
-  --cozy-accent-glow: rgba(249, 115, 22, 0.15);
+/* ==========================================================================
+   EDUCATIONOS / SCHOOLOS — Blue + Purple
+   ========================================================================== */
+html[data-cozy-app="schoolos"], html[data-cozy-app="educationos"], 
+[data-cozy-app="schoolos"], [data-cozy-app="educationos"] {
+    --cozy-accent: #3b82f6;
+    --cozy-accent-glow: rgba(59, 130, 246, 0.15);
+    --cozy-brand-primary: #3b82f6;
+    --cozy-brand-accent: #a855f7; 
+    --cozy-brand-glow: rgba(59, 130, 246, 0.15);
+    --cozy-bg-gradient: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #030712 100%);
+    --cozy-muted: #94a3b8;
+    --cozy-text: #f8fafc;
+    --cozy-border: rgba(255, 255, 255, 0.08);
 }
