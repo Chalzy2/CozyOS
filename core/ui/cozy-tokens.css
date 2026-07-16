@@ -1,29 +1,32 @@
 /**
- * CozyOS Enterprise Design System — Core Unified Token Registry
+ * CozyOS Enterprise Design System — System Tokens
  * File Reference: core/ui/cozy-tokens.css
- * * Maps all layout, glassmorphic variables, and premium active applications 
- * directly to the master core theme color registry.
  */
 :root {
-  /* System Typography */
-  --cozy-font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --cozy-font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+    /* Typographic System */
+    --cozy-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --cozy-font-mono: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", Courier, monospace;
 
-  /* Premium Glassmorphic Attributes */
-  --cozy-glass-bg: rgba(10, 10, 12, 0.45);
-  --cozy-glass-blur: 20px;
-  --cozy-glass-border: 1px solid rgba(255, 255, 255, 0.08);
-  --cozy-glass-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
+    /* Global Layout Metrics */
+    --cozy-sidebar-width: 260px;
+    --cozy-topbar-height: 56px;
+    --cozy-statusbar-height: 28px;
 
-  /* Shared Radii */
-  --cozy-radius-sm: 8px;
-  --cozy-radius-md: 14px;
-  --cozy-radius-lg: 24px;
-  --cozy-radius-full: 9999px;
+    /* Border Radii */
+    --cozy-radius-sm: 6px;
+    --cozy-radius-md: 12px;
+    --cozy-radius-lg: 18px;
+    --cozy-radius-xl: 28px;
 
-  /* Global Transitions */
-  --cozy-transition-smooth: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  --cozy-sidebar-width: 260px;
+    /* Premium Glassmorphic Attributes */
+    --cozy-glass-blur: blur(20px);
+    --cozy-glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    --cozy-glass-border: 1px solid rgba(255, 255, 255, 0.08);
+    --cozy-glass-bg: rgba(10, 12, 22, 0.6);
+
+    /* Animation Constants */
+    --cozy-transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+    --cozy-transition-normal: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ==========================================================================
