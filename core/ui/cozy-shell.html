@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en" data-cozy-app="developer">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CozyOS Workspace</title>
+    
+    <link rel="stylesheet" href="cozy-tokens.css">
+    <link rel="stylesheet" href="cozy-theme.css">
+    <link rel="stylesheet" href="cozy-layout.css">
+    <link rel="stylesheet" href="cozy-components.css">
+    <link rel="stylesheet" href="cozy-animations.css">
+    
+    <link rel="stylesheet" href="../../apps/developer-hub/developer-hub.css">
+</head>
+<body>
+
+    <header class="cozy-top-navigation">
+        <div class="cozy-brand-block">
+            <span class="cozy-logo-mark">◈</span>
+            <span class="cozy-app-title">CozyOS Workspace</span>
+        </div>
+        <div class="cozy-top-actions">
+            <div class="cozy-live-pill" id="universal-live-pill">
+                <span class="cozy-pulse-indicator"></span>
+                <span class="cozy-pill-text">SYS_STATUS: NOMINAL</span>
+            </div>
+        </div>
+    </header>
+
+    <aside id="cozy-sidebar" class="cozy-side-navigation">
+        <nav class="cozy-nav-menu">
+            <a href="#" class="cozy-nav-item active" data-target-app="developer">
+                <span class="icon">⌂</span> Developer Hub
+            </a>
+            <a href="#" class="cozy-nav-item" data-target-app="shopos">
+                <span class="icon">🛒</span> ShopOS
+            </a>
+            <a href="#" class="cozy-nav-item" data-target-app="quarryos">
+                <span class="icon">⛰</span> QuarryOS
+            </a>
+            <a href="#" class="cozy-nav-item" data-target-app="mpesaos">
+                <span class="icon">💸</span> MpesaOS
+            </a>
+            <a href="#" class="cozy-nav-item" data-target-app="hospitalos">
+                <span class="icon">🩺</span> HospitalOS
+            </a>
+        </nav>
+    </aside>
+
+    <main class="cozy-main-workspace" id="cozy-main-content">
+        <div class="cozy-dashboard-grid">
+            <div class="cozy-glass-card animate-float">
+                <h3>Welcome to CozyOS Developer Hub</h3>
+                <p>Universal environment loaded successfully. Edit this workspace context to build your application logic cleanly inside the container framework.</p>
+                <div class="cozy-action-group">
+                    <input type="text" class="cozy-input" placeholder="System command...">
+                </div>
+            </div>
+            
+            <div class="cozy-glass-card">
+                <h3>Workspace Nodes</h3>
+                <p>Status parameters: Active. System background canvas rendering successfully underneath layout layers.</p>
+            </div>
+        </div>
+        </main>
+
+    <footer class="cozy-bottom-statusbar">
+        <div class="cozy-status-left">
+            <span>LOC_NODE: 1.002.AFR</span>
+        </div>
+        <div class="cozy-status-center">
+            </div>
+        <div class="cozy-status-right">
+            <span>_RUNTIME: ACTIVE</span>
+        </div>
+    </footer>
+
+    <script src="cozy-ui.js" defer></script>
+    <script src="cozy-toast.js" defer></script>
+    <script src="cozy-navigation.js" defer></script>
+    <script src="cozy-theme.js" defer></script>
+    <script src="cozy-background.js" defer></script>
+    <script src="cozy-live.js" defer></script>
+
+</body>
+</html>
