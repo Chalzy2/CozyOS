@@ -1,0 +1,68 @@
+/**
+ * CozyOS Enterprise Design System — Global Workspace Layout
+ * File Reference: core/ui/cozy-layout.css
+ */
+body {
+    margin: 0;
+    padding: 0;
+    background: var(--cozy-bg-gradient);
+    color: var(--cozy-text);
+    font-family: var(--cozy-font-sans);
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: var(--cozy-topbar-height) 1fr var(--cozy-statusbar-height);
+    grid-template-columns: var(--cozy-sidebar-width) 1fr;
+    grid-template-areas:
+        "topbar topbar"
+        "sidebar main"
+        "statusbar statusbar";
+}
+
+.cozy-top-navigation {
+    grid-area: topbar;
+    background: rgba(10, 12, 22, 0.4);
+    backdrop-filter: var(--cozy-glass-blur);
+    -webkit-backdrop-filter: var(--cozy-glass-blur);
+    border-bottom: var(--cozy-glass-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    z-index: 1000;
+}
+
+.cozy-side-navigation {
+    grid-area: sidebar;
+    background: rgba(6, 8, 14, 0.7);
+    backdrop-filter: var(--cozy-glass-blur);
+    -webkit-backdrop-filter: var(--cozy-glass-blur);
+    border-right: var(--cozy-glass-border);
+    display: flex;
+    flex-direction: column;
+    padding: 16px 12px;
+    box-sizing: border-box;
+}
+
+.cozy-main-workspace {
+    grid-area: main;
+    overflow-y: auto;
+    padding: 32px;
+    box-sizing: border-box;
+    position: relative;
+}
+
+.cozy-bottom-statusbar {
+    grid-area: statusbar;
+    background: #04060a;
+    border-top: var(--cozy-glass-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    font-family: var(--cozy-font-mono);
+    font-size: 11px;
+    color: var(--cozy-muted);
+    z-index: 1000;
+}
