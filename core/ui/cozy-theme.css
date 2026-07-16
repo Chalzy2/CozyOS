@@ -1,0 +1,15 @@
+/**
+ * CozyOS Enterprise Design System — Theme Definitions
+ * File Reference: core/ui/cozy-theme.css
+ */
+
+/* Default Baseline Theme: Developer Hub */
+html, [data-cozy-app="developer"] {
+    --cozy-brand-primary: #10b981; /* Cozy Green */
+    --cozy-brand-accent: #fbbf24;  /* Gold */
+    --cozy-brand-glow: rgba(16, 185, 129, 0.15);
+    --cozy-bg-gradient: radial-gradient(circle at 50% 0%, #0c1514 0%, #06080c 100%);
+    --cozy-muted: #64748b;
+    --cozy-text: #f1f5f9;
+    --cozy-border: rgba(255, 255, 255, 0.08);
+}
