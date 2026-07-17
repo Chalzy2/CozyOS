@@ -39,8 +39,8 @@
 
     const CERT_LEVELS = Object.freeze({
         ENTERPRISE_CERTIFIED: "ENTERPRISE_CERTIFIED",
-        CERTIFIED_WITH_WARNINGS: "CERTIFIED_WITH_WARNINGS",
-        CERTIFICATION_FAILED: "CERTIFICATION_FAILED",
+        CERTIFIED_WITH_WARNINGS: "CONDITIONALLY_CERTIFIED",
+        CERTIFICATION_FAILED: "FAILED_CERTIFICATION",
         NOT_CERTIFIED: "NOT_CERTIFIED",
         UNKNOWN: "UNKNOWN"
     });
@@ -3028,15 +3028,15 @@ ${report.baselineComparison ? `<h2 id="baseline-comparison">Baseline Comparison<
             }
 
             const jsResults = jsFiles.map(([path]) => perFile[path]);
-            const certifiedFiles = jsResults.filter(r => r.verdict === "ENTERPRISE_CERTIFIED").length;
-            const warningFiles = jsResults.filter(r => r.verdict === "CERTIFIED_WITH_WARNINGS").length;
-            const failedFiles = jsResults.filter(r => r.verdict === "CERTIFICATION_FAILED" || r.verdict === "CERTIFICATION_ERROR").length;
+            const certifiedFiles = jsResults.filter(r => r.verdict === CERT_LEVELS.ENTERPRISE_CERTIFIED).length;
+            const warningFiles = jsResults.filter(r => r.verdict === CERT_LEVELS.CERTIFIED_WITH_WARNINGS).length;
+            const failedFiles = jsResults.filter(r => r.verdict === CERT_LEVELS.CERTIFICATION_FAILED || r.verdict === "CERTIFICATION_ERROR").length;
             const scoredResults = jsResults.filter(r => typeof r.scorePercent === "number");
             const overallProjectScore = scoredResults.length ? Math.round((scoredResults.reduce((sum, r) => sum + r.scorePercent, 0) / scoredResults.length) * 10) / 10 : null;
             const overallProjectVerdict = jsResults.length === 0 ? "NO_JS_FILES"
-                : failedFiles > 0 ? "CERTIFICATION_FAILED"
-                : warningFiles > 0 ? "CERTIFIED_WITH_WARNINGS"
-                : "ENTERPRISE_CERTIFIED";
+                : failedFiles > 0 ? CERT_LEVELS.CERTIFICATION_FAILED
+                : warningFiles > 0 ? CERT_LEVELS.CERTIFIED_WITH_WARNINGS
+                : CERT_LEVELS.ENTERPRISE_CERTIFIED;
 
             const crossFileValidation = this.#validateProjectCrossFile(files, jsFiles, version);
 
