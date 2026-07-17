@@ -32,6 +32,8 @@
             this.animationFrameId = null;
             this.isTabActive = true;
             this.prefersReducedMotion = false;
+            this._resizeDebounceId = null;
+            this._themeColorCache = {};
 
             // Theme transition configuration
             this.activeApp = "developer";
@@ -91,9 +93,14 @@
             this.ctx = this.canvas.getContext("2d");
 
             this.handleResize();
-            window.addEventListener("resize", () => this.handleResize());
+            window.addEventListener("resize", () => {
+                // generateInitialAssets() (called inside handleResize) reallocates
+                // every particle system; without debouncing this fires on every
+                // pixel of a window drag, causing GC pressure and jank.
+                clearTimeout(this._resizeDebounceId);
+                this._resizeDebounceId = setTimeout(() => this.handleResize(), 200);
+            });
 
-            this.generateInitialAssets();
             this.animate();
             this.observeThemeChanges();
         }
@@ -125,6 +132,22 @@
         updateForTheme(themeName) {
             this.targetApp = themeName;
             this.transitionAlpha = 0.0;
+            // Theme changed: cached custom-property colors are stale.
+            this._themeColorCache = {};
+        }
+
+        /**
+         * Canvas fillStyle/strokeStyle only accept resolved CSS <color> values,
+         * not var(--...) references — assigning an unparseable string is
+         * silently ignored by the Canvas API. This resolves the custom
+         * property to its actual computed color, caching per theme.
+         */
+        getCssVar(name, fallback) {
+            if (this._themeColorCache[name] === undefined) {
+                const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+                this._themeColorCache[name] = val || fallback;
+            }
+            return this._themeColorCache[name];
         }
 
         generateInitialAssets() {
@@ -223,7 +246,9 @@
                 size: Math.random() * 2.5 + 1,
                 life: Math.random() * 0.8 + 0.2,
                 // Fetches dynamic colors directly from the active theme
-                color: Math.random() > 0.5 ? "var(--cozy-brand-primary)" : "var(--cozy-brand-accent)"
+                color: Math.random() > 0.5
+                    ? this.getCssVar("--cozy-brand-primary", "#10b981")
+                    : this.getCssVar("--cozy-brand-accent", "#fbbf24")
             };
         }
 
@@ -284,6 +309,12 @@
                     break;
                 case "mpesaos":
                     this.renderMpesaScene(width, height);
+                    break;
+                case "hospitalos":
+                    this.renderHospitalScene(width, height);
+                    break;
+                case "churchos":
+                    this.renderChurchScene(width, height);
                     break;
                 case "developer":
                 default:
@@ -411,220 +442,73 @@
             });
             this.ctx.restore();
         }
-        /* ==========================================================================
-   AGRICULTUREOS ADDITIONS
-   ========================================================================== */
-
-// 1. [Add to generateInitialAssets() inside cozy-background.js]
-this.wheatFields = [];
-const fieldDensity = Math.floor(width / 18);
-for (let i = 0; i < fieldDensity; i++) {
-    this.wheatFields.push({
-        x: i * 18 + (Math.random() * 6),
-        height: Math.random() * 35 + 20,
-        swayOffset: Math.random() * 150,
-        swaySpeed: Math.random() * 0.012 + 0.004,
-        yieldHeadSize: Math.random() * 5 + 3
-    });
-}
-
-// 2. [Add to renderScene() switch-case or map to 'agricultureos']
-case "agricultureos":
-    this.renderAgricultureScene(width, height);
-    break;
-
-// 3. [Add as a method to CozyLivingBackground class]
-renderAgricultureScene(width, height) {
-    this.ctx.save();
-    
-    // Draw soft sun beams rising from lower left
-    const beamGrad = this.ctx.createLinearGradient(0, height, width * 0.4, 0);
-    beamGrad.addColorStop(0, "rgba(234, 179, 8, 0.04)"); // Wheat Gold
-    beamGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
-    this.ctx.fillStyle = beamGrad;
-    this.ctx.beginPath();
-    this.ctx.moveTo(0, height);
-    this.ctx.lineTo(0, height * 0.4);
-    this.ctx.lineTo(width * 0.6, 0);
-    this.ctx.lineTo(width, 0);
-    this.ctx.closePath();
-    this.ctx.fill();
-
-    // Render biological drifting spores (custom particles)
-    this.particles.forEach(p => {
-        p.y -= p.vy * 0.8; // Drifting upwards softly
-        p.x += Math.sin(Date.now() * 0.001 + p.alpha) * 0.15;
-        if (p.y < 0) p.y = height;
-        
-        this.ctx.fillStyle = `rgba(234, 179, 8, ${p.alpha * 0.4})`; // Gold spores
-        this.ctx.beginPath();
-        this.ctx.arc(p.x, p.y, p.size * 0.8, 0, Math.PI * 2);
-        this.ctx.fill();
-    });
-
-    // Draw swaying wheat blades at bottom layer
-    this.ctx.strokeStyle = "rgba(234, 179, 8, 0.06)";
-    this.ctx.lineWidth = 1.8;
-    this.wheatFields.forEach(blade => {
-        const sway = Math.sin(Date.now() * blade.swaySpeed + blade.swayOffset) * 16;
-        
-        this.ctx.beginPath();
-        this.ctx.moveTo(blade.x, height);
-        // Quad curve for organic sway structure
-        this.ctx.quadraticCurveTo(
-            blade.x, 
-            height - blade.height * 0.5, 
-            blade.x + sway, 
-            height - blade.height
-        );
-        this.ctx.stroke();
-
-        // Draw seed head (wheat spikelet)
-        this.ctx.fillStyle = "rgba(234, 179, 8, 0.08)";
-        this.ctx.beginPath();
-        this.ctx.arc(blade.x + sway, height - blade.height, blade.yieldHeadSize, 0, Math.PI * 2);
-        this.ctx.fill();
-    });
-
-    this.ctx.restore();
-        }
-/* ==========================================================================
-   SPORTS MODE ADDITIONS
-   ========================================================================== */
-
-// 1. [Add to renderScene() switch-case or map to 'sports']
-case "sports":
-    this.renderSportsScene(width, height);
-    break;
-
-// 2. [Add as a method to CozyLivingBackground class]
-renderSportsScene(width, height) {
-    this.ctx.save();
-
-    // Draw dynamic ground grass lines
-    this.ctx.strokeStyle = "rgba(34, 197, 94, 0.03)";
-    this.ctx.lineWidth = 1.5;
-    this.grassBlades.forEach(blade => {
-        const sway = Math.sin(Date.now() * blade.swaySpeed + blade.swayOffset) * 10;
-        this.ctx.beginPath();
-        this.ctx.moveTo(blade.x, height);
-        this.ctx.quadraticCurveTo(blade.x, height - blade.height * 0.6, blade.x + sway, height - blade.height);
-        this.ctx.stroke();
-    });
-
-    // Physics Update: Ball boundaries and velocity
-    const ball = this.soccerBall;
-    ball.x += ball.vx;
-    ball.y += ball.vy;
-    ball.rotation += ball.vx * ball.spinRate;
-
-    // Boundary bounces (elastic collisions with walls)
-    if (ball.x - ball.radius < 0) {
-        ball.x = ball.radius;
-        ball.vx *= -1;
-    } else if (ball.x + ball.radius > width) {
-        ball.x = width - ball.radius;
-        ball.vx *= -1;
-    }
-
-    if (ball.y - ball.radius < 0) {
-        ball.y = ball.radius;
-        ball.vy *= -1;
-    } else if (ball.y + ball.radius > height) {
-        ball.y = height - ball.radius;
-        ball.vy *= -1;
-    }
-
-    // Render the interactive geometric vector ball
-    this.ctx.save();
-    this.ctx.translate(ball.x, ball.y);
-    this.ctx.rotate(ball.rotation);
-    
-    // Outer shadow rim
-    this.ctx.fillStyle = "rgba(34, 197, 94, 0.02)";
-    this.ctx.beginPath();
-    this.ctx.arc(2, 2, ball.radius, 0, Math.PI * 2);
-    this.ctx.fill();
-
-    // Wireframe ball vector lines
-    this.ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
-    this.ctx.lineWidth = 1.2;
-    this.ctx.beginPath();
-    this.ctx.arc(0, 0, ball.radius, 0, Math.PI * 2);
-    this.ctx.stroke();
-
-    // Draw stylized geodesic pane lines (rotating details)
-    this.ctx.beginPath();
-    this.ctx.moveTo(0, -ball.radius);
-    this.ctx.lineTo(0, ball.radius);
-    this.ctx.moveTo(-ball.radius, 0);
-    this.ctx.lineTo(ball.radius, 0);
-    this.ctx.stroke();
-    
-    this.ctx.restore();
-    this.ctx.restore();
-        }
-/* ==========================================================================
-   MPESAOS & HOSPITALOS MESH NETWORK ADDITIONS
-   ========================================================================== */
-
-// 1. [Add to renderScene() switch-case]
-case "mpesaos":
-    this.renderMpesaScene(width, height);
-    break;
-case "hospitalos":
-    this.renderHospitalScene(width, height);
-    break;
-
-// 2. [Add as methods to CozyLivingBackground class]
-renderMpesaScene(width, height) {
-    this.ctx.save();
-    // Render dynamic green node connections
-    this.drawMeshNetwork("rgba(5, 150, 105, 0.04)", "rgba(5, 150, 105, 0.06)", 110);
-    this.ctx.restore();
-}
-
-renderHospitalScene(width, height) {
-    this.ctx.save();
-    // Render dynamic medical blue cardiogram frequency links
-    this.drawMeshNetwork("rgba(14, 165, 233, 0.04)", "rgba(14, 165, 233, 0.05)", 130);
-    this.ctx.restore();
-}
-
-// Global utility helper to connect close-proximity particles
-drawMeshNetwork(lineColor, dotColor, thresholdRange) {
-    const len = this.particles.length;
-    
-    // Draw connections between points within range
-    for (let i = 0; i < len; i++) {
-        const p1 = this.particles[i];
-        
-        for (let j = i + 1; j < len; j++) {
-            const p2 = this.particles[j];
-            const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
-            
-            if (dist < thresholdRange) {
-                // Soft fade line depending on distance proximity
-                const alphaFactor = (1 - dist / thresholdRange);
-                this.ctx.strokeStyle = lineColor;
-                this.ctx.globalAlpha = alphaFactor;
-                this.ctx.lineWidth = 0.8;
+        /**
+         * Renders soft stained-glass-style light beams for ChurchOS,
+         * in the same low-alpha ambient style as the other scenes.
+         */
+        renderChurchScene(width, height) {
+            this.ctx.save();
+            const beamCount = 5;
+            for (let i = 0; i < beamCount; i++) {
+                const x = (width / (beamCount + 1)) * (i + 1);
+                const beamGrad = this.ctx.createLinearGradient(x, 0, x, height);
+                beamGrad.addColorStop(0, "rgba(217, 119, 6, 0.05)");
+                beamGrad.addColorStop(1, "rgba(217, 119, 6, 0)");
+                this.ctx.fillStyle = beamGrad;
                 this.ctx.beginPath();
-                this.ctx.moveTo(p1.x, p1.y);
-                this.ctx.lineTo(p2.x, p2.y);
-                this.ctx.stroke();
+                this.ctx.moveTo(x - 40, 0);
+                this.ctx.lineTo(x + 40, 0);
+                this.ctx.lineTo(x + 80, height);
+                this.ctx.lineTo(x - 80, height);
+                this.ctx.closePath();
+                this.ctx.fill();
             }
+            this.ctx.restore();
         }
-        
-        // Draw little node joints
-        this.ctx.fillStyle = dotColor;
-        this.ctx.globalAlpha = p1.alpha * 1.5;
-        this.ctx.beginPath();
-        this.ctx.arc(p1.x, p1.y, p1.size * 1.2, 0, Math.PI * 2);
-        this.ctx.fill();
-    }
-    this.ctx.globalAlpha = 1.0;
-}
+
+        /**
+         * Renders the medical blue cardiogram-style mesh network for HospitalOS.
+         */
+        renderHospitalScene(width, height) {
+            this.ctx.save();
+            this.drawMeshNetwork("rgba(14, 165, 233, 0.04)", "rgba(14, 165, 233, 0.05)", 130);
+            this.ctx.restore();
+        }
+
+        /**
+         * Utility: connects close-proximity particles into a soft mesh network.
+         * Shared by renderMpesaScene-style visuals and renderHospitalScene.
+         */
+        drawMeshNetwork(lineColor, dotColor, thresholdRange) {
+            const len = this.particles.length;
+
+            for (let i = 0; i < len; i++) {
+                const p1 = this.particles[i];
+
+                for (let j = i + 1; j < len; j++) {
+                    const p2 = this.particles[j];
+                    const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+
+                    if (dist < thresholdRange) {
+                        const alphaFactor = (1 - dist / thresholdRange);
+                        this.ctx.strokeStyle = lineColor;
+                        this.ctx.globalAlpha = alphaFactor;
+                        this.ctx.lineWidth = 0.8;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(p1.x, p1.y);
+                        this.ctx.lineTo(p2.x, p2.y);
+                        this.ctx.stroke();
+                    }
+                }
+
+                this.ctx.fillStyle = dotColor;
+                this.ctx.globalAlpha = p1.alpha * 1.5;
+                this.ctx.beginPath();
+                this.ctx.arc(p1.x, p1.y, p1.size * 1.2, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
+            this.ctx.globalAlpha = 1.0;
+        }
 
         renderSportsScene(width, height) {
             this.ctx.save();
@@ -660,7 +544,7 @@ drawMeshNetwork(lineColor, dotColor, thresholdRange) {
 
         renderMpesaScene(width, height) {
             this.ctx.save();
-            this.ctx.strokeStyle = "var(--cozy-brand-primary)";
+            this.ctx.strokeStyle = this.getCssVar("--cozy-brand-primary", "#059669");
             this.ctx.globalAlpha = 0.03;
             this.ctx.lineWidth = 1.0;
             
@@ -678,7 +562,7 @@ drawMeshNetwork(lineColor, dotColor, thresholdRange) {
 
         renderDeveloperScene(width, height) {
             this.ctx.save();
-            this.ctx.strokeStyle = "var(--cozy-brand-primary)";
+            this.ctx.strokeStyle = this.getCssVar("--cozy-brand-primary", "#10b981");
             this.ctx.globalAlpha = 0.04;
             this.ctx.lineWidth = 2.0;
             this.ctx.beginPath();
