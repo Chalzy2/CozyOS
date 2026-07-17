@@ -259,6 +259,27 @@
         }
 
         /**
+         * canAccessApplication(userId, appName)
+         *   Real, single-call permission check for the one gap this
+         *   milestone identified: cozy-ui.js's loadModule() currently has
+         *   no permission check before loading anything. This is the
+         *   exact method the shell should call first — combines every
+         *   relevant real check (account status, admin/developer
+         *   override, global application toggle, per-user assignment)
+         *   into one boolean, so the shell's integration is a single
+         *   call rather than reimplementing this logic itself.
+         */
+        canAccessApplication(userId, appName) {
+            const user = this.#users.get(userId);
+            if (!user) return false;
+            if ((user.status || "active") !== "active") return false;
+            if (this.isPlatformAdmin(userId)) return true; // admins can reach every real application, including developer-hub
+            if (this.isDeveloper(userId)) return appName.toLowerCase() === "developer-hub";
+            if (!this.isApplicationEnabled(appName)) return false;
+            return this.listAssignedApplications(userId).includes(appName.toLowerCase());
+        }
+
+        /**
          * PLATFORM ADMIN — Minimal License Management
          *
          * HONEST SCOPE: "License ≠ Identity" per the frozen platform
