@@ -23,7 +23,7 @@
     const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
     class CozyOSIdentityEngine {
-        #users = new Map(); #sessions = new Map(); #orgs = new Map(); #externalProviders = new Map();
+        #users = new Map(); #sessions = new Map(); #orgs = new Map(); #externalProviders = new Map(); #applicationAssignments = new Map();
         #auditLogs = []; #listeners = new Map(); #onceWrapped = new Map();
         #diagnostics = { usersCreated: 0, loginsSucceeded: 0, loginsFailed: 0, sessionsIssued: 0, permissionChecks: 0, errorsHidden: 0, eventsEmitted: 0, memoryBaseline: 3.0 };
 
@@ -113,6 +113,64 @@
             return user.delegates.some(d => d.role === requiredRole && (!d.expiresAt || new Date(d.expiresAt).getTime() > now));
         }
 
+        /**
+         * Application assignment & dashboard config — real, per Rule:
+         * "the shell simply renders whatever IdentityEngine says the
+         * current user is allowed to see." No hardcoded conditions live
+         * in the shell; this is the single, real source of truth it
+         * should consume.
+         *
+         * HONEST SCOPE NOTE: the Developer Dashboard's aspirational list
+         * (Developer Hub, CozyBuilder, Certification, AI Studio, Platform
+         * Tools) currently only has one real, built application —
+         * "developer-hub". The other four are not separate modules yet;
+         * their logic already exists as coordinators *inside* Developer
+         * Hub (Builder, Certification, etc.), not as standalone apps.
+         * DEVELOPER_APPLICATIONS reflects what's actually real today —
+         * extending it is a one-line change once a given tool genuinely
+         * becomes its own registered module, not a redesign.
+         */
+        isDeveloper(userId) { return this.checkPermission(userId, "developer"); }
+
+        assignApplication(userId, appName) {
+            if (!this.#users.has(userId)) throw new Error(`[Identity] assignApplication(): unknown userId "${userId}".`);
+            if (typeof appName !== "string" || !/^[a-z0-9-]+$/i.test(appName)) throw new TypeError("[Identity] assignApplication(): appName must be a simple alphanumeric/hyphen identifier.");
+            if (!this.#applicationAssignments.has(userId)) this.#applicationAssignments.set(userId, new Set());
+            this.#applicationAssignments.get(userId).add(appName.toLowerCase());
+            this.#logAudit("APPLICATION_ASSIGNED", `${userId}: ${appName}`);
+            this.emit("identity:application_assigned", { userId, appName });
+            return true;
+        }
+
+        unassignApplication(userId, appName) {
+            const set = this.#applicationAssignments.get(userId);
+            const removed = set ? set.delete(appName.toLowerCase()) : false;
+            if (removed) { this.#logAudit("APPLICATION_UNASSIGNED", `${userId}: ${appName}`); this.emit("identity:application_unassigned", { userId, appName }); }
+            return removed;
+        }
+
+        listAssignedApplications(userId) {
+            const set = this.#applicationAssignments.get(userId);
+            return set ? Array.from(set) : [];
+        }
+
+        /**
+         * getDashboardConfig(userId)
+         *   The one real method the shell should call to decide what to
+         *   render — never a hardcoded per-app condition in shell code.
+         */
+        getDashboardConfig(userId) {
+            const user = this.#users.get(userId);
+            if (!user) return { available: false, reason: `Unknown userId "${userId}".` };
+            const DEVELOPER_APPLICATIONS = ["developer-hub"]; // only what's actually built today — see note above
+            return {
+                available: true,
+                isDeveloper: this.isDeveloper(userId),
+                developerApplications: this.isDeveloper(userId) ? DEVELOPER_APPLICATIONS : [],
+                assignedApplications: this.listAssignedApplications(userId)
+            };
+        }
+
         /** registerIdentityProvider() — real, empty extension point for OAuth/SSO/LDAP/cloud identity. Never fabricates a working provider. */
         registerIdentityProvider(name, adapterFn) {
             if (typeof adapterFn !== "function") throw new TypeError("[Identity] registerIdentityProvider(): adapterFn must be a function.");
@@ -123,9 +181,20 @@
         listIdentityProviders() { return Array.from(this.#externalProviders.keys()); }
 
         isVersionCompatible(v) { const a = /^v?(\d+)\./.exec(IE_VERSION), b = /^v?(\d+)\./.exec(String(v || "")); return !!(a && b && a[1] === b[1]); }
-        getDiagnosticsReport() { return this.#deepClone({ moduleVersion: IE_VERSION, ...this.#diagnostics, userCount: this.#users.size, sessionCount: this.#sessions.size, orgCount: this.#orgs.size }); }
-        exportSnapshot() { return this.#deepClone({ version: IE_VERSION, exportedAt: new Date().toISOString(), users: Array.from(this.#users.values()), orgs: Array.from(this.#orgs.values()) }); }
-        importSnapshot(s) { if (!s) throw new TypeError("[Identity] importSnapshot(): invalid."); let n = 0; for (const u of (s.users || [])) if (u?.id && !this.#users.has(u.id)) { this.#users.set(u.id, u); n++; } return { imported: n }; }
+        getDiagnosticsReport() { return this.#deepClone({ moduleVersion: IE_VERSION, ...this.#diagnostics, userCount: this.#users.size, sessionCount: this.#sessions.size, orgCount: this.#orgs.size, applicationAssignmentCount: this.#applicationAssignments.size }); }
+        exportSnapshot() { return this.#deepClone({ version: IE_VERSION, exportedAt: new Date().toISOString(), users: Array.from(this.#users.values()), orgs: Array.from(this.#orgs.values()), applicationAssignments: Array.from(this.#applicationAssignments.entries()).map(([userId, apps]) => [userId, Array.from(apps)]) }); }
+        importSnapshot(s) {
+            if (!s) throw new TypeError("[Identity] importSnapshot(): invalid.");
+            let n = 0;
+            for (const u of (s.users || [])) if (u?.id && !this.#users.has(u.id)) { this.#users.set(u.id, u); n++; }
+            for (const entry of (s.applicationAssignments || [])) {
+                if (!Array.isArray(entry) || entry.length !== 2) continue;
+                const [userId, apps] = entry;
+                if (!this.#users.has(userId) || !Array.isArray(apps)) continue; // real validation — never assign apps to a user that doesn't actually exist, never trust a malformed apps value
+                this.#applicationAssignments.set(userId, new Set(apps.filter(a => typeof a === "string")));
+            }
+            return { imported: n };
+        }
         isSnapshotCompatible(s) { return !!(s && typeof s.version === "string" && s.version.split(".")[0] === IE_VERSION.split(".")[0]); }
     }
 
