@@ -1,0 +1,38 @@
+/* CozyOS — ShopOS End-User Module Styles. Scoped to .sp-* classes only. */
+
+.sp-app { font-family: var(--cz-font, system-ui, sans-serif); color: var(--cz-text, #1a1a2e); }
+
+.sp-topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--cz-border, #e5e7eb); margin-bottom: 10px; }
+.sp-brand-cluster { display: flex; align-items: center; gap: 12px; }
+.sp-brand-badge { width: 36px; height: 36px; border-radius: 10px; background: #22c55e; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; }
+.sp-brand-name { font-weight: 700; font-size: 15px; }
+.sp-brand-sub { font-size: 12px; color: var(--cz-text-muted, #6b7280); }
+.sp-status-pill { font-size: 12px; font-weight: 600; color: #16a34a; }
+
+.sp-tabs { display: flex; gap: 4px; padding: 0 18px; border-bottom: 1px solid var(--cz-border, #e5e7eb); margin-bottom: 18px; }
+.sp-tab { font: inherit; font-size: 13px; font-weight: 600; padding: 10px 14px; border: none; background: none; color: var(--cz-text-muted, #6b7280); cursor: pointer; border-bottom: 2px solid transparent; }
+.sp-tab.active { color: #16a34a; border-bottom-color: #22c55e; }
+
+.sp-section { padding: 0 18px; margin-bottom: 22px; }
+.sp-section h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--cz-text-muted, #6b7280); margin: 0 0 10px; }
+
+.sp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; padding: 0 18px; margin-bottom: 18px; }
+.sp-card { background: var(--cz-panel, #fff); border: 1px solid var(--cz-border, #e5e7eb); border-radius: 10px; padding: 14px 16px; }
+.sp-card-title { font-size: 11px; color: var(--cz-text-muted, #6b7280); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.sp-card-value { font-size: 20px; font-weight: 700; }
+
+.sp-btn { font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid var(--cz-border, #e5e7eb); background: #fff; color: var(--cz-text, #1a1a2e); border-radius: 8px; padding: 8px 14px; }
+.sp-btn.sp-btn-primary { background: #22c55e; border-color: #22c55e; color: #fff; }
+
+.sp-table { width: 100%; border-collapse: collapse; font-size: 13px; padding: 0 18px; }
+.sp-table th, .sp-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--cz-border, #e5e7eb); }
+.sp-table th { color: var(--cz-text-muted, #6b7280); font-weight: 600; font-size: 11px; text-transform: uppercase; }
+
+.sp-field { margin-bottom: 12px; padding: 0 18px; }
+.sp-field label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px; color: var(--cz-text-muted, #6b7280); }
+.sp-field input, .sp-field select { font: inherit; width: 100%; max-width: 320px; border: 1px solid var(--cz-border, #e5e7eb); border-radius: 8px; padding: 8px 10px; box-sizing: border-box; }
+
+.sp-empty-state { padding: 18px; text-align: center; color: var(--cz-text-muted, #6b7280); }
+.sp-empty-note { color: var(--cz-text-muted, #6b7280); font-size: 13px; padding: 0 18px; }
+
+.sp-footer { padding: 14px 18px; border-top: 1px solid var(--cz-border, #e5e7eb); font-size: 12px; color: var(--cz-text-muted, #6b7280); }
