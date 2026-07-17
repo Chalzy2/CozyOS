@@ -2628,6 +2628,20 @@
     let singletonInstance = null;
     window.CozyOS.Modules["developer-hub"] = {
         version: HUB_UI_VERSION,
+        /**
+         * files — a real, self-declared manifest of Developer Hub's own
+         * asset paths, relative to core/modules/. Any loader (the shell's
+         * or otherwise) can read this instead of assuming a naming
+         * convention like `./core/modules/${moduleName}/${moduleName}.js`
+         * — which breaks the moment a module's folder name doesn't match
+         * its registered name (as already happened here: this module is
+         * named "developer-hub" but its real folder is "developer", not
+         * "developer-hub"). Only Developer Hub's own files are declared
+         * here — this is not a shell-wide module registry, since this
+         * file has no real knowledge of ShopOS, QuarryOS, or any other
+         * application's actual file locations.
+         */
+        files: { folder: "developer", html: "developer-hub.html", css: "developer-hub.css", js: "developer-hub.js" },
         init(container) {
             if (!singletonInstance) singletonInstance = new CozyDeveloperHubUI();
             singletonInstance.init(container);
