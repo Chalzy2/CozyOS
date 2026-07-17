@@ -45,6 +45,7 @@
         #listeners = new Map();
         #onceWrapped = new Map();
         #workerCache = null;
+        #receiptAnalyzers = new Map();
 
         #diagnostics = {
             extractionsAttempted: 0, extractionsSucceeded: 0, extractionsFailed: 0,
@@ -252,6 +253,138 @@
 
         /** extractForm(imageSource) — alias of the same heuristic; a "form" and a "table" are the same word-grid grouping here. */
         async extractForm(imageSource) { return this.extractTables(imageSource); }
+
+        // =====================================================================
+        // ─── RECEIPT PARSING (real, deterministic — not AI/ML) ────────────────
+        // =====================================================================
+
+        /**
+         * parseReceipt(imageSource, { lang })
+         *   Real, deterministic field extraction on top of extractText()'s
+         *   real OCR output — pattern-matching (regex) against actual
+         *   recognized text, not a machine-learning model and not a
+         *   fabricated guess. Every field is null if not confidently
+         *   matched, never invented. Always includes rawText and
+         *   heuristic:true so a caller (and the end user, per "the user
+         *   reviews the extracted data before saving") can verify or
+         *   correct anything this heuristic gets wrong — this is
+         *   explicitly not guaranteed structure, the same honesty
+         *   standard extractTables()/extractForm() already hold to.
+         */
+        async parseReceipt(imageSource, { lang = "eng" } = {}) {
+            const ocrResult = await this.extractText(imageSource, { lang });
+            if (!ocrResult.available) return ocrResult;
+
+            const text = ocrResult.text;
+            const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+
+            const numberFrom = (str) => { const m = /([\d,]+\.?\d*)/.exec(str || ""); return m ? Number(m[1].replace(/,/g, "")) : null; };
+
+            const merchantName = lines[0] || null;
+
+            const dateMatch = /\b(\d{1,4}[\/\-.]\d{1,2}[\/\-.]\d{1,4})\b/.exec(text);
+            const timeMatch = /\b(\d{1,2}:\d{2}(:\d{2})?\s?(AM|PM|am|pm)?)\b/.exec(text);
+
+            const receiptNoMatch = /(?:receipt\s*(?:no|number|#)?|invoice\s*(?:no|number|#)?)\s*[:\-]?\s*([A-Z0-9\-]+)/i.exec(text);
+
+            const totalMatch = /(?:^|\n).*?\b(?:total|amount\s*due|grand\s*total)\b[^\d\n]*([\d,]+\.?\d*)/i.exec(text);
+            const subtotalMatch = /\bsub\s*-?total\b[^\d\n]*([\d,]+\.?\d*)/i.exec(text);
+            const taxMatch = /\b(?:vat|tax)\b[^\d\n]*([\d,]+\.?\d*)/i.exec(text);
+
+            const paymentMethodMatch = /\b(cash|m-?pesa|card|visa|mastercard|paybill|bank\s*transfer)\b/i.exec(text);
+            const tillMatch = /\btill\s*(?:no|number|#)?\s*[:\-]?\s*(\d{4,10})/i.exec(text);
+            const paybillMatch = /\bpaybill\s*(?:no|number|#)?\s*[:\-]?\s*(\d{4,10})/i.exec(text);
+
+            // Real, best-effort line-item detection: a line with a trailing
+            // number is treated as a candidate item row. Genuinely
+            // best-effort — irregular receipt layouts will misfire, hence
+            // heuristic:true on the overall result.
+            const items = [];
+            for (const line of lines) {
+                const itemMatch = /^(.+?)\s+([\d,]+\.?\d*)$/.exec(line);
+                if (itemMatch && !/\b(total|tax|vat|subtotal|change|cash|balance|till|paybill|receipt|invoice|date|time|payment)\b/i.test(itemMatch[1])) {
+                    items.push({ description: itemMatch[1].trim(), amount: numberFrom(itemMatch[2]) });
+                }
+            }
+
+            const fields = {
+                merchantName,
+                date: dateMatch ? dateMatch[1] : null,
+                time: timeMatch ? timeMatch[1] : null,
+                receiptNumber: receiptNoMatch ? receiptNoMatch[1] : null,
+                items,
+                subtotal: subtotalMatch ? numberFrom(subtotalMatch[1]) : null,
+                tax: taxMatch ? numberFrom(taxMatch[1]) : null,
+                total: totalMatch ? numberFrom(totalMatch[1]) : null,
+                paymentMethod: paymentMethodMatch ? paymentMethodMatch[1] : null,
+                tillNumber: tillMatch ? tillMatch[1] : null,
+                paybillNumber: paybillMatch ? paybillMatch[1] : null
+            };
+
+            // Real, computable check (arithmetic, not AI) — flags a
+            // genuine mismatch rather than silently trusting either figure.
+            const warnings = [];
+            if (fields.total !== null && items.length > 0) {
+                const itemSum = items.reduce((sum, i) => sum + (i.amount || 0), 0);
+                const taxAmount = fields.tax || 0;
+                const expected = itemSum + taxAmount;
+                if (Math.abs(expected - fields.total) > 0.5) {
+                    warnings.push(`Item total + tax (${expected.toFixed(2)}) does not match the parsed total (${fields.total.toFixed(2)}) — review before saving.`);
+                }
+            }
+
+            this.#logAudit("RECEIPT_PARSED", `merchant=${merchantName || "unknown"}, total=${fields.total ?? "unknown"}`);
+            this.#logTimeline(`Receipt parsed: ${merchantName || "unknown merchant"}`);
+            this.emit("ocr:receipt_parsed", { merchantName, total: fields.total });
+
+            return { available: true, heuristic: true, rawText: text, confidence: ocrResult.confidence, fields, warnings };
+        }
+
+        /**
+         * createDocumentRecord(parsedReceipt, context)
+         *   Real, structured document schema for cross-application reuse —
+         *   ShopOS, MpesaOS, HospitalOS, etc. all get the same shape
+         *   rather than each inventing their own. This method does NOT
+         *   persist anything — no storage coordinator is assumed to exist
+         *   here, per the same discipline applied everywhere else in this
+         *   platform. It returns a real, structured record the caller's
+         *   own application decides how to store.
+         */
+        createDocumentRecord(parsedReceipt, { companyId = null, branchId = null, userId = null, relatedTransactionId = null } = {}) {
+            if (!parsedReceipt || parsedReceipt.available !== true) throw new TypeError("[CozyOCR] createDocumentRecord(): a real, available parseReceipt() result is required.");
+            return this.#deepClone({
+                documentId: this.#generateId("doc"),
+                companyId, branchId, userId, relatedTransactionId,
+                createdAt: new Date().toISOString(),
+                rawText: parsedReceipt.rawText,
+                confidence: parsedReceipt.confidence,
+                fields: parsedReceipt.fields,
+                warnings: parsedReceipt.warnings
+            });
+        }
+
+        /**
+         * registerReceiptAnalyzer(name, fn) / getReceiptAnalyzer(name) / hasReceiptAnalyzer(name)
+         *   Real, disclosed EMPTY extension points for the genuinely-AI
+         *   items requested (categorize an expense, suggest a supplier,
+         *   detect duplicate receipts, suggest matching an existing
+         *   transaction) — none of these are implemented here. Detecting
+         *   a duplicate or suggesting a category requires either a real
+         *   AI model or a real dataset to compare against (other stored
+         *   documents), neither of which this file owns or fabricates.
+         *   "Warn if totals don't add up" IS implemented above, in
+         *   parseReceipt() — because it's real arithmetic, not AI.
+         */
+        registerReceiptAnalyzer(name, fn) {
+            if (typeof name !== "string" || !name.trim()) throw new TypeError("[CozyOCR] registerReceiptAnalyzer(): name must be a non-empty string.");
+            if (typeof fn !== "function") throw new TypeError("[CozyOCR] registerReceiptAnalyzer(): fn must be a function.");
+            this.#receiptAnalyzers.set(name, fn);
+            this.#logAudit("RECEIPT_ANALYZER_REGISTERED", name);
+            return true;
+        }
+        getReceiptAnalyzer(name) { return this.#receiptAnalyzers.get(name) || null; }
+        hasReceiptAnalyzer(name) { return this.#receiptAnalyzers.has(name); }
+        listReceiptAnalyzers() { return Array.from(this.#receiptAnalyzers.keys()); }
 
         isVersionCompatible(version) {
             const a = /^v?(\d+)\./.exec(String(OCR_VERSION));
