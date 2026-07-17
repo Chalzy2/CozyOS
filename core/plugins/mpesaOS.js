@@ -132,8 +132,8 @@
         version: PLUGIN_VERSION,
         description: "Autonomous AI-Driven Business Engine managing multi-tenant background operational execution strings.",
         dependencies: {
-            required: ["window.CozyStorage"],
-            optional: ["window.CozyOS.PluginManager (falls back to window.CozyOS.KernelPlugins if absent)"]
+            required: ["window.CozyStorage", "window.CozyOS.Company"],
+            optional: ["window.CozyOS.Customer (falls back to an honest failure if absent — no duplicate customer store)", "window.CozyOS.PluginManager (falls back to window.CozyOS.KernelPlugins if absent)"]
         }
     };
 
@@ -161,9 +161,9 @@
     class CozyBusinessEngine {
         constructor() {
             this.requiredEnterpriseStores = [
-                "customers", "transactions", "customer_identity", "customer_history",
+                "transactions", "customer_history",
                 "daily_register", "statements", "receipts", "inventory", "products",
-                "expenses", "income", "commissions", "branches", "agents", "audit_logs",
+                "expenses", "income", "commissions", "agents", "audit_logs",
                 "reports", "notifications", "subscriptions", "language_packs",
                 "translation_memory", "learning_memory", "documents", "images",
                 "signatures", "camera_cache", "offline_queue", "sync_queue",
@@ -178,6 +178,7 @@
             this._listeners = new Map();
             this._onceWrapped = new Map();
             this._timelineEvents = [];
+            this._auditLog = [];
             this._maxInflightWorkflows = 5000; // hard cap, defense-in-depth on top of the existing 60s reaper
             this._diagnostics = {
                 workflowsStarted: 0, workflowsCompleted: 0, workflowsFailed: 0,
@@ -216,6 +217,26 @@
 
         getTimeline() { return deepClone(this._timelineEvents); }
 
+        /**
+         * _logAudit()/getAuditLog()
+         *   Real, append-only business-operation audit trail — distinct
+         *   from _logTimeline() (a lightweight event feed) and from the
+         *   cryptographic per-ledger-block auditHash (tamper-evidence for
+         *   one record). This is the actual "who did what, when" history
+         *   at the engine level, matching the same convention every other
+         *   CozyOS coordinator already uses (IdentityEngine, every ShopOS
+         *   coordinator, etc.) — MpesaOS was the one coordinator missing
+         *   this until now.
+         */
+        _logAudit(action, msg) {
+            this._auditLog.push(Object.freeze({ id: generateId("aud"), timestamp: new Date().toISOString(), action, msg }));
+            if (this._auditLog.length > 1000) this._auditLog.shift();
+        }
+        getAuditLog(predicate) {
+            const list = this._auditLog.map(e => deepClone(e));
+            return Object.freeze(predicate ? list.filter(predicate) : list);
+        }
+
         /** listActiveWorkflows() — real, safe-cloned read of currently in-flight lock keys and their age. */
         listActiveWorkflows() {
             const now = Date.now();
@@ -229,7 +250,8 @@
                 ...this._diagnostics,
                 inflightWorkflowCount: this._inflightWorkflows.size,
                 listenerCount: Array.from(this._listeners.values()).reduce((sum, set) => sum + set.size, 0),
-                timelineEventCount: this._timelineEvents.length
+                timelineEventCount: this._timelineEvents.length,
+                auditLogSize: this._auditLog.length
             });
         }
 
@@ -365,6 +387,40 @@
             }
         }
 
+        /**
+         * _resolveCustomer(customerInput, companyId, tenantId)
+         *   Real reuse of the shared Customer coordinator — replaces the
+         *   old AISmartScanner.scanIntake() + raw storage.save("customers")
+         *   path, which bypassed Customer entirely and defaulted to a
+         *   hardcoded fake profile ("Charles Cozy") when no real input was
+         *   given. Searches by phone first (the real, natural lookup key
+         *   for an M-Pesa agent transaction); reuses the existing customer
+         *   if found, creates a real new one only if genuinely not found.
+         *   Honestly throws if Customer isn't connected — never
+         *   fabricates a profile.
+         */
+        async _resolveCustomer(customerInput, companyId, tenantId) {
+            const customer = window.CozyOS.Customer;
+            if (!customer || typeof customer.searchCustomers !== "function") {
+                throw new Error("[mpesaOS] Customer coordinator is not connected — cannot proceed without real customer records.");
+            }
+            const phone = customerInput && customerInput.phone;
+            if (!phone) throw new TypeError("[mpesaOS] _resolveCustomer(): a real customer phone number is required.");
+
+            const matches = customer.searchCustomers(phone, { tenantId });
+            if (matches && matches.length > 0) return matches[0];
+
+            const fullName = String((customerInput && customerInput.name) || "").trim();
+            const [firstName, ...rest] = fullName.split(/\s+/).filter(Boolean);
+            const lastName = rest.join(" ");
+            if (!firstName) throw new TypeError("[mpesaOS] _resolveCustomer(): a real customer name is required to create a new customer record.");
+
+            return customer.createCustomer({
+                customerType: "individual", firstName, lastName: lastName || firstName,
+                companyId, tenantId, contacts: [{ phone }]
+            });
+        }
+
         async processAutomatedWorkflow(rawAction, tenantId) {
             const startTime = Date.now();
             const storage = window.CozyStorage;
@@ -378,6 +434,23 @@
             rawAction = sanitizeObject(rawAction);
             if (rawAction.customer) rawAction.customer = sanitizeObject(rawAction.customer);
 
+            // Real Company/Branch requirement — MpesaOS must not proceed
+            // on a hardcoded branch tag. Honestly refuses rather than
+            // silently falling back, matching the same discipline already
+            // applied to ShopOS via shop-core.js.
+            const company = window.CozyOS.Company;
+            if (!company || typeof company.getCompany !== "function") {
+                throw new Error("[mpesaOS] Company coordinator is not connected — cannot proceed without a real company.");
+            }
+            if (!rawAction.companyId) throw new TypeError("[mpesaOS] processAutomatedWorkflow(): companyId is required.");
+            const companyRecord = company.getCompany(rawAction.companyId);
+            if (!companyRecord) throw new Error(`[mpesaOS] Unknown companyId "${rawAction.companyId}" — a real, registered company is required.`);
+
+            if (!rawAction.branchId) throw new TypeError("[mpesaOS] processAutomatedWorkflow(): branchId is required.");
+            const branches = typeof company.listBranches === "function" ? (company.listBranches(rawAction.companyId) || []) : [];
+            const branchRecord = branches.find(b => b.branchId === rawAction.branchId);
+            if (!branchRecord) throw new Error(`[mpesaOS] Unknown branchId "${rawAction.branchId}" for company "${rawAction.companyId}" — a real, registered branch is required.`);
+
             const providerCode = rawAction.providerCode || ("MOCK_CODE_" + Date.now());
             const lockKey = `${tenantId}:${providerCode}`;
             
@@ -390,6 +463,7 @@
 
             this._diagnostics.workflowsStarted++;
             this._logTimeline(`Workflow started: ${providerCode}`);
+            this._logAudit("WORKFLOW_STARTED", `${providerCode} at company=${rawAction.companyId} branch=${rawAction.branchId}`);
             this.emit("workflow:started", { providerCode, tenantId });
 
             try {
@@ -409,7 +483,7 @@
                 const timeStr = new Date(timestamp).toISOString().split('T')[1].slice(0, 8);
                 const internalTxId = generateId("TXN");
 
-                const clientProfile = await AISmartScanner.scanIntake(rawAction.customer, rawAction.lookupMethod);
+                const clientProfile = await this._resolveCustomer(rawAction.customer, rawAction.companyId, tenantId);
                 const amount = parseFloat(rawAction.amount);
                 const { charge: charges, commission: generatedCommission } = await calculateCharges(amount, tenantId);
 
@@ -417,12 +491,14 @@
                 lifecycleState = "Validated";
 
                 const ledgerBlock = {
-                    id: internalTxId,
+                    id: providerCode,
+                    internalTransactionId: internalTxId,
                     providerTransactionCode: providerCode,
                     timestamp: timestamp,
                     date: dateStr,
                     agent: rawAction.agent || "Agent_Main_Node",
-                    branch: rawAction.branch || "HQ_Partition_01",
+                    companyId: rawAction.companyId,
+                    branchId: rawAction.branchId,
                     module: "BusinessOS_Mpesa",
                     transactionType: rawAction.type,
                     amount: amount,
@@ -433,7 +509,7 @@
                     offlineStatus: "Stored_Local",
                     syncStatus: "Pending_Queue_Sync",
                     encryptionStatus: "AES_256_Enforced",
-                    aiConfidence: clientProfile.confidence
+                    customerId: clientProfile.customerId
                 };
                 ledgerBlock.auditHash = await AISmartScanner.calculateAuditHash(ledgerBlock);
 
@@ -441,19 +517,24 @@
                 ledgerBlock.lifecycle = "Committed";
 
                 // Transaction Engine Database Handshake Logic
+                // Note: "customers" is deliberately NOT written here — the
+                // real Customer coordinator already owns and persists that
+                // record. Writing it again to window.CozyStorage would
+                // create a second, duplicate source of truth for the same
+                // customer, which is exactly what "no duplicate customer
+                // implementation" rules out.
                 if (typeof storage.beginTransaction === "function") {
                     const txEngine = await storage.beginTransaction([
-                        "customers", "customer_history", "transactions", "daily_register", 
+                        "customer_history", "transactions", "daily_register",
                         "commissions", "analytics", "receipts", "offline_queue"
                     ], tenantId);
 
                     try {
-                        await txEngine.save("customers", { id: clientProfile.idNumber, ...clientProfile });
-                        await txEngine.save("customer_history", { id: generateId("hist"), customerId: clientProfile.idNumber, txId: internalTxId });
+                        await txEngine.save("customer_history", { id: generateId("hist"), customerId: clientProfile.customerId, txId: internalTxId });
                         await txEngine.save("transactions", ledgerBlock);
                         await txEngine.save("daily_register", {
                             id: generateId("reg"), time: timeStr, transactionCode: ledgerBlock.providerTransactionCode,
-                            customerName: clientProfile.name, phone: clientProfile.phone, idNumber: clientProfile.idNumber,
+                            customerName: clientProfile.displayName, customerId: clientProfile.customerId,
                             transactionType: ledgerBlock.transactionType, amount: ledgerBlock.amount, agent: ledgerBlock.agent, status: ledgerBlock.status
                         });
                         await txEngine.save("commissions", { id: generateId("comm"), amount: generatedCommission, date: dateStr });
@@ -471,13 +552,13 @@
                     }
                 } else {
                     // Fail-safe manual fallback routine
+                    const dailyRegisterId = generateId("reg");
                     const writeResults = await Promise.allSettled([
-                        storage.save("customers", { id: clientProfile.idNumber, ...clientProfile }, tenantId),
-                        storage.save("customer_history", { id: generateId("hist"), customerId: clientProfile.idNumber, txId: internalTxId }, tenantId),
+                        storage.save("customer_history", { id: generateId("hist"), customerId: clientProfile.customerId, txId: internalTxId }, tenantId),
                         storage.save("transactions", ledgerBlock, tenantId),
                         storage.save("daily_register", {
-                            id: generateId("reg"), time: timeStr, transactionCode: ledgerBlock.providerTransactionCode,
-                            customerName: clientProfile.name, phone: clientProfile.phone, idNumber: clientProfile.idNumber,
+                            id: dailyRegisterId, time: timeStr, transactionCode: ledgerBlock.providerTransactionCode,
+                            customerName: clientProfile.displayName, customerId: clientProfile.customerId,
                             transactionType: ledgerBlock.transactionType, amount: ledgerBlock.amount, agent: ledgerBlock.agent, status: ledgerBlock.status
                         }, tenantId),
                         storage.save("commissions", { id: generateId("comm"), amount: generatedCommission, date: dateStr }, tenantId),
@@ -489,9 +570,8 @@
                     const failed = writeResults.filter(r => r.status === "rejected");
                     if (failed.length > 0) {
                         await Promise.allSettled([
-                            storage.delete("customers", clientProfile.idNumber, tenantId),
                             storage.delete("transactions", providerCode, tenantId),
-                            storage.delete("daily_register", internalTxId, tenantId)
+                            storage.delete("daily_register", dailyRegisterId, tenantId)
                         ]);
                         throw new Error(`[mpesaOS] Multi-Store Mutation Faulted. State rolled back.`);
                     }
@@ -544,13 +624,17 @@
 
         try {
             if (cleanQuery.includes("run_automated_workflow") || cleanQuery === "execute workflow") {
+                const contextCompanyId = kernelContext && typeof kernelContext.companyId === "function" ? kernelContext.companyId() : (kernelContext && kernelContext.companyId);
+                const contextBranchId = kernelContext && typeof kernelContext.branchId === "function" ? kernelContext.branchId() : (kernelContext && kernelContext.branchId);
                 const simulatedResult = await activeEngineInstance.processAutomatedWorkflow({
                     lookupMethod: "National_ID_Scan",
                     type: "Withdrawal",
                     amount: 15000,
                     providerCode: "XGYNGFDHKGD",
                     agent: "Charles_Main",
-                    customer: { name: "Charles Cozy", idNumber: "ID-11223344", phone: "0700123456", language: "Luo" }
+                    companyId: contextCompanyId,
+                    branchId: contextBranchId,
+                    customer: { name: "Charles Cozy", phone: "0700123456", language: "Luo" }
                 }, activeTenantId);
 
                 return {
@@ -560,7 +644,7 @@
 
             if (cleanQuery.includes("forecast") || cleanQuery.includes("predict")) {
                 return {
-                    responseText: `🔮 [AI Analytics Engine] Advanced Predictive Insight Compiled:\n• Busy Hours Risk: Peak transaction load expected between 4:00 PM and 6:00 PM.\n• Float Forecast: Recommend purchasing KES 45,000 extra float before 3:00 PM.\n• Fraud/Duplicate Status: 100% Clear. No transaction anomalies discovered inside local schema partitions.`
+                    responseText: `🔒 [BusinessOS Enterprise Core] Forecasting is not yet implemented. No prediction is computed — this response intentionally reports that honestly rather than fabricating one.`
                 };
             }
 
