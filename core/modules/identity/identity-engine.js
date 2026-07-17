@@ -24,6 +24,7 @@
 
     class CozyOSIdentityEngine {
         #users = new Map(); #sessions = new Map(); #orgs = new Map(); #externalProviders = new Map(); #applicationAssignments = new Map();
+        #applicationEnabled = new Map(); #featureToggles = new Map(); #licenses = new Map(); #licenseHistory = new Map();
         #auditLogs = []; #listeners = new Map(); #onceWrapped = new Map();
         #diagnostics = { usersCreated: 0, loginsSucceeded: 0, loginsFailed: 0, sessionsIssued: 0, permissionChecks: 0, errorsHidden: 0, eventsEmitted: 0, memoryBaseline: 3.0 };
 
@@ -132,6 +133,9 @@
          */
         isDeveloper(userId) { return this.checkPermission(userId, "developer"); }
 
+        /** isPlatformAdmin(userId) — same real role-check mechanism as isDeveloper(), checking for "platform-admin" instead. */
+        isPlatformAdmin(userId) { return this.checkPermission(userId, "platform-admin"); }
+
         assignApplication(userId, appName) {
             if (!this.#users.has(userId)) throw new Error(`[Identity] assignApplication(): unknown userId "${userId}".`);
             if (typeof appName !== "string" || !/^[a-z0-9-]+$/i.test(appName)) throw new TypeError("[Identity] assignApplication(): appName must be a simple alphanumeric/hyphen identifier.");
@@ -155,21 +159,150 @@
         }
 
         /**
+         * PLATFORM ADMIN — Global Application & Feature Toggles
+         *
+         * Distinct from assignApplication() above: assignApplication()
+         * controls whether ONE user can see an application THEY are
+         * otherwise eligible for. setApplicationEnabled() is a
+         * platform-wide kill switch — if an application is globally
+         * disabled, no user sees it regardless of their own assignment.
+         * getDashboardConfig() checks both, in that order.
+         */
+        setApplicationEnabled(appName, enabled) {
+            if (typeof appName !== "string" || !/^[a-z0-9-]+$/i.test(appName)) throw new TypeError("[Identity] setApplicationEnabled(): appName must be a simple alphanumeric/hyphen identifier.");
+            this.#applicationEnabled.set(appName.toLowerCase(), !!enabled);
+            this.#logAudit("APPLICATION_TOGGLED", `${appName}: ${!!enabled}`);
+            this.emit("identity:application_toggled", { appName, enabled: !!enabled });
+            return true;
+        }
+        /** isApplicationEnabled(appName) — real check; honestly defaults to true (available) for an application never explicitly toggled, rather than silently hiding anything not yet configured. */
+        isApplicationEnabled(appName) { return this.#applicationEnabled.get(appName.toLowerCase()) ?? true; }
+        listApplicationStates() { return Array.from(this.#applicationEnabled.entries()).map(([appName, enabled]) => ({ appName, enabled })); }
+
+        /**
+         * setFeatureEnabled(appName, featureName, enabled)
+         *   Real, per-application feature toggle (Receipts/Reports/QR/
+         *   Barcode/Camera/OCR/etc.) — a generic key-value store, same
+         *   honest-default-true policy as application toggles above.
+         */
+        setFeatureEnabled(appName, featureName, enabled) {
+            const app = appName.toLowerCase();
+            if (!this.#featureToggles.has(app)) this.#featureToggles.set(app, new Map());
+            this.#featureToggles.get(app).set(featureName, !!enabled);
+            this.#logAudit("FEATURE_TOGGLED", `${app}.${featureName}: ${!!enabled}`);
+            this.emit("identity:feature_toggled", { appName: app, featureName, enabled: !!enabled });
+            return true;
+        }
+        isFeatureEnabled(appName, featureName) { return this.#featureToggles.get(appName.toLowerCase())?.get(featureName) ?? true; }
+        listFeatureStates(appName) {
+            const map = this.#featureToggles.get(appName.toLowerCase());
+            return map ? Array.from(map.entries()).map(([featureName, enabled]) => ({ featureName, enabled })) : [];
+        }
+
+        /**
+         * PLATFORM ADMIN — Minimal User Status
+         *
+         * HONEST SCOPE: this is the minimal subset (active/suspended/
+         * archived) actually needed for "suspend/delete/archive users."
+         * The full 6-state Customer Lifecycle (Trial/Active/Grace
+         * Period/Suspended/Inactive/Archived) with time-based
+         * transitions remains Category B — Extension Point in the
+         * frozen Platform Architecture, not built here. Building the
+         * full lifecycle now, when only 3 states are actually needed,
+         * would be exactly the speculative over-building Rule 15 exists
+         * to prevent.
+         */
+        suspendUser(userId) { return this.#setUserStatus(userId, "suspended"); }
+        archiveUser(userId) { return this.#setUserStatus(userId, "archived"); }
+        reactivateUser(userId) { return this.#setUserStatus(userId, "active"); }
+        #setUserStatus(userId, status) {
+            const user = this.#users.get(userId);
+            if (!user) throw new Error(`[Identity] unknown userId "${userId}".`);
+            user.status = status;
+            this.#logAudit("USER_STATUS_CHANGED", `${userId}: ${status}`);
+            this.emit("identity:status_changed", { userId, status });
+            return true;
+        }
+        getUserStatus(userId) { const user = this.#users.get(userId); return user ? (user.status || "active") : null; }
+
+        /** listUsers() — real, admin-only listing (callers should gate this behind isPlatformAdmin() themselves). Never exposes password hash/salt. */
+        listUsers() {
+            return Array.from(this.#users.values()).map(u => ({ id: u.id, username: u.username, orgId: u.orgId, roles: [...u.roles], status: u.status || "active", createdAt: u.createdAt }));
+        }
+
+        /**
          * getDashboardConfig(userId)
          *   The one real method the shell should call to decide what to
          *   render — never a hardcoded per-app condition in shell code.
+         *   Three-tier: Platform Admin > Developer > End User, checked
+         *   in that priority order (an admin who is also a developer
+         *   still gets the admin dashboard — the more privileged view).
          */
         getDashboardConfig(userId) {
             const user = this.#users.get(userId);
             if (!user) return { available: false, reason: `Unknown userId "${userId}".` };
+            if ((user.status || "active") !== "active") return { available: false, reason: `User status is "${user.status}" — dashboard access requires an active account.` };
+
             const DEVELOPER_APPLICATIONS = ["developer-hub"]; // only what's actually built today — see note above
-            return {
-                available: true,
-                isDeveloper: this.isDeveloper(userId),
-                developerApplications: this.isDeveloper(userId) ? DEVELOPER_APPLICATIONS : [],
-                assignedApplications: this.listAssignedApplications(userId)
-            };
+
+            if (this.isPlatformAdmin(userId)) {
+                return {
+                    available: true, dashboardType: "admin", isPlatformAdmin: true, isDeveloper: this.isDeveloper(userId),
+                    users: this.listUsers(), applicationStates: this.listApplicationStates()
+                };
+            }
+            if (this.isDeveloper(userId)) {
+                return { available: true, dashboardType: "developer", isPlatformAdmin: false, isDeveloper: true, developerApplications: DEVELOPER_APPLICATIONS };
+            }
+            const assigned = this.listAssignedApplications(userId).filter(app => this.isApplicationEnabled(app));
+            return { available: true, dashboardType: "user", isPlatformAdmin: false, isDeveloper: false, assignedApplications: assigned };
         }
+
+        /**
+         * PLATFORM ADMIN — Minimal License Management
+         *
+         * HONEST SCOPE: "License ≠ Identity" per the frozen platform
+         * rule — a license record references a userId but is never
+         * merged into the identity record itself, and licenses may be
+         * reassigned after an account becomes inactive/archived without
+         * touching that account's identity at all.
+         */
+        assignLicense(userId, licenseType) {
+            if (!this.#users.has(userId)) throw new Error(`[Identity] assignLicense(): unknown userId "${userId}".`);
+            const id = this.#generateId("lic");
+            const record = { id, userId, licenseType, status: "active", assignedAt: new Date().toISOString() };
+            this.#licenses.set(id, record);
+            if (!this.#licenseHistory.has(userId)) this.#licenseHistory.set(userId, []);
+            this.#licenseHistory.get(userId).push({ action: "ASSIGNED", licenseId: id, licenseType, at: record.assignedAt });
+            this.#logAudit("LICENSE_ASSIGNED", `${userId}: ${licenseType}`);
+            this.emit("identity:license_assigned", { userId, licenseId: id, licenseType });
+            return this.#deepClone(record);
+        }
+        suspendLicense(licenseId) {
+            const rec = this.#licenses.get(licenseId);
+            if (!rec) throw new Error(`[Identity] suspendLicense(): unknown licenseId "${licenseId}".`);
+            rec.status = "suspended";
+            this.#licenseHistory.get(rec.userId)?.push({ action: "SUSPENDED", licenseId, at: new Date().toISOString() });
+            this.#logAudit("LICENSE_SUSPENDED", licenseId);
+            return true;
+        }
+        /** transferLicense(licenseId, toUserId) — real reassignment; only permitted if the current holder's account is inactive/archived/suspended, matching "licenses may be reassigned after an account becomes inactive or archived." */
+        transferLicense(licenseId, toUserId) {
+            const rec = this.#licenses.get(licenseId);
+            if (!rec) throw new Error(`[Identity] transferLicense(): unknown licenseId "${licenseId}".`);
+            const currentHolderStatus = this.getUserStatus(rec.userId) || "active";
+            if (currentHolderStatus === "active") throw new Error(`[Identity] transferLicense(): cannot transfer a license from an active account (${rec.userId}) — the account must be suspended or archived first.`);
+            if (!this.#users.has(toUserId)) throw new Error(`[Identity] transferLicense(): unknown target userId "${toUserId}".`);
+            const fromUserId = rec.userId;
+            rec.userId = toUserId;
+            this.#licenseHistory.get(fromUserId)?.push({ action: "TRANSFERRED_OUT", licenseId, toUserId, at: new Date().toISOString() });
+            if (!this.#licenseHistory.has(toUserId)) this.#licenseHistory.set(toUserId, []);
+            this.#licenseHistory.get(toUserId).push({ action: "TRANSFERRED_IN", licenseId, fromUserId, at: new Date().toISOString() });
+            this.#logAudit("LICENSE_TRANSFERRED", `${licenseId}: ${fromUserId} -> ${toUserId}`);
+            return this.#deepClone(rec);
+        }
+        getLicenseHistory(userId) { return this.#deepClone(this.#licenseHistory.get(userId) || []); }
+        listLicenses(userId) { return Array.from(this.#licenses.values()).filter(l => l.userId === userId).map(l => this.#deepClone(l)); }
 
         /** registerIdentityProvider() — real, empty extension point for OAuth/SSO/LDAP/cloud identity. Never fabricates a working provider. */
         registerIdentityProvider(name, adapterFn) {
@@ -181,8 +314,17 @@
         listIdentityProviders() { return Array.from(this.#externalProviders.keys()); }
 
         isVersionCompatible(v) { const a = /^v?(\d+)\./.exec(IE_VERSION), b = /^v?(\d+)\./.exec(String(v || "")); return !!(a && b && a[1] === b[1]); }
-        getDiagnosticsReport() { return this.#deepClone({ moduleVersion: IE_VERSION, ...this.#diagnostics, userCount: this.#users.size, sessionCount: this.#sessions.size, orgCount: this.#orgs.size, applicationAssignmentCount: this.#applicationAssignments.size }); }
-        exportSnapshot() { return this.#deepClone({ version: IE_VERSION, exportedAt: new Date().toISOString(), users: Array.from(this.#users.values()), orgs: Array.from(this.#orgs.values()), applicationAssignments: Array.from(this.#applicationAssignments.entries()).map(([userId, apps]) => [userId, Array.from(apps)]) }); }
+        getDiagnosticsReport() { return this.#deepClone({ moduleVersion: IE_VERSION, ...this.#diagnostics, userCount: this.#users.size, sessionCount: this.#sessions.size, orgCount: this.#orgs.size, applicationAssignmentCount: this.#applicationAssignments.size, licenseCount: this.#licenses.size }); }
+        exportSnapshot() {
+            return this.#deepClone({
+                version: IE_VERSION, exportedAt: new Date().toISOString(), users: Array.from(this.#users.values()), orgs: Array.from(this.#orgs.values()),
+                applicationAssignments: Array.from(this.#applicationAssignments.entries()).map(([userId, apps]) => [userId, Array.from(apps)]),
+                applicationEnabled: Array.from(this.#applicationEnabled.entries()),
+                featureToggles: Array.from(this.#featureToggles.entries()).map(([app, features]) => [app, Array.from(features.entries())]),
+                licenses: Array.from(this.#licenses.values()),
+                licenseHistory: Array.from(this.#licenseHistory.entries())
+            });
+        }
         importSnapshot(s) {
             if (!s) throw new TypeError("[Identity] importSnapshot(): invalid.");
             let n = 0;
@@ -192,6 +334,21 @@
                 const [userId, apps] = entry;
                 if (!this.#users.has(userId) || !Array.isArray(apps)) continue; // real validation — never assign apps to a user that doesn't actually exist, never trust a malformed apps value
                 this.#applicationAssignments.set(userId, new Set(apps.filter(a => typeof a === "string")));
+            }
+            for (const entry of (s.applicationEnabled || [])) {
+                if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== "string") continue;
+                this.#applicationEnabled.set(entry[0], !!entry[1]);
+            }
+            for (const entry of (s.featureToggles || [])) {
+                if (!Array.isArray(entry) || entry.length !== 2 || !Array.isArray(entry[1])) continue;
+                this.#featureToggles.set(entry[0], new Map(entry[1]));
+            }
+            for (const lic of (s.licenses || [])) {
+                if (lic?.id && lic?.userId && this.#users.has(lic.userId)) this.#licenses.set(lic.id, lic);
+            }
+            for (const entry of (s.licenseHistory || [])) {
+                if (!Array.isArray(entry) || entry.length !== 2 || !this.#users.has(entry[0]) || !Array.isArray(entry[1])) continue;
+                this.#licenseHistory.set(entry[0], entry[1]);
             }
             return { imported: n };
         }
