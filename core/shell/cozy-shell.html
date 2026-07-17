@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en" data-cozy-app="developer">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CozyOS Workspace</title>
+
+    <!-- Core UI -->
+    <link rel="stylesheet" href="cozy-tokens.css">
+    <link rel="stylesheet" href="cozy-theme.css">
+    <link rel="stylesheet" href="cozy-layout.css">
+    <link rel="stylesheet" href="cozy-components.css">
+    <link rel="stylesheet" href="cozy-animations.css">
+</head>
+
+<body data-cozy-app="developer">
+
+    <!-- Top Navigation -->
+    <header class="cozy-top-navigation">
+
+        <div class="cozy-brand-block">
+            <span class="cozy-logo-mark">◈</span>
+            <span class="cozy-app-title">CozyOS Workspace</span>
+        </div>
+
+        <div class="cozy-top-actions">
+            <div class="cozy-live-pill" id="universal-live-pill">
+                <span class="cozy-pulse-indicator"></span>
+                <span class="cozy-pill-text">
+                    SYS_STATUS: ACTIVE
+                </span>
+            </div>
+        </div>
+
+    </header>
+
+    <!-- Main Shell -->
+    <div class="cozy-app-container">
+
+        <!-- Sidebar -->
+        <aside id="cozy-sidebar">
+
+    <div class="cozy-sidebar-header">
+        Applications
+    </div>
+
+    <nav id="cozy-nav-menu">
+
+        <button class="cozy-nav-item" data-module="developer-hub">
+            Developer Hub
+        </button>
+
+        <button class="cozy-nav-item" data-module="churchos">
+            churchOS
+    </button>
+
+        <button class="cozy-nav-item" data-module="shopos">
+            ShopOS
+        </button>
+
+        <button class="cozy-nav-item" data-module="quarryos">
+            QuarryOS
+        </button>
+
+        <button class="cozy-nav-item" data-module="mpesaos">
+            MpesaOS
+        </button>
+
+        <button class="cozy-nav-item" data-module="hospitalos">
+            HospitalOS
+        </button>
+
+        <button class="cozy-nav-item" data-module="schoolos">
+            SchoolOS
+        </button>
+
+    </nav>
+
+        </aside>
+
+        <!-- ONE Workspace -->
+        <main id="cozy-app-root" class="cozy-main-workspace">
+
+            <div class="cozy-loading">
+                Select an application...
+            </div>
+
+        </main>
+
+    </div>
+
+    <!-- Status Bar -->
+    <footer class="cozy-bottom-statusbar">
+
+        <div class="cozy-status-left">
+            LOC_NODE: 1.002.AFR
+        </div>
+
+        <div class="cozy-status-center"></div>
+
+        <div class="cozy-status-right">
+            RUNTIME: ACTIVE
+        </div>
+
+    </footer>
+
+    <!-- Core UI Framework -->
+    <script src="cozy-theme.js" defer></script>
+    <script src="cozy-background.js" defer></script>
+    <script src="cozy-live.js" defer></script>
+    <script src="cozy-toast.js" defer></script>
+
+    <!-- Loader -->
+    <script src="cozy-ui.js" defer></script>
+
+    <!-- Navigation -->
+    <script src="cozy-navigation.js" defer></script>
+
+</body>
+</html>
