@@ -32,8 +32,6 @@
             this.animationFrameId = null;
             this.isTabActive = true;
             this.prefersReducedMotion = false;
-            this._resizeDebounceId = null;
-            this._themeColorCache = {};
 
             // Theme transition configuration
             this.activeApp = "developer";
@@ -60,6 +58,15 @@
             this.messageFadeState = "in"; // "in", "hold", "out"
             this.messageTimer = 0;
 
+            // Debounce handle for resize-triggered asset regeneration
+            this._resizeRegenTimer = null;
+
+            // Scene Registry: canonical appName -> { name, render, aliases }
+            this.scenes = new Map();
+            // Alias -> canonical scene name (e.g. "agricultureos" -> "shopos")
+            this.sceneAliases = new Map();
+            this.registerBuiltInScenes();
+
             if (document.readyState === "loading") {
                 document.addEventListener("DOMContentLoaded", () => this.init());
             } else {
@@ -70,7 +77,14 @@
         init() {
             if (document.getElementById("cozy-live-bg-canvas")) return;
 
-            this.prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+            this.prefersReducedMotion = motionQuery.matches;
+            if (motionQuery.addEventListener) {
+                motionQuery.addEventListener("change", (e) => { this.prefersReducedMotion = e.matches; });
+            } else if (motionQuery.addListener) {
+                // Fallback for older Safari
+                motionQuery.addListener((e) => { this.prefersReducedMotion = e.matches; });
+            }
             document.addEventListener("visibilitychange", () => {
                 this.isTabActive = !document.hidden;
             });
@@ -93,14 +107,13 @@
             this.ctx = this.canvas.getContext("2d");
 
             this.handleResize();
-            window.addEventListener("resize", () => {
-                // generateInitialAssets() (called inside handleResize) reallocates
-                // every particle system; without debouncing this fires on every
-                // pixel of a window drag, causing GC pressure and jank.
-                clearTimeout(this._resizeDebounceId);
-                this._resizeDebounceId = setTimeout(() => this.handleResize(), 200);
-            });
+            window.addEventListener("resize", () => this.handleResize());
 
+            // Initial population happens immediately (not debounced) so the
+            // first frame isn't empty; cancel the debounced regen that
+            // handleResize() just scheduled to avoid a redundant duplicate.
+            clearTimeout(this._resizeRegenTimer);
+            this.generateInitialAssets();
             this.animate();
             this.observeThemeChanges();
         }
@@ -113,7 +126,14 @@
             this.ctx.scale(dpr, dpr);
             this.canvas.style.width = window.innerWidth + "px";
             this.canvas.style.height = window.innerHeight + "px";
-            this.generateInitialAssets();
+
+            // Debounce the expensive full asset regeneration so continuous
+            // resize events (e.g. dragging a window edge) don't rebuild
+            // every particle/scene array dozens of times per second.
+            clearTimeout(this._resizeRegenTimer);
+            this._resizeRegenTimer = setTimeout(() => {
+                this.generateInitialAssets();
+            }, 150);
         }
 
         observeThemeChanges() {
@@ -132,22 +152,6 @@
         updateForTheme(themeName) {
             this.targetApp = themeName;
             this.transitionAlpha = 0.0;
-            // Theme changed: cached custom-property colors are stale.
-            this._themeColorCache = {};
-        }
-
-        /**
-         * Canvas fillStyle/strokeStyle only accept resolved CSS <color> values,
-         * not var(--...) references — assigning an unparseable string is
-         * silently ignored by the Canvas API. This resolves the custom
-         * property to its actual computed color, caching per theme.
-         */
-        getCssVar(name, fallback) {
-            if (this._themeColorCache[name] === undefined) {
-                const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-                this._themeColorCache[name] = val || fallback;
-            }
-            return this._themeColorCache[name];
         }
 
         generateInitialAssets() {
@@ -246,9 +250,7 @@
                 size: Math.random() * 2.5 + 1,
                 life: Math.random() * 0.8 + 0.2,
                 // Fetches dynamic colors directly from the active theme
-                color: Math.random() > 0.5
-                    ? this.getCssVar("--cozy-brand-primary", "#10b981")
-                    : this.getCssVar("--cozy-brand-accent", "#fbbf24")
+                color: Math.random() > 0.5 ? "var(--cozy-brand-primary)" : "var(--cozy-brand-accent)"
             };
         }
 
@@ -291,36 +293,115 @@
             }
         }
 
-        renderScene(appName, width, height) {
-            switch (appName) {
-                case "shopos":
-                case "agricultureos":
-                    this.renderNatureScene(width, height);
-                    break;
-                case "quarryos":
-                    this.renderQuarryScene(width, height);
-                    break;
-                case "schoolos":
-                case "educationos":
-                    this.renderSchoolScene(width, height);
-                    break;
-                case "sports":
-                    this.renderSportsScene(width, height);
-                    break;
-                case "mpesaos":
-                    this.renderMpesaScene(width, height);
-                    break;
-                case "hospitalos":
-                    this.renderHospitalScene(width, height);
-                    break;
-                case "churchos":
-                    this.renderChurchScene(width, height);
-                    break;
-                case "developer":
-                default:
-                    this.renderDeveloperScene(width, height);
-                    break;
+        /**
+         * Registers the scenes that already ship with the design system.
+         * Kept explicit so the mapping stays visible and future modules
+         * can extend it via registerScene() without editing this method
+         * or the renderScene() dispatch logic.
+         */
+        registerBuiltInScenes() {
+            this.registerScene("developer", (w, h) => this.renderDeveloperScene(w, h));
+            this.registerScene("shopos", (w, h) => this.renderNatureScene(w, h), ["agricultureos"]);
+            this.registerScene("quarryos", (w, h) => this.renderQuarryScene(w, h));
+            this.registerScene("schoolos", (w, h) => this.renderSchoolScene(w, h), ["educationos"]);
+            this.registerScene("sports", (w, h) => this.renderSportsScene(w, h));
+            this.registerScene("mpesaos", (w, h) => this.renderMpesaScene(w, h));
+            this.registerScene("hospitalos", (w, h) => this.renderHospitalScene(w, h));
+            this.registerScene("churchos", (w, h) => this.renderChurchScene(w, h));
+        }
+
+        /**
+         * Registers a scene renderer under an appName (and optional
+         * aliases), so it can be resolved by renderScene()/getScene()/
+         * hasScene(). Lets future applications add a scene without
+         * modifying this engine.
+         *
+         * Duplicate policy: re-registering an existing canonical name is a
+         * no-op (and logs a warning) unless options.overwrite is true.
+         *
+         * Validation: renderFn must be a function; invalid registrations
+         * are rejected (logged, not added) rather than crashing later
+         * during the animation loop.
+         */
+        registerScene(appName, renderFn, aliases = [], options = {}) {
+            const canonical = appName.toLowerCase().trim();
+            const { overwrite = false } = options;
+
+            if (typeof renderFn !== "function") {
+                console.warn(`[CozyBackground] Scene "${canonical}" rejected — renderFn must be a function.`);
+                return null;
             }
+
+            if (this.scenes.has(canonical) && !overwrite) {
+                console.warn(`[CozyBackground] Scene "${canonical}" is already registered. Ignoring duplicate registration (pass { overwrite: true } to replace it).`);
+                return this.scenes.get(canonical);
+            }
+
+            this.scenes.set(canonical, { name: canonical, render: renderFn, aliases: [] });
+
+            aliases.forEach((rawAlias) => {
+                const alias = rawAlias.toLowerCase().trim();
+                if (this.scenes.has(alias)) {
+                    console.warn(`[CozyBackground] Alias "${alias}" collides with an existing scene name and was not registered.`);
+                    return;
+                }
+                if (this.sceneAliases.has(alias) && this.sceneAliases.get(alias) !== canonical) {
+                    console.warn(`[CozyBackground] Alias "${alias}" is already mapped to "${this.sceneAliases.get(alias)}" and was not reassigned.`);
+                    return;
+                }
+                this.sceneAliases.set(alias, canonical);
+                this.scenes.get(canonical).aliases.push(alias);
+            });
+
+            return this.scenes.get(canonical);
+        }
+
+        /**
+         * Returns true if the given name is a registered scene or a
+         * registered alias of one.
+         */
+        hasScene(name) {
+            const key = name.toLowerCase().trim();
+            return this.scenes.has(key) || this.sceneAliases.has(key);
+        }
+
+        /**
+         * Resolves a name or alias to its canonical scene name.
+         * Returns null if unregistered.
+         */
+        getScene(name) {
+            const key = name.toLowerCase().trim();
+            if (this.scenes.has(key)) return key;
+            if (this.sceneAliases.has(key)) return this.sceneAliases.get(key);
+            return null;
+        }
+
+        /**
+         * Lists all registered scenes and their aliases, e.g. for a
+         * settings/diagnostics panel.
+         */
+        listScenes() {
+            return Array.from(this.scenes.values()).map((scene) => ({
+                name: scene.name,
+                aliases: [...scene.aliases]
+            }));
+        }
+
+        /**
+         * Dispatches to the registered scene for appName.
+         * Fallback policy: an unrecognized appName falls back to the
+         * "developer" scene (documented, matches the Theme Engine's
+         * DEFAULT_THEME fallback) rather than throwing or rendering
+         * nothing, so the shell never crashes on an unknown request.
+         */
+        renderScene(appName, width, height) {
+            const canonical = this.getScene(appName) || "developer";
+            const scene = this.scenes.get(canonical);
+            if (!scene) {
+                console.warn(`[CozyBackground] No scene available for "${appName}" and default fallback "developer" is missing. Skipping render.`);
+                return;
+            }
+            scene.render(width, height);
         }
 
         renderNatureScene(width, height) {
@@ -544,7 +625,7 @@
 
         renderMpesaScene(width, height) {
             this.ctx.save();
-            this.ctx.strokeStyle = this.getCssVar("--cozy-brand-primary", "#059669");
+            this.ctx.strokeStyle = "var(--cozy-brand-primary)";
             this.ctx.globalAlpha = 0.03;
             this.ctx.lineWidth = 1.0;
             
@@ -562,7 +643,7 @@
 
         renderDeveloperScene(width, height) {
             this.ctx.save();
-            this.ctx.strokeStyle = this.getCssVar("--cozy-brand-primary", "#10b981");
+            this.ctx.strokeStyle = "var(--cozy-brand-primary)";
             this.ctx.globalAlpha = 0.04;
             this.ctx.lineWidth = 2.0;
             this.ctx.beginPath();
