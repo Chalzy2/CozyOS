@@ -27,6 +27,7 @@
     /* Animation Constants */
     --cozy-transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
     --cozy-transition-normal: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    --cozy-transition-smooth: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ==========================================================================
@@ -117,5 +118,20 @@ html[data-cozy-app="schoolos"], html[data-cozy-app="educationos"],
     --cozy-bg-gradient: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #030712 100%);
     --cozy-muted: #94a3b8;
     --cozy-text: #f8fafc;
+    --cozy-border: rgba(255, 255, 255, 0.08);
+}
+
+/* ==========================================================================
+   CHURCHOS — Amber Gold + Deep Red
+   ========================================================================== */
+html[data-cozy-app="churchos"], [data-cozy-app="churchos"] {
+    --cozy-accent: #d97706;
+    --cozy-accent-glow: rgba(217, 119, 6, 0.15);
+    --cozy-brand-primary: #d97706;
+    --cozy-brand-accent: #b91c1c; 
+    --cozy-brand-glow: rgba(217, 119, 6, 0.15);
+    --cozy-bg-gradient: radial-gradient(circle at 50% 0%, #1c1210 0%, #0c0605 100%);
+    --cozy-muted: #a8a29e;
+    --cozy-text: #fef3c7;
     --cozy-border: rgba(255, 255, 255, 0.08);
 }

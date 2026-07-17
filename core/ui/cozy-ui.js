@@ -64,15 +64,17 @@ window.CozyOS.UI = {
 
             // 4. Mount & Init
             root.innerHTML = html;
-            this.activeModule = moduleName;
-            
+
             if (window.CozyOS.Modules?.[moduleName]?.init) {
                 window.CozyOS.Modules[moduleName].init();
                 console.info(`[CozyOS] Module ready: ${moduleName}`);
             }
 
+            this.activeModule = moduleName;
+
         } catch (err) {
             console.error("CozyOS Lifecycle Manager Error:", err);
+            this.activeModule = null;
             root.innerHTML = `<div class="cozy-error">System Alert: ${err.message}</div>`;
         } finally {
             this.isLoading = false;

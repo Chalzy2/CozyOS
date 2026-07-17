@@ -182,7 +182,14 @@
             }
 
             document.documentElement.setAttribute("data-cozy-app", cleanAppName);
-            
+            if (document.body) {
+                // cozy-tokens.css matches on a bare [data-cozy-app] selector, not
+                // just html[data-cozy-app]. If body's attribute is left stale, its
+                // directly-declared tokens shadow whatever html now provides for
+                // every element inside it. Keep both in sync.
+                document.body.setAttribute("data-cozy-app", cleanAppName);
+            }
+
             console.log(`[CozyTheme] Applied active theme profile: ${cleanAppName}`);
 
             // Notify sibling engines of the theme transition

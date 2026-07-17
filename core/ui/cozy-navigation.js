@@ -26,6 +26,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         console.info(`[CozyOS] Opening module: ${moduleName}`);
 
+        if (window.CozyOS?.Theme?.setTheme) {
+            window.CozyOS.Theme.setTheme(moduleName);
+        }
+
         window.CozyOS.UI.loadModule(moduleName);
 
     });

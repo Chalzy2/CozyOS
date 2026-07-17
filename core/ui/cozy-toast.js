@@ -43,10 +43,10 @@ class CozyToast {
     toast.style.cssText = `
       padding: 1rem 1.25rem;
       border-radius: var(--cozy-radius-md, 8px);
-      background-color: var(--cozy-bg-toast, #ffffff);
+      background-color: var(--cozy-glass-bg, #ffffff);
       box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
       border-left: 4px solid var(--cozy-accent-${type}, #d6baab);
-      color: var(--cozy-text-dark, #4a3e3d);
+      color: var(--cozy-text, #4a3e3d);
       font-family: inherit;
       font-size: 0.9rem;
       display: flex;
@@ -72,7 +72,7 @@ class CozyToast {
         border: none;
         margin-left: 1rem;
         padding: 0.25rem 0.5rem;
-        color: var(--cozy-color-primary, #bd9589);
+        color: var(--cozy-brand-primary, #bd9589);
         font-weight: 600;
         font-size: 0.8rem;
         cursor: pointer;
@@ -111,5 +111,6 @@ class CozyToast {
   }
 }
 
-export const toast = new CozyToast();
-export default CozyToast;
+window.CozyOS = window.CozyOS || {};
+window.CozyOS.Toast = new CozyToast();
+window.CozyOS.CozyToast = CozyToast;

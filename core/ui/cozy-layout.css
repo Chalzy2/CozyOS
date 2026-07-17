@@ -23,6 +23,8 @@
   display: flex;
   flex-direction: column;
   transition: var(--cozy-transition-smooth);
+  position: relative;
+  z-index: 1000;
 }
 
 .cozy-main-content {
@@ -32,7 +34,9 @@
   box-sizing: border-box;
   overflow-y: auto;
   transition: var(--cozy-transition-smooth);
+  pointer-events: auto;
 }
+
 #cozy-nav-menu {
   display: flex;
   flex-direction: column;
@@ -46,15 +50,4 @@
   padding: 10px;
   text-align: left;
   border-radius: 4px;
-}
-/* Add these to your existing classes in cozy-layout.css */
-
-.cozy-main-content {
-    /* ... your other styles ... */
-    pointer-events: auto; /* Ensure content can be clicked */
-}
-
-#cozy-sidebar {
-    position: relative;
-    z-index: 1000; /* This forces the sidebar to be physically ON TOP of the content area */
 }
