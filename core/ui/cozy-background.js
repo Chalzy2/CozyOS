@@ -646,6 +646,11 @@
             this.ctx.restore();
         }
     }
-
+// Add this at the end of cozy-background.js to ensure immediate execution
+// if the event has already passed (resolving the defer/DOMContentLoaded race).
+if (document.readyState === "complete" || document.readyState === "interactive") {
+    window.CozyOS.Background.init();
+}
+    
     window.CozyOS.Background = new CozyLivingBackground();
 })();
