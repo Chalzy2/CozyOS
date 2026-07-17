@@ -389,6 +389,7 @@
             // Identity/system fields are never overridable via input.
             record.customerId = customerId;
             record.customerCode = customerCode;
+            record.displayName = displayName;
             record.tenantId = tenantId;
             record.createdDate = now;
             record.updatedDate = now;
