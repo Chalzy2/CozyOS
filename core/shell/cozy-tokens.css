@@ -28,6 +28,16 @@
     --cozy-transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
     --cozy-transition-normal: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     --cozy-transition-smooth: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+
+    /* Platform Semantic Colors (Frozen)
+       Fixed across every application/theme — used by toasts, dialogs,
+       validation, forms, notifications, and reports. Do not override
+       per-app; the whole point is that "success" means the same green
+       everywhere in CozyOS. */
+    --cozy-success: #22c55e;
+    --cozy-info: #3b82f6;
+    --cozy-warning: #f59e0b;
+    --cozy-error: #ef4444;
 }
 
 /* ==========================================================================
