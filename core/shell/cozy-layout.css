@@ -1,53 +1,17 @@
-/**
- * CozyOS Enterprise Design System — Layout Architectures
- * File Reference: core/ui/cozy-layout.css
- */
-.cozy-app-container {
-  display: flex;
-  width: 100vw;
-  height: 100vh;
-  position: relative;
-  z-index: 10;
-  overflow: hidden;
+/* core/ui/cozy-layout.css */
+/* Tablet Breakpoint */
+@media (max-width: 1024px) {
+    .cozy-app-container { grid-template-columns: 260px 1fr; }
 }
 
-#cozy-sidebar {
-  width: var(--cozy-sidebar-width);
-  height: 100%;
-  background: var(--cozy-glass-bg);
-  backdrop-filter: var(--cozy-glass-blur);
-  -webkit-backdrop-filter: var(--cozy-glass-blur);
-  border-right: var(--cozy-glass-border);
-  padding: 24px 16px;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  transition: var(--cozy-transition-smooth);
-  position: relative;
-  z-index: 1000;
+/* Accessibility & Interaction */
+.cozy-app-tile:focus {
+    outline: 2px solid var(--cozy-brand-primary);
+    outline-offset: -2px;
 }
 
-.cozy-main-content {
-  flex-grow: 1;
-  height: 100%;
-  padding: 40px;
-  box-sizing: border-box;
-  overflow-y: auto;
-  transition: var(--cozy-transition-smooth);
-  pointer-events: auto;
-}
-
-#cozy-nav-menu {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.cozy-nav-button {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: white;
-  padding: 10px;
-  text-align: left;
-  border-radius: 4px;
+.cozy-app-tile.active {
+    border-color: var(--cozy-brand-primary);
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
 }
