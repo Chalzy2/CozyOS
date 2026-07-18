@@ -132,7 +132,7 @@
         version: PLUGIN_VERSION,
         description: "Autonomous AI-Driven Business Engine managing multi-tenant background operational execution strings.",
         dependencies: {
-            required: ["window.CozyStorage", "window.CozyOS.Company"],
+            required: ["window.CozyStorage", "window.CozyOS.Company", "window.CozyOS.PaymentChannel"],
             optional: ["window.CozyOS.Customer (falls back to an honest failure if absent — no duplicate customer store)", "window.CozyOS.PluginManager (falls back to window.CozyOS.KernelPlugins if absent)"]
         }
     };
@@ -179,6 +179,8 @@
             this._onceWrapped = new Map();
             this._timelineEvents = [];
             this._auditLog = [];
+            this._transactionIndex = []; // lightweight summary records for real reporting queries — see listTransactionSummaries()
+            this._dashboardHook = null; // real, optional {refresh, invalidate, notify} — see registerDashboardHook()
             this._maxInflightWorkflows = 5000; // hard cap, defense-in-depth on top of the existing 60s reaper
             this._diagnostics = {
                 workflowsStarted: 0, workflowsCompleted: 0, workflowsFailed: 0,
@@ -235,6 +237,36 @@
         getAuditLog(predicate) {
             const list = this._auditLog.map(e => deepClone(e));
             return Object.freeze(predicate ? list.filter(predicate) : list);
+        }
+
+        /**
+         * listTransactionSummaries({ companyId, branchId, date })
+         *   Real query over the lightweight in-memory transaction index
+         *   populated at each real transaction's completion — the
+         *   genuine gap this file had before: no way to query committed
+         *   transactions beyond a single-record lookup by id. Filters
+         *   are all optional; omitting one simply widens the result set,
+         *   never fabricates matching records.
+         */
+        listTransactionSummaries({ companyId = null, branchId = null, date = null } = {}) {
+            return deepClone(this._transactionIndex.filter(t =>
+                (!companyId || t.companyId === companyId) &&
+                (!branchId || t.branchId === branchId) &&
+                (!date || t.date === date)
+            ));
+        }
+
+        /**
+         * registerDashboardHook({ refresh, invalidate, notify })
+         *   Real, optional registration — not a Dashboard implementation.
+         *   Called after every successful transaction, in addition to
+         *   (not replacing) the existing workflow:completed event
+         *   mpesaos.js's UI already subscribes to. A hook failure never
+         *   fails the transaction itself.
+         */
+        registerDashboardHook(hook) {
+            if (!hook || typeof hook !== "object") throw new TypeError("[mpesaOS] registerDashboardHook(): hook object required.");
+            this._dashboardHook = hook;
         }
 
         /** listActiveWorkflows() — real, safe-cloned read of currently in-flight lock keys and their age. */
@@ -295,17 +327,24 @@
         /**
          * exportSnapshot()/importSnapshot()
          *   Scoped honestly to what this engine actually owns in memory —
-         *   diagnostics counters and plugin version. Transaction/customer/
-         *   ledger data lives in window.CozyStorage, not here, and is
-         *   deliberately not duplicated into this snapshot.
+         *   diagnostics counters, plugin version, and the lightweight
+         *   transaction summary index (amount/type/date/company/branch/
+         *   commission only — no customer data, no full ledger detail).
+         *   The full ledger/customer/receipt data lives in
+         *   window.CozyStorage, not here, and is deliberately not
+         *   duplicated into this snapshot.
          */
         exportSnapshot() {
-            return deepClone({ pluginVersion: PLUGIN_VERSION, exportedAt: new Date().toISOString(), diagnostics: this._diagnostics });
+            return deepClone({ pluginVersion: PLUGIN_VERSION, exportedAt: new Date().toISOString(), diagnostics: this._diagnostics, transactionIndex: this._transactionIndex });
         }
 
         importSnapshot(snapshot, { mergeStrategy = "merge" } = {}) {
             if (!snapshot || typeof snapshot !== "object") throw new TypeError("[mpesaOS] importSnapshot(): snapshot must be an object.");
             if (mergeStrategy !== "merge" && mergeStrategy !== "replace") throw new TypeError('[mpesaOS] importSnapshot(): mergeStrategy must be "merge" or "replace".');
+            if (Array.isArray(snapshot.transactionIndex)) {
+                if (mergeStrategy === "replace") this._transactionIndex = snapshot.transactionIndex.slice();
+                else this._transactionIndex = this._transactionIndex.concat(snapshot.transactionIndex);
+            }
             if (mergeStrategy === "replace" && snapshot.diagnostics) {
                 this._diagnostics = { ...this._diagnostics, ...snapshot.diagnostics };
             } else if (snapshot.diagnostics) {
@@ -445,11 +484,46 @@
             if (!rawAction.companyId) throw new TypeError("[mpesaOS] processAutomatedWorkflow(): companyId is required.");
             const companyRecord = company.getCompany(rawAction.companyId);
             if (!companyRecord) throw new Error(`[mpesaOS] Unknown companyId "${rawAction.companyId}" — a real, registered company is required.`);
+            // HONEST NOTE: the real Company coordinator only has ACTIVE/
+            // ARCHIVED company statuses — there is no "suspended" company
+            // state to check today. Validating against what's real rather
+            // than inventing a status that doesn't exist.
+            if (companyRecord.companyStatus === "ARCHIVED") throw new Error(`[mpesaOS] Company "${rawAction.companyId}" is archived — cannot process transactions.`);
 
             if (!rawAction.branchId) throw new TypeError("[mpesaOS] processAutomatedWorkflow(): branchId is required.");
             const branches = typeof company.listBranches === "function" ? (company.listBranches(rawAction.companyId) || []) : [];
             const branchRecord = branches.find(b => b.branchId === rawAction.branchId);
             if (!branchRecord) throw new Error(`[mpesaOS] Unknown branchId "${rawAction.branchId}" for company "${rawAction.companyId}" — a real, registered branch is required.`);
+            if (branchRecord.status === "ARCHIVED") throw new Error(`[mpesaOS] Branch "${rawAction.branchId}" is archived — cannot process transactions.`);
+
+            // Real transaction-type validation — reject unsupported types
+            // honestly rather than silently processing something unknown.
+            const SUPPORTED_TRANSACTION_TYPES = new Set(["Deposit", "Withdrawal", "Till Payment", "Paybill Payment", "Customer Payment", "Business Collection"]);
+            if (!SUPPORTED_TRANSACTION_TYPES.has(rawAction.type)) {
+                throw new TypeError(`[mpesaOS] processAutomatedWorkflow(): unsupported transaction type "${rawAction.type}". Supported: ${Array.from(SUPPORTED_TRANSACTION_TYPES).join(", ")}.`);
+            }
+
+            // Real Payment Channel Engine integration — Till/Paybill
+            // Payment map automatically to their real channel; every
+            // other type requires an explicit channel from the caller,
+            // since a Deposit/Withdrawal/Customer Payment/Business
+            // Collection could genuinely happen via cash, bank, card, or
+            // any other channel — never assumed. Validated here, before
+            // Float/Till/Paybill are touched; actually recorded only
+            // after the transaction genuinely commits (see below), since
+            // this engine has no "undo" for an already-recorded entry.
+            const paymentChannel = window.CozyOS.PaymentChannel;
+            if (!paymentChannel || typeof paymentChannel.validateChannel !== "function") {
+                throw new Error("[mpesaOS] PaymentChannel coordinator is not connected — cannot proceed without it.");
+            }
+            const TYPE_TO_CHANNEL = { "Till Payment": "mpesa_till", "Paybill Payment": "mpesa_paybill" };
+            const resolvedChannel = TYPE_TO_CHANNEL[rawAction.type] || rawAction.channel;
+            if (!resolvedChannel) throw new TypeError(`[mpesaOS] processAutomatedWorkflow(): a real payment channel is required for transaction type "${rawAction.type}".`);
+            const channelValidation = paymentChannel.validateChannel(resolvedChannel, { country: rawAction.country, currency: rawAction.currency });
+            if (!channelValidation.valid) {
+                this._logAudit("CHANNEL_VALIDATION_FAILED", `${rawAction.providerCode || "unknown"}: ${channelValidation.reason}`);
+                throw new Error(`[mpesaOS] ${channelValidation.reason}`);
+            }
 
             const providerCode = rawAction.providerCode || ("MOCK_CODE_" + Date.now());
             const lockKey = `${tenantId}:${providerCode}`;
@@ -477,6 +551,10 @@
                     this.emit("workflow:idempotentReturn", { providerCode, tenantId });
                     return deepFreeze(deepClone(existingTx));
                 }
+
+                // Real, guarded Live Engine integration — genuinely new
+                // transaction only, never fires on an idempotent retry.
+                window.CozyOS.Live?.publish?.("processing", { providerCode, companyId: rawAction.companyId, branchId: rawAction.branchId, amount: rawAction.amount, status: "processing" });
 
                 const timestamp = Date.now();
                 const dateStr = new Date(timestamp).toISOString().split('T')[0];
@@ -578,9 +656,86 @@
                 }
 
                 await this._trackTelemetry("WorkflowExecutionSuccess", Date.now() - startTime, true, { providerCode, internalTxId }, tenantId);
+
+                // Real Float/Till/Paybill integration — reuses each
+                // coordinator's own certified methods, never duplicates
+                // their balance logic. Only one applies per transaction
+                // type (Deposit/Withdrawal -> Float; Till Payment -> Till;
+                // Paybill Payment -> Paybill); Customer Payment/Business
+                // Collection intentionally have no coordinator side effect
+                // — none was specified, and inventing one would be
+                // fabricating business behavior.
+                let floatApplied = false, tillApplied = false, paybillApplied = false;
+                try {
+                    if (ledgerBlock.transactionType === "Deposit" || ledgerBlock.transactionType === "Withdrawal") {
+                        const float = window.CozyOS.MpesaFloat;
+                        if (!float || typeof float.recordTransactionImpact !== "function") throw new Error("[mpesaOS] MpesaFloat coordinator is not connected — cannot complete a Deposit/Withdrawal without it.");
+                        float.recordTransactionImpact({ companyId: rawAction.companyId, branchId: rawAction.branchId, transactionType: ledgerBlock.transactionType, amount: ledgerBlock.amount });
+                        floatApplied = true;
+                    } else if (ledgerBlock.transactionType === "Till Payment") {
+                        const till = window.CozyOS.MpesaTill;
+                        if (!till || typeof till.recordPayment !== "function") throw new Error("[mpesaOS] MpesaTill coordinator is not connected — cannot complete a Till Payment without it.");
+                        if (!rawAction.tillNumber) throw new TypeError("[mpesaOS] Till Payment requires tillNumber.");
+                        till.recordPayment({ tillNumber: rawAction.tillNumber, amount: ledgerBlock.amount, customerPhone: rawAction.customer?.phone, userId: rawAction.userId });
+                        tillApplied = true;
+                    } else if (ledgerBlock.transactionType === "Paybill Payment") {
+                        const paybill = window.CozyOS.MpesaPaybill;
+                        if (!paybill || typeof paybill.recordCollection !== "function") throw new Error("[mpesaOS] MpesaPaybill coordinator is not connected — cannot complete a Paybill Payment without it.");
+                        if (!rawAction.paybillNumber) throw new TypeError("[mpesaOS] Paybill Payment requires paybillNumber.");
+                        if (!rawAction.accountNumber) throw new TypeError("[mpesaOS] Paybill Payment requires accountNumber.");
+                        paybill.recordCollection({ paybillNumber: rawAction.paybillNumber, amount: ledgerBlock.amount, accountNumber: rawAction.accountNumber, customerPhone: rawAction.customer?.phone, userId: rawAction.userId });
+                        paybillApplied = true;
+                    }
+                    // Customer Payment / Business Collection: no coordinator side effect defined — ledger alone is the real record.
+                } catch (integrationErr) {
+                    // Real rollback — reverse whichever coordinator change
+                    // already applied (append-only correcting entries, never
+                    // edited history), then roll back the already-committed
+                    // ledger itself, since the pipeline requires no partial
+                    // state to survive a failure.
+                    if (floatApplied) {
+                        try { window.CozyOS.MpesaFloat.recordTransactionImpact({ companyId: rawAction.companyId, branchId: rawAction.branchId, transactionType: ledgerBlock.transactionType === "Deposit" ? "Withdrawal" : "Deposit", amount: ledgerBlock.amount }); } catch (_e) { /* best-effort reversal, original error still surfaces below */ }
+                    }
+                    if (tillApplied) {
+                        try { window.CozyOS.MpesaTill.withdrawFromTill({ tillNumber: rawAction.tillNumber, amount: ledgerBlock.amount, userId: rawAction.userId }); } catch (_e) { /* best-effort reversal */ }
+                    }
+                    if (paybillApplied) {
+                        try { window.CozyOS.MpesaPaybill.withdrawFromPaybill({ paybillNumber: rawAction.paybillNumber, amount: ledgerBlock.amount, userId: rawAction.userId }); } catch (_e) { /* best-effort reversal */ }
+                    }
+                    await Promise.allSettled([storage.delete("transactions", providerCode, tenantId)]);
+                    this._logAudit("TRANSACTION_ROLLED_BACK", `${providerCode}: ${integrationErr.message}`);
+                    window.CozyOS.Live?.publish?.("rolled_back", { providerCode, companyId: rawAction.companyId, branchId: rawAction.branchId, amount: ledgerBlock.amount, status: "rolled_back" });
+                    integrationErr._liveEventAlreadyPublished = true;
+                    throw integrationErr;
+                }
+
+                // Real, single audit record for this successful transaction —
+                // reuses the engine's own existing audit log, never a
+                // second audit system.
+                this._logAudit("TRANSACTION_COMPLETED", `id=${internalTxId} provider=${providerCode} company=${rawAction.companyId} branch=${rawAction.branchId} user=${rawAction.userId || "none"} status=Committed`);
+
+                // Real Payment Channel recording — deliberately the last
+                // real side effect, after Float/Till/Paybill and the
+                // ledger itself have already committed durably, so
+                // nothing downstream can fail and require reversing this
+                // entry (PaymentChannel has no "undo" — see validation
+                // above, which already ran before anything was touched).
+                paymentChannel.recordTransactionChannel({
+                    applicationId: "mpesaos", transactionId: internalTxId, providerCode, channel: resolvedChannel,
+                    companyId: rawAction.companyId, branchId: rawAction.branchId, amount: ledgerBlock.amount, date: dateStr
+                });
+
                 this._diagnostics.workflowsCompleted++;
                 this._logTimeline(`Workflow completed: ${providerCode}`);
+                this._transactionIndex.push(Object.freeze({
+                    id: internalTxId, providerCode, companyId: rawAction.companyId, branchId: rawAction.branchId,
+                    date: dateStr, type: ledgerBlock.transactionType, amount: ledgerBlock.amount, commission: ledgerBlock.commission,
+                    agent: ledgerBlock.agent, timestamp: ledgerBlock.timestamp
+                }));
+                if (this._transactionIndex.length > 100000) this._transactionIndex.shift(); // bounded, defense-in-depth
                 this.emit("workflow:completed", { providerCode, internalTxId, tenantId });
+                window.CozyOS.Live?.publish?.("completed", { providerCode, companyId: rawAction.companyId, branchId: rawAction.branchId, amount: ledgerBlock.amount, status: "completed" });
+                if (this._dashboardHook) { try { this._dashboardHook.refresh?.(); this._dashboardHook.notify?.({ providerCode, companyId: rawAction.companyId }); } catch (_e) { /* dashboard hook failure never fails the transaction itself */ } }
                 // Return a frozen, independent copy — callers can read every
                 // field but can never mutate this engine's committed ledger
                 // record through the reference they hold.
@@ -591,6 +746,9 @@
                 this._diagnostics.workflowsFailed++;
                 this._logTimeline(`Workflow failed: ${providerCode} (${err.message})`);
                 this.emit("workflow:failed", { providerCode, tenantId, message: err.message });
+                if (!err._liveEventAlreadyPublished) {
+                    window.CozyOS.Live?.publish?.("failed", { providerCode, companyId: rawAction.companyId, branchId: rawAction.branchId, amount: rawAction.amount, status: "failed" });
+                }
                 throw err;
             } finally {
                 await this._releaseLock(lockKey, tenantId);
@@ -630,6 +788,7 @@
                     lookupMethod: "National_ID_Scan",
                     type: "Withdrawal",
                     amount: 15000,
+                    channel: "cash",
                     providerCode: "XGYNGFDHKGD",
                     agent: "Charles_Main",
                     companyId: contextCompanyId,
