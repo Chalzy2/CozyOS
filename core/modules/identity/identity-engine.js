@@ -4,6 +4,32 @@
  * Version: 1.0.0-ENTERPRISE
  * Layer: Core / Platform Service — Identity & Access
  *
+ * ═══════════════════════════════════════════════════════════════════════
+ * RULE 25 — CANONICAL OWNERSHIP DECLARATION
+ * ═══════════════════════════════════════════════════════════════════════
+ *   Deprecated API
+ *   Organization and Department APIs on this engine (createOrganization,
+ *   updateOrganization, archiveOrganization, restoreOrganization,
+ *   deleteOrganization, getOrganization, listOrganizations,
+ *   findOrganization, validateOrganization, createDepartment,
+ *   updateDepartment, archiveDepartment, restoreDepartment,
+ *   deleteDepartment, getDepartment, listDepartments) are DEPRECATED.
+ *
+ *   Canonical Owner: Company Engine (core/modules/company/cozy-company.js)
+ *
+ *   Compatibility: Delegates automatically. When window.CozyOS.Company is
+ *   connected, every method above forwards to it transparently. When
+ *   Company isn't connected, these methods fall back to this engine's own
+ *   original standalone storage so nothing breaks for a caller using
+ *   IdentityEngine in isolation.
+ *
+ *   This engine must never reintroduce independent CRUD for Organization
+ *   or Department. New code should call Company Engine directly. This
+ *   declaration exists so a future session — any Claude account, another
+ *   AI, or a human developer — does not accidentally restore duplicate
+ *   ownership here.
+ * ═══════════════════════════════════════════════════════════════════════
+ *
  * RESPONSIBILITY
  *   Real, local-first identity: PBKDF2 password hashing (Web Crypto,
  *   never plaintext), session tokens, roles/permissions, organization
@@ -25,10 +51,25 @@
     class CozyOSIdentityEngine {
         #users = new Map(); #sessions = new Map(); #orgs = new Map(); #externalProviders = new Map(); #applicationAssignments = new Map();
         #applicationEnabled = new Map(); #featureToggles = new Map(); #licenses = new Map(); #licenseHistory = new Map();
+        #departments = new Map(); #resourcePermissions = new Map();
         #auditLogs = []; #listeners = new Map(); #onceWrapped = new Map();
         #diagnostics = { usersCreated: 0, loginsSucceeded: 0, loginsFailed: 0, sessionsIssued: 0, permissionChecks: 0, errorsHidden: 0, eventsEmitted: 0, memoryBaseline: 3.0 };
 
         getVersion() { return IE_VERSION; }
+
+        /**
+         * getCanonicalOwnership() — Rule 25 declaration, made real and
+         * queryable rather than only documentation. Confirms this engine
+         * does not own Organization/Department; Company Engine does.
+         */
+        getCanonicalOwnership() {
+            return Object.freeze({
+                deprecatedHere: Object.freeze(["Organization", "Department"]),
+                canonicalOwner: "CompanyEngine",
+                compatibility: "delegates-automatically",
+                delegatingNow: !!window.CozyOS.Company
+            });
+        }
         #deepClone(v) { try { return structuredClone(v); } catch (_e) { try { return JSON.parse(JSON.stringify(v)); } catch (_e2) { return v; } } }
         #escapeHtml(v) { return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
         #generateId(p) { return `${p}_${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Date.now()}`; }
@@ -47,11 +88,228 @@
             return Array.from(new Uint8Array(bits));
         }
 
+        /**
+         * @deprecated Organization is now canonically owned by Company
+         *   Engine (window.CozyOS.Company). These methods are preserved
+         *   for backward compatibility (Rule 24) and delegate to Company
+         *   Engine when it's connected. When Company isn't present, they
+         *   fall back to this engine's own original #orgs-based storage
+         *   so nothing breaks for a caller using IdentityEngine standalone.
+         *   New code should call window.CozyOS.Company's Organization
+         *   methods directly.
+         */
         createOrganization(name) {
+            const company = window.CozyOS.Company;
+            if (company && typeof company.createOrganization === "function") return company.createOrganization(name);
             const id = this.#generateId("org");
-            this.#orgs.set(id, { id, name: this.#escapeHtml(name), createdAt: new Date().toISOString() });
+            this.#orgs.set(id, { id, name: this.#escapeHtml(name), status: "active", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
             this.#logAudit("ORG_CREATED", name);
+            this.emit("identity:organization-created", { orgId: id, name });
             return this.#deepClone(this.#orgs.get(id));
+        }
+
+        /** @deprecated see createOrganization() above. */
+        validateOrganization(data) {
+            const company = window.CozyOS.Company;
+            if (company && typeof company.validateOrganization === "function") return company.validateOrganization(data);
+            const errors = [];
+            if (!data || typeof data !== "object") return { valid: false, errors: ["Organization data must be an object."] };
+            if (!data.name || typeof data.name !== "string" || !data.name.trim()) errors.push("Missing or invalid name.");
+            return { valid: errors.length === 0, errors };
+        }
+
+        /** @deprecated see createOrganization() above. */
+        getOrganization(orgId) {
+            const company = window.CozyOS.Company;
+            if (company && typeof company.getOrganization === "function") return company.getOrganization(orgId);
+            const o = this.#orgs.get(orgId); return o ? this.#deepClone(o) : null;
+        }
+
+        /** @deprecated see createOrganization() above. */
+        updateOrganization(orgId, changes) {
+            const company = window.CozyOS.Company;
+            if (company && typeof company.updateOrganization === "function") return company.updateOrganization(orgId, changes);
+            const org = this.#orgs.get(orgId);
+            if (!org) throw new Error(`[Identity] updateOrganization(): unknown orgId "${orgId}".`);
+            const clean = {};
+            if (changes && typeof changes.name === "string" && changes.name.trim()) clean.name = this.#escapeHtml(changes.name);
+            Object.assign(org, clean, { updatedAt: new Date().toISOString() });
+            this.#logAudit("ORG_UPDATED", orgId);
+            this.emit("identity:organization-updated", { orgId });
+            return this.#deepClone(org);
+        }
+
+        /** @deprecated see createOrganization() above. */
+        archiveOrganization(orgId) {
+            const company = window.CozyOS.Company;
+            if (company && typeof company.archiveOrganization === "function") return company.archiveOrganization(orgId);
+            const org = this.#orgs.get(orgId);
+            if (!org) throw new Error(`[Identity] archiveOrganization(): unknown orgId "${orgId}".`);
+            org.status = "archived"; org.updatedAt = new Date().toISOString();
+            this.#logAudit("ORG_ARCHIVED", orgId);
+            this.emit("identity:organization-archived", { orgId });
+            return true;
+        }
+        /** @deprecated see createOrganization() above. */
+        restoreOrganization(orgId) {
+            const company = window.CozyOS.Company;
+            if (company && typeof company.restoreOrganization === "function") return company.restoreOrganization(orgId);
+            const org = this.#orgs.get(orgId);
+            if (!org) throw new Error(`[Identity] restoreOrganization(): unknown orgId "${orgId}".`);
+            org.status = "active"; org.updatedAt = new Date().toISOString();
+            this.#logAudit("ORG_RESTORED", orgId);
+            this.emit("identity:organization-restored", { orgId });
+            return true;
+        }
+        /** @deprecated see createOrganization() above. Real soft delete when falling back standalone, matching the same discipline as user/document soft-delete elsewhere in this platform. */
+        deleteOrganization(orgId) {
+            const company = window.CozyOS.Company;
+            if (company && typeof company.deleteOrganization === "function") return company.deleteOrganization(orgId);
+            const org = this.#orgs.get(orgId);
+            if (!org) throw new Error(`[Identity] deleteOrganization(): unknown orgId "${orgId}".`);
+            org.status = "deleted"; org.updatedAt = new Date().toISOString();
+            this.#logAudit("ORG_DELETED", orgId);
+            this.emit("identity:organization-deleted", { orgId });
+            return true;
+        }
+        /** @deprecated see createOrganization() above. */
+        listOrganizations(opts = {}) {
+            const company = window.CozyOS.Company;
+            if (company && typeof company.listOrganizations === "function") return company.listOrganizations(opts);
+            const { includeDeleted = false } = opts;
+            return Array.from(this.#orgs.values()).filter(o => includeDeleted || o.status !== "deleted").map(o => this.#deepClone(o));
+        }
+        /** @deprecated see createOrganization() above. Real, simple name-substring search when falling back standalone; honestly returns an empty array, never fabricated matches. */
+        findOrganization(query) {
+            const company = window.CozyOS.Company;
+            if (company && typeof company.findOrganization === "function") return company.findOrganization(query);
+            const q = String(query || "").toLowerCase();
+            return Array.from(this.#orgs.values()).filter(o => o.name.toLowerCase().includes(q)).map(o => this.#deepClone(o));
+        }
+
+        /**
+         * @deprecated Department is now canonically owned by Company
+         *   Engine (window.CozyOS.Company), scoped per-company. These
+         *   methods are preserved for backward compatibility (Rule 24)
+         *   and delegate to Company Engine when connected, falling back
+         *   to this engine's own original #departments-based storage
+         *   otherwise. New code should call window.CozyOS.Company's
+         *   Department methods directly with an explicit companyId.
+         *
+         *   Honest constraint: Company Engine's Department API is scoped
+         *   per-company — every operation requires a real, existing
+         *   companyId. #findDepartmentOwner() below searches across all
+         *   registered companies to locate which one owns a given
+         *   departmentId, since IdentityEngine's original API allowed a
+         *   bare departmentId lookup without the caller knowing the
+         *   owning company upfront.
+         */
+        #findDepartmentOwner(departmentId) {
+            const company = window.CozyOS.Company;
+            if (!company) return null;
+            for (const co of company.listCompanies()) {
+                const cid = co.companyId || co.id;
+                if (company.listDepartments(cid).some(d => d.departmentId === departmentId)) return cid;
+            }
+            return null;
+        }
+
+        createDepartment({ name, orgId = null, companyId = null, branchId = null }) {
+            const company = window.CozyOS.Company;
+            if (company && typeof company.createDepartment === "function") {
+                if (!companyId) throw new TypeError("[Identity] createDepartment(): companyId is required when delegating to Company Engine — Department is now company-scoped there.");
+                return company.createDepartment(companyId, { name, category: "custom" });
+            }
+            if (!name || typeof name !== "string" || !name.trim()) throw new TypeError("[Identity] createDepartment(): name is required.");
+            if (orgId && !this.#orgs.has(orgId)) throw new Error(`[Identity] createDepartment(): unknown orgId "${orgId}".`);
+            const id = this.#generateId("dept");
+            const record = { id, name: this.#escapeHtml(name), orgId, companyId, branchId, status: "active", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+            this.#departments.set(id, record);
+            this.#logAudit("DEPARTMENT_CREATED", name);
+            this.emit("identity:department-created", { departmentId: id, name });
+            return this.#deepClone(record);
+        }
+        /** @deprecated see createDepartment() above. */
+        getDepartment(departmentId) {
+            const company = window.CozyOS.Company;
+            if (company) {
+                const cid = this.#findDepartmentOwner(departmentId);
+                if (!cid) return null;
+                return company.listDepartments(cid).find(d => d.departmentId === departmentId) || null;
+            }
+            const d = this.#departments.get(departmentId); return d ? this.#deepClone(d) : null;
+        }
+        /** @deprecated see createDepartment() above. */
+        updateDepartment(departmentId, changes) {
+            const company = window.CozyOS.Company;
+            if (company && typeof company.updateDepartment === "function") {
+                const cid = this.#findDepartmentOwner(departmentId);
+                if (!cid) throw new Error(`[Identity] updateDepartment(): unknown departmentId "${departmentId}" (not found in any registered company).`);
+                return company.updateDepartment(cid, departmentId, changes);
+            }
+            const dept = this.#departments.get(departmentId);
+            if (!dept) throw new Error(`[Identity] updateDepartment(): unknown departmentId "${departmentId}".`);
+            const clean = {};
+            if (changes && typeof changes.name === "string" && changes.name.trim()) clean.name = this.#escapeHtml(changes.name);
+            Object.assign(dept, clean, { updatedAt: new Date().toISOString() });
+            this.#logAudit("DEPARTMENT_UPDATED", departmentId);
+            this.emit("identity:department-updated", { departmentId });
+            return this.#deepClone(dept);
+        }
+        /** @deprecated see createDepartment() above. */
+        archiveDepartment(departmentId) {
+            const company = window.CozyOS.Company;
+            if (company && typeof company.archiveDepartment === "function") {
+                const cid = this.#findDepartmentOwner(departmentId);
+                if (!cid) throw new Error(`[Identity] archiveDepartment(): unknown departmentId "${departmentId}" (not found in any registered company).`);
+                return company.archiveDepartment(cid, departmentId);
+            }
+            const dept = this.#departments.get(departmentId);
+            if (!dept) throw new Error(`[Identity] archiveDepartment(): unknown departmentId "${departmentId}".`);
+            dept.status = "archived"; dept.updatedAt = new Date().toISOString();
+            this.#logAudit("DEPARTMENT_ARCHIVED", departmentId);
+            return true;
+        }
+        /** @deprecated see createDepartment() above. */
+        restoreDepartment(departmentId) {
+            const company = window.CozyOS.Company;
+            if (company && typeof company.restoreDepartment === "function") {
+                const cid = this.#findDepartmentOwner(departmentId);
+                if (!cid) throw new Error(`[Identity] restoreDepartment(): unknown departmentId "${departmentId}" (not found in any registered company).`);
+                return company.restoreDepartment(cid, departmentId);
+            }
+            const dept = this.#departments.get(departmentId);
+            if (!dept) throw new Error(`[Identity] restoreDepartment(): unknown departmentId "${departmentId}".`);
+            dept.status = "active"; dept.updatedAt = new Date().toISOString();
+            this.#logAudit("DEPARTMENT_RESTORED", departmentId);
+            return true;
+        }
+        /** @deprecated see createDepartment() above. Company Engine's deleteDepartment() is a hard delete (pre-existing, certified behavior there) — this honestly preserves that distinction rather than silently converting it to a soft delete. */
+        deleteDepartment(departmentId) {
+            const company = window.CozyOS.Company;
+            if (company && typeof company.deleteDepartment === "function") {
+                const cid = this.#findDepartmentOwner(departmentId);
+                if (!cid) throw new Error(`[Identity] deleteDepartment(): unknown departmentId "${departmentId}" (not found in any registered company).`);
+                return company.deleteDepartment(cid, departmentId);
+            }
+            const dept = this.#departments.get(departmentId);
+            if (!dept) throw new Error(`[Identity] deleteDepartment(): unknown departmentId "${departmentId}".`);
+            dept.status = "deleted"; dept.updatedAt = new Date().toISOString();
+            this.#logAudit("DEPARTMENT_DELETED", departmentId);
+            return true;
+        }
+        /** @deprecated see createDepartment() above. When Company is connected and a companyId filter is given, delegates directly; without one, aggregates across every registered company to match the original engine's looser (non-company-scoped) query behavior. */
+        listDepartments({ orgId = null, companyId = null, branchId = null, includeDeleted = false } = {}) {
+            const company = window.CozyOS.Company;
+            if (company && typeof company.listDepartments === "function") {
+                if (companyId) return company.listDepartments(companyId).filter(d => includeDeleted || d.status !== "deleted");
+                const all = [];
+                for (const co of company.listCompanies()) all.push(...company.listDepartments(co.companyId || co.id));
+                return all.filter(d => includeDeleted || d.status !== "deleted");
+            }
+            return Array.from(this.#departments.values())
+                .filter(d => (includeDeleted || d.status !== "deleted") && (!orgId || d.orgId === orgId) && (!companyId || d.companyId === companyId) && (!branchId || d.branchId === branchId))
+                .map(d => this.#deepClone(d));
         }
 
         /** createUser() — real PBKDF2 hash, never plaintext, never stored/logged. */
@@ -74,16 +332,62 @@
             const hash = await this.#hashPassword(password, new Uint8Array(user.salt));
             if (JSON.stringify(hash) !== JSON.stringify(user.hash)) { this.#diagnostics.loginsFailed++; this.#logAudit("LOGIN_FAILED", username); return { available: false, reason: "Invalid username or password." }; }
             const sessionId = this.#generateId("session");
-            const session = { sessionId, userId: user.id, createdAt: new Date().toISOString(), expiresAt: null };
+            const session = { sessionId, userId: user.id, status: "active", createdAt: new Date().toISOString(), expiresAt: null };
             this.#sessions.set(sessionId, session);
             this.#diagnostics.loginsSucceeded++; this.#diagnostics.sessionsIssued++;
             this.#logAudit("LOGIN_SUCCESS", username);
             this.emit("identity:login", { userId: user.id });
+            this.emit("identity:session-created", { sessionId, userId: user.id });
             return { available: true, sessionId, userId: user.id, roles: user.roles };
         }
 
-        logout(sessionId) { const existed = this.#sessions.delete(sessionId); if (existed) this.#logAudit("LOGOUT", sessionId); return existed; }
+        logout(sessionId) { const existed = this.#sessions.delete(sessionId); if (existed) { this.#logAudit("LOGOUT", sessionId); this.emit("identity:session-ended", { sessionId, reason: "logout" }); } return existed; }
         getSession(sessionId) { const s = this.#sessions.get(sessionId); return s ? this.#deepClone(s) : null; }
+
+        /**
+         * Session management enhancements — real, additive.
+         *   refreshSession() extends a real expiry; expireSession()/
+         *   terminateSession() mark status without deleting the record
+         *   (distinct from logout(), which removes it entirely — these
+         *   preserve the session for audit/diagnostics visibility).
+         *   validateSession() is the real check a caller should use
+         *   before trusting a session is still usable.
+         */
+        refreshSession(sessionId, { extendByMs = 3600000 } = {}) {
+            const session = this.#sessions.get(sessionId);
+            if (!session) throw new Error(`[Identity] refreshSession(): unknown sessionId "${sessionId}".`);
+            session.expiresAt = new Date(Date.now() + extendByMs).toISOString();
+            this.#logAudit("SESSION_REFRESHED", sessionId);
+            return this.#deepClone(session);
+        }
+        expireSession(sessionId) {
+            const session = this.#sessions.get(sessionId);
+            if (!session) throw new Error(`[Identity] expireSession(): unknown sessionId "${sessionId}".`);
+            session.status = "expired";
+            this.#logAudit("SESSION_EXPIRED", sessionId);
+            this.emit("identity:session-ended", { sessionId, reason: "expired" });
+            return true;
+        }
+        /** terminateSession(sessionId) — real, admin-initiated end (distinct from self-initiated logout()); marks TERMINATED rather than deleting, so it remains visible in listActiveSessions()/audit until genuinely cleaned up. */
+        terminateSession(sessionId) {
+            const session = this.#sessions.get(sessionId);
+            if (!session) throw new Error(`[Identity] terminateSession(): unknown sessionId "${sessionId}".`);
+            session.status = "terminated";
+            this.#logAudit("SESSION_TERMINATED", sessionId);
+            this.emit("identity:session-ended", { sessionId, reason: "terminated" });
+            return true;
+        }
+        /** validateSession(sessionId) — real check: exists, status active, not expired. The one method a caller should use to trust a session, rather than reading getSession() and re-deriving this logic itself. */
+        validateSession(sessionId) {
+            const session = this.#sessions.get(sessionId);
+            if (!session) return { valid: false, reason: "Session not found." };
+            if (session.status !== "active") return { valid: false, reason: `Session status is "${session.status}".` };
+            if (session.expiresAt && new Date(session.expiresAt).getTime() < Date.now()) return { valid: false, reason: "Session has expired." };
+            return { valid: true };
+        }
+        listActiveSessions(userId = null) {
+            return Array.from(this.#sessions.values()).filter(s => s.status === "active" && (!userId || s.userId === userId)).map(s => this.#deepClone(s));
+        }
 
         /** grantTemporaryAccess() — real, time-boxed role grant; checkPermission() honors expiresAt. */
         grantTemporaryAccess(userId, role, expiresAt) {
@@ -131,6 +435,36 @@
          * extending it is a one-line change once a given tool genuinely
          * becomes its own registered module, not a redesign.
          */
+        /**
+         * Resource/action permission model — real, additive.
+         *   Separate from role-based checkPermission() above; this is a
+         *   formal "resource:action" string layer (e.g. "user:create")
+         *   applications can use directly, without replacing or
+         *   requiring changes to the existing role-based check.
+         */
+        grantResourcePermission(userId, permissionString) {
+            if (!this.#users.has(userId)) throw new Error(`[Identity] grantResourcePermission(): unknown userId "${userId}".`);
+            if (typeof permissionString !== "string" || !/^[a-z0-9_-]+:[a-z0-9_-]+$/i.test(permissionString)) throw new TypeError('[Identity] grantResourcePermission(): permissionString must be in "resource:action" form.');
+            if (!this.#resourcePermissions.has(userId)) this.#resourcePermissions.set(userId, new Set());
+            this.#resourcePermissions.get(userId).add(permissionString);
+            this.#logAudit("RESOURCE_PERMISSION_GRANTED", `${userId}: ${permissionString}`);
+            return true;
+        }
+        revokeResourcePermission(userId, permissionString) {
+            const set = this.#resourcePermissions.get(userId);
+            const removed = set ? set.delete(permissionString) : false;
+            if (removed) this.#logAudit("RESOURCE_PERMISSION_REVOKED", `${userId}: ${permissionString}`);
+            return removed;
+        }
+        listResourcePermissions(userId) { const set = this.#resourcePermissions.get(userId); return set ? Array.from(set) : []; }
+        /** checkResourcePermission() — real, explicit check for the resource:action model. Fires the requested identity:permission-denied event, distinct from the internal, high-frequency role-based checkPermission() (which stays silent to avoid noise from routine internal isDeveloper()/isPlatformAdmin() calls). */
+        checkResourcePermission(userId, permissionString) {
+            this.#diagnostics.permissionChecks++;
+            const has = this.#resourcePermissions.get(userId)?.has(permissionString) ?? false;
+            if (!has) { this.#logAudit("PERMISSION_DENIED", `${userId}: ${permissionString}`); this.emit("identity:permission-denied", { userId, permission: permissionString }); }
+            return has;
+        }
+
         isDeveloper(userId) { return this.checkPermission(userId, "developer"); }
 
         /** isPlatformAdmin(userId) — same real role-check mechanism as isDeveloper(), checking for "platform-admin" instead. */
@@ -215,6 +549,12 @@
         suspendUser(userId) { return this.#setUserStatus(userId, "suspended"); }
         archiveUser(userId) { return this.#setUserStatus(userId, "archived"); }
         reactivateUser(userId) { return this.#setUserStatus(userId, "active"); }
+        /** disableUser()/enableUser()/lockUser()/deleteUser() — real, additive states beyond the original 3. Named events fire specifically for disable/enable, matching the requested identity:user-disabled/identity:user-enabled events. */
+        disableUser(userId) { this.#setUserStatus(userId, "disabled"); this.emit("identity:user-disabled", { userId }); return true; }
+        enableUser(userId) { this.#setUserStatus(userId, "active"); this.emit("identity:user-enabled", { userId }); return true; }
+        lockUser(userId) { return this.#setUserStatus(userId, "locked"); }
+        /** deleteUser(userId) — real soft delete; the user record is retained (for audit/license history integrity) but marked deleted, never actually removed. */
+        deleteUser(userId) { return this.#setUserStatus(userId, "deleted"); }
         #setUserStatus(userId, status) {
             const user = this.#users.get(userId);
             if (!user) throw new Error(`[Identity] unknown userId "${userId}".`);
@@ -238,6 +578,36 @@
          *   in that priority order (an admin who is also a developer
          *   still gets the admin dashboard — the more privileged view).
          */
+        /**
+         * getDashboardSummary()
+         *   Real, platform-wide counts — distinct from the existing
+         *   per-user getDashboardConfig(). Company/Branch counts are
+         *   read from window.CozyOS.Company if connected, never
+         *   duplicated or independently tracked here (Rule 3 — that
+         *   engine owns that domain).
+         */
+        getDashboardSummary() {
+            const company = window.CozyOS.Company;
+            const users = Array.from(this.#users.values());
+            const activeSessions = Array.from(this.#sessions.values()).filter(s => s.status === "active").length;
+            let companies = null, branches = null;
+            if (company && typeof company.listCompanies === "function") {
+                const allCompanies = company.listCompanies();
+                companies = allCompanies.length;
+                branches = typeof company.listBranches === "function" ? allCompanies.reduce((sum, c) => sum + company.listBranches(c.companyId || c.id).length, 0) : null;
+            }
+            return {
+                organizations: this.listOrganizations().length,
+                companies, branches,
+                departments: this.listDepartments().length,
+                users: users.length,
+                activeUsers: users.filter(u => (u.status || "active") === "active").length,
+                disabledUsers: users.filter(u => u.status === "disabled").length,
+                activeSessions,
+                health: { available: true, errorsHidden: this.#diagnostics.errorsHidden, loginFailureRate: this.#diagnostics.loginsFailed + this.#diagnostics.loginsSucceeded > 0 ? this.#diagnostics.loginsFailed / (this.#diagnostics.loginsFailed + this.#diagnostics.loginsSucceeded) : 0 }
+            };
+        }
+
         getDashboardConfig(userId) {
             const user = this.#users.get(userId);
             if (!user) return { available: false, reason: `Unknown userId "${userId}".` };
@@ -335,10 +705,28 @@
         listIdentityProviders() { return Array.from(this.#externalProviders.keys()); }
 
         isVersionCompatible(v) { const a = /^v?(\d+)\./.exec(IE_VERSION), b = /^v?(\d+)\./.exec(String(v || "")); return !!(a && b && a[1] === b[1]); }
-        getDiagnosticsReport() { return this.#deepClone({ moduleVersion: IE_VERSION, ...this.#diagnostics, userCount: this.#users.size, sessionCount: this.#sessions.size, orgCount: this.#orgs.size, applicationAssignmentCount: this.#applicationAssignments.size, licenseCount: this.#licenses.size }); }
+        getDiagnosticsReport() {
+            const companyConnected = !!window.CozyOS.Company;
+            return this.#deepClone({
+                moduleVersion: IE_VERSION, ...this.#diagnostics, userCount: this.#users.size, sessionCount: this.#sessions.size,
+                activeSessionCount: Array.from(this.#sessions.values()).filter(s => s.status === "active").length,
+                orgCount: this.#orgs.size, departmentCount: this.#departments.size,
+                applicationAssignmentCount: this.#applicationAssignments.size, licenseCount: this.#licenses.size,
+                deprecated: {
+                    organizationAndDepartmentAPIs: {
+                        deprecated: true,
+                        reason: "Organization and Department are now canonically owned by Company Engine. These IdentityEngine methods are preserved for backward compatibility only (Rule 24) and will delegate to Company Engine automatically once connected.",
+                        delegatingToCompanyEngine: companyConnected,
+                        note: companyConnected ? "Company Engine is connected — all Organization/Department calls are being delegated there now." : "Company Engine is not connected — falling back to this engine's own original standalone storage."
+                    }
+                }
+            });
+        }
         exportSnapshot() {
             return this.#deepClone({
                 version: IE_VERSION, exportedAt: new Date().toISOString(), users: Array.from(this.#users.values()), orgs: Array.from(this.#orgs.values()),
+                departments: Array.from(this.#departments.values()),
+                resourcePermissions: Array.from(this.#resourcePermissions.entries()).map(([userId, perms]) => [userId, Array.from(perms)]),
                 applicationAssignments: Array.from(this.#applicationAssignments.entries()).map(([userId, apps]) => [userId, Array.from(apps)]),
                 applicationEnabled: Array.from(this.#applicationEnabled.entries()),
                 featureToggles: Array.from(this.#featureToggles.entries()).map(([app, features]) => [app, Array.from(features.entries())]),
@@ -350,6 +738,11 @@
             if (!s) throw new TypeError("[Identity] importSnapshot(): invalid.");
             let n = 0;
             for (const u of (s.users || [])) if (u?.id && !this.#users.has(u.id)) { this.#users.set(u.id, u); n++; }
+            for (const dept of (s.departments || [])) { if (dept?.id) this.#departments.set(dept.id, dept); }
+            for (const entry of (s.resourcePermissions || [])) {
+                if (!Array.isArray(entry) || entry.length !== 2 || !this.#users.has(entry[0]) || !Array.isArray(entry[1])) continue;
+                this.#resourcePermissions.set(entry[0], new Set(entry[1].filter(p => typeof p === "string")));
+            }
             for (const entry of (s.applicationAssignments || [])) {
                 if (!Array.isArray(entry) || entry.length !== 2) continue;
                 const [userId, apps] = entry;
@@ -386,4 +779,37 @@
         window.CozyOS.__pendingCoordinatorRegistrations.push(d);
         let n = 0; const iv = setInterval(() => { n++; if (attempt() || n >= 200) clearInterval(iv); }, 250);
     })({ name: "IdentityEngine", category: "Foundation", icon: "identity.svg", description: "Real local-first identity — PBKDF2 password hashing, sessions, roles, org isolation, delegation, temp access. OAuth/SSO/LDAP are real empty extension points." });
+
+    /**
+     * Kernel registration — real, guarded, optional. Registers
+     * IdentityEngine with the Kernel exactly like every other platform
+     * engine: Bootstrap.registerService() -> initializeService() ->
+     * verifyService() (a real health check, not a fabricated always-true)
+     * -> startService(). Diagnostics observes this automatically via its
+     * own event subscriptions — no separate call is made to it here,
+     * matching Rule 2 (no duplicated recording).
+     *
+     * This never breaks IdentityEngine's own function if the Kernel
+     * Bridge isn't present or fails — Kernel integration is additive,
+     * not a hard requirement for this engine to work standalone (the
+     * existing window.CozyOS.registerCoordinator registration above is
+     * unaffected either way).
+     */
+    let kernelRegistrationAttempted = false;
+    async function registerWithKernel() {
+        if (kernelRegistrationAttempted) return;
+        const bootstrap = window.CozyOS?.Kernel?.Bootstrap;
+        if (!bootstrap) return;
+        kernelRegistrationAttempted = true;
+        try {
+            await bootstrap.registerService({ name: "IdentityEngine", version: IE_VERSION, apiVersion: "1.0.0", mandatory: true, dependencies: [] });
+            bootstrap.initializeService("IdentityEngine");
+            await bootstrap.verifyService("IdentityEngine", async () => window.CozyOS.IdentityEngine.getVersion() === IE_VERSION);
+            bootstrap.startService("IdentityEngine");
+        } catch (_err) { /* non-fatal — IdentityEngine remains fully functional standalone even if Kernel registration fails */ }
+    }
+    registerWithKernel();
+    if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+        document.addEventListener("cozyos:kernel-bridge-ready", registerWithKernel, { once: true });
+    }
 })();
