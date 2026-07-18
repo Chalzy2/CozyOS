@@ -608,7 +608,10 @@ function __resetForTests() {
   primaryMicId = null;
   backupMicId = null;
   micSeq = 0;
-  listeners.clear();
+  // BUGFIX (Rule 21): see the identical fix and rationale in Camera
+  // Manager's __resetForTests — clearing `listeners` here would sever
+  // cross-engine subscriptions (e.g. Scene Manager's health-triggered
+  // failover) that are wired once at import time, not per-test state.
 }
 
 // -----------------------------------------------------------------------------
