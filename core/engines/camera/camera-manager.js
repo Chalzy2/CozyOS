@@ -477,7 +477,14 @@ function __resetForTests() {
   lastDetection.clear();
   activeCameraId = null;
   cameraSeq = 0;
-  listeners.clear();
+  // BUGFIX (Rule 21): this used to also clear `listeners`, which wipes out
+  // subscriptions made by OTHER modules (e.g. Scene Manager's health-
+  // triggered failover, wired once at import time). __resetForTests exists
+  // to isolate device/provider state between test cases, not to sever
+  // cross-engine event wiring that is part of the running system. Camera
+  // Manager's own tests never relied on listeners being cleared for
+  // correctness (each test registers fresh, test-scoped closures), so this
+  // is safe to drop.
 }
 
 // -----------------------------------------------------------------------------
