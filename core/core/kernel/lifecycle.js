@@ -369,11 +369,17 @@ function stopService(token, name) {
   return getServiceState(name);
 }
 
-async function restartService(token, name) {
+async function restartService(token, name, verifyFn) {
   authorizeCaller(token);
   const record = assertRegistered(name);
 
-  // RUNNING -> STOPPING -> STOPPED -> RESTARTING -> INITIALIZING -> READY -> RUNNING
+  // RUNNING -> STOPPING -> STOPPED -> RESTARTING -> INITIALIZING -> VERIFYING -> READY -> RUNNING
+  // BUGFIX (Rule 21): this previously jumped INITIALIZING -> READY directly,
+  // which TRANSITIONS[INITIALIZING] (= [VERIFYING, FAILED]) forbids, and
+  // reimplemented a stripped-down copy of verifyService()'s READY logic
+  // (Rule 2 violation) instead of reusing it. Now it reuses the real
+  // verifyService()/startService() so dependency checks run identically on
+  // restart as they do on first start, and the transition stays legal.
   if (record.state === STATES.RUNNING) {
     transition(record, STATES.STOPPING);
     transition(record, STATES.STOPPED);
@@ -386,15 +392,9 @@ async function restartService(token, name) {
   record.lastRestart = now();
   emit(EVENTS.INITIALIZING, { name, state: record.state });
 
-  transition(record, STATES.READY);
-  record.readyTime = now();
-  emit(EVENTS.READY, { name, state: record.state });
+  await verifyService(token, name, verifyFn);
 
-  transition(record, STATES.RUNNING);
-  record.runningTime = now();
-  emit(EVENTS.RUNNING, { name, state: record.state });
-
-  return getServiceState(name);
+  return startService(token, name);
 }
 
 function removeService(token, name) {

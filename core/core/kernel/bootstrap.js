@@ -266,8 +266,8 @@ function resumeService(name) {
 function stopService(name) {
   return Lifecycle.stopService(bootstrapToken, name);
 }
-function restartService(name) {
-  return Lifecycle.restartService(bootstrapToken, name);
+function restartService(name, verifyFn) {
+  return Lifecycle.restartService(bootstrapToken, name, verifyFn);
 }
 function removeService(name) {
   manifestRegistry.delete(name);
