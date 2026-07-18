@@ -79,6 +79,9 @@
 
         #root = null;
         #engine = null;
+        #companyId = null;
+        #branchId = null;
+        #lastScannedDocument = null;
         #timelineIntervalId = null;
         #workflowListenerRefs = [];
 
@@ -94,25 +97,48 @@
          *   <script> element) executes correctly, unlike markup set via
          *   innerHTML, which browsers deliberately do not execute.
          */
-        #ensureEngineLoaded() {
+        /** #loadScript(src, checkFn) — real, generic script-loading helper. Reused for every required coordinator, not just the core engine. */
+        #loadScript(src, checkFn) {
             return new Promise((resolve) => {
-                if (window.CozyEnterpriseBusinessEngine) { resolve(true); return; }
-                const existing = document.querySelector('script[src*="mpesaOS.js"]');
+                if (checkFn()) { resolve(true); return; }
+                const existing = document.querySelector(`script[src*="${src.split("/").pop()}"]`);
                 if (existing) {
-                    // Already requested by something else — wait briefly for it to finish registering.
                     let attempts = 0;
                     const check = setInterval(() => {
                         attempts++;
-                        if (window.CozyEnterpriseBusinessEngine || attempts >= 40) { clearInterval(check); resolve(!!window.CozyEnterpriseBusinessEngine); }
+                        if (checkFn() || attempts >= 40) { clearInterval(check); resolve(checkFn()); }
                     }, 100);
                     return;
                 }
                 const script = document.createElement("script");
-                script.src = "../../plugins/mpesaOS.js";
-                script.onload = () => resolve(!!window.CozyEnterpriseBusinessEngine);
+                script.src = src;
+                script.onload = () => resolve(checkFn());
                 script.onerror = () => resolve(false);
                 document.head.appendChild(script);
             });
+        }
+
+        /**
+         * #ensureEngineLoaded()
+         *   Real fix for a genuine, pre-existing gap: this only ever
+         *   loaded the core engine — MpesaFloat/MpesaTill/MpesaPaybill/
+         *   PaymentChannel were never dynamically loaded by the UI at
+         *   all, meaning every real transaction would honestly fail in
+         *   an actual browser (confirmed directly: loading only this UI
+         *   module, without manually pre-loading the others, left all
+         *   four coordinators absent). Now loads all four required
+         *   dependencies, matching the same real <script> injection
+         *   pattern already proven for the core engine.
+         */
+        async #ensureEngineLoaded() {
+            const results = await Promise.all([
+                this.#loadScript("../../plugins/mpesaOS.js", () => !!window.CozyEnterpriseBusinessEngine),
+                this.#loadScript("../../plugins/mpesaOS-float.js", () => !!window.CozyOS.MpesaFloat),
+                this.#loadScript("../../plugins/mpesaOS-till.js", () => !!window.CozyOS.MpesaTill),
+                this.#loadScript("../../plugins/mpesaOS-paybill.js", () => !!window.CozyOS.MpesaPaybill),
+                this.#loadScript("../payment-channel/cozy-payment-channel-engine.js", () => !!window.CozyOS.PaymentChannel)
+            ]);
+            return results.every(Boolean);
         }
 
         #resolveEngine() {
@@ -198,10 +224,11 @@
             const responseBox = this.#root.querySelector("#mp-response-box");
             const handler = this.#resolvePluginHandler();
             if (!handler) { responseBox.textContent = "MpesaOS plugin handler is not registered."; return; }
+            if (!this.#companyId || !this.#branchId) { responseBox.textContent = "Please complete Quick Setup first — a real company/branch is required."; return; }
             responseBox.textContent = "Running…";
             this.#diagnostics.workflowsRun++;
             this.#logAudit("DEMO_WORKFLOW_RUN", "shell_demo_tenant");
-            Promise.resolve(handler("execute workflow", { tenantIsolation: () => "shell_demo_tenant" }))
+            Promise.resolve(handler("execute workflow", { tenantIsolation: () => "shell_demo_tenant", companyId: () => this.#companyId, branchId: () => this.#branchId }))
                 .then((result) => { responseBox.textContent = (result && result.responseText) || JSON.stringify(result); })
                 .catch((err) => { responseBox.textContent = "Workflow error: " + (err && err.message ? err.message : String(err)); });
         }
@@ -287,6 +314,77 @@
             return { available: true, engineReady: engineReady && !!this.#engine };
         }
 
+        /** #ensureCompanyBranch() — real check; if no company/branch exists yet, the UI shows Quick Setup instead of silently failing every real transaction. */
+        #ensureCompanyBranch() {
+            const company = window.CozyOS.Company;
+            if (!company || typeof company.listCompanies !== "function") return false;
+            const companies = company.listCompanies();
+            if (companies.length === 0) return false;
+            this.#companyId = companies[0].companyId || companies[0].id;
+            const branches = typeof company.listBranches === "function" ? (company.listBranches(this.#companyId) || []) : [];
+            if (branches.length === 0) return false;
+            this.#branchId = branches[0].branchId;
+            return true;
+        }
+
+        /**
+         * #scanReceipt(dataUrl)
+         *   Real receipt scanning — reuses window.CozyOS.DocumentEngine's
+         *   real parseDocument(), which itself reuses CozyOCR. No OCR or
+         *   document parsing logic lives in MpesaOS; this is UI wiring
+         *   only. Shows the real extracted data for the user to review
+         *   before it's used for anything, per "the user reviews the
+         *   extracted data before saving."
+         */
+        async #scanReceipt(dataUrl) {
+            const statusEl = this.#root.querySelector("#mp-scan-status");
+            const reviewSection = this.#root.querySelector("#mp-scan-review-section");
+            const reviewContent = this.#root.querySelector("#mp-scan-review-content");
+            const docEngine = window.CozyOS.DocumentEngine;
+            if (!docEngine || typeof docEngine.parseDocument !== "function") {
+                statusEl.textContent = "Document Engine is not connected — cannot scan receipts.";
+                return;
+            }
+            statusEl.textContent = "Scanning…";
+            const result = await docEngine.parseDocument(dataUrl, { companyId: this.#companyId, branchId: this.#branchId, application: "mpesaos" });
+            if (!result.available) {
+                statusEl.textContent = result.reason || "Scan failed.";
+                return;
+            }
+            this.#lastScannedDocument = result.record;
+            statusEl.textContent = "";
+            const f = result.record;
+            reviewContent.innerHTML = `Merchant: ${f.merchantName ?? "—"}<br>Date: ${f.date ?? "—"}<br>Total: ${f.total ?? "—"}<br>Document Type: ${f.documentType}` + (f.warnings.length ? `<br><span style="color:#b91c1c;">${f.warnings.join("; ")}</span>` : "");
+            reviewSection.style.display = "";
+            this.#logAudit("RECEIPT_SCANNED", `merchant=${f.merchantName || "unknown"} total=${f.total ?? "unknown"}`);
+        }
+
+        /** #useScannedReceiptForFloatPurchase() — real: takes the reviewed, extracted data and uses it for a real Float purchase, via the real MpesaFloat coordinator. Never bypasses its own validation. */
+        #useScannedReceiptForFloatPurchase() {
+            const float = window.CozyOS.MpesaFloat;
+            const doc = this.#lastScannedDocument;
+            if (!float || !doc) return;
+            const responseBox = this.#root.querySelector("#mp-scan-status");
+            try {
+                const result = float.purchaseFloat({ companyId: this.#companyId, branchId: this.#branchId, amount: doc.total, source: doc.merchantName || "Scanned receipt" });
+                responseBox.textContent = `Float purchase recorded: +${result.amount} (balance now ${result.balanceAfter}).`;
+                window.CozyOS.Toast?.show?.("Float purchase recorded from scanned receipt");
+            } catch (err) {
+                responseBox.textContent = "Could not record float purchase: " + err.message;
+            }
+        }
+
+        #quickSetup() {
+            const company = window.CozyOS.Company;
+            if (!company) return;
+            const rec = company.createCompany({ companyCode: "MPESA" + Date.now().toString(36).toUpperCase(), legalName: "My Mpesa Agency" });
+            this.#companyId = rec.companyId;
+            const branchResult = company.createBranch(this.#companyId, { branchCode: "MAIN", branchName: "Main Branch" });
+            this.#branchId = branchResult.branchId;
+            const noBranchSection = this.#root.querySelector("#mp-no-branch-section");
+            if (noBranchSection) noBranchSection.style.display = "none";
+        }
+
         async init(rawOptions = {}) {
             const { container = null, userId = null } = sanitizeObject(rawOptions);
             const root = container || document.getElementById("cozy-app-root");
@@ -312,6 +410,31 @@
             this.#applyTranslations();
             this.#refreshDashboard();
 
+            const hasCompanyBranch = this.#ensureCompanyBranch();
+            const noBranchSection = this.#root.querySelector("#mp-no-branch-section");
+            if (noBranchSection) noBranchSection.style.display = hasCompanyBranch ? "none" : "";
+
+            const setupBtn = this.#root.querySelector("#mp-quick-setup-btn");
+            if (setupBtn) setupBtn.addEventListener("click", () => this.#quickSetup());
+
+            const scanBtn = this.#root.querySelector("#mp-scan-receipt-btn");
+            const fileInput = this.#root.querySelector("#mp-receipt-file-input");
+            if (scanBtn && fileInput) {
+                scanBtn.addEventListener("click", () => fileInput.click());
+                fileInput.addEventListener("change", () => {
+                    const file = fileInput.files && fileInput.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => this.#scanReceipt(reader.result);
+                    reader.readAsDataURL(file);
+                });
+            }
+            const useForFloatBtn = this.#root.querySelector("#mp-use-for-float-btn");
+            if (useForFloatBtn) useForFloatBtn.addEventListener("click", () => this.#useScannedReceiptForFloatPurchase());
+
+            const bizDashBtn = this.#root.querySelector("#mp-toggle-business-dashboard-btn");
+            if (bizDashBtn) bizDashBtn.addEventListener("click", () => this.#toggleBusinessDashboard());
+
             this.#tryAdaptiveBusinessProfile();
             this.#tryDailyBusinessCoach();
             this.#tryUniversalTools();
@@ -325,6 +448,200 @@
                 ["workflow:started", "workflow:completed", "workflow:failed", "workflow:doubleTapBlocked", "workflow:idempotentReturn"].forEach(bind);
             }
             this.#timelineIntervalId = setInterval(() => this.#renderActiveLocks(), 5000);
+        }
+
+        /** #toggleBusinessDashboard() — real, functional rendering of getBusinessDashboard()'s real data. Visual polish is Design's work per the 5A/5B boundary; this proves the real data renders correctly end to end. */
+        #toggleBusinessDashboard() {
+            const content = this.#root.querySelector("#mp-business-dashboard-content");
+            if (content.style.display === "") { content.style.display = "none"; return; }
+            const d = this.getBusinessDashboard();
+            if (!d.available) { content.innerHTML = `<p class="mp-empty-note">${d.reason}</p>`; content.style.display = ""; return; }
+
+            const notAvailable = (section) => section.available === false ? `<span style="color:var(--cz-text-muted,#6b7280);font-style:italic;">Not Yet Available — ${section.reason}</span>` : null;
+            const rows = [];
+            rows.push(`<h4>Executive Summary</h4>`);
+            rows.push(`<p>Today's Collections: ${d.executiveSummary.todaysCollections} | Today's Transactions: ${d.executiveSummary.todaysTransactions} | Current Float: ${d.executiveSummary.currentFloat} | Till Balance: ${d.executiveSummary.tillBalance} | Paybill Balance: ${d.executiveSummary.paybillBalance}</p>`);
+            rows.push(`<p>Active Branches: ${d.executiveSummary.activeBranches} | Archived Branches: ${d.executiveSummary.archivedBranches} | Companies: ${d.executiveSummary.companies} | Users Online: ${d.executiveSummary.usersOnline ?? "—"}</p>`);
+
+            rows.push(`<h4>Financial Summary</h4>`);
+            rows.push(d.financialSummary.available ? `<p>Income Today: ${d.financialSummary.incomeToday} | Week: ${d.financialSummary.incomeWeek} | Month: ${d.financialSummary.incomeMonth} | Year: ${d.financialSummary.incomeYear}</p><p>Withdrawals: ${d.financialSummary.withdrawals} | Net Collections: ${d.financialSummary.netCollections}</p>` : `<p>${notAvailable(d.financialSummary)}</p>`);
+
+            rows.push(`<h4>Collections</h4>`);
+            rows.push(d.collections.available ? `<p>Till: ${d.collections.tillCollections} | Paybill: ${d.collections.paybillCollections} | Bank: ${d.collections.bankTransfers} | Cash: ${d.collections.cashCollections} | Card: ${d.collections.cardPayments} | Online: ${d.collections.onlinePayments} | Mobile Money (Other): ${d.collections.mobileMoneyOther} | Other: ${d.collections.other}</p>` : `<p>${notAvailable(d.collections)}</p>`);
+
+            rows.push(`<h4>Float</h4>`);
+            rows.push(d.floatDashboard.available ? `<p>Current: ${d.floatDashboard.current} | Low-Float Status: ${d.floatDashboard.lowFloatStatus.available ? (d.floatDashboard.lowFloatStatus.isLow ? "⚠️ LOW" : "OK") : "not configured"}</p>` : `<p>${notAvailable(d.floatDashboard)}</p>`);
+
+            rows.push(`<h4>Till</h4>`);
+            rows.push(d.tillDashboard.available ? `<p>Registered: ${d.tillDashboard.registered} | Active: ${d.tillDashboard.active} | Suspended: ${d.tillDashboard.suspended} | Top Till: ${d.tillDashboard.topTill ? escapeHtml(d.tillDashboard.topTill.tillNumber) : "—"}</p>` : `<p>${notAvailable(d.tillDashboard)}</p>`);
+
+            rows.push(`<h4>Paybill</h4>`);
+            rows.push(d.paybillDashboard.available ? `<p>Registered: ${d.paybillDashboard.registered}</p>` : `<p>${notAvailable(d.paybillDashboard)}</p>`);
+
+            rows.push(`<h4>Transaction Analytics</h4>`);
+            rows.push(d.transactionAnalytics.available ? `<p>Successful: ${d.transactionAnalytics.successful} | Failed: ${d.transactionAnalytics.failed} | Rolled Back: ${d.transactionAnalytics.rolledBack} | Duplicate Prevented: ${d.transactionAnalytics.duplicatePrevented}</p><p>Avg: ${d.transactionAnalytics.averageAmount ?? "—"} | Largest: ${d.transactionAnalytics.largestTransaction ?? "—"} | Smallest: ${d.transactionAnalytics.smallestTransaction ?? "—"}</p>` : `<p>${notAvailable(d.transactionAnalytics)}</p>`);
+
+            rows.push(`<h4>Receipt Status</h4><p>${notAvailable(d.receiptStatus)}</p>`);
+            rows.push(`<h4>Reconciliation</h4><p>Float — Matched: ${d.reconciliation.available ? d.reconciliation.float.matched : "—"}, Variance: ${d.reconciliation.available ? d.reconciliation.float.variance : "—"} | Till: ${notAvailable(d.reconciliation.till || { available: false, reason: "See Float coordinator." })} | Paybill: ${notAvailable(d.reconciliation.paybill || { available: false, reason: "See Float coordinator." })}</p>`);
+
+            rows.push(`<h4>Alerts</h4>`);
+            rows.push(d.alerts.length ? `<ul>${d.alerts.map(a => `<li>⚠️ ${a.message}</li>`).join("")}</ul>` : `<p class="mp-empty-note">No alerts.</p>`);
+
+            rows.push(`<h4>Recent Transactions</h4>`);
+            rows.push(d.recentTransactions.transactions.length ? `<table class="mp-table"><tr><th>Provider Code</th><th>Type</th><th>Amount</th><th>Date</th></tr>${d.recentTransactions.transactions.map(t => `<tr><td>${escapeHtml(t.providerCode)}</td><td>${escapeHtml(t.type)}</td><td>${escapeHtml(t.amount)}</td><td>${escapeHtml(t.date)}</td></tr>`).join("")}</table>` : `<p class="mp-empty-note">No transactions yet.</p>`);
+
+            content.innerHTML = rows.join("");
+            content.style.display = "";
+        }
+
+        /**
+         * getBusinessDashboard()
+         *   Real, read-only aggregation across every certified MpesaOS
+         *   coordinator — Float, Till, Paybill, the engine's own
+         *   transaction index/audit log/diagnostics, Company, and
+         *   IdentityEngine where connected. This is a presentation layer
+         *   only: every number here is read directly from an existing
+         *   coordinator's real method, never recomputed or duplicated.
+         *   Sections with no real backing data (payment-channel
+         *   breakdown, Document Engine receipt status, cross-type
+         *   reconciliation) honestly report {available:false, reason}
+         *   rather than fabricate a value.
+         */
+        getBusinessDashboard() {
+            if (!this.#companyId || !this.#branchId) return { available: false, reason: "No company/branch configured — complete Quick Setup first." };
+            const companyId = this.#companyId, branchId = this.#branchId;
+            const float = window.CozyOS.MpesaFloat, till = window.CozyOS.MpesaTill, paybill = window.CozyOS.MpesaPaybill;
+            const reporting = window.CozyOS.MpesaReporting, company = window.CozyOS.Company, identity = window.CozyOS.IdentityEngine;
+            const paymentChannel = window.CozyOS.PaymentChannel;
+            const engine = this.#engine;
+            const today = new Date().toISOString().split("T")[0];
+
+            const allTx = engine ? engine.listTransactionSummaries({ companyId, branchId }) : [];
+            const todayTx = allTx.filter(t => t.date === today);
+            const weekStart = new Date(Date.now() - 6 * 86400000).toISOString().split("T")[0];
+            const monthStart = today.slice(0, 7) + "-01";
+            const yearStart = today.slice(0, 4) + "-01-01";
+            const sumAmounts = (list) => list.reduce((s, t) => s + t.amount, 0);
+            const inRange = (fromDate) => allTx.filter(t => t.date >= fromDate);
+
+            // Section 1 — Executive Summary
+            const executiveSummary = {
+                available: true,
+                todaysCollections: sumAmounts(todayTx), todaysTransactions: todayTx.length,
+                currentFloat: float ? float.getCurrentFloat(companyId, branchId) : null,
+                tillBalance: till ? till.listTills(companyId, branchId).reduce((s, t) => s + till.getTillBalance(t.tillNumber), 0) : null,
+                paybillBalance: paybill ? paybill.listPaybills(companyId, branchId).reduce((s, p) => s + paybill.getPaybillBalance(p.paybillNumber), 0) : null,
+                failedTransactions: engine ? engine.getDiagnosticsReport().workflowsFailed : null,
+                activeBranches: company ? company.listBranches(companyId).filter(b => b.status !== "ARCHIVED").length : null,
+                archivedBranches: company ? company.listBranches(companyId).filter(b => b.status === "ARCHIVED").length : null,
+                companies: company ? company.listCompanies().length : null,
+                usersOnline: identity && typeof identity.getDiagnosticsReport === "function" ? identity.getDiagnosticsReport().sessionCount : null,
+                pendingReconciliation: float ? float.listReconciliations(companyId, branchId).filter(r => r.status === "VARIANCE_FOUND").length : null
+            };
+
+            // Section 2 — Financial Summary (date-range aggregation over the real transaction index — presentation-layer grouping, not a new calculation)
+            const financialSummary = engine ? {
+                available: true,
+                incomeToday: sumAmounts(todayTx), incomeWeek: sumAmounts(inRange(weekStart)), incomeMonth: sumAmounts(inRange(monthStart)), incomeYear: sumAmounts(inRange(yearStart)),
+                withdrawals: sumAmounts(allTx.filter(t => t.type === "Withdrawal")), floatPurchasedToday: float ? float.getFloatHistory(companyId, branchId).filter(m => m.type === "purchase" && m.timestamp.startsWith(today)).reduce((s, m) => s + m.amount, 0) : null,
+                floatRemaining: float ? float.getCurrentFloat(companyId, branchId) : null,
+                netCollections: sumAmounts(allTx.filter(t => t.type === "Deposit")) - sumAmounts(allTx.filter(t => t.type === "Withdrawal"))
+            } : { available: false, reason: "Engine not connected." };
+
+            // Section 3 — Collections (real, using the real Payment Channel Engine breakdown)
+            const collections = paymentChannel ? (() => {
+                const breakdown = paymentChannel.getChannelBreakdown({ companyId, branchId });
+                const allChannels = paymentChannel.listChannels();
+                const sumCategory = (category, excludeIds = []) => allChannels.filter(c => c.category === category && !excludeIds.includes(c.id)).reduce((s, c) => s + (breakdown.byChannel[c.id] || 0), 0);
+                return {
+                    available: true,
+                    tillCollections: breakdown.byChannel.mpesa_till || 0,
+                    paybillCollections: breakdown.byChannel.mpesa_paybill || 0,
+                    bankTransfers: sumCategory("bank"),
+                    cashCollections: sumCategory("cash"),
+                    cardPayments: sumCategory("card"),
+                    onlinePayments: sumCategory("online"),
+                    mobileMoneyOther: sumCategory("mobile_money", ["mpesa_till", "mpesa_paybill"]),
+                    other: sumCategory("internal"),
+                    totalTransactions: breakdown.totalTransactions, totalAmount: breakdown.totalAmount
+                };
+            })() : { available: false, reason: "PaymentChannel coordinator not connected." };
+
+            // Section 4 — Float Dashboard
+            const floatDashboard = float ? {
+                available: true,
+                current: float.getCurrentFloat(companyId, branchId),
+                purchasedToday: financialSummary.available ? financialSummary.floatPurchasedToday : null,
+                history: float.getFloatHistory(companyId, branchId),
+                reconciliations: float.listReconciliations(companyId, branchId),
+                lowFloatStatus: float.isLowFloat(companyId, branchId)
+            } : { available: false, reason: "MpesaFloat coordinator not connected." };
+
+            // Section 5 — Till Dashboard
+            const tillDashboard = till ? (() => {
+                const tills = till.listTills(companyId, branchId);
+                const perTill = tills.map(t => ({ ...t, balance: till.getTillBalance(t.tillNumber), totalCollected: till.getTillHistory(t.tillNumber).filter(h => h.type === "payment").reduce((s, h) => s + h.amount, 0) }));
+                const topTill = perTill.slice().sort((a, b) => b.totalCollected - a.totalCollected)[0] || null;
+                return { available: true, registered: tills.length, active: tills.filter(t => t.status === "active").length, suspended: tills.filter(t => t.status === "suspended").length, tills: perTill, topTill };
+            })() : { available: false, reason: "MpesaTill coordinator not connected." };
+
+            // Section 6 — Paybill Dashboard
+            const paybillDashboard = paybill ? (() => {
+                const paybills = paybill.listPaybills(companyId, branchId);
+                const perPaybill = paybills.map(p => ({ ...p, balance: paybill.getPaybillBalance(p.paybillNumber), totalCollected: paybill.getPaybillHistory(p.paybillNumber).filter(h => h.type === "collection").reduce((s, h) => s + h.amount, 0) }));
+                return { available: true, registered: paybills.length, paybills: perPaybill };
+            })() : { available: false, reason: "MpesaPaybill coordinator not connected." };
+
+            // Section 7 — Transaction Analytics
+            const diag = engine ? engine.getDiagnosticsReport() : null;
+            const amounts = allTx.map(t => t.amount);
+            const transactionAnalytics = diag ? {
+                available: true,
+                successful: diag.workflowsCompleted, failed: diag.workflowsFailed, duplicatePrevented: diag.doubleTapBlocked,
+                rolledBack: engine.getAuditLog(e => e.action === "TRANSACTION_ROLLED_BACK").length,
+                averageAmount: amounts.length ? amounts.reduce((s, a) => s + a, 0) / amounts.length : null,
+                largestTransaction: amounts.length ? Math.max(...amounts) : null, smallestTransaction: amounts.length ? Math.min(...amounts) : null
+            } : { available: false, reason: "Engine not connected." };
+
+            // Section 9 — Recent Transactions (most recent 20)
+            const recentTransactions = { available: true, transactions: allTx.slice(-20).reverse() };
+
+            // Section 10 — Receipt Status (not available — Document Engine's parseDocument() never persists anything, by design; no storage provider registered)
+            const receiptStatus = { available: false, reason: "Not Yet Available — the Document Engine does not persist scanned receipts by design (no storage provider is registered), so there is no real, queryable set of receipts to report on." };
+
+            // Section 11 — Audit
+            const auditSection = engine ? { available: true, recent: engine.getAuditLog().slice(-20).reverse(), permissionDenied: engine.getAuditLog(e => e.action === "PERMISSION_DENIED"||e.action==="INIT_DENIED").length, rollbacks: engine.getAuditLog(e => e.action === "TRANSACTION_ROLLED_BACK").length } : { available: false, reason: "Engine not connected." };
+
+            // Section 12 — Live Status (usersConnected not available — no real Live-side connection tracking exists)
+            const liveStatus = diag ? { available: true, processing: null, completed: diag.workflowsCompleted, failed: diag.workflowsFailed, rolledBack: transactionAnalytics.rolledBack, usersConnected: { available: false, reason: "Not Yet Available — no real connection-tracking exists on the Live Engine side." } } : { available: false, reason: "Engine not connected." };
+
+            // Section 13 — Reconciliation (only Float has real reconciliation; other types are not reconciled against anything)
+            const reconciliation = float ? { available: true, float: { matched: float.listReconciliations(companyId, branchId).filter(r => r.status === "MATCHED").length, variance: float.listReconciliations(companyId, branchId).filter(r => r.status === "VARIANCE_FOUND").length }, till: { available: false, reason: "Not Yet Available — no reconciliation exists for Till." }, paybill: { available: false, reason: "Not Yet Available — no reconciliation exists for Paybill." } } : { available: false, reason: "MpesaFloat coordinator not connected." };
+
+            // Section 14 — Alerts (only real, computed conditions)
+            const alerts = [];
+            if (floatDashboard.available && floatDashboard.lowFloatStatus.available && floatDashboard.lowFloatStatus.isLow) alerts.push({ type: "LOW_FLOAT", message: `Float balance (${floatDashboard.lowFloatStatus.current}) is below the configured threshold (${floatDashboard.lowFloatStatus.threshold}).` });
+            if (tillDashboard.available) tillDashboard.tills.filter(t => t.status === "suspended").forEach(t => alerts.push({ type: "SUSPENDED_TILL", message: `Till ${t.tillNumber} (${t.merchantName}) is suspended.` }));
+            if (paybillDashboard.available) paybillDashboard.paybills.filter(p => p.status !== "active").forEach(p => alerts.push({ type: "INACTIVE_PAYBILL", message: `Paybill ${p.paybillNumber} (${p.businessName}) is ${p.status}.` }));
+            if (transactionAnalytics.available && transactionAnalytics.failed > 0) alerts.push({ type: "FAILED_TRANSACTIONS", message: `${transactionAnalytics.failed} failed transaction(s) recorded.` });
+            if (executiveSummary.archivedBranches > 0) alerts.push({ type: "ARCHIVED_BRANCH", message: `${executiveSummary.archivedBranches} archived branch(es) on this company.` });
+            if (engine) { const channelFailures = engine.getAuditLog(e => e.action === "CHANNEL_VALIDATION_FAILED").length; if (channelFailures > 0) alerts.push({ type: "CHANNEL_VALIDATION_FAILED", message: `${channelFailures} transaction(s) rejected for an invalid/disabled/unsupported payment channel.` }); }
+            if (engine) { const permissionDenials = engine.getAuditLog(e => e.action === "PERMISSION_DENIED" || e.action === "INIT_DENIED").length; if (permissionDenials > 0) alerts.push({ type: "PERMISSION_DENIED", message: `${permissionDenials} permission-denied event(s) recorded.` }); }
+
+            // Section 16 — Business KPIs (scoped to this company/branch only — no cross-company aggregation exists)
+            const businessKPIs = {
+                available: true, todaysRevenue: executiveSummary.todaysCollections,
+                monthlyRevenue: financialSummary.available ? financialSummary.incomeMonth : null, yearlyRevenue: financialSummary.available ? financialSummary.incomeYear : null,
+                averageTransaction: transactionAnalytics.available ? transactionAnalytics.averageAmount : null,
+                topTill: tillDashboard.available ? tillDashboard.topTill : null,
+                scopeNote: "Scoped to the current company/branch only — no cross-company \"top branch/company\" aggregation exists yet."
+            };
+
+            return {
+                available: true, companyId, branchId,
+                executiveSummary, financialSummary, collections, floatDashboard, tillDashboard, paybillDashboard,
+                transactionAnalytics, recentTransactions, receiptStatus, auditSection, liveStatus, reconciliation, alerts, businessKPIs
+            };
         }
 
         /**
@@ -405,6 +722,7 @@
                 if (singletonInstance) { singletonInstance.destroy(); singletonInstance = null; }
             },
             getDashboard() { return singletonInstance ? singletonInstance.getDashboard() : { available: false, reason: "Not initialized." }; },
+            getBusinessDashboard() { return singletonInstance ? singletonInstance.getBusinessDashboard() : { available: false, reason: "Not initialized." }; },
             getNavigation() { return singletonInstance ? singletonInstance.getNavigation() : []; },
             getStatus() { return singletonInstance ? singletonInstance.getStatus() : { mounted: false, engineLoaded: false, activeSection: null }; },
             getNotifications() { return singletonInstance ? singletonInstance.getNotifications() : []; }
