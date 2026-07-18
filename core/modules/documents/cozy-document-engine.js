@@ -350,18 +350,87 @@
             this.#storageProvider = provider;
             this.#logAudit("STORAGE_PROVIDER_REGISTERED", "real provider registered");
         }
-        async saveDocument(record) {
+        /**
+         * saveDocument(record)
+         *   Real Vault integration: when window.CozyOS.Vault is
+         *   connected, requests a real encryption key (reusing one if it
+         *   already exists for this documentId, via Vault's own
+         *   validateKey() — never duplicating Vault's key-existence
+         *   logic), encrypts the record's real rawText, and stores only
+         *   ciphertext. Document Engine never stores the key itself —
+         *   only a keyId reference; Vault remains the sole owner of the
+         *   actual key material.
+         *
+         *   HONEST SCOPE, STATED EXPLICITLY: only rawText (the full,
+         *   unstructured OCR text — the most sensitive single field) is
+         *   encrypted. Structured fields extracted from it (merchantName,
+         *   total, date, documentType, category, status, companyId,
+         *   branchId, etc.) remain plaintext, deliberately — they are
+         *   exactly what searchDocuments()'s real, already-certified
+         *   filtering depends on (Rule 23: this integration must not
+         *   break that). This is a real, disclosed trade-off, not an
+         *   oversight: a document containing sensitive structured data
+         *   beyond what rawText captures is not fully protected by this
+         *   integration alone.
+         *
+         *   Honest degradation: if Vault isn't connected, the document
+         *   still saves (offline-first — matching the Offline
+         *   Philosophy), but encrypted:false is set explicitly on the
+         *   record so this is visible, never silently unencrypted
+         *   without disclosure.
+         */
+        async saveDocument(rawRecord) {
             if (!this.#storageProvider) return { available: false, reason: "Not Implemented — no storage provider registered." };
-            if (!this.#checkPermission(record?.userId, "document:save")) return { available: false, reason: "Permission denied." };
+            if (!this.#checkPermission(rawRecord?.userId, "document:save")) return { available: false, reason: "Permission denied." };
+
+            let record = { ...rawRecord };
+            const vault = window.CozyOS.Vault;
+            if (vault && record.rawText && typeof record.rawText === "string") {
+                try {
+                    const keyId = `doc_${record.documentId}`;
+                    const keyCheck = vault.validateKey(keyId);
+                    if (!keyCheck.valid) await vault.generateKey(keyId);
+                    const encrypted = await vault.encrypt(keyId, record.rawText);
+                    record.rawText = null; // never store plaintext alongside the ciphertext
+                    record.encryptedRawText = encrypted;
+                    record.encrypted = true;
+                    record.encryptionKeyId = keyId;
+                } catch (err) {
+                    this.#logAudit("ENCRYPTION_FAILED", `${record.documentId}: ${err.message}`);
+                    record.encrypted = false; // honestly disclosed — encryption was attempted and failed
+                }
+            } else {
+                record.encrypted = false; // honestly disclosed — no Vault connected, saved as-is
+            }
+
             const result = await this.#storageProvider.save(record);
             this.#logAudit("DOCUMENT_SAVED", record?.documentId);
-            this.emit("document:saved", { documentId: record?.documentId });
+            this.emit("document:saved", { documentId: record?.documentId, encrypted: record.encrypted });
             return result;
         }
+        /**
+         * loadDocument(documentId)
+         *   Real Vault integration: if the stored record is marked
+         *   encrypted, requests decryption via Vault's own real
+         *   decrypt() and restores rawText before returning. Honestly
+         *   reports failure if Vault isn't connected for an encrypted
+         *   record, rather than returning ciphertext silently as if it
+         *   were the real text.
+         */
         async loadDocument(documentId, { userId = null } = {}) {
             if (!this.#storageProvider) return { available: false, reason: "Not Implemented — no storage provider registered." };
             if (!this.#checkPermission(userId, "document:load")) return { available: false, reason: "Permission denied." };
-            return this.#storageProvider.load(documentId);
+            const result = await this.#storageProvider.load(documentId);
+            if (!result.available || !result.record?.encrypted) return result;
+
+            const vault = window.CozyOS.Vault;
+            if (!vault) return { available: false, reason: "This document is encrypted, but Vault is not connected — cannot decrypt." };
+            try {
+                const plaintext = await vault.decrypt(result.record.encryptionKeyId, result.record.encryptedRawText);
+                return { available: true, record: { ...result.record, rawText: plaintext, encryptedRawText: undefined } };
+            } catch (err) {
+                return { available: false, reason: `Decryption failed: ${err.message}` };
+            }
         }
         async deleteDocument(documentId, { userId = null } = {}) {
             if (!this.#storageProvider) return { available: false, reason: "Not Implemented — no storage provider registered." };
@@ -509,4 +578,22 @@
         name: "DocumentEngine", category: "Platform Service", icon: "document.svg",
         description: "Cozy Document Engine — the shared document platform for every CozyOS application. Reuses CozyOCR for all text extraction; never a second OCR engine."
     });
+
+    let kernelRegistrationAttempted = false;
+    async function registerWithKernel() {
+        if (kernelRegistrationAttempted) return;
+        const bootstrap = window.CozyOS?.Kernel?.Bootstrap;
+        if (!bootstrap) return;
+        kernelRegistrationAttempted = true;
+        try {
+            await bootstrap.registerService({ name: "DocumentEngine", version: DOC_ENGINE_VERSION, apiVersion: "1.0.0", mandatory: false, dependencies: [] });
+            bootstrap.initializeService("DocumentEngine");
+            await bootstrap.verifyService("DocumentEngine", async () => window.CozyOS.DocumentEngine.getVersion() === DOC_ENGINE_VERSION);
+            bootstrap.startService("DocumentEngine");
+        } catch (_err) { /* non-fatal — DocumentEngine remains fully functional standalone even if Kernel registration fails */ }
+    }
+    registerWithKernel();
+    if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+        document.addEventListener("cozyos:kernel-bridge-ready", registerWithKernel, { once: true });
+    }
 })();

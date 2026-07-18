@@ -355,4 +355,22 @@
         window.addEventListener("kernel:ready", initRegistration, { once: true });
         window.addEventListener("DOMContentLoaded", initRegistration, { once: true });
     }
+
+    let kernelRegistrationAttempted = false;
+    async function registerWithKernel() {
+        if (kernelRegistrationAttempted) return;
+        const bootstrap = window.CozyOS?.Kernel?.Bootstrap;
+        if (!bootstrap) return;
+        kernelRegistrationAttempted = true;
+        try {
+            await bootstrap.registerService({ name: "DocumentStorageProvider", version: STORAGE_PROVIDER_VERSION, apiVersion: "1.0.0", mandatory: false, dependencies: [] });
+            bootstrap.initializeService("DocumentStorageProvider");
+            await bootstrap.verifyService("DocumentStorageProvider", async () => window.CozyOS.DocumentStorageProvider.getVersion() === STORAGE_PROVIDER_VERSION);
+            bootstrap.startService("DocumentStorageProvider");
+        } catch (_err) { /* non-fatal — remains fully functional standalone even if Kernel registration fails */ }
+    }
+    registerWithKernel();
+    if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+        document.addEventListener("cozyos:kernel-bridge-ready", registerWithKernel, { once: true });
+    }
 })();
