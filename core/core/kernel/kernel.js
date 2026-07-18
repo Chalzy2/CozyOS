@@ -1,348 +1,251 @@
 /**
- * core/kernel/kernel.js
+ * =============================================================================
+ * CozyOS Kernel — Kernel Facade
+ * File: core/kernel/kernel.js
+ * =============================================================================
  *
- * CozyOS Kernel — Public Entry Point & Orchestration Layer
- * =========================================================
+ * PURPOSE
+ * -------
+ * Kernel is the single entry point applications and platform engines use to
+ * reach the kernel layer (Rule 4: Kernel Before Applications; Rule 10:
+ * Dependency Direction Kernel -> Shared Engines -> Applications).
  *
- * The Kernel is the single public API surface for the CozyOS Kernel layer.
- * It coordinates Bootstrap, Compatibility, Lifecycle, and Diagnostics.
+ * Kernel owns NOTHING itself. It is a pure delegation facade over the four
+ * real kernel engines:
+ *   - Compatibility (core/kernel/compatibility.js) — version decisions
+ *   - Bootstrap     (core/kernel/bootstrap.js)      — registration + platform state
+ *   - Lifecycle     (core/kernel/lifecycle.js)       — runtime state (reached only
+ *                                                       through Bootstrap's token,
+ *                                                       never touched directly here)
+ *   - Diagnostics   (core/kernel/diagnostics.js)     — observation + reporting
  *
- * It does NOT:
- *   - perform compatibility checks
- *   - register services
- *   - manage runtime state
- *   - generate diagnostics
- *   - render UI
- *   - contain business logic
- *   - duplicate Bootstrap / Lifecycle / Diagnostics / Compatibility logic
+ * Every exported function here does one of two things:
+ *   1. Forwards a call straight to the engine that owns that responsibility, or
+ *   2. Aggregates read-only reports from multiple engines into one convenience
+ *      shape for callers (no new state, no new decisions — Rule 2, Rule 6).
  *
- * Every method below is a thin delegation to an existing, certified engine.
- * If a method body is more than "call the dependency and shape the return
- * value / emit an event", that is a bug per Rule 1 (Single Responsibility)
- * and Rule 2 (No Duplication).
+ * Kernel never calls Lifecycle directly. Rule 11 reserves Lifecycle mutation
+ * for Bootstrap's private token; Kernel reaches runtime-state operations
+ * exclusively through Bootstrap's own pass-through methods, exactly as an
+ * application would.
  *
- * Compliance: CozyOS Engineering Rules v1.0, Rules 1-19.
+ * DEPENDENCIES (Rule 17)
+ * ------------------------
+ * Requires bootstrap.js, lifecycle.js (indirectly), compatibility.js, and
+ * diagnostics.js — all already built, self-certified (26/26, see
+ * Diagnostics.runSelfCertification), and integrated. No missing dependency
+ * blocks this file.
+ * =============================================================================
  */
 
 'use strict';
 
-const { EventEmitter } = require('events');
+import Bootstrap from './bootstrap.js';
+import Compatibility from './compatibility.js';
+import Diagnostics from './diagnostics.js';
 
-// ---------------------------------------------------------------------------
-// Kernel Metadata (Rule 9 — Service Manifest Contract / Rule 16 — Frozen Kernel)
-// ---------------------------------------------------------------------------
-const KERNEL_METADATA = Object.freeze({
-  kernelName: 'CozyOS Kernel',
-  kernelVersion: '1.0.0',
-  apiVersion: '1.0.0',
-  architectureVersion: '1.0.0',
-  certification: 'ENTERPRISE_CERTIFIED',
-  buildDate: '2026-07-18',
-});
+// -----------------------------------------------------------------------------
+// Re-exported constants (never redefined — Rule 2: single source of truth
+// stays with the engine that owns it)
+// -----------------------------------------------------------------------------
 
-const PLATFORM_STATES = Object.freeze({
-  BOOTING: 'BOOTING',
-  READY: 'READY',
-  DEGRADED: 'DEGRADED',
-  ERROR: 'ERROR',
-  SHUTDOWN: 'SHUTDOWN',
-});
+const KERNEL_VERSION = Bootstrap.KERNEL_VERSION;
+const PLATFORM_STATES = Bootstrap.PLATFORM_STATES;
 
-const KERNEL_EVENTS = Object.freeze({
-  READY: 'kernel:ready',
-  SHUTDOWN: 'kernel:shutdown',
-  RESTART: 'kernel:restart',
-  ERROR: 'kernel:error',
-  DEGRADED: 'kernel:degraded',
-});
+// -----------------------------------------------------------------------------
+// Kernel-level event bus — forwards Bootstrap's platform events under a
+// `kernel:*` namespace for application convenience. This is aggregation, not
+// duplication: Kernel does not decide platform state, it only re-announces
+// what Bootstrap already decided (Rule 1, Rule 8).
+// -----------------------------------------------------------------------------
 
-/**
- * @typedef {Object} KernelDependencies
- * @property {Object} bootstrap     - Certified Bootstrap engine (Rule 11)
- * @property {Object} compatibility - Certified Compatibility engine (Rule 14)
- * @property {Object} lifecycle     - Certified Lifecycle engine (Rule 12)
- * @property {Object} diagnostics   - Certified Diagnostics engine (Rule 13)
- * @property {EventEmitter} [eventBus] - Shared platform event bus, if one
- *   exists (Rule 8 — Event Driven Architecture). Falls back to a local
- *   EventEmitter so the Kernel never has to implement its own pub/sub logic.
- */
+const kernelListeners = new Map();
 
-class Kernel {
-  /**
-   * @param {KernelDependencies} dependencies
-   *
-   * The Kernel never constructs its own engines — they are injected.
-   * This satisfies Rule 17 (Dependency-First Development): Bootstrap,
-   * Compatibility, Lifecycle, and Diagnostics must already exist and be
-   * certified before the Kernel can be instantiated.
-   */
-  constructor({ bootstrap, compatibility, lifecycle, diagnostics, eventBus } = {}) {
-    const missing = ['bootstrap', 'compatibility', 'lifecycle', 'diagnostics'].filter(
-      (dep) => !arguments[0] || !arguments[0][dep]
-    );
-    if (missing.length) {
-      throw new Error(
-        `[Kernel] Cannot initialize: missing required dependencies: ${missing.join(', ')}. ` +
-          'Rule 17 (Dependency-First) requires Bootstrap, Compatibility, Lifecycle, and ' +
-          'Diagnostics to be built and injected before the Kernel exists.'
-      );
-    }
+function on(eventName, handler) {
+  if (typeof handler !== 'function') return () => {};
+  if (!kernelListeners.has(eventName)) kernelListeners.set(eventName, new Set());
+  kernelListeners.get(eventName).add(handler);
+  return () => kernelListeners.get(eventName)?.delete(handler);
+}
 
-    /** @private */
-    this._bootstrap = bootstrap;
-    /** @private */
-    this._compatibility = compatibility;
-    /** @private */
-    this._lifecycle = lifecycle;
-    /** @private */
-    this._diagnostics = diagnostics;
-    /** @private — reuse shared event bus if provided, never invent a new one */
-    this._events = eventBus || new EventEmitter();
-  }
-
-  // ---------------------------------------------------------------------
-  // Startup / Shutdown / Restart — delegate entirely to Bootstrap/Lifecycle
-  // ---------------------------------------------------------------------
-
-  /**
-   * Starts the Kernel.
-   * Flow: Kernel -> Bootstrap.initialize() -> Platform Ready
-   */
-  async initialize() {
+function emit(eventName, payload) {
+  const handlers = kernelListeners.get(eventName);
+  if (!handlers) return;
+  for (const handler of handlers) {
     try {
-      const result = await this._bootstrap.initialize();
-      const state = this._bootstrap.getPlatformState();
-
-      if (state === PLATFORM_STATES.READY) {
-        this._events.emit(KERNEL_EVENTS.READY, result);
-      } else if (state === PLATFORM_STATES.DEGRADED) {
-        this._events.emit(KERNEL_EVENTS.DEGRADED, result);
-      } else if (state === PLATFORM_STATES.ERROR) {
-        this._events.emit(KERNEL_EVENTS.ERROR, result);
-      }
-
-      return result;
+      handler(payload);
     } catch (err) {
-      this._events.emit(KERNEL_EVENTS.ERROR, err);
-      throw err;
+      // eslint-disable-next-line no-console
+      console.error(`[Kernel] listener error on "${eventName}":`, err);
     }
-  }
-
-  /**
-   * Gracefully shuts down the platform.
-   * Uses Bootstrap + Lifecycle. Never stops services directly.
-   */
-  async shutdown() {
-    try {
-      const result = await this._bootstrap.shutdown();
-      this._events.emit(KERNEL_EVENTS.SHUTDOWN, result);
-      return result;
-    } catch (err) {
-      this._events.emit(KERNEL_EVENTS.ERROR, err);
-      throw err;
-    }
-  }
-
-  /**
-   * Gracefully restarts the platform via Lifecycle.
-   */
-  async restart() {
-    try {
-      const result = await this._lifecycle.restartService('platform');
-      this._events.emit(KERNEL_EVENTS.RESTART, result);
-      return result;
-    } catch (err) {
-      this._events.emit(KERNEL_EVENTS.ERROR, err);
-      throw err;
-    }
-  }
-
-  // ---------------------------------------------------------------------
-  // Version / Metadata / Capabilities
-  // ---------------------------------------------------------------------
-
-  /**
-   * @returns {{kernelVersion: string, platformVersion: string, apiVersion: string}}
-   */
-  getVersion() {
-    return {
-      kernelVersion: KERNEL_METADATA.kernelVersion,
-      platformVersion: this._bootstrap.getPlatformVersion
-        ? this._bootstrap.getPlatformVersion()
-        : KERNEL_METADATA.kernelVersion,
-      apiVersion: KERNEL_METADATA.apiVersion,
-    };
-  }
-
-  /**
-   * Read-only Kernel metadata (Rule 9, Rule 16).
-   */
-  getMetadata() {
-    return { ...KERNEL_METADATA };
-  }
-
-  /**
-   * Delegates to Bootstrap. One of: BOOTING, READY, DEGRADED, ERROR, SHUTDOWN.
-   */
-  getPlatformState() {
-    return this._bootstrap.getPlatformState();
-  }
-
-  /**
-   * Delegates to Diagnostics. Returns platform health.
-   */
-  getHealth() {
-    return this._diagnostics.getHealth();
-  }
-
-  /**
-   * Delegates to Diagnostics. Returns the Enterprise Boot Report.
-   */
-  getDiagnostics() {
-    return this._diagnostics.getBootReport();
-  }
-
-  /**
-   * Aggregates capability metadata from each Kernel service. Does not
-   * compute capabilities itself — each engine reports its own.
-   */
-  getCapabilities() {
-    return {
-      compatibility: this._compatibility.getCapabilities
-        ? this._compatibility.getCapabilities()
-        : true,
-      bootstrap: this._bootstrap.getCapabilities ? this._bootstrap.getCapabilities() : true,
-      lifecycle: this._lifecycle.getCapabilities ? this._lifecycle.getCapabilities() : true,
-      diagnostics: this._diagnostics.getCapabilities
-        ? this._diagnostics.getCapabilities()
-        : true,
-      kernelVersion: KERNEL_METADATA.kernelVersion,
-      apiVersion: KERNEL_METADATA.apiVersion,
-      future: ['vault', 'identity', 'payment', 'documents', 'formula', 'language', 'ai'],
-    };
-  }
-
-  /**
-   * True only when Bootstrap reports platform state READY.
-   */
-  isReady() {
-    return this._bootstrap.getPlatformState() === PLATFORM_STATES.READY;
-  }
-
-  // ---------------------------------------------------------------------
-  // Engine Registration / Runtime — pure delegation, Kernel never registers
-  // itself and never mutates runtime state directly.
-  // ---------------------------------------------------------------------
-
-  /**
-   * Registers a new engine/service. Kernel -> Bootstrap.registerService().
-   * @param {Object} manifest - Service Manifest (Rule 9).
-   */
-  registerEngine(manifest) {
-    return this._bootstrap.registerService(manifest);
-  }
-
-  /**
-   * Restarts a registered engine via Lifecycle.
-   * @param {string} engineName
-   */
-  restartEngine(engineName) {
-    return this._lifecycle.restartService(engineName);
-  }
-
-  /**
-   * Stops a registered engine via Lifecycle.
-   * @param {string} engineName
-   */
-  stopEngine(engineName) {
-    return this._lifecycle.stopService(engineName);
-  }
-
-  /**
-   * Returns registered engine metadata via Bootstrap.
-   * @param {string} engineName
-   */
-  getEngine(engineName) {
-    return this._bootstrap.getService(engineName);
-  }
-
-  // ---------------------------------------------------------------------
-  // Reporting
-  // ---------------------------------------------------------------------
-
-  /**
-   * Aggregated Kernel report: kernel info, platform info, diagnostics
-   * summary, service count, health, version. Pure aggregation of
-   * delegated calls — no independent computation.
-   */
-  getKernelReport() {
-    return {
-      kernel: this.getMetadata(),
-      platform: this.getPlatformInfo(),
-      state: this.getPlatformState(),
-      health: this.getHealth(),
-      diagnostics: this.getDiagnostics(),
-      serviceCount: this._bootstrap.getServiceCount
-        ? this._bootstrap.getServiceCount()
-        : undefined,
-      version: this.getVersion(),
-    };
-  }
-
-  /**
-   * Platform Name, Platform Version, Kernel Version, Architecture Version,
-   * Certification, Supported Engines.
-   */
-  getPlatformInfo() {
-    return {
-      platformName: KERNEL_METADATA.kernelName,
-      platformVersion: this._bootstrap.getPlatformVersion
-        ? this._bootstrap.getPlatformVersion()
-        : KERNEL_METADATA.kernelVersion,
-      kernelVersion: KERNEL_METADATA.kernelVersion,
-      architectureVersion: KERNEL_METADATA.architectureVersion,
-      certification: KERNEL_METADATA.certification,
-      supportedEngines: this._bootstrap.getRegisteredServices
-        ? this._bootstrap.getRegisteredServices()
-        : [],
-    };
-  }
-
-  // ---------------------------------------------------------------------
-  // Compatibility Integration — Kernel never validates itself
-  // ---------------------------------------------------------------------
-
-  /**
-   * Delegates to Compatibility.check().
-   */
-  checkCompatibility(...args) {
-    return this._compatibility.check(...args);
-  }
-
-  /**
-   * Delegates to Compatibility.validateManifest().
-   */
-  validateManifest(manifest) {
-    return this._compatibility.validateManifest(manifest);
-  }
-
-  // ---------------------------------------------------------------------
-  // Event subscription (Rule 8 — Event Driven Architecture)
-  // ---------------------------------------------------------------------
-
-  /**
-   * Subscribe to Kernel events: kernel:ready, kernel:shutdown,
-   * kernel:restart, kernel:error, kernel:degraded.
-   */
-  on(eventName, handler) {
-    this._events.on(eventName, handler);
-    return this;
-  }
-
-  off(eventName, handler) {
-    this._events.off(eventName, handler);
-    return this;
   }
 }
 
-module.exports = { Kernel, KERNEL_METADATA, PLATFORM_STATES, KERNEL_EVENTS };
+Bootstrap.on(Bootstrap.PLATFORM_EVENTS.READY, (payload) => emit('kernel:ready', payload));
+Bootstrap.on(Bootstrap.PLATFORM_EVENTS.SHUTDOWN, (payload) => emit('kernel:shutdown', payload));
+Bootstrap.on(Bootstrap.PLATFORM_EVENTS.DEGRADED, (payload) => emit('kernel:degraded', payload));
+Bootstrap.on(Bootstrap.PLATFORM_EVENTS.SERVICE_REJECTED, (payload) => emit('kernel:error', payload));
+
+// -----------------------------------------------------------------------------
+// Registration & compatibility — forwarded to Bootstrap / Compatibility
+// -----------------------------------------------------------------------------
+
+function registerEngine(manifest, runtimeOptions) {
+  return Bootstrap.registerService(manifest, runtimeOptions);
+}
+
+function validateManifest(manifest) {
+  return Bootstrap.validateManifest(manifest);
+}
+
+function checkCompatibility(manifest) {
+  return Compatibility.check(manifest, { kernelVersion: KERNEL_VERSION });
+}
+
+// -----------------------------------------------------------------------------
+// Runtime state — forwarded to Bootstrap's own pass-through methods only.
+// Kernel never imports or calls Lifecycle directly (Rule 11).
+// -----------------------------------------------------------------------------
+
+function initializeService(name) {
+  return Bootstrap.initializeService(name);
+}
+function verifyService(name, verifyFn) {
+  return Bootstrap.verifyService(name, verifyFn);
+}
+function startService(name) {
+  return Bootstrap.startService(name);
+}
+function pauseService(name) {
+  return Bootstrap.pauseService(name);
+}
+function resumeService(name) {
+  return Bootstrap.resumeService(name);
+}
+function stopService(name) {
+  return Bootstrap.stopService(name);
+}
+function restartService(name, verifyFn) {
+  return Bootstrap.restartService(name, verifyFn);
+}
+function removeService(name) {
+  return Bootstrap.removeService(name);
+}
+function failService(name, error) {
+  return Bootstrap.failService(name, error);
+}
+function recoverService(name, verifyFn) {
+  return Bootstrap.recoverService(name, verifyFn);
+}
+
+// -----------------------------------------------------------------------------
+// Platform state — forwarded to Bootstrap (the sole owner, Rule 11)
+// -----------------------------------------------------------------------------
+
+function getPlatformState() {
+  return Bootstrap.getPlatformState();
+}
+function markPlatformReady() {
+  return Bootstrap.markPlatformReady();
+}
+function shutdownPlatform() {
+  return Bootstrap.shutdownPlatform();
+}
+function isReady() {
+  return Bootstrap.getPlatformState() === PLATFORM_STATES.READY;
+}
+
+// -----------------------------------------------------------------------------
+// Diagnostics / health — forwarded to Diagnostics (the sole owner, Rule 13)
+// -----------------------------------------------------------------------------
+
+function getHealth() {
+  return Diagnostics.getPlatformHealth();
+}
+function getServiceHealth(name) {
+  return Diagnostics.getServiceHealth(name);
+}
+function getBootReport() {
+  return Diagnostics.getBootReport();
+}
+function getStatistics() {
+  return Diagnostics.getStatistics();
+}
+function getDashboard() {
+  return Diagnostics.getDashboardSummary();
+}
+
+// -----------------------------------------------------------------------------
+// Aggregated reports — read-only combination of existing reports, no new
+// computation invented here (Rule 6: honest engineering, nothing fabricated)
+// -----------------------------------------------------------------------------
+
+function getCapabilities() {
+  return Object.freeze({
+    compatibility: Compatibility.getDiagnostics(),
+    bootstrap: { kernelVersion: Bootstrap.KERNEL_VERSION },
+    lifecycle: true,
+    diagnostics: true,
+    // AI Extension Points and other future providers declared by the spec
+    // are intentionally not implemented (Rule 15: No Speculative Over-Build).
+    future: []
+  });
+}
+
+function getKernelReport() {
+  return Object.freeze({
+    kernelVersion: KERNEL_VERSION,
+    platformState: getPlatformState(),
+    platform: Bootstrap.getPlatformReport(),
+    health: Diagnostics.getPlatformHealth(),
+    dashboard: Diagnostics.getDashboardSummary()
+  });
+}
+
+// -----------------------------------------------------------------------------
+// Frozen public surface (Rule 16: Frozen Kernel Standard)
+// -----------------------------------------------------------------------------
+
+const Kernel = Object.freeze({
+  KERNEL_VERSION,
+  PLATFORM_STATES,
+
+  // events
+  on,
+
+  // registration & compatibility
+  registerEngine,
+  validateManifest,
+  checkCompatibility,
+
+  // runtime state (via Bootstrap only)
+  initializeService,
+  verifyService,
+  startService,
+  pauseService,
+  resumeService,
+  stopService,
+  restartService,
+  removeService,
+  failService,
+  recoverService,
+
+  // platform state
+  getPlatformState,
+  markPlatformReady,
+  shutdownPlatform,
+  isReady,
+
+  // diagnostics / health
+  getHealth,
+  getServiceHealth,
+  getBootReport,
+  getStatistics,
+  getDashboard,
+
+  // aggregated reports
+  getCapabilities,
+  getKernelReport
+});
+
+export default Kernel;
