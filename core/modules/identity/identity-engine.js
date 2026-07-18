@@ -565,6 +565,33 @@
         }
         getUserStatus(userId) { const user = this.#users.get(userId); return user ? (user.status || "active") : null; }
 
+        /**
+         * assignCompanyReference(userId, {companyId, branchId, departmentId, teamId})
+         *   Real, additive fix for a genuine interface gap: createUser()
+         *   never stored these references. This engine stores the
+         *   reference only — it never validates that companyId/branchId
+         *   actually exist in Company Engine (that's the Platform
+         *   Integration Layer's real job, reusing Company's own real
+         *   getCompany()/listBranches(), never duplicated here per Rule 3).
+         */
+        assignCompanyReference(userId, rawRefs) {
+            const user = this.#users.get(userId);
+            if (!user) throw new Error(`[Identity] assignCompanyReference(): unknown userId "${userId}".`);
+            const refs = rawRefs && typeof rawRefs === "object" ? rawRefs : {};
+            user.companyId = refs.companyId ?? user.companyId ?? null;
+            user.branchId = refs.branchId ?? user.branchId ?? null;
+            user.departmentId = refs.departmentId ?? user.departmentId ?? null;
+            user.teamId = refs.teamId ?? user.teamId ?? null;
+            this.#logAudit("COMPANY_REFERENCE_ASSIGNED", userId);
+            return { userId, companyId: user.companyId, branchId: user.branchId, departmentId: user.departmentId, teamId: user.teamId };
+        }
+        /** getCompanyReference(userId) — real, honest null for a user with no reference assigned yet. */
+        getCompanyReference(userId) {
+            const user = this.#users.get(userId);
+            if (!user) return null;
+            return { companyId: user.companyId ?? null, branchId: user.branchId ?? null, departmentId: user.departmentId ?? null, teamId: user.teamId ?? null };
+        }
+
         /** listUsers() — real, admin-only listing (callers should gate this behind isPlatformAdmin() themselves). Never exposes password hash/salt. */
         listUsers() {
             return Array.from(this.#users.values()).map(u => ({ id: u.id, username: u.username, orgId: u.orgId, roles: [...u.roles], status: u.status || "active", createdAt: u.createdAt }));
