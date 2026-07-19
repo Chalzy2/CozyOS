@@ -1,17 +1,24 @@
 /**
  * CozyOS Enterprise Framework — Developer Hub UI
  * File Reference: core/modules/developer/developer-hub.js
- * Version: 1.0.0-ENTERPRISE
+ * Version: 1.0.1-ENTERPRISE
  * Layer: Core / Orchestration — Developer Hub UI
  * Every data read and every action here calls window.CozyOS.DeveloperHub,
  * which itself only ever delegates to the real owning coordinator. This
  * file renders; it never certifies, repairs, generates, or scores anything.
+ *
+ * v1.0.1 (Rule 21 fix, additive-only): module registration now matches
+ * the real core/ui/cozy-ui.js loader contract — added getDashboard()
+ * and made init() work when called with zero arguments (the real loader
+ * never passed a container). Fixes a confirmed crash on real-shell load
+ * ("a valid DOM container element is required"). The explicit-container
+ * call path is unchanged and still works for direct/standalone callers.
  */
 
 (function () {
     "use strict";
 
-    const HUB_UI_VERSION = "1.0.0-ENTERPRISE";
+    const HUB_UI_VERSION = "1.0.1-ENTERPRISE";
     const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
     function escapeHtml(value) {
@@ -2608,11 +2615,24 @@
      * the evidence: the explicit init()/destroy() lifecycle requirement,
      * and the observed "System Alert: undefined" symptom, which is
      * consistent with the loader looking up a registered module by name
-     * and finding nothing there. If the real loadModule() expects a
-     * different shape (a different registry object, a factory function
-     * instead of a singleton, etc.), this needs a small, disclosed
-     * correction once the real contract is confirmed — not a guess
-     * layered on a guess.
+     * and finding nothing there.
+     *
+     * RULE 21 UPDATE — real contract now verified against the actual
+     * core/ui/cozy-ui.js (previously unavailable, so the shape below was
+     * a disclosed guess; it is no longer a guess):
+     *   const app = window.CozyOS.Modules?.[moduleName];
+     *   ...
+     *   root.innerHTML = app.getDashboard?.() || "";
+     *   if (app.init) app.init();
+     * Two real mismatches existed and are fixed below:
+     *   1. The loader calls init() with ZERO arguments, not init(container).
+     *      The old init(container) threw "a valid DOM container element is
+     *      required" every time, since container was always undefined —
+     *      this was the exact cause of the "System Alert: undefined"
+     *      symptom this file already anticipated.
+     *   2. The loader requires a getDashboard() method, which did not
+     *      exist here, so root.innerHTML was cleared to "" before init()
+     *      ever ran.
      */
     window.CozyOS = window.CozyOS || {};
     window.CozyOS.Modules = window.CozyOS.Modules || {};
@@ -2642,9 +2662,32 @@
          * application's actual file locations.
          */
         files: { folder: "developer", html: "developer-hub.html", css: "developer-hub.css", js: "developer-hub.js" },
+        /**
+         * getDashboard() — required by the real cozy-ui.js contract:
+         * `root.innerHTML = app.getDashboard?.() || ""` runs BEFORE
+         * init(). This returns one empty wrapper div only; #renderMain()
+         * still owns all real content, exactly as before this fix — no
+         * markup or business logic is duplicated here.
+         */
+        getDashboard() {
+            return '<div id="cozy-developer-hub-root" class="cozy-developer-hub-shell"></div>';
+        },
+        /**
+         * init(container?) — dual contract, kept backward compatible:
+         *   - The real loader (cozy-ui.js) calls this with ZERO
+         *     arguments, after already injecting the div from
+         *     getDashboard() above into #cozy-app-root. In that case we
+         *     resolve our own container by id.
+         *   - Any existing direct caller — including this file's own
+         *     standalone fallback below — may still pass an explicit
+         *     container element; that path is unchanged from before.
+         */
         init(container) {
+            const resolvedContainer = container
+                || document.getElementById("cozy-developer-hub-root")
+                || document.getElementById("cozy-app-root");
             if (!singletonInstance) singletonInstance = new CozyDeveloperHubUI();
-            singletonInstance.init(container);
+            singletonInstance.init(resolvedContainer);
             window.CozyDeveloperHubUI = singletonInstance; // preserved for any existing code that reads this directly
             return singletonInstance;
         },
