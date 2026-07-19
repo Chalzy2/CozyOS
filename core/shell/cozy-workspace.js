@@ -156,7 +156,8 @@
         #fileBackups = new Map(); // fileId -> [{ backupId, source, hash, timestamp }], bounded
         #projectRegistry = new Map(); // projectName -> { name, fileIds, folderStructure, registeredAt, lastUpdated }
 
-        // ---- WorkspaceShell's own public event bus state ----
+        // ---- WorkspaceShell's own public event bus state (fallback only —
+        // see the MIGRATION note on on/off/once/emit below) ----
         #ownListeners = new Map();
         #onceWrapped = new Map();
 
@@ -242,16 +243,32 @@
         // #recordEvent below, which observes events emitted BY discovered
         // coordinators. This bus is for events WorkspaceShell itself
         // raises (file:registered, etc.) that external code can subscribe
-        // to directly. ----
+        // to directly.
+        // MIGRATION (Shared Platform Rule): delegates to
+        // window.CozyOS.PlatformEventBus, namespaced "workspaceshell:<e>",
+        // when loaded. #ownListeners/#onceWrapped kept as fallback only.
+        // #recordEvent's own subscriptions to OTHER coordinators (via their
+        // .on() methods) are UNCHANGED by this migration — those
+        // coordinators' public on() signature is identical post-migration,
+        // so no caller-side change was needed there. ----
         on(eventName, handler) {
             if (typeof eventName !== "string" || !eventName.trim()) throw new TypeError("[WorkspaceShell] on(): eventName must be a non-empty string.");
             if (typeof handler !== "function") throw new TypeError("[WorkspaceShell] on(): handler must be a function.");
+            const bus = window.CozyOS && window.CozyOS.PlatformEventBus;
+            if (bus) return bus.on(`workspaceshell:${eventName}`, handler);
             if (!this.#ownListeners.has(eventName)) this.#ownListeners.set(eventName, new Set());
             this.#ownListeners.get(eventName).add(handler);
             return () => this.off(eventName, handler);
         }
 
         off(eventName, handler) {
+            const bus = window.CozyOS && window.CozyOS.PlatformEventBus;
+            if (bus) {
+                const before = bus.getDiagnostics().events[`workspaceshell:${eventName}`]?.listenerCount || 0;
+                bus.off(`workspaceshell:${eventName}`, handler);
+                const after = bus.getDiagnostics().events[`workspaceshell:${eventName}`]?.listenerCount || 0;
+                return after < before;
+            }
             const set = this.#ownListeners.get(eventName);
             if (!set) return false;
             const wrapped = this.#onceWrapped.get(handler);
@@ -262,6 +279,8 @@
 
         once(eventName, handler) {
             if (typeof handler !== "function") throw new TypeError("[WorkspaceShell] once(): handler must be a function.");
+            const bus = window.CozyOS && window.CozyOS.PlatformEventBus;
+            if (bus) { bus.once(`workspaceshell:${eventName}`, handler); return; }
             const wrapper = (payload) => { this.off(eventName, handler); this.#onceWrapped.delete(handler); handler(payload); };
             this.#onceWrapped.set(handler, wrapper);
             this.on(eventName, wrapper);
@@ -269,10 +288,17 @@
 
         emit(eventName, payload) {
             if (typeof eventName !== "string" || !eventName.trim()) { this.#diagnostics.errorsHidden++; return false; }
-            const set = this.#ownListeners.get(eventName);
-            if (!set || set.size === 0) return false;
             let safePayload = payload;
             try { safePayload = this.#deepClone(payload); } catch (_err) { safePayload = payload; }
+            const bus = window.CozyOS && window.CozyOS.PlatformEventBus;
+            if (bus) {
+                const hadListeners = (bus.getDiagnostics().events[`workspaceshell:${eventName}`]?.listenerCount || 0) > 0;
+                if (!hadListeners) return false;
+                bus.emit(`workspaceshell:${eventName}`, safePayload);
+                return true;
+            }
+            const set = this.#ownListeners.get(eventName);
+            if (!set || set.size === 0) return false;
             for (const fn of Array.from(set)) {
                 try { fn(safePayload); } catch (_err) { this.#diagnostics.errorsHidden++; }
             }
