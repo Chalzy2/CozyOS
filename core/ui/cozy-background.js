@@ -60,11 +60,53 @@
             this.messageFadeState = "in"; // "in", "hold", "out"
             this.messageTimer = 0;
 
+            // Background Pack registry (Rule 36) — real, honestly empty
+            // until an application registers real illustration assets.
+            // Never consulted by the current procedural scene renderers
+            // below; see registerBackgroundPack()'s own comment.
+            this._backgroundPacks = new Map();
+
             if (document.readyState === "loading") {
                 document.addEventListener("DOMContentLoaded", () => this.init());
             } else {
                 this.init();
             }
+        }
+
+        /**
+         * registerBackgroundPack(appId, pack) / getBackgroundPack(appId)
+         *   Rule 36: Background Packs provide the actual illustrated content
+         *   (local asset paths, not the procedural canvas effects below).
+         *   Real registration/storage — mirrors ContextEngine's exact
+         *   pattern (register once, honest "not registered" lookup
+         *   otherwise) rather than inventing a different convention.
+         *
+         *   HONEST STATUS: not yet consulted by animate()/renderScene()
+         *   below. No real illustration assets have been uploaded anywhere
+         *   in this project, so wiring this into actual rendering now would
+         *   mean drawing images that don't exist. The current procedural
+         *   scenes (renderDeveloperScene, renderCozyOSScene, etc.) remain
+         *   the disclosed placeholder rendering until real Background Pack
+         *   assets exist and this gets wired in as a real follow-up.
+         */
+        registerBackgroundPack(appId, pack) {
+            if (typeof appId !== "string" || !appId.trim()) {
+                throw new TypeError("[CozyBackground] registerBackgroundPack(): appId is required and must be a non-empty string.");
+            }
+            if (!pack || typeof pack !== "object") {
+                throw new TypeError("[CozyBackground] registerBackgroundPack(): pack must be a plain object.");
+            }
+            this._backgroundPacks.set(appId, Object.freeze({
+                appId,
+                illustrations: Object.freeze((pack.illustrations || []).slice()),
+                registeredAt: new Date().toISOString()
+            }));
+        }
+
+        getBackgroundPack(appId) {
+            const record = this._backgroundPacks.get(appId);
+            if (!record) return { connected: false, appId, message: `No Background Pack registered for "${appId}" yet — using the procedural placeholder scene instead.` };
+            return { connected: true, ...record };
         }
 
         init() {
