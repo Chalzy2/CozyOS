@@ -1,106 +1,360 @@
 <!DOCTYPE html>
-<html lang="en" data-cozy-app="developer">
+<html lang="en" data-cozy-app="cozyos">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CozyOS Workspace</title>
+    <title>CozyOS</title>
+    <link rel="stylesheet" href="core/ui/cozy-tokens.css">
+    <link rel="stylesheet" href="core/ui/cozy-components.css">
+    <style>
+        /* Structural CSS only — every color/glass/radius/font/transition
+           value comes from the shared design tokens via var(--cozy-X). */
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; min-height: 100%; font-family: var(--cozy-font-sans); color: var(--cozy-text, #f1f5f9); }
 
-    <!-- Core Styles -->
-    <link rel="stylesheet" href="cozy-tokens.css">
-    <link rel="stylesheet" href="cozy-theme.css">
-    <link rel="stylesheet" href="cozy-layout.css">
-    <link rel="stylesheet" href="cozy-components.css">
-    <link rel="stylesheet" href="cozy-animations.css">
+        #cozy-shell-root { display: grid; grid-template-columns: 1fr; min-height: 100vh; }
+        @media (min-width: 860px) { #cozy-shell-root { grid-template-columns: 240px 1fr; } }
+
+        #cozy-shell-sidebar {
+            background: var(--cozy-glass-bg);
+            backdrop-filter: var(--cozy-glass-blur);
+            -webkit-backdrop-filter: var(--cozy-glass-blur);
+            border-right: var(--cozy-glass-border);
+            padding: 16px 0;
+            order: 2;
+        }
+        @media (min-width: 860px) { #cozy-shell-sidebar { order: 0; height: 100vh; position: sticky; top: 0; overflow-y: auto; } }
+        .cozy-shell-brand { font-weight: 700; font-size: 1.1rem; padding: 0 16px 16px; color: var(--cozy-brand-primary, inherit); }
+        .cozy-shell-nav-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--cozy-muted, #6b7280); padding: 14px 16px 6px; }
+        /* .cozy-nav-link base styling comes from the shared
+         * core/ui/cozy-components.css (linked above). */
+        .cozy-shell-star { cursor: pointer; opacity: 0.4; font-size: 0.9rem; }
+        .cozy-shell-star.favorited { opacity: 1; color: var(--cozy-brand-accent, gold); }
+
+        #cozy-shell-main-wrap { display: flex; flex-direction: column; min-height: 100vh; }
+        #cozy-shell-header {
+            display: flex; align-items: center; gap: 12px; padding: 10px 20px;
+            background: var(--cozy-glass-bg); backdrop-filter: var(--cozy-glass-blur); -webkit-backdrop-filter: var(--cozy-glass-blur);
+            border-bottom: var(--cozy-glass-border); flex-wrap: wrap;
+        }
+        #cozy-shell-header button {
+            background: transparent; border: var(--cozy-glass-border); color: inherit; border-radius: var(--cozy-radius-md);
+            padding: 6px 14px; font: inherit; font-size: 0.85rem; cursor: pointer; transition: background var(--cozy-transition-fast);
+        }
+        #cozy-shell-header button:hover { background: rgba(255, 255, 255, 0.06); }
+        #cozy-global-search {
+            flex: 1; max-width: 420px; background: rgba(255, 255, 255, 0.04); border: var(--cozy-glass-border);
+            border-radius: var(--cozy-radius-md); padding: 7px 12px; color: inherit; font: inherit; font-size: 0.85rem;
+        }
+        #cozy-notif-bell { position: relative; cursor: pointer; margin-left: auto; font-size: 1.1rem; }
+        #cozy-notif-count {
+            position: absolute; top: -6px; right: -8px; background: var(--cozy-error, #ef4444); color: #fff;
+            font-size: 0.65rem; border-radius: 999px; padding: 1px 5px; display: none;
+        }
+
+        #cozy-app-root { flex-grow: 1; padding: 24px; }
+
+        /* .cozy-card base styling comes from the shared
+         * core/ui/cozy-components.css (linked above). */
+        .cozy-shell-welcome h1 { margin: 0 0 6px; font-size: 1.4rem; }
+        .cozy-shell-welcome p { margin: 0; color: var(--cozy-muted, #6b7280); font-size: 0.9rem; }
+        .cozy-shell-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+        .cozy-shell-shortcut {
+            background: rgba(255, 255, 255, 0.03); border: var(--cozy-glass-border); border-radius: var(--cozy-radius-md);
+            padding: 16px; cursor: pointer; text-align: center; font-size: 0.9rem; transition: border-color var(--cozy-transition-fast);
+        }
+        .cozy-shell-shortcut:hover { border-color: var(--cozy-brand-primary); }
+        /* .cozy-empty-state comes from the shared cozy-components.css. */
+        .cozy-shell-notif-row { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: var(--cozy-glass-border); font-size: 0.85rem; }
+        .cozy-shell-notif-row:last-child { border-bottom: none; }
+
+        #cozy-app-root .cozy-card { margin-bottom: 18px; }
+        #cozy-shell-footer {
+            display: flex; gap: 18px; flex-wrap: wrap; padding: 8px 20px; font-size: 0.75rem; color: var(--cozy-muted, #6b7280);
+            background: var(--cozy-glass-bg); border-top: var(--cozy-glass-border);
+        }
+    </style>
 </head>
+<body>
 
-<body data-cozy-app="developer">
+    <!--
+      CozyOS Shared Shell — the permanent foundation for every current and
+      future end-user CozyOS application (ShopOS, QuarryOS, HospitalOS,
+      SchoolOS, ChurchOS, Marketplace, Wallet, and anything registered
+      later). This file is deliberately application-agnostic: it never
+      hardcodes an app name anywhere. Every app tile, favorite, recent
+      entry, and quick shortcut below is generated from real
+      window.CozyOS.ModuleRegistry entries at runtime — adding a new
+      end-user application means registering it in ModuleRegistry, never
+      editing this file.
 
-<header class="cozy-top-navigation">
+      Per the Shared Shell Principle: this file is permanent, applications
+      are temporary guests inside it. Only the active application's Theme
+      Profile, Context Pack, and Knowledge Pack change when the user
+      switches apps — never this shell's own navigation, layout, or
+      component structure.
 
-    <div class="cozy-brand-block">
-        <span class="cozy-logo-mark">◈</span>
-        <span class="cozy-app-title">CozyOS Workspace</span>
-    </div>
+      Real vs. honestly-empty, explicitly:
+        - Search, sidebar app list, recent apps, quick shortcuts: REAL,
+          driven by actual ModuleRegistry entries and actual session
+          activity — nothing fabricated.
+        - Notifications: REAL, driven by actual window.CozyOS.Live events
+          published during this session — not a fabricated feed.
+        - Context widget: REAL infrastructure (window.CozyOS.ContextEngine),
+          but honestly shows "no context pack registered" for every app
+          today, since zero app-specific content (ChurchOS verses, SchoolOS
+          facts, etc.) has been supplied anywhere in this project yet.
+          Nothing invented to fill that slot.
+        - Favorites/recents/notifications are session-only (in-memory), the
+          same convention every other CozyOS coordinator already uses.
+    -->
+    <div id="cozy-shell-root">
+        <aside id="cozy-shell-sidebar">
+            <div class="cozy-shell-brand">CozyOS</div>
+            <div class="cozy-nav-link" data-action="home">⌂ Home</div>
 
-    <div class="cozy-top-actions">
-        <div class="cozy-live-pill" id="universal-live-pill">
-            <span class="cozy-pulse-indicator" data-cozy-live-pulse="normal"></span>
-            <span class="cozy-pill-text">
-                SYS_STATUS: ACTIVE
-            </span>
+            <div class="cozy-shell-nav-label">Favorites</div>
+            <div id="cozy-shell-favorites-list"><div class="cozy-empty-state" style="padding-left:16px;">None yet — star an app to pin it here.</div></div>
+
+            <div class="cozy-shell-nav-label">Recent</div>
+            <div id="cozy-shell-recent-list"><div class="cozy-empty-state" style="padding-left:16px;">Nothing opened yet this session.</div></div>
+
+            <div class="cozy-shell-nav-label">Applications</div>
+            <div id="cozy-shell-apps-list"></div>
+        </aside>
+
+        <div id="cozy-shell-main-wrap">
+            <header id="cozy-shell-header">
+                <button type="button" data-action="home">⌂ Home</button>
+                <input type="text" id="cozy-global-search" placeholder="Search applications…">
+                <span id="cozy-notif-bell">🔔<span id="cozy-notif-count">0</span></span>
+            </header>
+            <main id="cozy-app-root"></main>
+            <footer id="cozy-shell-footer">
+                <span id="cozy-shell-footer-theme"></span>
+                <span id="cozy-shell-footer-appcount"></span>
+                <span id="cozy-shell-footer-session"></span>
+            </footer>
         </div>
     </div>
 
-</header>
+    <!-- CozyOS Shell UI Services (core/ui/) — real, verified files, same as dashboard.html -->
+    <script src="core/ui/cozy-theme.js"></script>
+    <script src="core/ui/cozy-background.js"></script>
+    <script src="core/ui/cozy-toast.js"></script>
+    <script src="core/ui/cozy-live.js"></script>
 
-<div class="cozy-app-container">
+    <!-- Platform foundation registries — real, verified files, same as dashboard.html -->
+    <script src="core/registry/cozy-registry.js"></script>
+    <script src="core/modules/module-registry.js"></script>
 
-    <!-- Sidebar -->
-    <aside id="cozy-sidebar">
+    <!-- Context Engine — new, real, shell-owned, zero fabricated content (see its own header). -->
+    <script src="core/context/cozy-context-engine.js"></script>
 
-        <div class="cozy-sidebar-header">
-            Applications
-        </div>
+    <!-- The real, fixed loader (see its own header for the two bugs fixed
+         to make it usable: IdentityEngine fail-open, updateActiveTile()
+         implemented). -->
+    <script src="core/ui/cozy-ui.js"></script>
 
-        <!-- Dynamic Navigation -->
-        <nav id="cozy-nav-menu">
-            <!-- cozy-navigation.js builds this automatically -->
-        </nav>
+    <script>
+        (function bootSharedShell() {
+            // The Shared Shell's own neutral platform identity — distinct
+            // from platform-admin (Administrator Workspace) and developer
+            // (Developer Hub). Colors are a first pass, see migration log;
+            // trivial to revise since this is just a theme-name reference.
+            const HOME_THEME = "cozyos";
+            const favoriteAppIds = new Set();
+            const recentAppIds = [];
+            const notifications = [];
+            let sessionLaunchCount = 0;
 
-    </aside>
+            function waitFor(checkFn, cb, maxAttempts = 40) {
+                if (checkFn()) { cb(); return; }
+                let attempts = 0;
+                const id = setInterval(() => {
+                    attempts++;
+                    if (checkFn() || attempts >= maxAttempts) { clearInterval(id); if (checkFn()) cb(); }
+                }, 250);
+            }
 
-    <!-- Workspace -->
-    <main id="cozy-app-root" class="cozy-main-workspace">
+            // The one and only place this file reads "which apps exist" —
+            // always live, always from ModuleRegistry, never hardcoded.
+            function getApps() {
+                if (!window.CozyOS || !window.CozyOS.ModuleRegistry) return [];
+                return window.CozyOS.ModuleRegistry.list().filter(m => m.dashboard === "end-user");
+            }
 
-        <div class="cozy-loading">
-            Select an application...
-        </div>
+            function escapeHtml(v) {
+                return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+            }
 
-    </main>
+            function renderSidebarLists() {
+                const apps = getApps();
 
-</div>
+                const appsList = document.getElementById("cozy-shell-apps-list");
+                appsList.innerHTML = apps.map(app => `
+                    <div class="cozy-nav-link" data-module="${escapeHtml(app.id)}">
+                        <span data-action="launch" data-module="${escapeHtml(app.id)}" style="flex-grow:1;">${escapeHtml(app.name)}</span>
+                        <span class="cozy-shell-star ${favoriteAppIds.has(app.id) ? "favorited" : ""}" data-action="favorite" data-module="${escapeHtml(app.id)}">★</span>
+                    </div>`).join("") || `<div class="cozy-empty-state" style="padding-left:16px;">No end-user applications registered yet.</div>`;
 
-<footer class="cozy-bottom-statusbar">
+                const favList = document.getElementById("cozy-shell-favorites-list");
+                const favApps = apps.filter(a => favoriteAppIds.has(a.id));
+                favList.innerHTML = favApps.length
+                    ? favApps.map(a => `<div class="cozy-nav-link" data-action="launch" data-module="${escapeHtml(a.id)}">${escapeHtml(a.name)}</div>`).join("")
+                    : `<div class="cozy-empty-state" style="padding-left:16px;">None yet — star an app to pin it here.</div>`;
 
-    <div class="cozy-status-left">
-        LOC_NODE: 1.002.AFR
-    </div>
+                const recentList = document.getElementById("cozy-shell-recent-list");
+                const recentApps = recentAppIds.map(id => apps.find(a => a.id === id)).filter(Boolean);
+                recentList.innerHTML = recentApps.length
+                    ? recentApps.map(a => `<div class="cozy-nav-link" data-action="launch" data-module="${escapeHtml(a.id)}">${escapeHtml(a.name)}</div>`).join("")
+                    : `<div class="cozy-empty-state" style="padding-left:16px;">Nothing opened yet this session.</div>`;
+            }
 
-    <div class="cozy-status-center"></div>
+            function renderFooter() {
+                const theme = document.documentElement.getAttribute("data-cozy-app") || "unknown";
+                document.getElementById("cozy-shell-footer-theme").textContent = `Theme: ${theme}`;
+                document.getElementById("cozy-shell-footer-appcount").textContent = `Applications: ${getApps().length}`;
+                document.getElementById("cozy-shell-footer-session").textContent = `Opened this session: ${sessionLaunchCount}`;
+            }
 
-    <div class="cozy-status-right">
-        RUNTIME: ACTIVE
-    </div>
+            function renderNotifBadge() {
+                const el = document.getElementById("cozy-notif-count");
+                el.textContent = String(notifications.length);
+                el.style.display = notifications.length ? "inline-block" : "none";
+            }
 
-</footer>
+            function greeting() {
+                const hour = new Date().getHours();
+                if (hour < 12) return "Good morning";
+                if (hour < 18) return "Good afternoon";
+                return "Good evening";
+            }
 
-<!-- ========================= -->
-<!-- Engineering Layer -->
-<!-- ========================= -->
+            /**
+             * renderHome() — the actual CozyOS operating-environment home
+             * screen: welcome card, context widget (honest, real
+             * ContextEngine lookup keyed on the ACTIVE theme, so it
+             * automatically reflects whichever application's theme is
+             * currently applied — this is the "automatic context" behavior
+             * from the Shared Shell Principle, minus any fabricated
+             * content), quick shortcuts, notifications feed. Rebuilt into
+             * #cozy-app-root whenever the user returns Home.
+             */
+            function renderHome() {
+                const apps = getApps();
+                const activeTheme = document.documentElement.getAttribute("data-cozy-app") || HOME_THEME;
+                const ctx = (window.CozyOS.ContextEngine) ? window.CozyOS.ContextEngine.getContextForApp(activeTheme) : { connected: false, message: "ContextEngine is not loaded on this page." };
 
-<script src="../modules/module-registry.js"></script>
-<script src="../modules/identity/identity-engine.js"></script>
+                const contextHtml = ctx.connected
+                    ? `<div class="cozy-card"><h3>${escapeHtml(ctx.welcomeMessage || "Today")}</h3>${(ctx.dailyContent || []).map(c => `<p>${escapeHtml(c.text)}</p>`).join("") || `<p class="cozy-empty-state">Pack registered but has no daily content yet.</p>`}</div>`
+                    : `<div class="cozy-card"><div class="cozy-shell-nav-label" style="padding-left:0;">Today</div><p class="cozy-empty-state">${escapeHtml(ctx.message)}</p></div>`;
 
-<!-- ========================= -->
-<!-- Shell -->
-<!-- ========================= -->
+                const shortcutsHtml = apps.length
+                    ? `<div class="cozy-shell-grid">${apps.map(a => `<div class="cozy-shell-shortcut" data-action="launch" data-module="${escapeHtml(a.id)}">${escapeHtml(a.name)}</div>`).join("")}</div>`
+                    : `<p class="cozy-empty-state">No end-user applications registered yet.</p>`;
 
-<script src="cozy-theme.js"></script>
-<script src="cozy-background.js"></script>
-<script src="cozy-live.js"></script>
-<script src="cozy-toast.js"></script>
-<script src="cozy-ui.js"></script>
-<script src="cozy-navigation.js"></script>
+                const notifHtml = notifications.length
+                    ? notifications.slice(-8).reverse().map(n => `<div class="cozy-shell-notif-row"><span>${escapeHtml(n.text)}</span><span class="cozy-empty-state">${escapeHtml(n.time)}</span></div>`).join("")
+                    : `<p class="cozy-empty-state">No activity yet this session.</p>`;
 
-<script>
-window.addEventListener("DOMContentLoaded", () => {
+                document.getElementById("cozy-app-root").innerHTML = `
+                    <div class="cozy-card cozy-shell-welcome">
+                        <h1>${greeting()}, welcome to CozyOS</h1>
+                        <p>Sign-in and personalized greetings arrive once IdentityEngine is connected — this greeting is time-of-day only, not personalized.</p>
+                    </div>
+                    ${contextHtml}
+                    <div class="cozy-card">
+                        <div class="cozy-shell-nav-label" style="padding-left:0;">Applications</div>
+                        ${shortcutsHtml}
+                    </div>
+                    <div class="cozy-card">
+                        <div class="cozy-shell-nav-label" style="padding-left:0;">Recent Activity</div>
+                        ${notifHtml}
+                    </div>`;
+            }
 
-    if (window.buildSidebar) {
-        buildSidebar("system");
-    }
+            function goHome() {
+                if (window.CozyOS.UI && window.CozyOS.UI.activeModule) {
+                    const prev = window.CozyOS.Modules && window.CozyOS.Modules[window.CozyOS.UI.activeModule];
+                    if (prev && typeof prev.destroy === "function") { try { prev.destroy(); } catch (_err) { /* non-fatal */ } }
+                    window.CozyOS.UI.activeModule = null;
+                }
+                if (window.CozyOS.Theme && typeof window.CozyOS.Theme.setTheme === "function") {
+                    try { window.CozyOS.Theme.setTheme(HOME_THEME); } catch (_err) { /* non-fatal */ }
+                }
+                if (window.CozyOS.ContextEngine && typeof window.CozyOS.ContextEngine.setActiveContext === "function") {
+                    window.CozyOS.ContextEngine.setActiveContext(HOME_THEME);
+                }
+                renderHome();
+                renderSidebarLists();
+                renderFooter();
+            }
 
-});
-</script>
+            // The ONLY app-launch path in this file — every entry point
+            // (sidebar item, favorite, recent, quick shortcut) calls this
+            // same function, which delegates entirely to the real
+            // window.CozyOS.UI.loadModule() contract. Nothing here
+            // reimplements app loading.
+            function launchApp(appId) {
+                const idx = recentAppIds.indexOf(appId);
+                if (idx !== -1) recentAppIds.splice(idx, 1);
+                recentAppIds.unshift(appId);
+                if (recentAppIds.length > 5) recentAppIds.pop();
 
+                sessionLaunchCount++;
+                if (window.CozyOS.UI && typeof window.CozyOS.UI.loadModule === "function") {
+                    window.CozyOS.UI.loadModule(appId);
+                }
+                if (window.CozyOS.ContextEngine && typeof window.CozyOS.ContextEngine.setActiveContext === "function") {
+                    window.CozyOS.ContextEngine.setActiveContext(appId);
+                }
+                renderSidebarLists();
+                renderFooter();
+            }
+
+            function wireEvents() {
+                document.body.addEventListener("click", (evt) => {
+                    const favEl = evt.target.closest('[data-action="favorite"]');
+                    if (favEl) {
+                        const id = favEl.getAttribute("data-module");
+                        if (favoriteAppIds.has(id)) favoriteAppIds.delete(id); else favoriteAppIds.add(id);
+                        renderSidebarLists();
+                        return;
+                    }
+                    const launchEl = evt.target.closest('[data-action="launch"]');
+                    if (launchEl) { launchApp(launchEl.getAttribute("data-module")); return; }
+                    const homeEl = evt.target.closest('[data-action="home"]');
+                    if (homeEl) { goHome(); return; }
+                });
+
+                document.getElementById("cozy-global-search").addEventListener("input", (evt) => {
+                    const q = evt.target.value.trim().toLowerCase();
+                    const items = document.querySelectorAll("#cozy-shell-apps-list .cozy-nav-link");
+                    items.forEach((el) => {
+                        const name = el.textContent.toLowerCase();
+                        el.style.display = (!q || name.includes(q)) ? "" : "none";
+                    });
+                });
+
+                if (window.CozyOS.Live && typeof window.CozyOS.Live.subscribe === "function") {
+                    ["loading", "ready", "error"].forEach((channel) => {
+                        window.CozyOS.Live.subscribe(channel, (payload) => {
+                            const label = channel === "ready" ? `Opened ${payload.module}`
+                                : channel === "error" ? `Error: ${payload.module || ""} ${payload.reason || payload.error || ""}`.trim()
+                                : `Loading ${payload.module}…`;
+                            notifications.push({ text: label, time: new Date().toLocaleTimeString() });
+                            renderNotifBadge();
+                        });
+                    });
+                }
+            }
+
+            waitFor(() => window.CozyOS && window.CozyOS.ModuleRegistry, () => {
+                wireEvents();
+                goHome();
+            });
+        })();
+    </script>
 </body>
 </html>
