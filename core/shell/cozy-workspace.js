@@ -2139,6 +2139,77 @@
                     </div>
                 </div>`;
 
+            // Feature cards — the two real, connected major capabilities
+            // today (Developer Hub, Certification). Sub-tiles reflect real
+            // sections/actions that exist, not invented feature names.
+            const featureCardsHtml = `
+                <div class="cozy-feature-card" style="border-left:4px solid var(--accent-emerald,#1B5E20);">
+                    <div class="cozy-feature-card-head">
+                        <div>
+                            <h3 style="margin:0;text-transform:none;color:var(--text-primary);font-size:1.1rem;">Developer Hub</h3>
+                            <p style="margin:4px 0 0;color:var(--text-secondary);font-size:0.85rem;">Builder, Certification, BugFixer, Workspace, and Service Registry tools for CozyOS development.</p>
+                        </div>
+                        <button type="button" class="cozy-btn cozy-btn-primary" data-center="developerHub">Open Developer Hub →</button>
+                    </div>
+                    <div class="cozy-quick-grid" style="margin-top:14px;">
+                        <div class="cozy-quick-card" data-center="developerHub"><div class="cozy-card-label">Builder</div><div style="font-size:0.8rem;color:var(--text-secondary);">Code generation</div></div>
+                        <div class="cozy-quick-card" data-center="developerHub"><div class="cozy-card-label">BugFixer</div><div style="font-size:0.8rem;color:var(--text-secondary);">Repair tools</div></div>
+                        <div class="cozy-quick-card" data-center="developerHub"><div class="cozy-card-label">Memory</div><div style="font-size:0.8rem;color:var(--text-secondary);">Knowledge search</div></div>
+                    </div>
+                </div>
+                <div class="cozy-feature-card" style="border-left:4px solid #3b82f6;">
+                    <div class="cozy-feature-card-head">
+                        <div>
+                            <h3 style="margin:0;text-transform:none;color:var(--text-primary);font-size:1.1rem;">Certification</h3>
+                            <p style="margin:4px 0 0;color:var(--text-secondary);font-size:0.85rem;">Platform-wide certification, release integrity, and dependency tracking.</p>
+                        </div>
+                        <button type="button" class="cozy-btn" style="border-color:#3b82f6;color:#3b82f6;" data-center="certification">Open Certification →</button>
+                    </div>
+                    <div class="cozy-quick-grid" style="margin-top:14px;">
+                        <div class="cozy-quick-card" data-center="certification"><div class="cozy-card-label">Certification Center</div><div style="font-size:0.8rem;color:var(--text-secondary);">Run checks</div></div>
+                        <div class="cozy-quick-card" data-center="releases"><div class="cozy-card-label">Release Center</div><div style="font-size:0.8rem;color:var(--text-secondary);">Track releases</div></div>
+                        <div class="cozy-quick-card" data-center="dependencies"><div class="cozy-card-label">Dependency Viewer</div><div style="font-size:0.8rem;color:var(--text-secondary);">Inspect dependencies</div></div>
+                    </div>
+                </div>`;
+
+            // System Status — real presence checks only. No fabricated
+            // "Running"/"Ready"/"Online" for anything not actually verified;
+            // shows the real connection state each coordinator itself
+            // reports elsewhere in this file.
+            const statusChecks = [
+                ["Certification", !!cert],
+                ["Identity", !!identity],
+                ["Service Registry", !!(window.CozyOS && window.CozyOS.ServiceRegistry)],
+                ["Module Registry", !!(window.CozyOS && window.CozyOS.ModuleRegistry)],
+                ["Plugin Manager", !!(window.CozyOS && window.CozyOS.PluginManager)],
+                ["Platform Event Bus", !!(window.CozyOS && window.CozyOS.PlatformEventBus)]
+            ];
+            const systemStatusHtml = `
+                <div class="cozy-panel">
+                    <h3 style="margin:0 0 10px;">System Status</h3>
+                    ${statusChecks.map(([label, ok]) => `
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-color,#e2e8f0);">
+                            <span>${ok ? "✅" : "⭕"} ${this.#escapeHtml(label)}</span>
+                            <span style="color:${ok ? "var(--accent-emerald,#1B5E20)" : "var(--text-secondary,#475569)"};font-size:0.85rem;">${ok ? "Connected" : "Not connected"}</span>
+                        </div>`).join("")}
+                </div>`;
+
+            // Recent Activity — real events from getEventLog(), the same
+            // log every coordinator's live activity already writes to.
+            // Never fabricated; shows an honest empty state if nothing has
+            // happened yet this session.
+            let recentEvents = [];
+            try { recentEvents = this.getEventLog(6); } catch (_err) { /* stays empty */ }
+            const recentActivityHtml = `
+                <div class="cozy-panel">
+                    <h3 style="margin:0 0 10px;">Recent Activity</h3>
+                    ${recentEvents.length ? recentEvents.map(e => `
+                        <div style="padding:6px 0;border-bottom:1px solid var(--border-color,#e2e8f0);">
+                            <div>${this.#escapeHtml(e.source)}: ${this.#escapeHtml(e.eventName)}</div>
+                            <div style="font-size:0.75rem;color:var(--text-secondary,#475569);">${this.#escapeHtml(new Date(e.time).toLocaleString())}</div>
+                        </div>`).join("") : `<p class="cozy-disclosure-note">No activity recorded yet this session.</p>`}
+                </div>`;
+
             const rows = data.coordinators.map(c => `
                 <div class="cozy-nav-link" data-view="modules" data-id="${this.#escapeHtml(c.name)}">
                     <span>${this.#escapeHtml(c.name)}</span>
@@ -2165,7 +2236,11 @@
                     </div>
                 </section>`;
 
-            return `${heroHtml}${statsHtml}${quickActionsHtml}
+            return `${heroHtml}${statsHtml}
+                <h3 style="margin:20px 0 10px;">Platform Capabilities</h3>
+                ${featureCardsHtml}
+                ${quickActionsHtml}
+                <div class="cozy-grid" style="grid-template-columns:1fr 1fr;margin-top:20px;">${systemStatusHtml}${recentActivityHtml}</div>
                 <h3 style="margin:24px 0 10px;">Coordinator Status</h3>
                 <p style="color:var(--text-secondary,#475569);font-size:0.85rem;">${data.discoveredCount}/${data.totalCount} coordinators discovered.</p>
                 ${banner}<div class="cozy-list">${rows}</div>${terminalHtml}`;
@@ -2185,12 +2260,16 @@
             const data = this.getModuleManagerData();
             return `<h2>Module Manager</h2>${this.#renderList(data.modules, m => `
                 <div class="cozy-module-row" data-view="certification-detail" data-id="${this.#escapeHtml(m.name)}">
-                    <b>${this.#escapeHtml(m.name)}</b>
-                    <span>${m.discovered ? this.#escapeHtml(m.version || "unknown version") : this.#escapeHtml(m.registrationStatus)}</span>
-                    <span class="cozy-badge">${m.certification ? this.#escapeHtml(m.certification.certification) : "Unknown"}</span>
-                    <span class="cozy-badge">${this.#escapeHtml(m.updateStatus)}</span>
-                    <span>${m.health !== null ? this.#escapeHtml(m.health) + "%" : "Health: Unknown"}</span>
-                    <span>${m.dependencies.length} dependenc${m.dependencies.length === 1 ? "y" : "ies"} declared</span>
+                    <div class="cozy-module-row-main">
+                        <b>${this.#escapeHtml(m.name)}</b>
+                        <span class="cozy-badge">${m.certification ? this.#escapeHtml(m.certification.certification) : "Unknown"}</span>
+                        <span class="cozy-badge cozy-badge-neutral">${this.#escapeHtml(m.updateStatus)}</span>
+                    </div>
+                    <div class="cozy-module-row-meta">
+                        <span>${m.discovered ? this.#escapeHtml(m.version || "unknown version") : this.#escapeHtml(m.registrationStatus)}</span>
+                        <span>${m.health !== null ? "Health: " + this.#escapeHtml(m.health) + "%" : "Health: Unknown"}</span>
+                        <span>${m.dependencies.length} dependenc${m.dependencies.length === 1 ? "y" : "ies"} declared</span>
+                    </div>
                 </div>`)}`;
         }
 
@@ -2353,6 +2432,7 @@
                     <div class="cozy-main-wrap">
                         ${statusBarHtml}
                         <main class="cozy-main">${mainHtml}</main>
+                        <footer class="cozy-shell-footer">CozyOS Enterprise &middot; Built for Africa &middot; Secure &middot; Offline First &middot; Open Future</footer>
                     </div>
                 </div>`;
 
