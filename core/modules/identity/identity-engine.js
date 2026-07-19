@@ -566,6 +566,19 @@
         getUserStatus(userId) { const user = this.#users.get(userId); return user ? (user.status || "active") : null; }
 
         /**
+         * getUser(userId)
+         *   Real, additive (Rule 24) — a genuine gap found while building
+         *   the Session Service: no method previously returned a user's
+         *   basic profile (username/roles/status) to an external caller.
+         *   Never exposes hash/salt — those never leave this engine.
+         */
+        getUser(userId) {
+            const user = this.#users.get(userId);
+            if (!user) return null;
+            return { userId: user.id, username: user.username, roles: [...(user.roles || [])], status: user.status || "active", companyId: user.companyId ?? null, branchId: user.branchId ?? null, departmentId: user.departmentId ?? null, teamId: user.teamId ?? null };
+        }
+
+        /**
          * assignCompanyReference(userId, {companyId, branchId, departmentId, teamId})
          *   Real, additive fix for a genuine interface gap: createUser()
          *   never stored these references. This engine stores the
