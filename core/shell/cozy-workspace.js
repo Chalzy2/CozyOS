@@ -108,13 +108,14 @@
         ai: "CozyAI",
         plugin: null, // no single coordinator convention exists for plugins yet
         // Additive (Administrator Workspace expansion): Users/Roles/Permissions
-        // all read the SAME CozyIdentity coordinator already used by
-        // getVisibleApplications() above — CozyOS has one identity coordinator,
-        // not three, so these three centers honestly share one connection
-        // check rather than pretending to be three independent systems.
-        users: "CozyIdentity",
-        roles: "CozyIdentity",
-        permissions: "CozyIdentity"
+        // all read the SAME IdentityEngine coordinator — CORRECTED (Phase 1):
+        // the real global is window.CozyOS.IdentityEngine
+        // (core/modules/identity/identity-engine.js), not the guessed
+        // "CozyIdentity" — this was a functional bug (these three sections
+        // would never have connected even with the real file loaded).
+        users: "IdentityEngine",
+        roles: "IdentityEngine",
+        permissions: "IdentityEngine"
     });
 
     class CozyOSWorkspaceShell {
@@ -949,35 +950,54 @@
         }
 
         // =========================================================================
-        // ─── ROLE-BASED MENU ────────────────────────────────────────────────────
-        // Reads permissions from CozyIdentity ONLY — the Workspace never
-        // decides who can see what. If CozyIdentity isn't connected, or
-        // doesn't expose the proposed getAllowedApplications(role) method,
-        // this fails OPEN (shows everything) with a clear, visible reason,
-        // rather than silently hiding applications for a reason the operator
-        // can't see.
+        // ─── USER-BASED APPLICATION VISIBILITY ─────────────────────────────────
+        // CORRECTED (Phase 1, Identity integration): the real coordinator is
+        // window.CozyOS.IdentityEngine (core/modules/identity/identity-engine.js),
+        // not the guessed "CozyIdentity" global, and its real model is
+        // per-user (via getDashboardConfig(userId)/canAccessApplication),
+        // not per-role — there is no getAllowedApplications(role) method on
+        // the real file. This method had zero existing callers anywhere in
+        // this file, so correcting its parameter from a guessed `role` to
+        // the real `userId` breaks nothing. Still fails OPEN (shows
+        // everything) with a clear, visible reason if Identity isn't
+        // connected or the call throws — never silently hides applications
+        // for a reason the operator can't see.
         // =========================================================================
 
-        getVisibleApplications(role) {
+        getVisibleApplications(userId) {
             const cert = this.#certification;
             const allApps = cert ? cert.listApplications() : [];
-            const identity = window.CozyOS && window.CozyOS.CozyIdentity ? window.CozyOS.CozyIdentity : null;
+            const identity = window.CozyOS && window.CozyOS.IdentityEngine ? window.CozyOS.IdentityEngine : null;
             if (!identity) {
-                return this.#deepClone({ role: role || null, source: "none", applications: allApps, message: "CozyIdentity not connected — showing all applications (role-based filtering unavailable)." });
+                return this.#deepClone({ userId: userId || null, source: "none", applications: allApps, message: "IdentityEngine not connected — showing all applications (per-user filtering unavailable)." });
             }
-            if (typeof identity.getAllowedApplications !== "function") {
-                return this.#deepClone({ role: role || null, source: "CozyIdentity (unsupported)", applications: allApps, message: "CozyIdentity is connected but doesn't expose getAllowedApplications(role) — showing all applications." });
+            if (typeof identity.getDashboardConfig !== "function") {
+                return this.#deepClone({ userId: userId || null, source: "IdentityEngine (unsupported)", applications: allApps, message: "IdentityEngine is connected but doesn't expose getDashboardConfig(userId) — showing all applications." });
             }
-            let allowedIds;
-            try { allowedIds = identity.getAllowedApplications(role); }
+            let config;
+            try { config = identity.getDashboardConfig(userId); }
             catch (_err) {
                 this.#diagnostics.errorsHidden++;
-                return this.#deepClone({ role: role || null, source: "CozyIdentity (error)", applications: allApps, message: "CozyIdentity.getAllowedApplications() threw — showing all applications." });
+                return this.#deepClone({ userId: userId || null, source: "IdentityEngine (error)", applications: allApps, message: "IdentityEngine.getDashboardConfig() threw — showing all applications." });
             }
-            const allowedSet = new Set(Array.isArray(allowedIds) ? allowedIds : []);
+            if (!config || !config.available) {
+                return this.#deepClone({ userId: userId || null, source: "IdentityEngine", applications: [], message: (config && config.reason) || "No dashboard configuration available for this user." });
+            }
+            // Three-tier model, per the real getDashboardConfig() contract:
+            // admin sees everything; developer sees developer-hub plus
+            // whatever's individually assigned; end-user sees only their
+            // real assigned+enabled applications.
+            if (config.dashboardType === "admin") {
+                return this.#deepClone({ userId, source: "IdentityEngine", dashboardType: "admin", applications: allApps });
+            }
+            const allowedIds = new Set(
+                config.dashboardType === "developer"
+                    ? [...(config.developerApplications || [])]
+                    : [...(config.assignedApplications || [])]
+            );
             return this.#deepClone({
-                role: role || null, source: "CozyIdentity",
-                applications: allApps.filter(a => allowedSet.has(a.id))
+                userId, source: "IdentityEngine", dashboardType: config.dashboardType,
+                applications: allApps.filter(a => allowedIds.has(a.id))
             });
         }
 
@@ -1066,7 +1086,7 @@
                 { label: "Loading Coordinators", loaded: this.#coordinators.size > 0 },
                 { label: "Loading Applications", loaded: !!cert && cert.listApplications().length >= 0 && !!cert },
                 { label: "Loading Certification", loaded: !!cert },
-                { label: "Loading Identity", loaded: !!(window.CozyOS && window.CozyOS.CozyIdentity) },
+                { label: "Loading Identity", loaded: !!(window.CozyOS && window.CozyOS.IdentityEngine) },
                 { label: "Loading Subscription", loaded: this.getSubscriptionCenterData().connected },
                 { label: "Loading Notifications", loaded: !!(window.CozyOS && window.CozyOS.CozyNotification) },
                 { label: "Loading Storage", loaded: !!(window.CozyOS && window.CozyOS.CozyStorage) },
@@ -1183,12 +1203,22 @@
 
         // =========================================================================
         // ─── ADMINISTRATOR WORKSPACE EXPANSION (additive) ──────────────────────
-        // Users / Roles / Permissions read the same CozyIdentity coordinator as
-        // getVisibleApplications() above — generic version/diagnostics only,
-        // since this shell has no documented CozyIdentity API for listing
-        // actual user/role/permission records and must not invent one.
+        // CORRECTED (Phase 1): real global is IdentityEngine, not the guessed
+        // "CozyIdentity". Users now shows real data via the real listUsers()
+        // method (verified to exist and match this exact use case). Roles/
+        // Permissions remain generic version/diagnostics-only for now —
+        // identity-engine.js has listResourcePermissions()/checkPermission()
+        // but no confirmed "list every role" / "list every permission
+        // definition" method; upgrading those two needs that read finished
+        // first, not guessed at.
         // =========================================================================
-        getUsersCenterData() { return this.#getIntegrationSlotData("users"); }
+        getUsersCenterData() {
+            const identity = window.CozyOS && window.CozyOS.IdentityEngine ? window.CozyOS.IdentityEngine : null;
+            if (!identity) return { connected: false, message: "IdentityEngine is not connected." };
+            if (typeof identity.listUsers !== "function") return { connected: false, message: "IdentityEngine is connected but doesn't expose listUsers()." };
+            try { return this.#deepClone({ connected: true, users: identity.listUsers() }); }
+            catch (_err) { this.#diagnostics.errorsHidden++; return { connected: false, message: "IdentityEngine.listUsers() threw." }; }
+        }
         getRolesCenterData() { return this.#getIntegrationSlotData("roles"); }
         getPermissionsCenterData() { return this.#getIntegrationSlotData("permissions"); }
 
@@ -2021,7 +2051,17 @@
                 case "tenants": return `<h2>Tenant Center</h2>${this.#renderNotConnected(this.getTenantCenterData().message)}`;
 
                 // --- Administrator Workspace expansion (additive) ---
-                case "users": return this.#renderIntegrationSlot(this.getUsersCenterData(), "Users");
+                case "users": {
+                    const data = this.getUsersCenterData();
+                    if (!data.connected) return `<h2>Users</h2>${this.#renderNotConnected(data.message)}`;
+                    const rows = this.#renderList(data.users, u => `
+                        <div class="cozy-module-row">
+                            <b>${this.#escapeHtml(u.username)}</b>
+                            <span>${this.#escapeHtml((u.roles || []).join(", ") || "no roles")}</span>
+                            <span class="cozy-badge">${this.#escapeHtml(u.status)}</span>
+                        </div>`);
+                    return `<h2>Users</h2>${rows}`;
+                }
                 case "roles": return this.#renderIntegrationSlot(this.getRolesCenterData(), "Roles");
                 case "permissions": return this.#renderIntegrationSlot(this.getPermissionsCenterData(), "Permissions");
                 case "companies": return `<h2>Companies</h2>${this.#renderNotConnected(this.getCompaniesCenterData().message)}`;
