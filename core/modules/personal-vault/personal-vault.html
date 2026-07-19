@@ -1,0 +1,118 @@
+<!--
+    core/modules/personal-vault/personal-vault.html
+    Fetched and mounted directly into #cozy-app-root by cozy-ui.js's
+    real loadModule(). Contains ONLY this application's own content —
+    no header/sidebar/footer/bottom-nav, which remain the Shell's
+    responsibility. (The original vault__1_.html had its own bottom
+    nav bar with Home/Profile/Vault/Wallet/Contacts links — that is
+    shared cross-application navigation, intentionally NOT duplicated
+    here per the migration rule: "Applications should never create
+    Sidebar/Toolbar/Footer/Header/Window/Notifications. The Shell
+    provides them.")
+-->
+<div class="cozy-app-content" data-app="personal-vault">
+
+    <div class="pv-tabs">
+        <div class="pv-tab active" data-tab="all">📦 All</div>
+        <div class="pv-tab" data-tab="goals">🎯 Goals</div>
+        <div class="pv-tab" data-tab="coach">🤖 Smart Tips</div>
+    </div>
+
+    <div class="pv-search">
+        <input type="text" id="pv-search-input" placeholder="Search your vault…">
+    </div>
+
+    <!-- ALL ITEMS VIEW -->
+    <div id="pv-view-all">
+        <div class="pv-pinned-section" id="pv-pinned-section" style="display:none;">
+            <div class="pv-pinned-title">📌 Pinned</div>
+            <div class="pv-pinned-row" id="pv-pinned-row"></div>
+        </div>
+        <div class="pv-vault-list" id="pv-vault-list"></div>
+        <button id="pv-open-add-modal">+ Add to Vault</button>
+    </div>
+
+    <!-- GOALS VIEW -->
+    <div id="pv-view-goals" style="display:none;">
+        <div class="pv-goals-header">
+            <div>🎯 My Goals</div>
+            <button id="pv-open-goal-modal">+ New Goal</button>
+        </div>
+        <div id="pv-goals-list"></div>
+    </div>
+
+    <!-- SMART TIPS VIEW (formerly "Coach"/"AI") -->
+    <div id="pv-view-coach" style="display:none;">
+        <div>🤖 Smart Tips — real, rule-based suggestions, not AI</div>
+        <div class="pv-topics">
+            <button class="pv-topic-btn" data-topic="business">🏪 Business</button>
+            <button class="pv-topic-btn" data-topic="savings">💰 Savings</button>
+            <button class="pv-topic-btn" data-topic="goals">🎯 Goals</button>
+            <button class="pv-topic-btn" data-topic="studies">📚 Studies</button>
+            <button class="pv-topic-btn" data-topic="farming">🌱 Farming</button>
+        </div>
+        <div id="pv-coach-messages"></div>
+        <div class="pv-coach-input-row">
+            <input type="text" id="pv-coach-input" placeholder="Ask for a tip…">
+            <button id="pv-coach-send">➤</button>
+        </div>
+    </div>
+
+    <!-- ADD ITEM MODAL -->
+    <div class="pv-modal-bg" id="pv-add-modal">
+        <div class="pv-modal">
+            <div class="pv-modal-title">📦 Add to Vault <button class="pv-modal-close" data-close="pv-add-modal">×</button></div>
+            <label>Type *</label>
+            <select id="pv-v-type">
+                <option value="idea">💡 Idea</option>
+                <option value="goal">🎯 Goal</option>
+                <option value="document">📄 Document</option>
+                <option value="memory">🌟 Memory</option>
+                <option value="business">🏪 Business Note</option>
+                <option value="lesson">📚 Lesson</option>
+                <option value="ai_note">🤖 AI Note</option>
+            </select>
+            <label>Title *</label>
+            <input type="text" id="pv-v-title" placeholder="What is this about?">
+            <label>Content / Notes</label>
+            <textarea id="pv-v-content" rows="4" placeholder="Write your thoughts, notes or content here…"></textarea>
+            <label>Tags (comma separated)</label>
+            <input type="text" id="pv-v-tags" placeholder="e.g. business, kilifi, idea">
+            <label><input type="checkbox" id="pv-v-pin"> 📌 Pin this item to top</label>
+            <div class="pv-btn-row">
+                <button data-close="pv-add-modal">Cancel</button>
+                <button id="pv-save-item">Save to Vault</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADD GOAL MODAL -->
+    <div class="pv-modal-bg" id="pv-goal-modal">
+        <div class="pv-modal">
+            <div class="pv-modal-title">🎯 New Goal <button class="pv-modal-close" data-close="pv-goal-modal">×</button></div>
+            <label>Goal Title *</label>
+            <input type="text" id="pv-g-title" placeholder="e.g. Save KES 10,000 by December">
+            <label>Description</label>
+            <textarea id="pv-g-desc" rows="2" placeholder="Why is this goal important to you?"></textarea>
+            <label>Target Amount (KES)</label>
+            <input type="number" id="pv-g-target" placeholder="10000">
+            <label>Deadline</label>
+            <input type="date" id="pv-g-date">
+            <label>Category</label>
+            <select id="pv-g-cat">
+                <option value="goals">🎯 General Goal</option>
+                <option value="savings">💰 Savings</option>
+                <option value="business">🏪 Business</option>
+                <option value="studies">📚 Education</option>
+                <option value="farming">🌱 Farming</option>
+                <option value="family">👨‍👩‍👧 Family</option>
+                <option value="community">🌍 Community</option>
+            </select>
+            <div class="pv-btn-row">
+                <button data-close="pv-goal-modal">Cancel</button>
+                <button id="pv-save-goal">Create Goal</button>
+            </div>
+        </div>
+    </div>
+
+</div>

@@ -1,0 +1,13 @@
+/* core/modules/personal-vault/personal-vault.css
+   Application-specific styling only. Shared layout, theme colors,
+   fonts, and spacing remain the Shared Shell's responsibility
+   (cozy-theme.css / cozy-layout.css / cozy-components.css) and are
+   not duplicated here. */
+
+.cozy-app-tabs button {
+    margin-right: 0.5rem;
+}
+.cozy-vault-item, .cozy-goal {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
