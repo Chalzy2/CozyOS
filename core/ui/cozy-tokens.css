@@ -61,22 +61,42 @@ html[data-cozy-app="cozyos"], [data-cozy-app="cozyos"] {
 }
 
 /* ==========================================================================
-   PLATFORM-ADMIN — CozyOS Emerald Green + Gold (Administrator Workspace)
-   Additive: a distinct theme profile for the Administrator Workspace,
-   sharing the same design system (glass panels, radii, transitions, fonts,
-   frozen semantic status colors above) as every other app, with its own
-   Administrator branding rather than inheriting Developer Hub's colors.
+   PLATFORM-ADMIN — Light Enterprise (Administrator Workspace)
+   REWORKED per reference design: light content area with a dark navy
+   sidebar, replacing the earlier dark-glass treatment. Overrides the
+   universal glass/card tokens (defined in the base :root above) ONLY
+   within this theme's own selector — Developer Hub and every other app
+   theme are unaffected, since CSS custom properties only cascade where
+   the [data-cozy-app="platform-admin"] attribute is actually present.
+   New tokens (--cozy-sidebar-*) added here because no prior theme needed
+   a visually distinct sidebar from its main content area — justified
+   under Rule 34 (new tokens, real need, no duplication of an existing one).
    ========================================================================== */
 html[data-cozy-app="platform-admin"], [data-cozy-app="platform-admin"] {
     --cozy-accent: #1B5E20;
-    --cozy-accent-glow: rgba(27, 94, 32, 0.18);
+    --cozy-accent-glow: rgba(27, 94, 32, 0.15);
     --cozy-brand-primary: #1B5E20;
-    --cozy-brand-accent: #F9A825;
-    --cozy-brand-glow: rgba(27, 94, 32, 0.18);
-    --cozy-bg-gradient: radial-gradient(circle at 50% 0%, #10130f 0%, #05060a 100%);
-    --cozy-muted: #6b7280;
-    --cozy-text: #f1f5f9;
-    --cozy-border: rgba(255, 255, 255, 0.08);
+    --cozy-brand-accent: #00A86B;
+    --cozy-brand-glow: rgba(27, 94, 32, 0.15);
+    --cozy-bg-gradient: #f8fafc;
+    --cozy-muted: #475569;
+    --cozy-text: #0f172a;
+    --cozy-border: rgba(15, 23, 42, 0.08);
+
+    /* Light card/glass treatment — overrides the universal dark-glass
+       defaults specifically for this theme. */
+    --cozy-glass-bg: #ffffff;
+    --cozy-glass-blur: none;
+    --cozy-glass-shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.06);
+    --cozy-glass-border: 1px solid rgba(15, 23, 42, 0.06);
+
+    /* New: sidebar-specific tokens (dark navy sidebar, distinct from the
+       light main content area). */
+    --cozy-sidebar-bg: #0f172a;
+    --cozy-sidebar-text: #e2e8f0;
+    --cozy-sidebar-text-muted: #94a3b8;
+    --cozy-sidebar-hover: #1e293b;
+    --cozy-sidebar-active-bg: rgba(27, 94, 32, 0.25);
 }
 
 /* ==========================================================================
