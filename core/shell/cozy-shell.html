@@ -148,6 +148,13 @@
     <script src="core/registry/cozy-registry.js"></script>
     <script src="core/modules/module-registry.js"></script>
 
+    <!-- Shared Platform Strengthening: PlatformEventBus / ModuleLoadingManager
+         (core/shell/) — must load before cozy-ui.js below, since its
+         one-time ModuleLoadingManager.init() hook runs at cozy-ui.js's own
+         script-execution time. -->
+    <script src="core/shell/platform-event-bus.js"></script>
+    <script src="core/shell/module-loading-manager.js"></script>
+
     <!-- Context Engine — new, real, shell-owned, zero fabricated content (see its own header). -->
     <script src="core/context/cozy-context-engine.js"></script>
 
