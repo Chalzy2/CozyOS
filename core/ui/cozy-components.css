@@ -1,0 +1,120 @@
+/**
+ * CozyOS Enterprise Design System — Shared Component Library
+ * File Reference: core/ui/cozy-components.css
+ *
+ * SCOPE, HONESTLY STATED
+ *   This file consolidates component patterns that were ALREADY duplicated,
+ *   independently and slightly inconsistently, across dashboard.html,
+ *   cozy-shell.html, and developer-hub.css: glass cards/panels, buttons,
+ *   badges, navigation items, and empty states. Every rule here uses the
+ *   shared --cozy-* tokens (from cozy-tokens.css) exclusively — no
+ *   hardcoded colors — so cozyos's own palette (or any application theme's
+ *   override) flows through automatically.
+ *
+ *   This is NOT yet the complete component library Rule 35 describes.
+ *   Tabs, dropdowns, charts, timelines, tooltips, chips, window frames,
+ *   modals, and the full animation library are NOT included — nothing in
+ *   the codebase today actually consumes them, and building them
+ *   speculatively would risk diverging from whatever the eventual real
+ *   implementation turns out to need. See the migration log for the exact
+ *   dated status of this gap.
+ *
+ * NAMING
+ *   Uses the "cozy-" prefix throughout (matching cozy-workspace.js's own
+ *   real output classes and this file's own home in core/ui/), distinct
+ *   from Developer Hub's separate "cz-" prefixed component set in
+ *   developer-hub.css, which is intentionally NOT touched or merged here —
+ *   Developer Hub explicitly retains its own developer-focused identity
+ *   per the locked architecture, and its "cz-" components are a distinct,
+ *   deliberately separate set, not a duplicate of these.
+ */
+
+/* ---------- Card / Panel ---------- */
+.cozy-card, .cozy-panel {
+    background: var(--cozy-glass-bg);
+    backdrop-filter: var(--cozy-glass-blur);
+    -webkit-backdrop-filter: var(--cozy-glass-blur);
+    border: var(--cozy-glass-border);
+    border-radius: var(--cozy-radius-lg, var(--cozy-radius-md));
+    box-shadow: var(--cozy-glass-shadow);
+    padding: 20px;
+}
+
+/* ---------- Buttons ---------- */
+.cozy-btn {
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: var(--cozy-glass-border);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--cozy-text, inherit);
+    border-radius: var(--cozy-radius-md);
+    padding: 8px 16px;
+    transition: background var(--cozy-transition-fast), border-color var(--cozy-transition-fast), opacity var(--cozy-transition-fast);
+}
+.cozy-btn:hover { background: rgba(255, 255, 255, 0.08); border-color: var(--cozy-brand-primary); }
+.cozy-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.cozy-btn.cozy-btn-primary {
+    background: var(--cozy-brand-primary);
+    border-color: var(--cozy-brand-primary);
+    color: #000;
+}
+.cozy-btn.cozy-btn-primary:hover { box-shadow: 0 0 15px var(--cozy-brand-glow); opacity: 0.9; }
+.cozy-btn.cozy-btn-danger {
+    background: transparent;
+    border-color: var(--cozy-error, #ef4444);
+    color: var(--cozy-error, #ef4444);
+}
+
+/* ---------- Badges ---------- */
+.cozy-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+.cozy-badge-success, .cozy-badge-ready { background: rgba(34, 197, 94, 0.15); color: var(--cozy-success, #22c55e); }
+.cozy-badge-warning, .cozy-badge-warn { background: rgba(245, 158, 11, 0.15); color: var(--cozy-warning, #f59e0b); }
+.cozy-badge-info { background: rgba(59, 130, 246, 0.15); color: var(--cozy-info, #3b82f6); }
+.cozy-badge-error, .cozy-badge-blocked { background: rgba(239, 68, 68, 0.15); color: var(--cozy-error, #ef4444); }
+.cozy-badge-neutral { background: rgba(255, 255, 255, 0.08); color: var(--cozy-muted, #6b7280); }
+
+/* ---------- Navigation Items ---------- */
+.cozy-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    transition: background var(--cozy-transition-fast), color var(--cozy-transition-fast);
+}
+.cozy-nav-link:hover { background: rgba(255, 255, 255, 0.05); }
+.cozy-nav-link.active {
+    border-left-color: var(--cozy-brand-primary);
+    color: var(--cozy-brand-primary);
+    font-weight: 600;
+}
+
+/* ---------- Empty / Not-Connected States ---------- */
+.cozy-empty-state, .cozy-not-connected {
+    color: var(--cozy-muted, #6b7280);
+    font-size: 0.85rem;
+    font-style: italic;
+    padding: 10px 0;
+}
+
+/* ---------- Form Inputs ---------- */
+.cozy-input {
+    background: rgba(255, 255, 255, 0.04);
+    border: var(--cozy-glass-border);
+    border-radius: var(--cozy-radius-md);
+    padding: 7px 12px;
+    color: var(--cozy-text, inherit);
+    font: inherit;
+    font-size: 0.85rem;
+}
+.cozy-input:focus { outline: none; border-color: var(--cozy-brand-primary); }
