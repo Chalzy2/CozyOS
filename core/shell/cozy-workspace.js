@@ -2090,33 +2090,85 @@
 
         #renderDashboard() {
             const data = this.getDashboardData();
+            const cert = this.#certification;
+            const identity = window.CozyOS && window.CozyOS.IdentityEngine ? window.CozyOS.IdentityEngine : null;
+
+            // Real stat cards only — every number below comes from an
+            // actually-connected coordinator, or the card honestly shows
+            // "—" rather than a fabricated figure.
+            let appsValue = "—";
+            try { if (cert && typeof cert.listApplications === "function") appsValue = String(cert.listApplications().length); } catch (_err) { /* stays "—" */ }
+            const modulesValue = `${data.discoveredCount}/${data.totalCount}`;
+            let usersValue = "—";
+            try { if (identity && typeof identity.listUsers === "function") usersValue = String(identity.listUsers().length); } catch (_err) { /* stays "—" */ }
+
+            const heroHtml = `
+                <div class="cozy-hero">
+                    <div>
+                        <h1>Welcome to the Administrator Workspace</h1>
+                        <p>CozyOS Enterprise Control Center</p>
+                    </div>
+                    <span class="cozy-hero-status">System Online</span>
+                </div>`;
+
+            const statsHtml = `
+                <div class="cozy-stat-grid">
+                    <div class="cozy-stat-card"><div class="cozy-card-label">Applications</div><div class="cozy-card-value">${appsValue}</div></div>
+                    <div class="cozy-stat-card"><div class="cozy-card-label">Modules Discovered</div><div class="cozy-card-value">${modulesValue}</div></div>
+                    <div class="cozy-stat-card"><div class="cozy-card-label">Users</div><div class="cozy-card-value">${usersValue}</div></div>
+                </div>`;
+
+            const quickActionsHtml = `
+                <h3 style="margin:20px 0 10px;">Quick Actions</h3>
+                <div class="cozy-quick-grid">
+                    <div class="cozy-quick-card" data-center="developerHub">
+                        <div class="cozy-card-label">Developer Hub</div>
+                        <div style="color:var(--text-secondary,#475569);font-size:0.85rem;">Dev tools</div>
+                    </div>
+                    <div class="cozy-quick-card" data-center="applications">
+                        <div class="cozy-card-label">Application Center</div>
+                        <div style="color:var(--text-secondary,#475569);font-size:0.85rem;">Manage applications</div>
+                    </div>
+                    <div class="cozy-quick-card" data-center="modules">
+                        <div class="cozy-card-label">Module Manager</div>
+                        <div style="color:var(--text-secondary,#475569);font-size:0.85rem;">Manage modules</div>
+                    </div>
+                    <div class="cozy-quick-card" data-center="security">
+                        <div class="cozy-card-label">Security Center</div>
+                        <div style="color:var(--text-secondary,#475569);font-size:0.85rem;">System security</div>
+                    </div>
+                </div>`;
+
             const rows = data.coordinators.map(c => `
                 <div class="cozy-nav-link" data-view="modules" data-id="${this.#escapeHtml(c.name)}">
                     <span>${this.#escapeHtml(c.name)}</span>
                     <span class="cozy-badge">${this.#escapeHtml(c.certSymbol)} ${this.#escapeHtml(c.certStatus)}</span>
                 </div>`).join("");
             const banner = data.certificationConnected ? "" : this.#renderNotConnected("CozyCertification is not connected — certification status below is unknown for every coordinator, not fabricated as passing.");
-            // Additive: Core Terminal, preserved unchanged from the original
-            // standalone dashboard.html, now rendered as part of the
-            // Dashboard section instead of the whole page. Same three status
-            // cards, same terminal input/output, same execute button.
+            // Core Terminal, preserved unchanged from the original standalone
+            // dashboard.html — same three status cards, same terminal
+            // input/output, same execute button, now inside the new layout.
             const terminalHtml = `
-                <section class="cozy-panel" style="display:flex;flex-direction:column;gap:12px;min-height:350px;margin-top:16px;">
-                    <div class="cozy-card-label" style="border-bottom:1px solid var(--cz-border,#262626);padding-bottom:8px;">Unified AI Core Ingestion Gateway</div>
+                <section class="cozy-panel" style="display:flex;flex-direction:column;gap:12px;min-height:350px;margin-top:20px;">
+                    <div class="cozy-card-label" style="border-bottom:1px solid var(--border-color,#e2e8f0);padding-bottom:8px;">Unified AI Core Ingestion Gateway</div>
                     <div class="cozy-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));">
                         <div class="cozy-card"><div class="cozy-card-label">Tenant State</div><div class="cozy-card-value">Isolated</div></div>
                         <div class="cozy-card"><div class="cozy-card-label">SDK Framework</div><div class="cozy-card-value">v1.0 Frozen</div></div>
                         <div class="cozy-card"><div class="cozy-card-label">Active Plugins</div><div class="cozy-card-value" id="plugin-count">0 Loaded</div></div>
                     </div>
-                    <div id="terminal-output" style="background:#050505;border-radius:6px;padding:12px;font-family:monospace;font-size:0.9rem;flex-grow:1;color:#a0a0a0;overflow-y:auto;min-height:160px;">
+                    <div id="terminal-output" style="border-radius:6px;padding:12px;font-family:monospace;font-size:0.9rem;flex-grow:1;overflow-y:auto;min-height:160px;">
                         <div>⚡ CozyOS Kernel initialized. Ready for context queries...</div>
                     </div>
                     <div style="display:flex;gap:8px;">
-                        <input type="text" id="terminal-input" placeholder="Query industry context..." style="flex-grow:1;background:#0a0a0a;border:1px solid var(--cz-border,#262626);border-radius:6px;padding:12px;color:white;">
-                        <button id="execute-btn" type="button" style="background:var(--accent-emerald,#0f5132);border:none;border-radius:6px;color:white;padding:0 16px;font-weight:600;cursor:pointer;">Execute</button>
+                        <input type="text" id="terminal-input" placeholder="Query industry context..." style="flex-grow:1;border-radius:6px;padding:12px;">
+                        <button id="execute-btn" type="button" style="background:var(--accent-emerald,#1B5E20);border:none;border-radius:6px;color:white;padding:0 16px;font-weight:600;cursor:pointer;">Execute</button>
                     </div>
                 </section>`;
-            return `<h2>Dashboard</h2><p>${data.discoveredCount}/${data.totalCount} coordinators discovered.</p>${banner}<div class="cozy-list">${rows}</div>${terminalHtml}`;
+
+            return `${heroHtml}${statsHtml}${quickActionsHtml}
+                <h3 style="margin:24px 0 10px;">Coordinator Status</h3>
+                <p style="color:var(--text-secondary,#475569);font-size:0.85rem;">${data.discoveredCount}/${data.totalCount} coordinators discovered.</p>
+                ${banner}<div class="cozy-list">${rows}</div>${terminalHtml}`;
         }
 
         #renderApplicationCenter() {
