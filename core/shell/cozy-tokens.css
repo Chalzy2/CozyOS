@@ -41,6 +41,45 @@
 }
 
 /* ==========================================================================
+   COZYOS — Platform Identity (Shared Shell default, before any app is active)
+   Additive: distinct from platform-admin (Administrator Workspace) and
+   developer (Developer Hub) — this is the Shared Shell's own neutral
+   identity. Colors below are a first pass (indigo/sky), not a confirmed
+   final brand decision — flagged explicitly in the migration log; trivial
+   to revise since they're plain CSS custom properties.
+   ========================================================================== */
+html[data-cozy-app="cozyos"], [data-cozy-app="cozyos"] {
+    --cozy-accent: #4F46E5;
+    --cozy-accent-glow: rgba(79, 70, 229, 0.18);
+    --cozy-brand-primary: #4F46E5;
+    --cozy-brand-accent: #38BDF8;
+    --cozy-brand-glow: rgba(79, 70, 229, 0.18);
+    --cozy-bg-gradient: radial-gradient(circle at 50% 0%, #0f1020 0%, #05050a 100%);
+    --cozy-muted: #6b7280;
+    --cozy-text: #f1f5f9;
+    --cozy-border: rgba(255, 255, 255, 0.08);
+}
+
+/* ==========================================================================
+   PLATFORM-ADMIN — CozyOS Emerald Green + Gold (Administrator Workspace)
+   Additive: a distinct theme profile for the Administrator Workspace,
+   sharing the same design system (glass panels, radii, transitions, fonts,
+   frozen semantic status colors above) as every other app, with its own
+   Administrator branding rather than inheriting Developer Hub's colors.
+   ========================================================================== */
+html[data-cozy-app="platform-admin"], [data-cozy-app="platform-admin"] {
+    --cozy-accent: #1B5E20;
+    --cozy-accent-glow: rgba(27, 94, 32, 0.18);
+    --cozy-brand-primary: #1B5E20;
+    --cozy-brand-accent: #F9A825;
+    --cozy-brand-glow: rgba(27, 94, 32, 0.18);
+    --cozy-bg-gradient: radial-gradient(circle at 50% 0%, #10130f 0%, #05060a 100%);
+    --cozy-muted: #6b7280;
+    --cozy-text: #f1f5f9;
+    --cozy-border: rgba(255, 255, 255, 0.08);
+}
+
+/* ==========================================================================
    DEVELOPER HUB — Cozy Green + Gold (Default)
    ========================================================================== */
 html[data-cozy-app="developer"], [data-cozy-app="developer"] {

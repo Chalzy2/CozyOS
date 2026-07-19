@@ -106,7 +106,15 @@
         translation: "LanguageEngine",
         notification: "CozyNotification",
         ai: "CozyAI",
-        plugin: null // no single coordinator convention exists for plugins yet
+        plugin: null, // no single coordinator convention exists for plugins yet
+        // Additive (Administrator Workspace expansion): Users/Roles/Permissions
+        // all read the SAME CozyIdentity coordinator already used by
+        // getVisibleApplications() above — CozyOS has one identity coordinator,
+        // not three, so these three centers honestly share one connection
+        // check rather than pretending to be three independent systems.
+        users: "CozyIdentity",
+        roles: "CozyIdentity",
+        permissions: "CozyIdentity"
     });
 
     class CozyOSWorkspaceShell {
@@ -1124,15 +1132,74 @@
         getNotificationCenterData() { return this.#getIntegrationSlotData("notification"); }
         getAICenterData() { return this.#getIntegrationSlotData("ai"); }
 
-        // Plugin Center and Tenant Center have no backing coordinator
-        // convention at all yet in CozyOS — honestly empty, not simulated.
+        // Plugin Center — CONNECTED (Rule 32 verified): core/pluginManager.js
+        // exposes a real coordinator at window.CozyOS.PluginManager with its
+        // own read-only stats()/list()/health() API (P-08 in its header). This
+        // shell reuses that API directly rather than reimplementing any
+        // plugin bookkeeping. Falls back to honest "Not Connected" only if
+        // pluginManager.js genuinely isn't loaded on the page.
         getPluginCenterData() {
-            return { connected: false, message: "No plugin-registry coordinator exists yet in CozyOS. Nothing to show until one is built and registers plugins with a documented API." };
+            const pm = window.CozyOS && window.CozyOS.PluginManager;
+            if (!pm || typeof pm.stats !== "function") {
+                return { connected: false, message: "PluginManager (core/pluginManager.js) is not loaded on this page." };
+            }
+            let stats = null, list = null;
+            try { stats = pm.stats(); } catch (_err) { this.#diagnostics.errorsHidden++; }
+            try { list = pm.list(); } catch (_err) { this.#diagnostics.errorsHidden++; }
+            return this.#deepClone({ connected: true, stats, list: list || [] });
         }
 
+        // Tenant Center has no backing coordinator convention at all yet in
+        // CozyOS — honestly empty, not simulated.
         getTenantCenterData() {
             return { connected: false, message: "No tenant/multi-org coordinator exists yet in CozyOS. Nothing to show until one is built and registers tenants with a documented API." };
         }
+
+        // =========================================================================
+        // ─── ADMINISTRATOR WORKSPACE EXPANSION (additive) ──────────────────────
+        // Users / Roles / Permissions read the same CozyIdentity coordinator as
+        // getVisibleApplications() above — generic version/diagnostics only,
+        // since this shell has no documented CozyIdentity API for listing
+        // actual user/role/permission records and must not invent one.
+        // =========================================================================
+        getUsersCenterData() { return this.#getIntegrationSlotData("users"); }
+        getRolesCenterData() { return this.#getIntegrationSlotData("roles"); }
+        getPermissionsCenterData() { return this.#getIntegrationSlotData("permissions"); }
+
+        // Companies, Monitoring, Configuration, and Audit have no backing
+        // coordinator convention at all yet in CozyOS — same honest treatment
+        // as Plugin/Tenant Center above, not simulated.
+        getCompaniesCenterData() {
+            return { connected: false, message: "No company/organization coordinator exists yet in CozyOS. Nothing to show until one is built and registers companies with a documented API." };
+        }
+        getMonitoringCenterData() {
+            return { connected: false, message: "No monitoring coordinator exists yet in CozyOS, distinct from the Diagnostics Center above. Nothing to show until one is built with a documented API." };
+        }
+        getConfigurationCenterData() {
+            return { connected: false, message: "No platform-configuration coordinator exists yet in CozyOS. Nothing to show until one is built with a documented API." };
+        }
+        getAuditCenterData() {
+            return { connected: false, message: "No audit-log coordinator exists yet in CozyOS. Nothing to show until one is built with a documented API." };
+        }
+
+        // RULE 32 OWNERSHIP NOTE — Engines and Services are NOT the same
+        // concept as Module Manager, and this is a TEMPORARY integration
+        // state, not a permanent alias:
+        //   Module Manager → loaded modules (coordinator discovery, as-is)
+        //   Engines        → certified CozyOS business engines (no
+        //                     dedicated Engine Registry coordinator exists
+        //                     yet — ownership analysis pending)
+        //   Services       → platform/runtime services (no dedicated
+        //                     Service Registry listing coordinator exists
+        //                     yet, distinct from generic module discovery)
+        // Until those coordinators exist, both centers render the SAME
+        // this.#coordinators data as Module Manager, purely because it's
+        // the only real discovery mechanism CozyOS has today — never
+        // fabricated data. The render layer below labels both views
+        // explicitly as temporary, so nobody mistakes this for the real
+        // Engine/Service domains being merged into Module Manager.
+        getEnginesCenterData() { return this.getModuleManagerData(); }
+        getServicesCenterData() { return this.getModuleManagerData(); }
 
         // =====================================================================
         // ─── FILE REGISTRY (Upload / central file hub) ────────────────────────
@@ -1912,8 +1979,45 @@
                 case "notifications": return this.#renderNotificationCenter();
                 case "ai": return this.#renderIntegrationSlot(this.getAICenterData(), "AI Center");
                 case "subscription": return this.#renderIntegrationSlot(this.getSubscriptionCenterData(), "Subscription / License Center");
-                case "plugins": return `<h2>Plugin Center</h2>${this.#renderNotConnected(this.getPluginCenterData().message)}`;
+                case "plugins": {
+                    const data = this.getPluginCenterData();
+                    if (!data.connected) return `<h2>Plugin Center</h2>${this.#renderNotConnected(data.message)}`;
+                    const statsHtml = data.stats ? this.#renderKeyValueTable(data.stats) : this.#renderNotConnected("stats() unavailable.");
+                    const rows = this.#renderList(data.list, p => `
+                        <div class="cozy-module-row">
+                            <b>${this.#escapeHtml(p.name || p.id)}</b>
+                            <span>v${this.#escapeHtml(p.version)}</span>
+                            <span class="cozy-badge">${this.#escapeHtml(p.status)}</span>
+                            <span>${this.#escapeHtml(p.author || "unknown author")}</span>
+                        </div>`);
+                    return `<h2>Plugin Center</h2><h3>Registry Stats</h3>${statsHtml}<h3>Registered Plugins</h3>${rows}`;
+                }
                 case "tenants": return `<h2>Tenant Center</h2>${this.#renderNotConnected(this.getTenantCenterData().message)}`;
+
+                // --- Administrator Workspace expansion (additive) ---
+                case "users": return this.#renderIntegrationSlot(this.getUsersCenterData(), "Users");
+                case "roles": return this.#renderIntegrationSlot(this.getRolesCenterData(), "Roles");
+                case "permissions": return this.#renderIntegrationSlot(this.getPermissionsCenterData(), "Permissions");
+                case "companies": return `<h2>Companies</h2>${this.#renderNotConnected(this.getCompaniesCenterData().message)}`;
+                case "monitoring": return `<h2>Monitoring</h2>${this.#renderNotConnected(this.getMonitoringCenterData().message)}`;
+                case "configuration": return `<h2>Configuration</h2>${this.#renderNotConnected(this.getConfigurationCenterData().message)}`;
+                case "audit": return `<h2>Audit</h2>${this.#renderNotConnected(this.getAuditCenterData().message)}`;
+                case "engines": return `<h2>Engines</h2><p class="cozy-disclosure-note">TEMPORARY VIEW — Engines are a distinct domain (certified CozyOS business engines) from Module Manager's loaded-module discovery. No dedicated Engine Registry coordinator exists yet, so this section shows Module Manager's current data as a placeholder only, pending a real Engine Registry (Rule 32 ownership review).</p>${this.#renderList(this.getEnginesCenterData().modules, m => `<div class="cozy-module-row"><b>${this.#escapeHtml(m.name)}</b><span>${m.discovered ? this.#escapeHtml(m.version || "unknown version") : this.#escapeHtml(m.registrationStatus)}</span></div>`)}`;
+                case "services": return `<h2>Services</h2><p class="cozy-disclosure-note">TEMPORARY VIEW — Services are a distinct domain (platform/runtime services) from Module Manager's loaded-module discovery. No dedicated Service Registry listing coordinator exists yet, so this section shows Module Manager's current data as a placeholder only, pending a real Service Registry (Rule 32 ownership review).</p>${this.#renderList(this.getServicesCenterData().modules, m => `<div class="cozy-module-row"><b>${this.#escapeHtml(m.name)}</b><span>${m.discovered ? this.#escapeHtml(m.version || "unknown version") : this.#escapeHtml(m.registrationStatus)}</span></div>`)}`;
+
+                // --- Developer Hub: real application, delegated entirely to its
+                // own module (developer-hub.js). This shell never reimplements
+                // or duplicates any Developer Hub logic — it only injects the
+                // markup getDashboard() returns; init()/destroy() lifecycle is
+                // wired in mount()/#render() below, matching the real
+                // cozy-ui.js loadModule() contract Developer Hub already
+                // supports. ---
+                case "developerHub": {
+                    const hub = window.CozyOS.Modules && window.CozyOS.Modules["developer-hub"];
+                    if (!hub) return `<h2>Developer Hub</h2>${this.#renderNotConnected("developer-hub.js is not loaded on this page — Developer Hub cannot mount.")}`;
+                    return typeof hub.getDashboard === "function" ? hub.getDashboard() : '<div id="cozy-developer-hub-root" class="cozy-developer-hub-shell"></div>';
+                }
+
                 default: return this.#renderNotConnected(`Unknown center "${centerId}".`);
             }
         }
@@ -1926,7 +2030,27 @@
                     <span class="cozy-badge">${this.#escapeHtml(c.certSymbol)} ${this.#escapeHtml(c.certStatus)}</span>
                 </div>`).join("");
             const banner = data.certificationConnected ? "" : this.#renderNotConnected("CozyCertification is not connected — certification status below is unknown for every coordinator, not fabricated as passing.");
-            return `<h2>Dashboard</h2><p>${data.discoveredCount}/${data.totalCount} coordinators discovered.</p>${banner}<div class="cozy-list">${rows}</div>`;
+            // Additive: Core Terminal, preserved unchanged from the original
+            // standalone dashboard.html, now rendered as part of the
+            // Dashboard section instead of the whole page. Same three status
+            // cards, same terminal input/output, same execute button.
+            const terminalHtml = `
+                <section class="cozy-panel" style="display:flex;flex-direction:column;gap:12px;min-height:350px;margin-top:16px;">
+                    <div class="cozy-card-label" style="border-bottom:1px solid var(--cz-border,#262626);padding-bottom:8px;">Unified AI Core Ingestion Gateway</div>
+                    <div class="cozy-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));">
+                        <div class="cozy-card"><div class="cozy-card-label">Tenant State</div><div class="cozy-card-value">Isolated</div></div>
+                        <div class="cozy-card"><div class="cozy-card-label">SDK Framework</div><div class="cozy-card-value">v1.0 Frozen</div></div>
+                        <div class="cozy-card"><div class="cozy-card-label">Active Plugins</div><div class="cozy-card-value" id="plugin-count">0 Loaded</div></div>
+                    </div>
+                    <div id="terminal-output" style="background:#050505;border-radius:6px;padding:12px;font-family:monospace;font-size:0.9rem;flex-grow:1;color:#a0a0a0;overflow-y:auto;min-height:160px;">
+                        <div>⚡ CozyOS Kernel initialized. Ready for context queries...</div>
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <input type="text" id="terminal-input" placeholder="Query industry context..." style="flex-grow:1;background:#0a0a0a;border:1px solid var(--cz-border,#262626);border-radius:6px;padding:12px;color:white;">
+                        <button id="execute-btn" type="button" style="background:var(--accent-emerald,#0f5132);border:none;border-radius:6px;color:white;padding:0 16px;font-weight:600;cursor:pointer;">Execute</button>
+                    </div>
+                </section>`;
+            return `<h2>Dashboard</h2><p>${data.discoveredCount}/${data.totalCount} coordinators discovered.</p>${banner}<div class="cozy-list">${rows}</div>${terminalHtml}`;
         }
 
         #renderApplicationCenter() {
@@ -2076,7 +2200,11 @@
                 { label: "Overview", items: [["dashboard", "Dashboard"], ["applications", "Application Center"], ["modules", "Module Manager"]] },
                 { label: "Certification", items: [["certification", "Certification Center"], ["releases", "Release Center"], ["upgrades", "Upgrade Center"], ["dependencies", "Dependency Viewer"]] },
                 { label: "Operations", items: [["diagnostics", "Diagnostics Center"], ["events", "Event Monitor"], ["notifications", "Notification Center"], ["search", "Enterprise Search"]] },
-                { label: "Integrations (awaiting coordinators)", items: [["security", "Security Center"], ["storage", "Storage Center"], ["sync", "Synchronization Center"], ["automation", "Automation Center"], ["live", "Live Center"], ["speech", "Speech Center"], ["translation", "Translation Center"], ["subscription", "Subscription / License Center"], ["ai", "AI Center"], ["plugins", "Plugin Center"], ["tenants", "Tenant Center"]] }
+                { label: "Integrations (awaiting coordinators)", items: [["security", "Security Center"], ["storage", "Storage Center"], ["sync", "Synchronization Center"], ["automation", "Automation Center"], ["live", "Live Center"], ["speech", "Speech Center"], ["translation", "Translation Center"], ["subscription", "Subscription / License Center"], ["ai", "AI Center"], ["plugins", "Plugin Center"], ["tenants", "Tenant Center"]] },
+                // Additive: Administrator Workspace expansion per the locked
+                // CozyOS architecture. Nothing above this line was changed.
+                { label: "Administration", items: [["users", "Users"], ["roles", "Roles"], ["permissions", "Permissions"], ["companies", "Companies"], ["engines", "Engines (temporary view)"], ["services", "Services (temporary view)"], ["monitoring", "Monitoring"], ["configuration", "Configuration"], ["audit", "Audit"]] },
+                { label: "Development", items: [["developerHub", "Developer Hub"]] }
             ];
 
             const navHtml = NAV_SECTIONS.map(section => `
@@ -2109,6 +2237,76 @@
                         <main class="cozy-main">${mainHtml}</main>
                     </div>
                 </div>`;
+
+            // Additive: real post-render lifecycle hooks. Both are no-ops if
+            // their target section isn't currently active, and both delegate
+            // entirely to existing, already-verified code — nothing here
+            // reimplements Developer Hub or the Core Terminal.
+            if (this.#activeCenter === "developerHub") {
+                const hub = window.CozyOS.Modules && window.CozyOS.Modules["developer-hub"];
+                if (hub && typeof hub.init === "function") { try { hub.init(); } catch (_err) { /* non-fatal */ } }
+            }
+            if (this.#activeCenter === "dashboard") {
+                this.#syncTerminalTelemetry();
+            }
+        }
+
+        /**
+         * #handleTerminalQuery() / #syncTerminalTelemetry()
+         *   Ported unchanged from the original dashboard.html inline <script>
+         *   (postQuery()/syncTelemetry()) so the Core Terminal keeps working
+         *   exactly as before, now inside the Dashboard section instead of a
+         *   standalone page. Same window.CozyOS.KernelPlugins routing, same
+         *   plugin-count telemetry source (window.CozyOS.PluginMetadata).
+         */
+        #syncTerminalTelemetry() {
+            const el = this.#domRoot.querySelector("#plugin-count");
+            if (!el) return;
+            const plugins = (window.CozyOS && window.CozyOS.PluginMetadata) || new Map();
+            const activeCount = Array.from(plugins.values()).filter(m => m.status === "enabled").length;
+            el.innerText = `${activeCount} Active`;
+        }
+
+        #handleTerminalQuery() {
+            const input = this.#domRoot.querySelector("#terminal-input");
+            const output = this.#domRoot.querySelector("#terminal-output");
+            if (!input || !output) return;
+
+            const text = input.value.trim();
+            if (!text) return;
+
+            output.innerHTML += `<div style="color:#ffffff;margin-top:6px;">&gt; ${this.#escapeHtml(text)}</div>`;
+            input.value = "";
+
+            try {
+                const normalizedText = text.toLowerCase();
+                let intentHandled = false;
+
+                if (window.CozyOS && window.CozyOS.KernelPlugins) {
+                    if (normalizedText.includes("mpesa") || normalizedText.includes("pay") || normalizedText.includes("stk")) {
+                        const mpesaHandler = window.CozyOS.KernelPlugins.get("mpesa");
+                        if (mpesaHandler) {
+                            const res = mpesaHandler(text);
+                            output.innerHTML += `<div style="color:var(--accent-gold, #d4af37);margin-top:2px;">${this.#escapeHtml(res.responseText)}</div>`;
+                            intentHandled = true;
+                        }
+                    } else if (normalizedText.includes("pharmacy") || normalizedText.includes("inventory") || normalizedText.includes("stock")) {
+                        const pharmacyHandler = window.CozyOS.KernelPlugins.get("pharmacy");
+                        if (pharmacyHandler) {
+                            const res = pharmacyHandler(text);
+                            output.innerHTML += `<div style="color:var(--accent-gold, #d4af37);margin-top:2px;">${this.#escapeHtml(res.responseText)}</div>`;
+                            intentHandled = true;
+                        }
+                    }
+                }
+
+                if (!intentHandled) {
+                    output.innerHTML += `<div style="color:#a0a0a0;margin-top:2px;">💡 Kernel Gateway Sandbox: Intent registered. Forwarded safely to base operational layer.</div>`;
+                }
+            } catch (err) {
+                output.innerHTML += `<div style="color:#dc3545;margin-top:2px;">🚨 Exception: ${this.#escapeHtml(err.message)}</div>`;
+            }
+            output.scrollTop = output.scrollHeight;
         }
 
         mount(mountingContainerElement) {
@@ -2121,9 +2319,42 @@
                 this.#domRoot.addEventListener("click", (evt) => {
                     const centerEl = evt.target.closest("[data-center]");
                     if (centerEl) {
-                        this.#activeCenter = centerEl.getAttribute("data-center");
+                        const nextCenter = centerEl.getAttribute("data-center");
+                        // Additive: real lifecycle cleanup for Developer Hub —
+                        // matches the loadModule() convention of calling the
+                        // outgoing module's destroy() before switching away,
+                        // without this shell reimplementing any of its logic.
+                        if (this.#activeCenter === "developerHub" && nextCenter !== "developerHub") {
+                            const hub = window.CozyOS.Modules && window.CozyOS.Modules["developer-hub"];
+                            if (hub && typeof hub.destroy === "function") { try { hub.destroy(); } catch (_err) { /* non-fatal */ } }
+                        }
+                        // Additive: theme switch to match, mirroring the real
+                        // cozy-ui.js loadModule() contract
+                        // (Theme.setTheme(manifest.theme)) without this shell
+                        // needing to know that contract's exact shape — just
+                        // toggles between the Administrator Workspace's own
+                        // "platform-admin" theme and Developer Hub's
+                        // "developer" theme on entry/exit. No-op if
+                        // cozy-theme.js isn't loaded.
+                        if (nextCenter === "developerHub" && this.#activeCenter !== "developerHub") {
+                            if (window.CozyOS.Theme && typeof window.CozyOS.Theme.setTheme === "function") {
+                                try { window.CozyOS.Theme.setTheme("developer"); } catch (_err) { /* non-fatal */ }
+                            }
+                        } else if (nextCenter !== "developerHub" && this.#activeCenter === "developerHub") {
+                            if (window.CozyOS.Theme && typeof window.CozyOS.Theme.setTheme === "function") {
+                                try { window.CozyOS.Theme.setTheme("platform-admin"); } catch (_err) { /* non-fatal */ }
+                            }
+                        }
+                        this.#activeCenter = nextCenter;
                         this.#selectedContext = null;
                         this.#render();
+                        return;
+                    }
+                    // Additive: Core Terminal (preserved from the original
+                    // dashboard.html) — delegated so it keeps working across
+                    // re-renders of the Dashboard section.
+                    if (evt.target.id === "execute-btn") {
+                        this.#handleTerminalQuery();
                         return;
                     }
                     if (evt.target.id === "cozy-rediscover-btn") {
@@ -2141,6 +2372,13 @@
                     if (evt.target.id === "cozy-global-search-field") {
                         this.#searchTerm = evt.target.value;
                         this.#render();
+                    }
+                });
+                // Additive: Core Terminal Enter-key submit (preserved behavior
+                // from the original dashboard.html's terminal-input listener).
+                this.#domRoot.addEventListener("keydown", (evt) => {
+                    if (evt.target.id === "terminal-input" && evt.key === "Enter") {
+                        this.#handleTerminalQuery();
                     }
                 });
                 this.#documentClickDismissBound = true;

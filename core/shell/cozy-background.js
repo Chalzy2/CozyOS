@@ -293,6 +293,12 @@
 
         renderScene(appName, width, height) {
             switch (appName) {
+                case "cozyos":
+                    this.renderCozyOSScene(width, height);
+                    break;
+                case "platform-admin":
+                    this.renderPlatformAdminScene(width, height);
+                    break;
                 case "shopos":
                 case "agricultureos":
                     this.renderNatureScene(width, height);
@@ -539,6 +545,58 @@
             this.ctx.arc(0, 0, ball.radius, 0, Math.PI * 2);
             this.ctx.stroke();
             this.ctx.restore();
+            this.ctx.restore();
+        }
+
+        /**
+         * Renders a subtle, professional emerald mesh network for the
+         * Administrator Workspace — deliberately calmer than Developer Hub's
+         * animated wave (renderDeveloperScene) or any other app scene, per
+         * the Administrator Workspace's own distinct branding. Reuses the
+         * same drawMeshNetwork utility already shared by renderHospitalScene
+         * rather than introducing new particle state.
+         */
+        renderPlatformAdminScene(width, height) {
+            this.ctx.save();
+            const brandPrimary = this.getCssVar("--cozy-brand-primary", "#1B5E20");
+            const brandAccent = this.getCssVar("--cozy-brand-accent", "#F9A825");
+            this.drawMeshNetwork(
+                "rgba(27, 94, 32, 0.05)",
+                brandPrimary,
+                110
+            );
+            // Faint gold accent dots on a slow-moving subset, kept sparse and
+            // low-alpha to stay "subtle" rather than decorative.
+            this.ctx.globalAlpha = 0.05;
+            this.ctx.fillStyle = brandAccent;
+            this.particles.slice(0, 8).forEach(p => {
+                this.ctx.beginPath();
+                this.ctx.arc(p.x, p.y, p.size * 0.8, 0, Math.PI * 2);
+                this.ctx.fill();
+            });
+            this.ctx.globalAlpha = 1.0;
+            this.ctx.restore();
+        }
+
+        /**
+         * Renders the Shared Shell's own subtle scene — a slow drifting
+         * dot field in the cozyos indigo/sky palette, deliberately calmer
+         * and visually distinct from both renderDeveloperScene (Developer
+         * Hub) and renderPlatformAdminScene (Administrator Workspace), so
+         * the Shell's default identity never looks like either.
+         */
+        renderCozyOSScene(width, height) {
+            this.ctx.save();
+            const primary = this.getCssVar("--cozy-brand-primary", "#4F46E5");
+            const accent = this.getCssVar("--cozy-brand-accent", "#38BDF8");
+            this.ctx.globalAlpha = 0.05;
+            this.particles.forEach((p, i) => {
+                this.ctx.fillStyle = i % 3 === 0 ? accent : primary;
+                this.ctx.beginPath();
+                this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                this.ctx.fill();
+            });
+            this.ctx.globalAlpha = 1.0;
             this.ctx.restore();
         }
 

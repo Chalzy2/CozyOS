@@ -11,7 +11,13 @@
     // Theme that setTheme() falls back to when a requested theme is
     // unregistered or fails validation. Must itself be a valid, registered
     // theme with a complete token block in cozy-tokens.css.
-    const DEFAULT_THEME = "developer";
+    //
+    // CHANGED (deliberate, not additive): was "developer". The Shared Shell
+    // now has its own neutral platform identity ("cozyos") distinct from
+    // Developer Hub's — falling back to Developer Hub's theme for any
+    // unrecognized page was never correct, it was just the only theme that
+    // existed at the time this fallback was written.
+    const DEFAULT_THEME = "cozyos";
 
     // CSS custom properties every theme must define. Mirrors the token
     // set every existing block in cozy-tokens.css already provides.
@@ -44,7 +50,9 @@
          * registerTheme() without editing this list.
          */
         registerBuiltInThemes() {
+            this.registerTheme("cozyos", ["home", "shell"]);
             this.registerTheme("developer", ["developer-hub"]);
+            this.registerTheme("platform-admin", ["admin", "dashboard"]);
             this.registerTheme("shopos");
             this.registerTheme("quarryos");
             this.registerTheme("mpesaos");
@@ -214,7 +222,10 @@
 
             // Priority 2: Detect based on path URL structure
             const path = window.location.pathname.toLowerCase();
-            let matchedTheme = "developer"; // Default fallback
+            // CHANGED (deliberate, not additive): was "developer" — same
+            // reasoning as DEFAULT_THEME above. An unrecognized path should
+            // land on the Shared Shell's own identity, not Developer Hub's.
+            let matchedTheme = "cozyos"; // Default fallback
 
             if (path.includes("/shopos") || path.includes("/shop/")) {
                 matchedTheme = "shopos";
