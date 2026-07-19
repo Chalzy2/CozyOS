@@ -23,12 +23,12 @@
             --emerald-glow: #00A86B;
             --text-primary: var(--cozy-text, #0f172a);
             --text-secondary: var(--cozy-muted, #475569);
-            --border-color: var(--cozy-border, rgba(15,23,42,0.08));
+            --border-color: var(--cozy-border, #E2E8F0);
             --sidebar-bg: var(--cozy-sidebar-bg, #0f172a);
             --sidebar-text: var(--cozy-sidebar-text, #e2e8f0);
             --sidebar-text-muted: var(--cozy-sidebar-text-muted, #94a3b8);
             --sidebar-hover: var(--cozy-sidebar-hover, #1e293b);
-            --sidebar-active-bg: var(--cozy-sidebar-active-bg, rgba(27,94,32,0.25));
+            --sidebar-active-bg: var(--cozy-sidebar-active-bg, #16A34A);
         }
 
         body {
@@ -320,6 +320,27 @@
          WorkspaceShell.getDeveloperQueue(), confirmed to already exist);
          Builder/UnderstandingEngine/OCR/BugFixer/AIMode will honestly report
          "not connected" until those files are uploaded. -->
+    <!-- Builder / Understanding Engine toolset (core/modules/builder/) — 10
+         real files found in the full repository export, verified to
+         self-register under EXACTLY the global names developer-hub.js and
+         cozy-developer.js already call directly (window.CozyOS.Builder,
+         .BuilderRules, .BuilderTemplates, .BuilderAI, .UnderstandingEngine,
+         .ArchitectureEngine, .QuestionEngine, .RequirementAnalyzer,
+         .RequirementReader, .ProjectRefactor) — zero code changes needed
+         anywhere; this was simply never loaded before. BuilderRules/
+         BuilderTemplates/BuilderAI loaded first per cozy-builder.js's own
+         header ("required" dependencies). -->
+    <script src="core/modules/builder/builder-rules.js"></script>
+    <script src="core/modules/builder/builder-templates.js"></script>
+    <script src="core/modules/builder/builder-ai.js"></script>
+    <script src="core/modules/builder/architecture-engine.js"></script>
+    <script src="core/modules/builder/question-engine.js"></script>
+    <script src="core/modules/builder/requirement-analyzer.js"></script>
+    <script src="core/modules/builder/requirement-reader.js"></script>
+    <script src="core/modules/builder/understanding-engine.js"></script>
+    <script src="core/modules/builder/project-refactor.js"></script>
+    <script src="core/modules/builder/cozy-builder.js"></script>
+
     <script src="core/modules/developer/cozy-developer.js"></script>
 
     <!-- 1. PLATFORM SHELL + DEVELOPER HUB -->
