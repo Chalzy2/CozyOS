@@ -189,6 +189,14 @@
     <script src="core/registry/cozy-registry.js"></script>
     <script src="core/modules/module-registry.js"></script>
 
+    <!-- Shared Platform Strengthening: PlatformEventBus / ModuleLoadingManager
+         (core/shell/) — the one shared event bus and load-lifecycle manager
+         every coordinator/application should use. Not yet adopted by
+         already-certified coordinators' own private event buses; see
+         migration log for the exact disclosed status. -->
+    <script src="core/shell/platform-event-bus.js"></script>
+    <script src="core/shell/module-loading-manager.js"></script>
+
     <!-- Certification (activates existing Certification/Release/Upgrade/
          Dependency centers in cozy-workspace.js AND Developer Hub's
          certification tools — same window.CozyOS.Certification instance,
