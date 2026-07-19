@@ -163,8 +163,8 @@
         // (section changes, module actions) for anyone observing this
         // page, without duplicating what DeveloperHub itself already logs. ----
         #auditLogs = [];
-        #listeners = new Map();
-        #onceWrapped = new Map();
+        #listeners = new Map();   // fallback only, used when PlatformEventBus isn't loaded
+        #onceWrapped = new Map(); // fallback only, same
         #diagnostics = { rendersRun: 0, actionsHandled: 0, errorsShown: 0, eventsEmitted: 0, memoryBaseline: 2.4 };
         #timelineEvents = [];
 
@@ -215,15 +215,33 @@
             return Object.freeze(predicate ? list.filter(predicate) : list);
         }
 
+        // MIGRATION (Shared Platform Rule): delegates to
+        // window.CozyOS.PlatformEventBus, namespaced "developerhubui:<e>",
+        // when loaded — deliberately distinct from cozy-developer.js's own
+        // orchestrator event bus (different coordinator, different tag).
+        // Private Map-based fallback kept for standalone operation.
+        // NOTE: this emit() does NOT deep-clone payload before dispatch,
+        // unlike every other coordinator's emit() — preserved exactly as
+        // originally written, not "fixed" to match the others, since that
+        // would be a behavior change beyond this migration's scope.
         on(eventName, handler) {
             if (typeof eventName !== "string" || !eventName.trim()) throw new TypeError("[DeveloperHubUI] on(): eventName must be a non-empty string.");
             if (typeof handler !== "function") throw new TypeError("[DeveloperHubUI] on(): handler must be a function.");
+            const bus = window.CozyOS && window.CozyOS.PlatformEventBus;
+            if (bus) return bus.on(`developerhubui:${eventName}`, handler);
             if (!this.#listeners.has(eventName)) this.#listeners.set(eventName, new Set());
             this.#listeners.get(eventName).add(handler);
             return () => this.off(eventName, handler);
         }
 
         off(eventName, handler) {
+            const bus = window.CozyOS && window.CozyOS.PlatformEventBus;
+            if (bus) {
+                const before = bus.getDiagnostics().events[`developerhubui:${eventName}`]?.listenerCount || 0;
+                bus.off(`developerhubui:${eventName}`, handler);
+                const after = bus.getDiagnostics().events[`developerhubui:${eventName}`]?.listenerCount || 0;
+                return after < before;
+            }
             const set = this.#listeners.get(eventName);
             if (!set) return false;
             const wrapped = this.#onceWrapped.get(handler);
@@ -234,6 +252,8 @@
 
         once(eventName, handler) {
             if (typeof handler !== "function") throw new TypeError("[DeveloperHubUI] once(): handler must be a function.");
+            const bus = window.CozyOS && window.CozyOS.PlatformEventBus;
+            if (bus) { bus.once(`developerhubui:${eventName}`, handler); return; }
             const wrapper = (payload) => { this.off(eventName, handler); this.#onceWrapped.delete(handler); handler(payload); };
             this.#onceWrapped.set(handler, wrapper);
             this.on(eventName, wrapper);
@@ -241,8 +261,15 @@
 
         emit(eventName, payload) {
             if (typeof eventName !== "string" || !eventName.trim()) { this.#diagnostics.errorsShown++; return false; }
-            const set = this.#listeners.get(eventName);
             this.#diagnostics.eventsEmitted++;
+            const bus = window.CozyOS && window.CozyOS.PlatformEventBus;
+            if (bus) {
+                const hadListeners = (bus.getDiagnostics().events[`developerhubui:${eventName}`]?.listenerCount || 0) > 0;
+                if (!hadListeners) return false;
+                bus.emit(`developerhubui:${eventName}`, payload); // no deep-clone, matches original
+                return true;
+            }
+            const set = this.#listeners.get(eventName);
             if (!set || set.size === 0) return false;
             for (const fn of Array.from(set)) { try { fn(payload); } catch (_err) { this.#diagnostics.errorsShown++; } }
             return true;

@@ -278,8 +278,6 @@ ${REVIEW_INSTRUCTIONS}
     class CozyOSDeveloperHub {
         #auditLogs = [];
         #timelineEvents = [];
-        #listeners = new Map();
-        #onceWrapped = new Map();
         #diagnostics = { aggregationsRun: 0, actionsDelegated: 0, errorsHidden: 0, eventsEmitted: 0, memoryBaseline: 3.2 };
 
         getVersion() { return HUB_VERSION; }
@@ -329,17 +327,33 @@ ${REVIEW_INSTRUCTIONS}
 
         // =====================================================================
         // ─── EVENT BUS ────────────────────────────────────────────────────────
+        // MIGRATION (Shared Platform Rule): delegates to
+        // window.CozyOS.PlatformEventBus, namespaced "developerhub:<e>" —
+        // deliberately distinct from developer-hub.js's own UI-level bus
+        // ("developerhubui:", a different coordinator entirely). Private
+        // Map-based fallback kept for standalone operation.
         // =====================================================================
+        #listeners = new Map();   // fallback only
+        #onceWrapped = new Map(); // fallback only
 
         on(eventName, handler) {
             if (typeof eventName !== "string" || !eventName.trim()) throw new TypeError("[DeveloperHub] on(): eventName must be a non-empty string.");
             if (typeof handler !== "function") throw new TypeError("[DeveloperHub] on(): handler must be a function.");
+            const bus = window.CozyOS && window.CozyOS.PlatformEventBus;
+            if (bus) return bus.on(`developerhub:${eventName}`, handler);
             if (!this.#listeners.has(eventName)) this.#listeners.set(eventName, new Set());
             this.#listeners.get(eventName).add(handler);
             return () => this.off(eventName, handler);
         }
 
         off(eventName, handler) {
+            const bus = window.CozyOS && window.CozyOS.PlatformEventBus;
+            if (bus) {
+                const before = bus.getDiagnostics().events[`developerhub:${eventName}`]?.listenerCount || 0;
+                bus.off(`developerhub:${eventName}`, handler);
+                const after = bus.getDiagnostics().events[`developerhub:${eventName}`]?.listenerCount || 0;
+                return after < before;
+            }
             const set = this.#listeners.get(eventName);
             if (!set) return false;
             const wrapped = this.#onceWrapped.get(handler);
@@ -350,6 +364,8 @@ ${REVIEW_INSTRUCTIONS}
 
         once(eventName, handler) {
             if (typeof handler !== "function") throw new TypeError("[DeveloperHub] once(): handler must be a function.");
+            const bus = window.CozyOS && window.CozyOS.PlatformEventBus;
+            if (bus) { bus.once(`developerhub:${eventName}`, handler); return; }
             const wrapper = (payload) => { this.off(eventName, handler); this.#onceWrapped.delete(handler); handler(payload); };
             this.#onceWrapped.set(handler, wrapper);
             this.on(eventName, wrapper);
@@ -357,11 +373,18 @@ ${REVIEW_INSTRUCTIONS}
 
         emit(eventName, payload) {
             if (typeof eventName !== "string" || !eventName.trim()) { this.#diagnostics.errorsHidden++; return false; }
-            const set = this.#listeners.get(eventName);
             this.#diagnostics.eventsEmitted++;
-            if (!set || set.size === 0) return false;
             let safePayload = payload;
             try { safePayload = this.#deepClone(payload); } catch (_err) { safePayload = payload; }
+            const bus = window.CozyOS && window.CozyOS.PlatformEventBus;
+            if (bus) {
+                const hadListeners = (bus.getDiagnostics().events[`developerhub:${eventName}`]?.listenerCount || 0) > 0;
+                if (!hadListeners) return false;
+                bus.emit(`developerhub:${eventName}`, safePayload);
+                return true;
+            }
+            const set = this.#listeners.get(eventName);
+            if (!set || set.size === 0) return false;
             for (const fn of Array.from(set)) { try { fn(safePayload); } catch (_err) { this.#diagnostics.errorsHidden++; } }
             return true;
         }
