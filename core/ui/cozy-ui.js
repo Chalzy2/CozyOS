@@ -32,7 +32,21 @@
  *     cozy-toast.js
  *   - window.CozyOS.Modules[...] shape — real, matches developer-hub.js's
  *     own self-registration (version/files/getDashboard/init/destroy)
+ *
+ * STRENGTHENING (Shared Platform directive): if ModuleLoadingManager is
+ * loaded, loadModule() now routes app.load() through it for real
+ * concurrent-load deduplication, history, and diagnostics. Falls back to
+ * calling app.load() directly, exactly as before, if it isn't loaded —
+ * optional, additive, no behavior change for any page that doesn't load it.
  */
+if (window.CozyOS.ModuleLoadingManager && !window.CozyOS.ModuleLoadingManager._internalLoader) {
+    window.CozyOS.ModuleLoadingManager.init(async (_path, name) => {
+        const app = window.CozyOS.Modules?.[name];
+        if (app && typeof app.load === "function") return app.load();
+        return true;
+    });
+}
+
 window.CozyOS.UI = {
     activeModule: null,
     isLoading: false,
@@ -82,7 +96,13 @@ window.CozyOS.UI = {
             if (!app) throw new Error(`Application "${moduleName}" is not registered.`);
 
             // 1. Prepare new application
-            if (app.load) await app.load();
+            if (app.load) {
+                if (window.CozyOS.ModuleLoadingManager) {
+                    await window.CozyOS.ModuleLoadingManager.loadModule(manifest.js || moduleName, moduleName);
+                } else {
+                    await app.load();
+                }
+            }
 
             // 2. State Transition (Only after successful load)
             if (this.activeModule && window.CozyOS.Modules?.[this.activeModule]?.destroy) {
