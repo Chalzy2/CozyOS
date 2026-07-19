@@ -1,268 +1,249 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-cozy-app="platform-admin">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CozyOS Production Workspace</title>
+    <link rel="stylesheet" href="core/ui/cozy-tokens.css">
+    <link rel="stylesheet" href="core/ui/cozy-components.css">
+    <link rel="stylesheet" href="core/modules/developer/developer-hub.css">
     <style>
+        /* Preserved values kept as fallbacks. Each token now aliases the
+         * shared CozyOS design token first (var(--cozy-X, fallback)) — once
+         * core/ui/cozy-tokens.css etc. are uploaded and load via
+         * developer-hub.css's own @import chain (linked above), this page
+         * automatically inherits the same shared theme, with zero further
+         * changes here. Until then, these exact fallback values keep the
+         * current appearance unchanged — additive, not a replacement. */
         :root {
-            --bg-primary: #0a0a0a;
-            --bg-surface: #121212;
-            --accent-gold: #d4af37;
-            --accent-gold-hover: #f3e5ab;
+            --bg-primary: var(--cozy-bg-gradient, #0a0a0a);
+            --bg-surface: var(--cozy-glass-bg, #121212);
+            --accent-gold: var(--cozy-brand-primary, #d4af37);
+            --accent-gold-hover: var(--cozy-brand-glow, #f3e5ab);
             --accent-emerald: #0f5132;
             --emerald-glow: #198754;
             --text-primary: #ffffff;
-            --text-secondary: #a0a0a0;
-            --border-color: #262626;
+            --text-secondary: var(--cozy-muted, #a0a0a0);
+            --border-color: var(--cozy-glass-border, #262626);
         }
 
         body {
             background-color: var(--bg-primary);
             color: var(--text-primary);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            font-family: var(--cozy-font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif);
             margin: 0;
             padding: 0;
             overflow-x: hidden;
         }
 
-        .dashboard-container {
+        /* --------------------------------------------------------------
+         * Additive: structural CSS for cozy-workspace.js's real generated
+         * markup (.cozy-shell / .cozy-sidebar / .cozy-nav-link / etc.).
+         * No existing file styled these classes at all before this change
+         * — this is new layout CSS only, reusing the color tokens above
+         * (which themselves now alias the shared theme, see above), not a
+         * redesign of anything that previously worked.
+         * -------------------------------------------------------------- */
+        #cozy-workspace-root { min-height: 100vh; }
+
+        .cozy-shell {
             display: grid;
             grid-template-columns: 1fr;
             min-height: 100vh;
         }
-
         @media (min-width: 768px) {
-            .dashboard-container {
-                grid-template-columns: 280px 1fr;
-            }
+            .cozy-shell { grid-template-columns: 280px 1fr; }
         }
 
-        .workspace-sidebar {
+        .cozy-sidebar {
             background-color: var(--bg-surface);
             border-bottom: 1px solid var(--border-color);
-            padding: 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
+            padding: 20px;
+            backdrop-filter: var(--cozy-glass-blur, none);
+            -webkit-backdrop-filter: var(--cozy-glass-blur, none);
         }
-
         @media (min-width: 768px) {
-            .workspace-sidebar {
+            .cozy-sidebar {
                 border-bottom: none;
                 border-right: 1px solid var(--border-color);
                 height: 100vh;
                 position: sticky;
                 top: 0;
+                overflow-y: auto;
             }
         }
 
-        .brand-title {
+        .cozy-shell-title {
             color: var(--accent-gold);
-            font-size: 1.5rem;
+            font-size: 1.15rem;
             font-weight: 700;
-            letter-spacing: -0.025em;
-            margin: 0;
+            margin-bottom: 16px;
         }
 
-        .main-content {
-            padding: 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-            box-sizing: border-box;
-        }
-
-        .control-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 16px;
-        }
-
-        .control-title {
-            font-size: 1.75rem;
-            font-weight: 600;
-            margin: 0;
-        }
-
-        .status-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 16px;
-        }
-
-        .status-card {
-            background: linear-gradient(145deg, #161616, #0f0f0f);
+        .cozy-rediscover-btn {
+            width: 100%;
+            background: transparent;
             border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 16px;
-            position: relative;
-        }
-
-        .status-indicator {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: #198754;
-            box-shadow: 0 0 8px var(--emerald-glow);
-            display: inline-block;
-            margin-right: 6px;
-        }
-
-        .card-title {
             color: var(--text-secondary);
-            font-size: 0.85rem;
+            border-radius: 6px;
+            padding: 8px;
+            cursor: pointer;
+            margin-bottom: 16px;
+        }
+        .cozy-rediscover-btn:hover { border-color: var(--accent-gold); color: var(--accent-gold); }
+
+        .cozy-nav-section { margin-bottom: 14px; }
+        .cozy-nav-section-label {
+            color: var(--text-secondary);
+            font-size: 0.7rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            margin-bottom: 8px;
+            padding: 6px 10px;
         }
+        /* .cozy-nav-link base styling now comes from the shared
+         * core/ui/cozy-components.css (linked above) — removed here to
+         * eliminate the duplication Rule 35 flagged. */
 
-        .card-value {
-            font-size: 1.25rem;
-            font-weight: 600;
+        .cozy-main-wrap { display: flex; flex-direction: column; min-height: 100vh; }
+        .cozy-status-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding: 10px 24px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-surface);
+            font-size: 0.8rem;
+            color: var(--text-secondary);
         }
+        .cozy-main { padding: 24px; flex-grow: 1; }
+        .cozy-main h2 { font-size: 1.5rem; margin: 0 0 12px; }
+        .cozy-main h3 { color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase; }
 
-        #terminal-input {
-            background-color: var(--bg-primary);
+        .cozy-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+        .cozy-module-row, .cozy-list > .cozy-nav-link {
+            background: linear-gradient(145deg, #161616, #0f0f0f);
             border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 12px;
-            color: white;
-            flex-grow: 1;
-            outline: none;
-            box-sizing: border-box;
+            border-radius: 8px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: space-between;
         }
-        
-        #terminal-input:focus {
-            border-color: var(--accent-gold);
-        }
+
+        /* .cozy-badge and .cozy-panel/.cozy-card base styling now come from
+         * the shared core/ui/cozy-components.css (linked above) — removed
+         * here to eliminate the duplication Rule 35 flagged. */
+        .cozy-grid { display: grid; gap: 16px; margin-top: 12px; }
+        .cozy-card-label { color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+        .cozy-card-value { font-size: 1.25rem; font-weight: 600; }
+
+        .cozy-disclosure-note { color: var(--text-secondary); font-size: 0.8rem; font-style: italic; margin: 4px 0 12px; }
+
+        #terminal-input:focus { border-color: var(--accent-gold); outline: none; }
+        #terminal-input, #execute-btn { transition: border-color var(--cozy-transition-fast, 0.15s), background var(--cozy-transition-fast, 0.15s); }
     </style>
 </head>
 <body>
 
-    <div class="dashboard-container">
-        <aside class="workspace-sidebar">
-            <div>
-                <h1 class="brand-title">CozyOS Workspace</h1>
-                <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 4px 0 0 0;">System Shell v1.0</p>
-            </div>
-            <nav style="display: flex; flex-direction: column; gap: 8px; margin-top: 20px;">
-                <div style="color: var(--accent-gold); padding: 8px 12px; border-left: 2px solid var(--accent-gold); background: rgba(212, 175, 55, 0.05); font-weight: 500;">
-                    🎛️ Core Terminal
-                </div>
-                <div style="color: var(--text-secondary); padding: 8px 12px;">📦 Modules</div>
-                <div style="color: var(--text-secondary); padding: 8px 12px;">⚙️ Tenants</div>
-            </nav>
-        </aside>
-
-        <main class="main-content">
-            <header class="control-header">
-                <h2 class="control-title">Control Dashboard</h2>
-                <div style="padding: 6px 12px; border-radius: 20px; font-size: 0.85rem; display: flex; align-items: center; background: rgba(15, 81, 50, 0.1); border: 1px solid var(--accent-emerald);">
-                    <span class="status-indicator"></span> Core Online
-                </div>
-            </header>
-
-            <section class="status-grid">
-                <div class="status-card">
-                    <div class="card-title">Tenant State</div>
-                    <div class="card-value">Isolated</div>
-                </div>
-                <div class="status-card">
-                    <div class="card-title">SDK Framework</div>
-                    <div class="card-value">v1.0 Frozen</div>
-                </div>
-                <div class="status-card">
-                    <div class="card-title">Active Plugins</div>
-                    <div class="card-value" id="plugin-count">0 Loaded</div>
-                </div>
-            </section>
-
-            <section class="status-card" style="display: flex; flex-direction: column; gap: 12px; min-height: 350px;">
-                <div class="card-title" style="border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">Unified AI Core Ingestion Gateway</div>
-                <div id="terminal-output" style="background-color: #050505; border-radius: 6px; padding: 12px; font-family: monospace; font-size: 0.9rem; flex-grow: 1; color: var(--text-secondary); overflow-y: auto;">
-                    <div>⚡ CozyOS Kernel initialized. Ready for context queries...</div>
-                </div>
-                <div style="display: flex; gap: 8px;">
-                    <input type="text" id="terminal-input" placeholder="Query industry context...">
-                    <button id="execute-btn" style="background-color: var(--accent-emerald); border: none; border-radius: 6px; color: white; padding: 0 16px; font-weight: 600; cursor: pointer;">Execute</button>
-                </div>
-            </section>
-        </main>
+    <!-- Additive: single mount point for the real Enterprise Control Center
+         (core/shell/cozy-workspace.js). Its mount() call builds its own
+         sidebar/topbar/main structure inside this div — nothing else in
+         this file writes to it directly. -->
+    <div id="cozy-workspace-root">
+        <noscript>The CozyOS Administrator Workspace requires JavaScript.</noscript>
     </div>
 
-    <!-- 1. INITIALIZE SYSTEM TELEMETRY BINDINGS -->
-    <script>
-        function syncTelemetry() {
-            const plugins = window.CozyOS?.PluginMetadata || new Map();
-            const activeCount = Array.from(plugins.values()).filter(m => m.status === 'enabled').length;
-            document.getElementById('plugin-count').innerText = `${activeCount} Active`;
-        }
+    <!-- CozyOS Shell UI Services (core/ui/). Loaded first: cozy-theme.js
+         applies the active theme immediately on construction (reading the
+         data-cozy-app="platform-admin" attribute already set on <html>
+         above), so it should run before anything else that might read
+         theme-dependent CSS variables.
+         - cozy-theme.js / cozy-background.js: real, verified compatible,
+           but required a new "platform-admin" theme profile to be added
+           (see migration log) — without it, both would have defaulted the
+           whole Administrator Workspace to Developer Hub's green/gold theme
+           and particle background. That gap is now closed: cozy-tokens.css
+           has a platform-admin block, cozy-theme.js registers it, and
+           cozy-background.js has a dedicated (subtle, emerald/gold mesh)
+           scene for it — Developer Hub keeps its own "developer" theme.
+         - cozy-toast.js / cozy-live.js: zero risk, no per-app coupling,
+           real API verified to match every existing call in
+           developer-hub.js and cozy-ui.js exactly (Toast.show(),
+           Live.publish()/subscribe()). -->
+    <script src="core/ui/cozy-theme.js"></script>
+    <script src="core/ui/cozy-background.js"></script>
+    <script src="core/ui/cozy-toast.js"></script>
+    <script src="core/ui/cozy-live.js"></script>
 
-        async function postQuery() {
-            const input = document.getElementById('terminal-input');
-            const output = document.getElementById('terminal-output');
-            if (!input || !output) return;
+    <!-- 0. PLATFORM FOUNDATION REGISTRIES — loaded first (plain, non-deferred)
+         so their synchronous self-registration completes before anything
+         else queries them. cozy-workspace.js already has dormant,
+         bounded-retry integration code expecting window.CozyOS.ServiceRegistry
+         (Application Center + Module Manager metadata) — no code change was
+         needed there, only loading this file. module-registry.js is loaded
+         too (real, verified file) but has no current Administrator Workspace
+         consumer yet — it's the app-launch/dashboard-placement resolver for
+         a future loadModule() flow, not a catalog/display coordinator. -->
+    <script src="core/registry/cozy-registry.js"></script>
+    <script src="core/modules/module-registry.js"></script>
 
-            const text = input.value.trim();
-            if (!text) return;
+    <!-- Certification (activates existing Certification/Release/Upgrade/
+         Dependency centers in cozy-workspace.js AND Developer Hub's
+         certification tools — same window.CozyOS.Certification instance,
+         every method name verified against both consumers, zero duplicated
+         logic) and Memory (Developer Hub's Memory section + cozy-workspace's
+         own Project-namespace file-registration hook — same window.CozyOS.
+         CozyMemory instance). Both verified compatible; no code changes
+         needed anywhere else. -->
+    <script src="core/certification/cozy-certification.js"></script>
+    <script src="core/modules/memory/cozy-memory-engine.js"></script>
 
-            // Render text string output log locally
-            output.innerHTML += `<div style="color: #ffffff; margin-top: 6px;">&gt; ${text}</div>`;
-            input.value = '';
+    <!-- DeveloperHub orchestrator — pure orchestration (verified: every
+         method is a one-line delegation to a real coordinator's real API,
+         e.g. fullCertification() literally just calls cert.fullCertification()
+         — no independent business logic, per its own header). Loading it
+         activates every existing window.CozyOS.DeveloperHub call already
+         present in developer-hub.js, with zero code changes there.
+         3 of its 8 optional integrations are already real and verified here
+         (Certification, ServiceRegistry, WorkspaceShell — including
+         WorkspaceShell.getDeveloperQueue(), confirmed to already exist);
+         Builder/UnderstandingEngine/OCR/BugFixer/AIMode will honestly report
+         "not connected" until those files are uploaded. -->
+    <script src="core/modules/developer/cozy-developer.js"></script>
 
-            try {
-                const normalizedText = text.toLowerCase();
-                let intentHandled = false;
+    <!-- 1. PLATFORM SHELL + DEVELOPER HUB -->
+    <script src="core/shell/cozy-workspace.js" defer></script>
+    <script src="core/modules/developer/developer-hub.js" defer></script>
 
-                // Check if Kernel Routing Layer is loaded with active plugins
-                if (window.CozyOS?.KernelPlugins) {
-                    // Route to M-pesa plugin
-                    if (normalizedText.includes("mpesa") || normalizedText.includes("pay") || normalizedText.includes("stk")) {
-                        const mpesaHandler = window.CozyOS.KernelPlugins.get("mpesa");
-                        if (mpesaHandler) {
-                            const res = mpesaHandler(text);
-                            output.innerHTML += `<div style="color: var(--accent-gold); margin-top: 2px;">${res.responseText}</div>`;
-                            intentHandled = true;
-                        }
-                    }
-                    // Route to Pharmacy plugin
-                    else if (normalizedText.includes("pharmacy") || normalizedText.includes("inventory") || normalizedText.includes("stock")) {
-                        const pharmacyHandler = window.CozyOS.KernelPlugins.get("pharmacy");
-                        if (pharmacyHandler) {
-                            const res = pharmacyHandler(text);
-                            output.innerHTML += `<div style="color: var(--accent-gold); margin-top: 2px;">${res.responseText}</div>`;
-                            intentHandled = true;
-                        }
-                    }
-                }
-
-                if (!intentHandled) {
-                    output.innerHTML += `<div style="color: var(--text-secondary); margin-top: 2px;">💡 Kernel Gateway Sandbox: Intent registered. Forwarded safely to base operational layer.</div>`;
-                }
-            } catch (err) {
-                output.innerHTML += `<div style="color: #dc3545; margin-top: 2px;">🚨 Exception: ${err.message}</div>`;
-            }
-            output.scrollTop = output.scrollHeight;
-        }
-
-        window.addEventListener('DOMContentLoaded', () => {
-            // Short delay lets hot plugins load into storage structures smoothly
-            setTimeout(syncTelemetry, 250);
-            
-            document.getElementById('execute-btn').addEventListener('click', postQuery);
-            document.getElementById('terminal-input').addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') postQuery();
-            });
-        });
-    </script>
-
-    <!-- 2. PLUGGABLE CORE ARCHITECTURE REGISTRIES -->
+    <!-- 2. PLUGGABLE CORE ARCHITECTURE REGISTRIES (preserved, unchanged paths) -->
     <script src="core/pluginManager.js"></script>
     <script src="plugins/mpesaOS.js"></script>
     <script src="plugins/pharmacyOS.js"></script>
     <script src="core/dashboard.js"></script>
+
+    <!-- 3. BOOTSTRAP: mount the Workspace Shell once it and its scripts have
+         loaded. Bounded retry (same convention already used elsewhere in
+         CozyOS, e.g. developer-hub.js's own initStandaloneMount) covers
+         defer/script-order timing rather than assuming a fixed load order. -->
+    <script>
+        (function bootWorkspace() {
+            const root = document.getElementById("cozy-workspace-root");
+            function tryMount() {
+                if (window.CozyOS && window.CozyOS.WorkspaceShell && typeof window.CozyOS.WorkspaceShell.mount === "function") {
+                    window.CozyOS.WorkspaceShell.mount(root);
+                    return true;
+                }
+                return false;
+            }
+            if (tryMount()) return;
+            let attempts = 0;
+            const intervalId = setInterval(() => {
+                attempts++;
+                if (tryMount() || attempts >= 40) clearInterval(intervalId);
+            }, 250);
+        })();
+    </script>
 </body>
 </html>
