@@ -8,23 +8,27 @@
     <link rel="stylesheet" href="core/ui/cozy-components.css">
     <link rel="stylesheet" href="core/modules/developer/developer-hub.css">
     <style>
-        /* Preserved values kept as fallbacks. Each token now aliases the
-         * shared CozyOS design token first (var(--cozy-X, fallback)) — once
-         * core/ui/cozy-tokens.css etc. are uploaded and load via
-         * developer-hub.css's own @import chain (linked above), this page
-         * automatically inherits the same shared theme, with zero further
-         * changes here. Until then, these exact fallback values keep the
-         * current appearance unchanged — additive, not a replacement. */
+        /* REWORKED (visual redesign per reference design): light content
+         * area with a dark navy sidebar and a proper header bar, replacing
+         * the earlier dark-glass-everywhere look. Every color below reads
+         * from the shared --cozy-* tokens (cozy-tokens.css's reworked
+         * platform-admin block) with the same value hardcoded as a
+         * fallback, so nothing breaks if tokens fail to load. */
         :root {
-            --bg-primary: var(--cozy-bg-gradient, #0a0a0a);
-            --bg-surface: var(--cozy-glass-bg, #121212);
-            --accent-gold: var(--cozy-brand-primary, #d4af37);
-            --accent-gold-hover: var(--cozy-brand-glow, #f3e5ab);
-            --accent-emerald: #0f5132;
-            --emerald-glow: #198754;
-            --text-primary: #ffffff;
-            --text-secondary: var(--cozy-muted, #a0a0a0);
-            --border-color: var(--cozy-glass-border, #262626);
+            --bg-primary: var(--cozy-bg-gradient, #f8fafc);
+            --bg-surface: var(--cozy-glass-bg, #ffffff);
+            --accent-gold: var(--cozy-brand-primary, #1B5E20);
+            --accent-gold-hover: var(--cozy-brand-glow, rgba(27,94,32,0.15));
+            --accent-emerald: #1B5E20;
+            --emerald-glow: #00A86B;
+            --text-primary: var(--cozy-text, #0f172a);
+            --text-secondary: var(--cozy-muted, #475569);
+            --border-color: var(--cozy-border, rgba(15,23,42,0.08));
+            --sidebar-bg: var(--cozy-sidebar-bg, #0f172a);
+            --sidebar-text: var(--cozy-sidebar-text, #e2e8f0);
+            --sidebar-text-muted: var(--cozy-sidebar-text-muted, #94a3b8);
+            --sidebar-hover: var(--cozy-sidebar-hover, #1e293b);
+            --sidebar-active-bg: var(--cozy-sidebar-active-bg, rgba(27,94,32,0.25));
         }
 
         body {
@@ -37,12 +41,8 @@
         }
 
         /* --------------------------------------------------------------
-         * Additive: structural CSS for cozy-workspace.js's real generated
-         * markup (.cozy-shell / .cozy-sidebar / .cozy-nav-link / etc.).
-         * No existing file styled these classes at all before this change
-         * — this is new layout CSS only, reusing the color tokens above
-         * (which themselves now alias the shared theme, see above), not a
-         * redesign of anything that previously worked.
+         * Structural CSS for cozy-workspace.js's real generated markup
+         * (.cozy-shell / .cozy-sidebar / .cozy-nav-link / etc.).
          * -------------------------------------------------------------- */
         #cozy-workspace-root { min-height: 100vh; }
 
@@ -52,20 +52,17 @@
             min-height: 100vh;
         }
         @media (min-width: 768px) {
-            .cozy-shell { grid-template-columns: 280px 1fr; }
+            .cozy-shell { grid-template-columns: 260px 1fr; }
         }
 
         .cozy-sidebar {
-            background-color: var(--bg-surface);
-            border-bottom: 1px solid var(--border-color);
-            padding: 20px;
-            backdrop-filter: var(--cozy-glass-blur, none);
-            -webkit-backdrop-filter: var(--cozy-glass-blur, none);
+            background-color: var(--sidebar-bg);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            padding: 20px 12px;
         }
         @media (min-width: 768px) {
             .cozy-sidebar {
                 border-bottom: none;
-                border-right: 1px solid var(--border-color);
                 height: 100vh;
                 position: sticky;
                 top: 0;
@@ -74,54 +71,74 @@
         }
 
         .cozy-shell-title {
-            color: var(--accent-gold);
+            color: #ffffff;
             font-size: 1.15rem;
             font-weight: 700;
             margin-bottom: 16px;
+            padding: 0 8px;
         }
 
         .cozy-rediscover-btn {
             width: 100%;
             background: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--text-secondary);
+            border: 1px solid rgba(255,255,255,0.12);
+            color: var(--sidebar-text-muted);
             border-radius: 6px;
             padding: 8px;
             cursor: pointer;
             margin-bottom: 16px;
         }
-        .cozy-rediscover-btn:hover { border-color: var(--accent-gold); color: var(--accent-gold); }
+        .cozy-rediscover-btn:hover { border-color: var(--emerald-glow); color: #ffffff; }
 
-        .cozy-nav-section { margin-bottom: 14px; }
+        .cozy-nav-section { margin-bottom: 10px; }
         .cozy-nav-section-label {
-            color: var(--text-secondary);
+            color: var(--sidebar-text-muted);
             font-size: 0.7rem;
+            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            padding: 6px 10px;
+            padding: 10px 12px 4px;
         }
-        /* .cozy-nav-link base styling now comes from the shared
-         * core/ui/cozy-components.css (linked above) — removed here to
-         * eliminate the duplication Rule 35 flagged. */
+        /* .cozy-nav-link base layout comes from cozy-components.css; these
+         * rules restyle it specifically for the dark sidebar context. */
+        .cozy-sidebar .cozy-nav-link {
+            color: var(--sidebar-text);
+            border-radius: 6px;
+            margin: 1px 4px;
+        }
+        .cozy-sidebar .cozy-nav-link:hover { background: var(--sidebar-hover); color: #ffffff; }
+        .cozy-sidebar .cozy-nav-link.active {
+            background: var(--sidebar-active-bg);
+            color: #ffffff;
+            border-left-color: var(--emerald-glow);
+            font-weight: 600;
+        }
 
         .cozy-main-wrap { display: flex; flex-direction: column; min-height: 100vh; }
+
+        /* Header bar: brand context lives in the sidebar already, so this
+         * status bar plays the "top header" role (search/status/session) —
+         * restyled to sit on light background with real contrast, matching
+         * the reference header's spirit without fabricating a search box
+         * or notification system that isn't real yet. */
         .cozy-status-bar {
             display: flex;
+            align-items: center;
             flex-wrap: wrap;
             gap: 16px;
-            padding: 10px 24px;
+            padding: 14px 28px;
             border-bottom: 1px solid var(--border-color);
             background: var(--bg-surface);
             font-size: 0.8rem;
             color: var(--text-secondary);
         }
-        .cozy-main { padding: 24px; flex-grow: 1; }
-        .cozy-main h2 { font-size: 1.5rem; margin: 0 0 12px; }
-        .cozy-main h3 { color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase; }
+        .cozy-main { padding: 28px; flex-grow: 1; }
+        .cozy-main h2 { font-size: 1.5rem; margin: 0 0 12px; color: var(--text-primary); }
+        .cozy-main h3 { color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
 
         .cozy-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
         .cozy-module-row, .cozy-list > .cozy-nav-link {
-            background: linear-gradient(145deg, #161616, #0f0f0f);
+            background: var(--bg-surface);
             border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 12px 16px;
@@ -130,19 +147,65 @@
             gap: 12px;
             flex-wrap: wrap;
             justify-content: space-between;
+            color: var(--text-primary);
         }
 
-        /* .cozy-badge and .cozy-panel/.cozy-card base styling now come from
-         * the shared core/ui/cozy-components.css (linked above) — removed
-         * here to eliminate the duplication Rule 35 flagged. */
         .cozy-grid { display: grid; gap: 16px; margin-top: 12px; }
-        .cozy-card-label { color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
-        .cozy-card-value { font-size: 1.25rem; font-weight: 600; }
+        .cozy-card-label { color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+        .cozy-card-value { font-size: 1.6rem; font-weight: 700; color: var(--text-primary); }
 
         .cozy-disclosure-note { color: var(--text-secondary); font-size: 0.8rem; font-style: italic; margin: 4px 0 12px; }
 
+        /* --- New: Dashboard hero + stat cards + quick actions, matching
+         * the reference design's home layout. Real data only — stat
+         * numbers come from actual connected coordinators (Certification's
+         * application count, Module Manager's coordinator count, real user
+         * count when Identity is connected), never fabricated. --- */
+        .cozy-hero {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px 28px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+            box-shadow: var(--cozy-glass-shadow, none);
+        }
+        .cozy-hero h1 { margin: 0 0 4px; font-size: 1.4rem; color: var(--text-primary); }
+        .cozy-hero p { margin: 0; color: var(--text-secondary); font-size: 0.9rem; }
+        .cozy-hero-status {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(27,94,32,0.1); color: var(--accent-emerald);
+            padding: 6px 14px; border-radius: 999px; font-size: 0.8rem; font-weight: 600;
+        }
+        .cozy-hero-status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-emerald); display: inline-block; }
+
+        .cozy-stat-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px; margin-bottom: 20px;
+        }
+        .cozy-stat-card {
+            background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 10px;
+            padding: 16px 18px; box-shadow: var(--cozy-glass-shadow, none);
+        }
+        .cozy-quick-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px;
+        }
+        .cozy-quick-card {
+            background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 10px;
+            padding: 16px; cursor: pointer; transition: border-color 0.15s;
+            box-shadow: var(--cozy-glass-shadow, none);
+        }
+        .cozy-quick-card:hover { border-color: var(--accent-emerald); }
+        .cozy-quick-card .cozy-card-label { margin-bottom: 2px; }
+
         #terminal-input:focus { border-color: var(--accent-gold); outline: none; }
         #terminal-input, #execute-btn { transition: border-color var(--cozy-transition-fast, 0.15s), background var(--cozy-transition-fast, 0.15s); }
+        #terminal-input { background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); }
+        #terminal-output { background: #ffffff !important; color: var(--text-secondary) !important; border: 1px solid var(--border-color); }
     </style>
 </head>
 <body>
@@ -191,9 +254,7 @@
 
     <!-- Shared Platform Strengthening: PlatformEventBus / ModuleLoadingManager
          (core/shell/) — the one shared event bus and load-lifecycle manager
-         every coordinator/application should use. Not yet adopted by
-         already-certified coordinators' own private event buses; see
-         migration log for the exact disclosed status. -->
+         every coordinator/application should use. -->
     <script src="core/shell/platform-event-bus.js"></script>
     <script src="core/shell/module-loading-manager.js"></script>
 
