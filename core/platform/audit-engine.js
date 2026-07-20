@@ -293,6 +293,12 @@
     }
 
     window.CozyOS.PlatformAudit = new CozyPlatformAudit();
+    // Application Visibility Registry — real, additive self-declaration.
+    window.CozyOS.PlatformAudit.visibility = Object.freeze({
+        appId: "platformAudit", name: "Audit Center", icon: "🕵", category: "platform-tool",
+        launchTarget: Object.freeze({ center: "platformAudit" }),
+        audience: "admin"
+    });
 
     // Real, additive hook: whenever PlatformDiscovery finishes a scan, feed
     // it to the Audit Engine's session-comparison baseline. Uses

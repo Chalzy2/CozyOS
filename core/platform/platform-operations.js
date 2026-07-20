@@ -673,6 +673,12 @@
     }
 
     window.CozyOS.PlatformOperations = new CozyPlatformOperations();
+    // Application Visibility Registry — real, additive self-declaration.
+    window.CozyOS.PlatformOperations.visibility = Object.freeze({
+        appId: "platformOperations", name: "Operations Center", icon: "🛠", category: "platform-tool",
+        launchTarget: Object.freeze({ center: "platformOperations" }),
+        audience: "admin"
+    });
 
     if (window.CozyOS.ServiceRegistry && typeof window.CozyOS.ServiceRegistry.registerCoordinator === "function") {
         try {
