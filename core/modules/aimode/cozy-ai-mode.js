@@ -462,6 +462,22 @@
     }
 
     window.CozyOS.AIMode = new CozyOSAIModeGateway();
+    // Application Visibility Registry + capability standard — real, additive.
+    // "conversation"/"chat" deliberately NOT listed: requestAssistance() is
+    // a task-dispatch gateway, not a free-form conversational engine, and
+    // (as of this version) zero providers are registered anywhere in this
+    // codebase, so no task ever actually gets handled yet. Advertising only
+    // what's genuinely verified, per the Discovery standard this mirrors.
+    window.CozyOS.AIMode.visibility = Object.freeze({
+        appId: "aimode", name: "AI Mode", icon: "🤖", category: "platform-tool",
+        launchTarget: Object.freeze({ center: "developerHub", section: "aimode" }),
+        audience: "developer"
+    });
+    window.CozyOS.AIMode.capabilities = Object.freeze([
+        Object.freeze({ id: "mode-switching", permission: "aimode:refresh", rollback: false, category: "AI Mode" }),
+        Object.freeze({ id: "task-dispatch", permission: "aimode:analyze", rollback: false, category: "AI Mode" }),
+        Object.freeze({ id: "diagnostics", permission: "aimode:refresh", rollback: false, category: "AI Mode" })
+    ]);
 
     (function registerWithServiceRegistry(descriptor) {
         function attempt() {
