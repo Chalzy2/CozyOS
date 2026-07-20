@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en" data-cozy-app="platform-admin">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CozyOS Production Workspace</title>
+    <link rel="stylesheet" href="core/ui/cozy-tokens.css">
+    <link rel="stylesheet" href="core/ui/cozy-components.css">
+    <link rel="stylesheet" href="core/modules/developer/developer-hub.css">
+    <style>
+        /* REWORKED (visual redesign per reference design): light content
+         * area with a dark navy sidebar and a proper header bar, replacing
+         * the earlier dark-glass-everywhere look. Every color below reads
+         * from the shared --cozy-* tokens (cozy-tokens.css's reworked
+         * platform-admin block) with the same value hardcoded as a
+         * fallback, so nothing breaks if tokens fail to load. */
+        :root {
+            --bg-primary: var(--cozy-bg-gradient, #f8fafc);
+            --bg-surface: var(--cozy-glass-bg, #ffffff);
+            --accent-gold: var(--cozy-brand-primary, #1B5E20);
+            --accent-gold-hover: var(--cozy-brand-glow, rgba(27,94,32,0.15));
+            --accent-emerald: #1B5E20;
+            --emerald-glow: #00A86B;
+            --text-primary: var(--cozy-text, #0f172a);
+            --text-secondary: var(--cozy-muted, #475569);
+            --border-color: var(--cozy-border, #E2E8F0);
+            --sidebar-bg: var(--cozy-sidebar-bg, #0f172a);
+            --sidebar-text: var(--cozy-sidebar-text, #e2e8f0);
+            --sidebar-text-muted: var(--cozy-sidebar-text-muted, #94a3b8);
+            --sidebar-hover: var(--cozy-sidebar-hover, #1e293b);
+            --sidebar-active-bg: var(--cozy-sidebar-active-bg, #16A34A);
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--cozy-font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif);
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        /* --------------------------------------------------------------
+         * Structural CSS for cozy-workspace.js's real generated markup
+         * (.cozy-shell / .cozy-sidebar / .cozy-nav-link / etc.).
+         * -------------------------------------------------------------- */
+        #cozy-workspace-root { min-height: 100vh; }
+
+        .cozy-shell {
+            display: grid;
+            grid-template-columns: 1fr;
+            min-height: 100vh;
+        }
+        /* Lowered from 768px: Chrome's "Request Desktop Site" on mobile
+         * doesn't reliably override an effective viewport width above this
+         * page's own width=device-width meta tag, so a higher breakpoint
+         * could fail to trigger even in desktop-site mode on some devices.
+         * 600px triggers reliably while still being a reasonable mobile
+         * cutoff for genuinely narrow real phone viewports. */
+        @media (min-width: 600px) {
+            .cozy-shell { grid-template-columns: 260px 1fr; }
+        }
+
+        .cozy-sidebar {
+            background-color: var(--sidebar-bg);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            padding: 20px 12px;
+        }
+        @media (min-width: 600px) {
+            .cozy-sidebar {
+                border-bottom: none;
+                height: 100vh;
+                position: sticky;
+                top: 0;
+                overflow-y: auto;
+            }
+        }
+
+        .cozy-shell-title {
+            color: #ffffff;
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            padding: 0 8px;
+        }
+
+        .cozy-rediscover-btn {
+            width: 100%;
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.12);
+            color: var(--sidebar-text-muted);
+            border-radius: 6px;
+            padding: 8px;
+            cursor: pointer;
+            margin-bottom: 16px;
+        }
+        .cozy-rediscover-btn:hover { border-color: var(--emerald-glow); color: #ffffff; }
+
+        .cozy-nav-section { margin-bottom: 10px; }
+        .cozy-nav-section-label {
+            color: var(--sidebar-text-muted);
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 10px 12px 4px;
+        }
+        /* .cozy-nav-link base layout comes from cozy-components.css; these
+         * rules restyle it specifically for the dark sidebar context. */
+        .cozy-sidebar .cozy-nav-link {
+            color: var(--sidebar-text);
+            border-radius: 6px;
+            margin: 1px 4px;
+        }
+        .cozy-sidebar .cozy-nav-link:hover { background: var(--sidebar-hover); color: #ffffff; }
+        .cozy-sidebar .cozy-nav-link.active {
+            background: var(--sidebar-active-bg);
+            color: #ffffff;
+            border-left-color: var(--emerald-glow);
+            font-weight: 600;
+        }
+
+        .cozy-main-wrap { display: flex; flex-direction: column; min-height: 100vh; }
+
+        /* Header bar: brand context lives in the sidebar already, so this
+         * status bar plays the "top header" role (search/status/session) —
+         * restyled to sit on light background with real contrast, matching
+         * the reference header's spirit without fabricating a search box
+         * or notification system that isn't real yet. */
+        .cozy-status-bar {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding: 14px 28px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-surface);
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+        .cozy-main { padding: 28px; flex-grow: 1; }
+        .cozy-main h2 { font-size: 1.5rem; margin: 0 0 12px; color: var(--text-primary); }
+        .cozy-main h3 { color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+
+        .cozy-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+        .cozy-list > .cozy-nav-link {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            color: var(--text-primary);
+        }
+        .cozy-module-row {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            color: var(--text-primary);
+        }
+        .cozy-module-row-main {
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        }
+        .cozy-module-row-main b { font-size: 0.95rem; }
+        .cozy-module-row-meta {
+            display: flex; gap: 18px; flex-wrap: wrap;
+            font-size: 0.8rem; color: var(--text-secondary);
+        }
+
+        .cozy-grid { display: grid; gap: 16px; margin-top: 12px; }
+        .cozy-card-label { color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+        .cozy-card-value { font-size: 1.6rem; font-weight: 700; color: var(--text-primary); }
+
+        .cozy-disclosure-note { color: var(--text-secondary); font-size: 0.8rem; font-style: italic; margin: 4px 0 12px; }
+
+        /* --- New: Dashboard hero + stat cards + quick actions, matching
+         * the reference design's home layout. Real data only — stat
+         * numbers come from actual connected coordinators (Certification's
+         * application count, Module Manager's coordinator count, real user
+         * count when Identity is connected), never fabricated. --- */
+        .cozy-hero {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px 28px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+            box-shadow: var(--cozy-glass-shadow, none);
+        }
+        .cozy-hero h1 { margin: 0 0 4px; font-size: 1.4rem; color: var(--text-primary); }
+        .cozy-hero p { margin: 0; color: var(--text-secondary); font-size: 0.9rem; }
+        .cozy-hero-status {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(27,94,32,0.1); color: var(--accent-emerald);
+            padding: 6px 14px; border-radius: 999px; font-size: 0.8rem; font-weight: 600;
+        }
+        .cozy-hero-status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-emerald); display: inline-block; }
+
+        .cozy-stat-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px; margin-bottom: 20px;
+        }
+        .cozy-stat-card {
+            background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 10px;
+            padding: 16px 18px; box-shadow: var(--cozy-glass-shadow, none);
+        }
+        .cozy-quick-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px;
+        }
+        .cozy-quick-card {
+            background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 10px;
+            padding: 16px; cursor: pointer; transition: border-color 0.15s;
+            box-shadow: var(--cozy-glass-shadow, none);
+        }
+        .cozy-quick-card:hover { border-color: var(--accent-emerald); }
+        .cozy-quick-card .cozy-card-label { margin-bottom: 2px; }
+
+        .cozy-feature-card {
+            background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 10px;
+            padding: 18px 20px; margin-bottom: 16px; box-shadow: var(--cozy-glass-shadow, none);
+        }
+        .cozy-feature-card-head {
+            display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+        }
+
+        .cozy-shell-footer {
+            padding: 16px 28px;
+            text-align: center;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            border-top: 1px solid var(--border-color);
+        }
+
+        #terminal-input:focus { border-color: var(--accent-gold); outline: none; }
+        #terminal-input, #execute-btn { transition: border-color var(--cozy-transition-fast, 0.15s), background var(--cozy-transition-fast, 0.15s); }
+        #terminal-input { background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); }
+        #terminal-output { background: #ffffff !important; color: var(--text-secondary) !important; border: 1px solid var(--border-color); }
+    </style>
+</head>
+<body>
+
+    <!-- Additive: single mount point for the real Enterprise Control Center
+         (core/shell/cozy-workspace.js). Its mount() call builds its own
+         sidebar/topbar/main structure inside this div — nothing else in
+         this file writes to it directly. -->
+    <div id="cozy-workspace-root">
+        <noscript>The CozyOS Administrator Workspace requires JavaScript.</noscript>
+    </div>
+
+    <!-- CozyOS Shell UI Services (core/ui/). Loaded first: cozy-theme.js
+         applies the active theme immediately on construction (reading the
+         data-cozy-app="platform-admin" attribute already set on <html>
+         above), so it should run before anything else that might read
+         theme-dependent CSS variables.
+         - cozy-theme.js / cozy-background.js: real, verified compatible,
+           but required a new "platform-admin" theme profile to be added
+           (see migration log) — without it, both would have defaulted the
+           whole Administrator Workspace to Developer Hub's green/gold theme
+           and particle background. That gap is now closed: cozy-tokens.css
+           has a platform-admin block, cozy-theme.js registers it, and
+           cozy-background.js has a dedicated (subtle, emerald/gold mesh)
+           scene for it — Developer Hub keeps its own "developer" theme.
+         - cozy-toast.js / cozy-live.js: zero risk, no per-app coupling,
+           real API verified to match every existing call in
+           developer-hub.js and cozy-ui.js exactly (Toast.show(),
+           Live.publish()/subscribe()). -->
+    <script src="core/ui/cozy-theme.js"></script>
+    <script src="core/ui/cozy-background.js"></script>
+    <script src="core/ui/cozy-toast.js"></script>
+    <script src="core/ui/cozy-live.js"></script>
+
+    <!-- 0. PLATFORM FOUNDATION REGISTRIES — loaded first (plain, non-deferred)
+         so their synchronous self-registration completes before anything
+         else queries them. cozy-workspace.js already has dormant,
+         bounded-retry integration code expecting window.CozyOS.ServiceRegistry
+         (Application Center + Module Manager metadata) — no code change was
+         needed there, only loading this file. module-registry.js is loaded
+         too (real, verified file) but has no current Administrator Workspace
+         consumer yet — it's the app-launch/dashboard-placement resolver for
+         a future loadModule() flow, not a catalog/display coordinator. -->
+    <script src="core/registry/cozy-registry.js"></script>
+    <script src="core/modules/module-registry.js"></script>
+
+    <!-- Shared Platform Strengthening: PlatformEventBus / ModuleLoadingManager
+         (core/shell/) — the one shared event bus and load-lifecycle manager
+         every coordinator/application should use. -->
+    <script src="core/shell/platform-event-bus.js"></script>
+    <script src="core/shell/module-loading-manager.js"></script>
+
+    <!-- Certification (activates existing Certification/Release/Upgrade/
+         Dependency centers in cozy-workspace.js AND Developer Hub's
+         certification tools — same window.CozyOS.Certification instance,
+         every method name verified against both consumers, zero duplicated
+         logic) and Memory (Developer Hub's Memory section + cozy-workspace's
+         own Project-namespace file-registration hook — same window.CozyOS.
+         CozyMemory instance). Both verified compatible; no code changes
+         needed anywhere else. -->
+    <script src="core/certification/cozy-certification.js"></script>
+    <script src="core/modules/memory/cozy-memory-engine.js"></script>
+
+    <!-- DeveloperHub orchestrator — pure orchestration (verified: every
+         method is a one-line delegation to a real coordinator's real API,
+         e.g. fullCertification() literally just calls cert.fullCertification()
+         — no independent business logic, per its own header). Loading it
+         activates every existing window.CozyOS.DeveloperHub call already
+         present in developer-hub.js, with zero code changes there.
+         3 of its 8 optional integrations are already real and verified here
+         (Certification, ServiceRegistry, WorkspaceShell — including
+         WorkspaceShell.getDeveloperQueue(), confirmed to already exist);
+         Builder/UnderstandingEngine/OCR/BugFixer/AIMode will honestly report
+         "not connected" until those files are uploaded. -->
+    <!-- Builder / Understanding Engine toolset (core/modules/builder/) — 10
+         real files found in the full repository export, verified to
+         self-register under EXACTLY the global names developer-hub.js and
+         cozy-developer.js already call directly (window.CozyOS.Builder,
+         .BuilderRules, .BuilderTemplates, .BuilderAI, .UnderstandingEngine,
+         .ArchitectureEngine, .QuestionEngine, .RequirementAnalyzer,
+         .RequirementReader, .ProjectRefactor) — zero code changes needed
+         anywhere; this was simply never loaded before. BuilderRules/
+         BuilderTemplates/BuilderAI loaded first per cozy-builder.js's own
+         header ("required" dependencies). -->
+    <script src="core/modules/builder/builder-rules.js"></script>
+    <script src="core/modules/builder/builder-templates.js"></script>
+    <script src="core/modules/builder/builder-ai.js"></script>
+    <script src="core/modules/builder/architecture-engine.js"></script>
+    <script src="core/modules/builder/question-engine.js"></script>
+    <script src="core/modules/builder/requirement-analyzer.js"></script>
+    <script src="core/modules/builder/requirement-reader.js"></script>
+    <script src="core/modules/builder/understanding-engine.js"></script>
+    <script src="core/modules/builder/project-refactor.js"></script>
+    <script src="core/modules/builder/cozy-builder.js"></script>
+
+    <!-- OCR (core/modules/ocr/) — cozy-ocr.js registers window.CozyOS.OCR,
+         exact match for cozy-developer.js's #ocr(). document-router.js
+         registers a separate window.CozyOS.DocumentRouter — not yet
+         directly referenced by developer-hub.js/cozy-developer.js, but
+         real and part of the same domain; loaded for the same reason
+         module-registry.js was loaded before it had an Administrator
+         Workspace consumer. -->
+    <script src="core/modules/ocr/cozy-ocr.js"></script>
+    <script src="core/modules/ocr/document-router.js"></script>
+
+    <!-- AIMode (core/modules/aimode/cozy-ai-mode.js) — registers
+         window.CozyOS.AIMode, exact match for cozy-developer.js's
+         #aimode(). The last of DeveloperHub's 8 optional integrations. -->
+    <script src="core/modules/aimode/cozy-ai-mode.js"></script>
+
+    <!-- BugFixer (core/modules/bugfixer/cozy-bugfixer.js) — 1071 lines, real
+         and complete, found in the full repository export. Registers as
+         window.CozyOS.BugFixer, verified to match exactly what
+         developer-hub.js and cozy-developer.js already call directly.
+         All three of its optional integrations (Certification,
+         WorkspaceShell, ServiceRegistry) are already loaded above — no
+         further prerequisites needed. -->
+    <script src="core/modules/bugfixer/cozy-bugfixer.js"></script>
+
+    <script src="core/modules/developer/cozy-developer.js"></script>
+
+    <!-- 1. PLATFORM SHELL + DEVELOPER HUB -->
+    <script src="core/shell/cozy-workspace.js" defer></script>
+    <script src="core/modules/developer/developer-hub.js" defer></script>
+
+    <!-- 2. PLUGGABLE CORE ARCHITECTURE REGISTRIES (preserved, unchanged paths) -->
+    <script src="core/pluginManager.js"></script>
+    <script src="plugins/mpesaOS.js"></script>
+    <script src="plugins/pharmacyOS.js"></script>
+    <script src="core/dashboard.js"></script>
+
+    <!-- 3. BOOTSTRAP: mount the Workspace Shell once it and its scripts have
+         loaded. Bounded retry (same convention already used elsewhere in
+         CozyOS, e.g. developer-hub.js's own initStandaloneMount) covers
+         defer/script-order timing rather than assuming a fixed load order. -->
+    <script>
+        (function bootWorkspace() {
+            const root = document.getElementById("cozy-workspace-root");
+            function tryMount() {
+                if (window.CozyOS && window.CozyOS.WorkspaceShell && typeof window.CozyOS.WorkspaceShell.mount === "function") {
+                    window.CozyOS.WorkspaceShell.mount(root);
+                    return true;
+                }
+                return false;
+            }
+            if (tryMount()) return;
+            let attempts = 0;
+            const intervalId = setInterval(() => {
+                attempts++;
+                if (tryMount() || attempts >= 40) clearInterval(intervalId);
+            }, 250);
+        })();
+    </script>
+</body>
+</html>
