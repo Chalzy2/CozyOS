@@ -336,6 +336,12 @@
          by correlating what those engines already report. -->
     <script src="core/platform/audit-engine.js"></script>
 
+    <!-- Platform Operations Engine (core/platform/platform-operations.js) —
+         the execution layer. Orchestrator only; never fabricates a
+         lifecycle capability a coordinator doesn't have. Fails closed
+         without real Identity authorization. -->
+    <script src="core/platform/platform-operations.js"></script>
+
     <!-- Certification (activates existing Certification/Release/Upgrade/
          Dependency centers in cozy-workspace.js AND Developer Hub's
          certification tools — same window.CozyOS.Certification instance,
