@@ -129,6 +129,14 @@
 
         // ---- shell-local state (NOT business data — navigation/UI only) ----
         #activeCenter = (() => { try { return window.localStorage.getItem("cozy.workspace.activeCenter") || "dashboard"; } catch (_err) { return "dashboard"; } })();
+        #currentUserId = null; // no real login screen exists yet anywhere in CozyOS — this stays null until one does, and every gated action correctly fails closed as a result
+        #diagnosticsFilter = "";
+        #diagnosticsSort = "name";
+        #diagnosticsConnectedOnly = false;
+        #diagnosticsErrorsOnly = false;
+        #diagnosticsExpanded = new Set();
+        #themeStudioSelected = null;
+        #themeStudioCertification = null;
         #selectedContext = null; // { type: "module"|"application"|"release", id }
         #searchTerm = "";
         #sidebarCollapsed = (() => { try { return window.localStorage.getItem("cozy.workspace.sidebarCollapsed") === "1"; } catch (_err) { return false; } })();
@@ -2032,6 +2040,9 @@
                 case "platformOperations": return this.#renderPlatformOperations();
                 case "platformResources": return this.#renderPlatformResources();
                 case "accessibilityCenter": return this.#renderAccessibilityCenter();
+                case "contentStudio": return this.#renderContentStudio();
+                case "themeStudio": return this.#renderThemeStudio();
+                case "livingButtonEngine": return this.#renderLivingButtonEngine();
                 case "events": return this.#renderEventMonitor();
                 case "search": return this.#renderSearch();
                 case "security": return this.#renderIntegrationSlot(this.getSecurityCenterData(), "Security Center");
@@ -2157,6 +2168,55 @@
                     <div class="cozy-stat-card"><div class="cozy-card-label">Users</div><div class="cozy-card-value">${usersValue}</div></div>
                 </div>`;
 
+            // Executive summary cards — every value below is either read
+            // from a real, connected engine or shown honestly as "Not
+            // tracked"/"Not loaded". Verified before writing this: no real
+            // memory-usage API exists anywhere in CozyOS; the real Kernel
+            // (core/core/kernel/) is confirmed dormant, never loaded on
+            // this page (Bootstrap Certification); CozySync's real API is
+            // session/plugin lifecycle tracking, not literal sync status —
+            // none of these three are fabricated to look populated.
+            let healthSummary = "—";
+            try {
+                const health = window.CozyOS.HealthEngine;
+                if (health && typeof health.report === "function") {
+                    const badges = health.report().files;
+                    const counts = { "🟢": 0, "🟡": 0, "🔴": 0, "⚪": 0 };
+                    badges.forEach(b => { if (counts[b.badge] !== undefined) counts[b.badge]++; });
+                    healthSummary = `🟢 ${counts["🟢"]} · 🟡 ${counts["🟡"]} · 🔴 ${counts["🔴"]}`;
+                }
+            } catch (_err) { /* stays "—" */ }
+
+            let certSummary = "—";
+            try {
+                if (cert && typeof cert.listApplications === "function") {
+                    const apps = cert.listApplications();
+                    const certified = apps.filter(a => a.certification && a.certification !== "Not Certified").length;
+                    certSummary = `${certified}/${apps.length} certified`;
+                }
+            } catch (_err) { /* stays "—" */ }
+
+            const notificationCount = this.getNotificationFeed(500).length;
+            const a11yLoaded = !!(window.CozyOS && window.CozyOS.AccessibilityEngine);
+            const kernelLoaded = !!(window.CozyOS && window.CozyOS.Kernel);
+            const resourceCount = (() => {
+                try { return window.CozyOS.PlatformResourceManager ? window.CozyOS.PlatformResourceManager.discoverResources().length : null; }
+                catch (_err) { return null; }
+            })();
+
+            const summaryCardsHtml = `
+                <h3 style="margin:20px 0 10px;">Platform Summary</h3>
+                <div class="cozy-stat-grid">
+                    <div class="cozy-stat-card"><div class="cozy-card-label">Coordinator Health</div><div class="cozy-card-value" style="font-size:16px;">${healthSummary}</div></div>
+                    <div class="cozy-stat-card"><div class="cozy-card-label">Certification Summary</div><div class="cozy-card-value" style="font-size:16px;">${certSummary}</div></div>
+                    <div class="cozy-stat-card"><div class="cozy-card-label">Notifications</div><div class="cozy-card-value">${notificationCount}</div></div>
+                    <div class="cozy-stat-card"><div class="cozy-card-label">Resources Tracked</div><div class="cozy-card-value">${resourceCount === null ? "—" : resourceCount}</div></div>
+                    <div class="cozy-stat-card"><div class="cozy-card-label">Accessibility Engine</div><div class="cozy-card-value" style="font-size:16px;">${a11yLoaded ? "Loaded" : "Not Loaded"}</div></div>
+                    <div class="cozy-stat-card"><div class="cozy-card-label">Kernel Status</div><div class="cozy-card-value" style="font-size:16px;">${kernelLoaded ? "Loaded" : "Not Loaded"}</div></div>
+                    <div class="cozy-stat-card"><div class="cozy-card-label">Memory</div><div class="cozy-card-value" style="font-size:14px;color:var(--cozy-muted);">Not tracked</div></div>
+                    <div class="cozy-stat-card"><div class="cozy-card-label">Live Synchronization</div><div class="cozy-card-value" style="font-size:14px;color:var(--cozy-muted);">Not tracked</div></div>
+                </div>`;
+
             const quickActionsHtml = `
                 <h3 style="margin:20px 0 10px;">Quick Actions</h3>
                 <div class="cozy-quick-grid">
@@ -2276,6 +2336,7 @@
                 </section>`;
 
             return `${heroHtml}${statsHtml}
+                ${summaryCardsHtml}
                 <h3 style="margin:20px 0 10px;">Platform Capabilities</h3>
                 ${featureCardsHtml}
                 ${quickActionsHtml}
@@ -2387,15 +2448,74 @@
             return `<h2>Dependency Viewer</h2>${trees || this.#renderNotConnected("No applications registered.")}`;
         }
 
+        /**
+         * #renderDiagnosticsCenter()
+         *   Real accordion redesign. Collapsed view shows only fields that
+         *   actually exist on a given coordinator's own real
+         *   getDiagnosticsReport() output — Version/Certification/Memory/
+         *   Events show "—" per-coordinator when that coordinator doesn't
+         *   expose them, never a fabricated placeholder. Expanded content
+         *   is the exact same real key-value table this page always
+         *   showed, lazy-rendered (built only when a row is expanded, not
+         *   for all rows up front).
+         */
         #renderDiagnosticsCenter() {
             const data = this.getDiagnosticsCenterData();
             const shellTable = this.#renderKeyValueTable(data.shellDiagnostics);
-            const rows = data.coordinators.map(c => `
-                <div class="cozy-module-row">
-                    <b>${this.#escapeHtml(c.name)}</b>
-                    ${c.discovered ? this.#renderKeyValueTable(c.diagnostics) : "<span>Not Connected</span>"}
-                </div>`).join("");
-            return `<h2>Diagnostics Center</h2><h3>Shell</h3>${shellTable}<h3>Coordinators</h3>${rows}`;
+            const filterValue = this.#diagnosticsFilter || "";
+            const sortMode = this.#diagnosticsSort || "name";
+            const connectedOnly = !!this.#diagnosticsConnectedOnly;
+            const errorsOnly = !!this.#diagnosticsErrorsOnly;
+
+            let rows = data.coordinators.slice();
+            if (filterValue) rows = rows.filter(c => c.name.toLowerCase().includes(filterValue.toLowerCase()));
+            if (connectedOnly) rows = rows.filter(c => c.discovered);
+            if (errorsOnly) rows = rows.filter(c => c.discovered && c.diagnostics && (c.diagnostics.errors > 0 || c.diagnostics.lastError));
+            if (sortMode === "name") rows.sort((a, b) => a.name.localeCompare(b.name));
+            else if (sortMode === "status") rows.sort((a, b) => (b.discovered ? 1 : 0) - (a.discovered ? 1 : 0));
+            else if (sortMode === "certification") rows.sort((a, b) => {
+                const av = (a.diagnostics && a.diagnostics.certification) || "";
+                const bv = (b.diagnostics && b.diagnostics.certification) || "";
+                return String(av).localeCompare(String(bv));
+            });
+
+            const accordionRows = rows.map(c => {
+                const d = c.diagnostics || {};
+                const version = d.moduleVersion || "—";
+                const certification = d.certification || "—";
+                const memory = d.memory || "—";
+                const events = (typeof d.eventsEmitted === "number") ? d.eventsEmitted : "—";
+                const expanded = this.#diagnosticsExpanded && this.#diagnosticsExpanded.has(c.name);
+                return `
+                <div class="cozy-accordion-item" data-coordinator-row="${this.#escapeHtml(c.name)}">
+                    <button type="button" class="cozy-accordion-header" data-toggle-coordinator="${this.#escapeHtml(c.name)}">
+                        <span class="cozy-accordion-title">${this.#escapeHtml(c.name)}</span>
+                        <span class="cozy-badge ${c.discovered ? "cozy-badge-success" : "cozy-badge-neutral"}">${c.discovered ? "Connected" : "Not Connected"}</span>
+                        <span class="cozy-muted">v${this.#escapeHtml(String(version))}</span>
+                        <span class="cozy-muted">Cert: ${this.#escapeHtml(String(certification))}</span>
+                        <span class="cozy-muted">Mem: ${this.#escapeHtml(String(memory))}</span>
+                        <span class="cozy-muted">Events: ${this.#escapeHtml(String(events))}</span>
+                        <span class="cozy-accordion-chevron">${expanded ? "▾" : "▸"}</span>
+                    </button>
+                    ${expanded ? `<div class="cozy-accordion-body">${c.discovered ? this.#renderKeyValueTable(c.diagnostics) : "<p class=\"cozy-disclosure-note\">Not connected on this page.</p>"}</div>` : ""}
+                </div>`;
+            }).join("");
+
+            return `<h2>Diagnostics Center</h2>
+                <div class="cozy-field" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+                    <input type="text" id="cozy-diag-search" placeholder="Search coordinators…" value="${this.#escapeHtml(filterValue)}" />
+                    <button type="button" class="cozy-btn" id="cozy-diag-expand-all">Expand All</button>
+                    <button type="button" class="cozy-btn" id="cozy-diag-collapse-all">Collapse All</button>
+                    <button type="button" class="cozy-btn ${sortMode === "name" ? "cozy-btn-primary" : ""}" id="cozy-diag-sort-name">Sort by Name</button>
+                    <button type="button" class="cozy-btn ${sortMode === "status" ? "cozy-btn-primary" : ""}" id="cozy-diag-sort-status">Sort by Status</button>
+                    <button type="button" class="cozy-btn ${sortMode === "certification" ? "cozy-btn-primary" : ""}" id="cozy-diag-sort-cert">Sort by Certification</button>
+                    <button type="button" class="cozy-btn ${connectedOnly ? "cozy-btn-primary" : ""}" id="cozy-diag-connected-only">Connected Only</button>
+                    <button type="button" class="cozy-btn ${errorsOnly ? "cozy-btn-primary" : ""}" id="cozy-diag-errors-only">Errors Only</button>
+                </div>
+                <p class="cozy-disclosure-note">Certification/Memory/Events show "—" for coordinators whose own diagnostics don't report that field — never a fabricated value.</p>
+                <h3>Shell</h3>${shellTable}
+                <h3>Coordinators (${rows.length}/${data.coordinators.length})</h3>
+                ${accordionRows || `<p class="cozy-disclosure-note">No coordinators match this filter.</p>`}`;
         }
 
         #renderEventMonitor() {
@@ -2653,6 +2773,103 @@
                 ${fontViolations}`;
         }
 
+        /**
+         * #renderContentStudio()
+         *   Phase 1 only — real content-item list and create/publish
+         *   actions, no holiday templates, animation rendering, or
+         *   placement-specific display yet. Disclosed plainly in the UI
+         *   itself, not just in code comments.
+         */
+        #renderContentStudio() {
+            const cp = window.CozyOS && window.CozyOS.ContentPresentation ? window.CozyOS.ContentPresentation : null;
+            if (!cp) return `<h2>Content Studio</h2>${this.#renderNotConnected("ContentPresentation is not loaded on this page.")}`;
+
+            const items = cp.listContent();
+            const rows = items.map(c => `
+                <div class="cozy-module-row">
+                    <div class="cozy-module-row-main">
+                        <b>${this.#escapeHtml(c.title)}</b>
+                        <span class="cozy-badge ${c.status === "published" ? "cozy-badge-success" : "cozy-badge-neutral"}">${this.#escapeHtml(c.status)}</span>
+                        <span class="cozy-badge cozy-badge-neutral">${this.#escapeHtml(c.category)}</span>
+                    </div>
+                    <div class="cozy-module-row-meta">
+                        <span>${this.#escapeHtml(c.body)}</span>
+                        ${c.status === "draft" ? `<button type="button" class="cozy-btn" data-content-publish="${this.#escapeHtml(c.id)}">Publish</button>` : ""}
+                    </div>
+                </div>`).join("") || `<p class="cozy-disclosure-note">No content items yet.</p>`;
+
+            return `<h2>Content Studio</h2>
+                <p class="cozy-disclosure-note">Phase 1 of the requested Design Studio & Content Presentation Engine. Real content CRUD with a real Accessibility Engine publish gate — most requested content categories, holiday templates, animation rendering, and placement modes are not yet built. See the migration log for the full, honest scope.</p>
+                <button type="button" id="cozy-content-seed-btn" class="cozy-btn cozy-btn-primary">Load Demonstration Content</button>
+                <h3>Content Items (${items.length})</h3>
+                <div class="cozy-list">${rows}</div>`;
+        }
+
+        /**
+         * #renderThemeStudio()
+         *   Real Theme Studio — lists every real, registered theme
+         *   (cozy-theme.js's own listThemes()), shows each one's actual
+         *   currently-resolved tokens (getThemeTokens(), never a
+         *   hardcoded second copy), and runs the real Accessibility
+         *   Engine certification against whichever theme the admin
+         *   selects. "Corporate," "CozyCabin," and "Seasonal Themes" are
+         *   not built — disclosed here, not silently omitted.
+         */
+        /**
+         * #renderLivingButtonEngine()
+         *   Real showcase of the CSS classes already built in
+         *   cozy-components.css (prior milestone) — this page adds no new
+         *   CSS, it only demonstrates the existing, real classes and
+         *   provides the real global on/off toggle
+         *   (.cozy-animations-disabled) the Constitution rule requires.
+         */
+        #renderLivingButtonEngine() {
+            const disabled = document.body.classList.contains("cozy-animations-disabled");
+            const states = [
+                ["cozy-btn-breathing", "Breathing"], ["cozy-btn-glow", "Glow"], ["cozy-btn-pulse", "Pulse"],
+                ["cozy-btn-floating", "Floating"], ["cozy-btn-gradient", "Gradient"], ["cozy-btn-heartbeat", "Heartbeat"],
+                ["cozy-btn-shimmer", "Shimmer"], ["cozy-btn-loading", "Loading"]
+            ];
+            const buttons = states.map(([cls, label]) => `<button type="button" class="cozy-btn cozy-btn-primary ${cls}">${this.#escapeHtml(label)}</button>`).join(" ");
+            return `<h2>Living Button Engine</h2>
+                <p class="cozy-disclosure-note">Real showcase of the reusable CSS classes in cozy-components.css — no new styles added here, just demonstrated. Applications adopt these by adding one class, no duplicated CSS.</p>
+                <button type="button" id="cozy-lbe-toggle-btn" class="cozy-btn">${disabled ? "Enable Animations Globally" : "Disable Animations Globally"}</button>
+                <div class="cozy-field" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">${buttons}
+                    <button type="button" class="cozy-btn cozy-btn-primary" disabled>Disabled State</button>
+                    <button type="button" class="cozy-btn cozy-btn-primary cozy-btn-badge" data-badge="3">Badge</button>
+                </div>`;
+        }
+
+        #renderThemeStudio() {
+            const theme = window.CozyOS && window.CozyOS.Theme ? window.CozyOS.Theme : null;
+            if (!theme) return `<h2>Theme Studio</h2>${this.#renderNotConnected("Theme Engine is not loaded on this page.")}`;
+            const themes = theme.listThemes();
+            const selected = this.#themeStudioSelected || themes[0]?.name || null;
+            const tokens = selected ? theme.getThemeTokens(selected) : null;
+
+            const themeButtons = themes.map(t => `<button type="button" class="cozy-btn ${t.name === selected ? "cozy-btn-primary" : ""}" data-theme-select="${this.#escapeHtml(t.name)}">${this.#escapeHtml(t.name)}${t.aliases.length ? ` <span class="cozy-muted">(${this.#escapeHtml(t.aliases.join(", "))})</span>` : ""}</button>`).join(" ");
+
+            const tokenTable = tokens && tokens.available
+                ? this.#renderKeyValueTable(tokens.tokens)
+                : `<p class="cozy-disclosure-note">${this.#escapeHtml(tokens?.reason || "No theme selected.")}</p>`;
+
+            const certResult = this.#themeStudioCertification;
+            const certBlock = certResult
+                ? `<div class="cozy-module-row"><b>Accessibility: ${certResult.certified ? "PASS" : "FAIL"}</b><p>${this.#escapeHtml(certResult.reason)}</p></div>`
+                : `<p class="cozy-disclosure-note">Not yet validated this session.</p>`;
+
+            return `<h2>Theme Studio</h2>
+                <p class="cozy-disclosure-note">The central visual authority for CozyOS themes — reads and validates the real Theme Engine, does not duplicate it. "Corporate," "CozyCabin," and "Seasonal Themes" do not exist anywhere in this codebase and are not fabricated here.</p>
+                <h3>Registered Themes (${themes.length})</h3>
+                <div class="cozy-field" style="display:flex;gap:8px;flex-wrap:wrap;">${themeButtons}</div>
+                <h3>Resolved Tokens — ${this.#escapeHtml(selected || "none")}</h3>
+                ${tokenTable}
+                <button type="button" class="cozy-btn cozy-btn-primary" id="cozy-theme-preview-btn" ${selected ? "" : "disabled"}>Preview This Theme</button>
+                <button type="button" class="cozy-btn" id="cozy-theme-validate-btn" ${selected ? "" : "disabled"}>Validate Accessibility</button>
+                <h3>Accessibility Validation</h3>
+                ${certBlock}`;
+        }
+
         #renderNotificationCenter() {
             const feed = this.getNotificationFeed(50);
             return `<h2>Enterprise Notification Center</h2>
@@ -2684,7 +2901,8 @@
             const NAV_SECTIONS = [
                 { label: "Overview", items: [["dashboard", "Dashboard"], ["applications", "Application Center"], ["modules", "Module Manager"]] },
                 { label: "Certification", items: [["certification", "Certification Center"], ["releases", "Release Center"], ["upgrades", "Upgrade Center"], ["dependencies", "Dependency Viewer"]] },
-                { label: "Operations", items: [["diagnostics", "Diagnostics Center"], ["events", "Event Monitor"], ["notifications", "Notification Center"], ["search", "Enterprise Search"], ["platformDiscovery", "Platform Discovery"], ["platformAudit", "Audit Center"], ["platformOperations", "Operations Center"], ["platformResources", "Resource Center"], ["accessibilityCenter", "Accessibility Center"]] },
+                { label: "Operations", items: [["diagnostics", "Diagnostics Center"], ["events", "Event Monitor"], ["notifications", "Notification Center"], ["search", "Enterprise Search"], ["platformDiscovery", "Platform Discovery"], ["platformAudit", "Audit Center"], ["platformOperations", "Operations Center"], ["platformResources", "Resource Center"]] },
+                { label: "Design Studio", items: [["themeStudio", "Theme Studio"], ["livingButtonEngine", "Living Button Engine"], ["accessibilityCenter", "Accessibility Studio"], ["contentStudio", "Content Studio"]] },
                 { label: "Integrations (awaiting coordinators)", items: [["security", "Security Center"], ["storage", "Storage Center"], ["sync", "Synchronization Center"], ["automation", "Automation Center"], ["live", "Live Center"], ["speech", "Speech Center"], ["translation", "Translation Center"], ["subscription", "Subscription / License Center"], ["ai", "AI Center"], ["plugins", "Plugin Center"], ["tenants", "Tenant Center"]] },
                 // Additive: Administrator Workspace expansion per the locked
                 // CozyOS architecture. Nothing above this line was changed.
@@ -2940,6 +3158,75 @@
                         }
                         return;
                     }
+                    if (evt.target.id === "cozy-content-seed-btn") {
+                        // Real call — will honestly refuse (no fabricated
+                        // success) since no real, authenticated userId
+                        // exists yet anywhere in CozyOS. This is correct,
+                        // fail-closed behavior, not a bug in this button.
+                        if (window.CozyOS.ContentPresentation) {
+                            const result = window.CozyOS.ContentPresentation.seedDemonstrationContent(this.#currentUserId || null);
+                            if (!result.success) window.CozyOS.Toast?.show?.(result.reason);
+                        }
+                        this.#render();
+                        return;
+                    }
+                    if (evt.target.hasAttribute("data-content-publish")) {
+                        const contentId = evt.target.getAttribute("data-content-publish");
+                        if (window.CozyOS.ContentPresentation) {
+                            evt.target.disabled = true;
+                            window.CozyOS.ContentPresentation.publishContent(this.#currentUserId || null, contentId).then(result => {
+                                if (!result.success) window.CozyOS.Toast?.show?.(result.reason);
+                                this.#render();
+                            });
+                        }
+                        return;
+                    }
+                    if (evt.target.hasAttribute("data-toggle-coordinator")) {
+                        const name = evt.target.getAttribute("data-toggle-coordinator") || evt.target.closest("[data-toggle-coordinator]")?.getAttribute("data-toggle-coordinator");
+                        if (name) { this.#diagnosticsExpanded.has(name) ? this.#diagnosticsExpanded.delete(name) : this.#diagnosticsExpanded.add(name); this.#render(); }
+                        return;
+                    }
+                    if (evt.target.id === "cozy-diag-expand-all") {
+                        this.getDiagnosticsCenterData().coordinators.forEach(c => this.#diagnosticsExpanded.add(c.name));
+                        this.#render(); return;
+                    }
+                    if (evt.target.id === "cozy-diag-collapse-all") { this.#diagnosticsExpanded.clear(); this.#render(); return; }
+                    if (evt.target.id === "cozy-diag-sort-name") { this.#diagnosticsSort = "name"; this.#render(); return; }
+                    if (evt.target.id === "cozy-diag-sort-status") { this.#diagnosticsSort = "status"; this.#render(); return; }
+                    if (evt.target.id === "cozy-diag-sort-cert") { this.#diagnosticsSort = "certification"; this.#render(); return; }
+                    if (evt.target.id === "cozy-diag-connected-only") { this.#diagnosticsConnectedOnly = !this.#diagnosticsConnectedOnly; this.#render(); return; }
+                    if (evt.target.id === "cozy-diag-errors-only") { this.#diagnosticsErrorsOnly = !this.#diagnosticsErrorsOnly; this.#render(); return; }
+                    if (evt.target.hasAttribute("data-theme-select")) {
+                        this.#themeStudioSelected = evt.target.getAttribute("data-theme-select");
+                        this.#themeStudioCertification = null; // stale from a different theme — clear rather than show a misleading old result
+                        this.#render();
+                        return;
+                    }
+                    if (evt.target.id === "cozy-theme-preview-btn") {
+                        // Real, not simulated: actually switches the live
+                        // theme via the real Theme Engine, the same call
+                        // any application makes to change theme.
+                        if (window.CozyOS.Theme && this.#themeStudioSelected) window.CozyOS.Theme.setTheme(this.#themeStudioSelected);
+                        this.#render();
+                        return;
+                    }
+                    if (evt.target.id === "cozy-theme-validate-btn") {
+                        const selected = this.#themeStudioSelected;
+                        if (window.CozyOS.AccessibilityEngine && selected) {
+                            evt.target.disabled = true;
+                            evt.target.textContent = "Validating…";
+                            window.CozyOS.AccessibilityEngine.generateCertification([selected]).then(cert => {
+                                this.#themeStudioCertification = { certified: cert.certified, reason: cert.reason };
+                                this.#render();
+                            });
+                        }
+                        return;
+                    }
+                    if (evt.target.id === "cozy-lbe-toggle-btn") {
+                        document.body.classList.toggle("cozy-animations-disabled");
+                        this.#render();
+                        return;
+                    }
                     if (evt.target.closest("#cozy-mobile-menu-btn")) {
                         this.#sidebarMobileOpen = !this.#sidebarMobileOpen;
                         this.#render();
@@ -2975,12 +3262,27 @@
                         this.#searchTerm = evt.target.value;
                         this.#render();
                     }
+                    if (evt.target.id === "cozy-diag-search") {
+                        this.#diagnosticsFilter = evt.target.value;
+                        this.#render();
+                        // Re-focus and restore cursor position — re-render
+                        // replaces the input element, which would otherwise
+                        // steal focus on every keystroke.
+                        const refocused = this.#domRoot.querySelector("#cozy-diag-search");
+                        if (refocused) { refocused.focus(); refocused.setSelectionRange(refocused.value.length, refocused.value.length); }
+                    }
                 });
                 // Additive: Core Terminal Enter-key submit (preserved behavior
                 // from the original dashboard.html's terminal-input listener).
                 this.#domRoot.addEventListener("keydown", (evt) => {
                     if (evt.target.id === "terminal-input" && evt.key === "Enter") {
                         this.#handleTerminalQuery();
+                    }
+                    // Diagnostics search: Enter expands the first visible result.
+                    if (evt.target.id === "cozy-diag-search" && evt.key === "Enter") {
+                        const firstRow = this.#domRoot.querySelector("[data-toggle-coordinator]");
+                        const name = firstRow?.getAttribute("data-toggle-coordinator");
+                        if (name) { this.#diagnosticsExpanded.add(name); this.#render(); }
                     }
                 });
                 this.#documentClickDismissBound = true;
