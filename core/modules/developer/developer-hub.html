@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>CozyOS Developer Hub</title>
 <link rel="stylesheet" href="developer-hub.css" />
+<link rel="stylesheet" href="../../ui/cozy-shell-layout.css" />
 
 <!--
   CozyOS Phase 3 UI Architecture — Shell integration hooks.
@@ -15,11 +16,12 @@
   Nothing in developer-hub.js or developer-hub.css assumes these are
   present.
 -->
-<script src="../ui/cozy-ui.js" defer></script>
-<script src="../ui/cozy-background.js" defer></script>
-<script src="../ui/cozy-live.js" defer></script>
-<script src="../ui/cozy-navigation.js" defer></script>
-<script src="../ui/cozy-toast.js" defer></script>
+<script src="../../ui/cozy-ui.js" defer></script>
+<script src="../../ui/cozy-background.js" defer></script>
+<script src="../../shell/cozy-live.js" defer></script>
+<script src="../../shell/cozy-navigation.js" defer></script>
+<script src="../../ui/cozy-sidebar.js" defer></script>
+<script src="../../shell/cozy-toast.js" defer></script>
 
 <!-- Optional PDF export support for reports generated elsewhere in CozyOS. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
@@ -87,28 +89,78 @@
          behavior via event delegation but never rebuilds this list. -->
     <aside id="cozy-sidebar" class="cozy-side-navigation">
         <nav class="cozy-nav-menu" id="cozy-hub-nav-menu">
-            <a href="#" class="cozy-nav-item active" data-section="dashboard"><span class="icon">⌂</span> Dashboard</a>
-            <a href="#" class="cozy-nav-item" data-section="builder"><span class="icon">🔨</span> Builder</a>
-            <a href="#" class="cozy-nav-item" data-section="understanding"><span class="icon">🧠</span> Understanding Engine</a>
-            <a href="#" class="cozy-nav-item" data-section="ocr"><span class="icon">📷</span> OCR</a>
-            <a href="#" class="cozy-nav-item" data-section="quickCert"><span class="icon">⚡</span> Quick Certification</a>
-            <a href="#" class="cozy-nav-item" data-section="fullCert"><span class="icon">✔</span> Full Certification</a>
-            <a href="#" class="cozy-nav-item" data-section="bugfixer"><span class="icon">🐛</span> BugFixer</a>
-            <a href="#" class="cozy-nav-item" data-section="workspace"><span class="icon">🗂</span> Workspace</a>
-            <a href="#" class="cozy-nav-item" data-section="moduleExplorer"><span class="icon">🧩</span> Module Explorer</a>
-            <a href="#" class="cozy-nav-item" data-section="applicationExplorer"><span class="icon">📱</span> Application Explorer</a>
-            <a href="#" class="cozy-nav-item" data-section="serviceRegistry"><span class="icon">📇</span> Service Registry</a>
-            <a href="#" class="cozy-nav-item" data-section="releaseCenter"><span class="icon">🚀</span> Release Center</a>
-            <a href="#" class="cozy-nav-item" data-section="goldenVault"><span class="icon">🏆</span> Golden Vault</a>
-            <a href="#" class="cozy-nav-item" data-section="certHistory"><span class="icon">📜</span> Certification History</a>
-            <a href="#" class="cozy-nav-item" data-section="repairHistory"><span class="icon">🛠</span> Repair History</a>
-            <a href="#" class="cozy-nav-item" data-section="reviewQueue"><span class="icon">📥</span> Knowledge Review Queue</a>
-            <a href="#" class="cozy-nav-item" data-section="patternLibrary"><span class="icon">📚</span> Enterprise Pattern Library</a>
-            <a href="#" class="cozy-nav-item" data-section="developerQueue"><span class="icon">🧑‍💻</span> Developer Queue</a>
-            <a href="#" class="cozy-nav-item" data-section="research"><span class="icon">🔍</span> Research</a>
-            <a href="#" class="cozy-nav-item" data-section="memory"><span class="icon">💾</span> Memory</a>
-            <a href="#" class="cozy-nav-item" data-section="search"><span class="icon">🔎</span> Search</a>
-            <a href="#" class="cozy-nav-item" data-section="settings"><span class="icon">⚙</span> Settings</a>
+
+            <div class="cozy-nav-group" data-group="overview">
+                <button type="button" class="cozy-nav-group-header" data-group-toggle="overview">
+                    <span class="cozy-nav-group-arrow">▶</span><span class="cozy-nav-group-label">Overview</span>
+                </button>
+                <div class="cozy-nav-group-items"><div>
+                    <a href="#" class="cozy-nav-item active" data-section="dashboard" title="Dashboard"><span class="icon">⌂</span><span class="label">Dashboard</span></a>
+                </div></div>
+            </div>
+
+            <div class="cozy-nav-group" data-group="development">
+                <button type="button" class="cozy-nav-group-header" data-group-toggle="development">
+                    <span class="cozy-nav-group-arrow">▶</span><span class="cozy-nav-group-label">Development</span>
+                </button>
+                <div class="cozy-nav-group-items"><div>
+                    <a href="#" class="cozy-nav-item" data-section="builder" title="Builder"><span class="icon">🔨</span><span class="label">Builder</span></a>
+                    <a href="#" class="cozy-nav-item" data-section="understanding" title="Understanding Engine"><span class="icon">🧠</span><span class="label">Understanding Engine</span></a>
+                    <a href="#" class="cozy-nav-item" data-section="ocr" title="OCR"><span class="icon">📷</span><span class="label">OCR</span></a>
+                    <a href="#" class="cozy-nav-item" data-section="aimode" title="AI Mode"><span class="icon">🤖</span><span class="label">AI Mode</span></a>
+                    <a href="#" class="cozy-nav-item" data-section="research" title="Research"><span class="icon">🔍</span><span class="label">Research</span></a>
+                    <a href="#" class="cozy-nav-item" data-section="memory" title="Memory"><span class="icon">💾</span><span class="label">Memory</span></a>
+                </div></div>
+            </div>
+
+            <div class="cozy-nav-group" data-group="certification">
+                <button type="button" class="cozy-nav-group-header" data-group-toggle="certification">
+                    <span class="cozy-nav-group-arrow">▶</span><span class="cozy-nav-group-label">Certification</span>
+                </button>
+                <div class="cozy-nav-group-items"><div>
+                    <a href="#" class="cozy-nav-item" data-section="quickCert" title="Quick Certification"><span class="icon">⚡</span><span class="label">Quick Certification</span></a>
+                    <a href="#" class="cozy-nav-item" data-section="fullCert" title="Full Certification"><span class="icon">✔</span><span class="label">Full Certification</span></a>
+                    <a href="#" class="cozy-nav-item" data-section="certHistory" title="Certification History"><span class="icon">📜</span><span class="label">Certification History</span></a>
+                    <a href="#" class="cozy-nav-item" data-section="goldenVault" title="Golden Vault"><span class="icon">🏆</span><span class="label">Golden Vault</span></a>
+                </div></div>
+            </div>
+
+            <div class="cozy-nav-group" data-group="operations">
+                <button type="button" class="cozy-nav-group-header" data-group-toggle="operations">
+                    <span class="cozy-nav-group-arrow">▶</span><span class="cozy-nav-group-label">Operations</span>
+                </button>
+                <div class="cozy-nav-group-items"><div>
+                    <a href="#" class="cozy-nav-item" data-section="bugfixer" title="BugFixer"><span class="icon">🐛</span><span class="label">BugFixer</span></a>
+                    <a href="#" class="cozy-nav-item" data-section="workspace" title="Workspace"><span class="icon">🗂</span><span class="label">Workspace</span></a>
+                    <a href="#" class="cozy-nav-item" data-section="repairHistory" title="Repair History"><span class="icon">🛠</span><span class="label">Repair History</span></a>
+                </div></div>
+            </div>
+
+            <div class="cozy-nav-group" data-group="integrations">
+                <button type="button" class="cozy-nav-group-header" data-group-toggle="integrations">
+                    <span class="cozy-nav-group-arrow">▶</span><span class="cozy-nav-group-label">Integrations</span>
+                </button>
+                <div class="cozy-nav-group-items"><div>
+                    <a href="#" class="cozy-nav-item" data-section="moduleExplorer" title="Module Explorer"><span class="icon">🧩</span><span class="label">Module Explorer</span></a>
+                    <a href="#" class="cozy-nav-item" data-section="applicationExplorer" title="Application Explorer"><span class="icon">📱</span><span class="label">Application Explorer</span></a>
+                    <a href="#" class="cozy-nav-item" data-section="serviceRegistry" title="Service Registry"><span class="icon">📇</span><span class="label">Service Registry</span></a>
+                </div></div>
+            </div>
+
+            <div class="cozy-nav-group" data-group="administration">
+                <button type="button" class="cozy-nav-group-header" data-group-toggle="administration">
+                    <span class="cozy-nav-group-arrow">▶</span><span class="cozy-nav-group-label">Administration</span>
+                </button>
+                <div class="cozy-nav-group-items"><div>
+                    <a href="#" class="cozy-nav-item" data-section="releaseCenter" title="Release Center"><span class="icon">🚀</span><span class="label">Release Center</span></a>
+                    <a href="#" class="cozy-nav-item" data-section="reviewQueue" title="Knowledge Review Queue"><span class="icon">📥</span><span class="label">Knowledge Review Queue</span></a>
+                    <a href="#" class="cozy-nav-item" data-section="patternLibrary" title="Enterprise Pattern Library"><span class="icon">📚</span><span class="label">Enterprise Pattern Library</span></a>
+                    <a href="#" class="cozy-nav-item" data-section="developerQueue" title="Developer Queue"><span class="icon">🧑‍💻</span><span class="label">Developer Queue</span></a>
+                    <a href="#" class="cozy-nav-item" data-section="search" title="Search"><span class="icon">🔎</span><span class="label">Search</span></a>
+                    <a href="#" class="cozy-nav-item" data-section="settings" title="Settings"><span class="icon">⚙</span><span class="label">Settings</span></a>
+                </div></div>
+            </div>
+
         </nav>
     </aside>
 

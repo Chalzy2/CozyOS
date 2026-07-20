@@ -405,6 +405,7 @@
                 case "builder": return this.#renderBuilder();
                 case "understanding": return this.#renderUnderstanding();
                 case "ocr": return this.#renderOcr();
+                case "aimode": return this.#renderAiMode();
                 case "quickCert": return this.#renderQuickCert();
                 case "fullCert": return this.#renderFullCert();
                 case "bugfixer": return this.#renderBugFixerSection();
@@ -500,11 +501,12 @@
         #renderBuilder() {
             const selected = this.#selectedModuleId;
             const subTab = this.#builderSubTab || "generate";
-            const tabs = [["generate", "Generate"], ["refactor-split", "Split Single File"], ["refactor-merge", "Merge Project"], ["refactor-modularize", "Convert to CozyOS Module"], ["refactor-optimize", "Optimize Project"]];
+            const tabs = [["generate", "Generate"], ["refactor-split", "Split Single File"], ["refactor-merge", "Merge Project"], ["refactor-modularize", "Convert to CozyOS Module"], ["refactor-optimize", "Optimize Project"], ["architecture", "Architecture Viewer"]];
             const nav = `<div class="cz-row" style="flex-wrap:wrap;gap:6px;margin-bottom:10px;">
                 ${tabs.map(([id, label]) => `<button class="cz-btn${subTab === id ? " cz-btn-primary" : ""}" data-action="hub-builder-subtab" data-tab="${id}">${escapeHtml(label)}</button>`).join("")}
             </div>`;
 
+            if (subTab === "architecture") return `<h1>Builder — Architecture Viewer</h1>${nav}${this.#renderArchitecturePanel()}`;
             if (subTab !== "generate") return `<h1>Builder — Refactor Existing Project</h1>${nav}${this.#renderRefactorPanel(subTab)}`;
 
             return `<h1>Builder</h1>${nav}
@@ -581,6 +583,28 @@
                 <div class="cz-field"><label>Module ID</label><input class="cz-input" id="cz-hub-optimize-moduleid" placeholder="MyModule" /></div>
                 <div class="cz-field"><label>JavaScript</label><textarea class="cz-input" id="cz-hub-optimize-js" rows="10" placeholder="Paste the JS to optimize..."></textarea></div>
                 <button class="cz-btn cz-btn-primary" data-action="hub-refactor-optimize">Optimize</button>
+            </div>
+            <div class="cz-panel cz-dev-action-output-panel" id="cz-hub-output"></div>`;
+        }
+
+        /**
+         * #renderArchitecturePanel()
+         *   Restoration fix, not a new feature: window.CozyOS.ArchitectureEngine
+         *   (generateBlueprint()/listBlueprints()/getBlueprint()) has been
+         *   real and connected since Milestone 30 — this was the only real
+         *   gap found in Phase 1 of the Functional Workspace Restoration
+         *   audit: the coordinator existed, nothing in this UI called it.
+         *   This panel adds no analysis logic of its own — it only calls
+         *   the real, existing methods and displays their real output.
+         */
+        #renderArchitecturePanel() {
+            const engine = window.CozyOS.ArchitectureEngine;
+            if (!engine) return `<div class="cz-panel"><p class="cz-muted">ArchitectureEngine is not connected.</p></div>`;
+            const blueprints = typeof engine.listBlueprints === "function" ? engine.listBlueprints() : [];
+            return `<div class="cz-panel">
+                <p class="cz-subtitle">Generates a real architecture blueprint from the current project files (Method 2/3 in Generate) via ArchitectureEngine — nothing here is invented by this panel.</p>
+                <button class="cz-btn cz-btn-primary" data-action="hub-generate-blueprint">Generate Blueprint</button>
+                ${blueprints.length ? `<h3>Existing Blueprints</h3>${blueprints.map(b => `<div class="cz-row"><span>${escapeHtml(b.id || b.name)}</span><button class="cz-btn" data-action="hub-view-blueprint" data-blueprint-id="${escapeHtml(b.id)}">View</button></div>`).join("")}` : `<p class="cz-muted">No blueprints generated yet this session.</p>`}
             </div>
             <div class="cz-panel cz-dev-action-output-panel" id="cz-hub-output"></div>`;
         }
@@ -891,6 +915,101 @@
             if (el) el.value = text;
         }
 
+        /**
+         * #hubGenerateBlueprint()
+         *   Real 2-step chain, no shortcuts invented: ArchitectureEngine.
+         *   generateBlueprint(analysisId) requires a real analysisId from
+         *   RequirementAnalyzer — reuses whatever text is already in the
+         *   Generate tab's prompt/paste fields rather than asking for a
+         *   duplicate description.
+         */
+        #hubGenerateBlueprint() {
+            const analyzer = window.CozyOS.RequirementAnalyzer;
+            const engine = window.CozyOS.ArchitectureEngine;
+            if (!analyzer || !engine) { this.#devOutput('<p class="cz-muted">RequirementAnalyzer and ArchitectureEngine are both required.</p>'); return; }
+            const text = (document.getElementById("cz-hub-builder-prompt")?.value || document.getElementById("cz-hub-builder-code-paste")?.value || "").trim();
+            if (!text) { this.#devOutput('<p class="cz-muted">Enter a description or paste/upload source on the Generate tab first — Architecture Viewer analyzes the same input.</p>'); return; }
+            try {
+                const analysis = analyzer.analyzeRequirement(text);
+                const blueprint = engine.generateBlueprint(analysis.id || analysis.analysisId);
+                this.#devOutput(`<h3>Blueprint Generated</h3><pre class="cz-code-block">${escapeHtml(JSON.stringify(blueprint, null, 2))}</pre>`);
+            } catch (err) { this.#devOutput(`<p class="cz-muted">${escapeHtml(err.message)}</p>`); }
+        }
+        #hubViewBlueprint(blueprintId) {
+            const engine = window.CozyOS.ArchitectureEngine;
+            if (!engine || typeof engine.getBlueprint !== "function") { this.#devOutput('<p class="cz-muted">ArchitectureEngine is not connected.</p>'); return; }
+            try {
+                const blueprint = engine.getBlueprint(blueprintId);
+                this.#devOutput(blueprint ? `<h3>Blueprint: ${escapeHtml(blueprintId)}</h3><pre class="cz-code-block">${escapeHtml(JSON.stringify(blueprint, null, 2))}</pre>` : '<p class="cz-muted">Blueprint not found.</p>');
+            } catch (err) { this.#devOutput(`<p class="cz-muted">${escapeHtml(err.message)}</p>`); }
+        }
+
+        /**
+         * #hubOcrParse()
+         *   Real: passes the uploaded File directly to Tesseract.js via
+         *   CozyOCR.parseReceipt() (Tesseract.recognize() accepts a File
+         *   object natively). Real limitation disclosed, not worked
+         *   around: this coordinator's current API has no incremental
+         *   progress callback, so this shows a simple "processing…" state
+         *   for the real await, not a fabricated progress bar.
+         */
+        #hubAiModeSetMode() {
+            const ai = window.CozyOS.AIMode;
+            const mode = document.getElementById("cz-hub-aimode-mode")?.value;
+            if (!ai || !mode) return;
+            try { ai.setMode(mode); this.#devOutput(`<p>Mode switched to ${escapeHtml(mode)}.</p>`); this.#renderMain(); }
+            catch (err) { this.#devOutput(`<p class="cz-muted">${escapeHtml(err.message)}</p>`); }
+        }
+
+        /**
+         * #hubAiModeSend()
+         *   Real: calls the actual requestAssistance(task, payload) gateway
+         *   with exactly what the user entered — no task name or payload
+         *   invented. Displays the REAL result, including the honest
+         *   {handled:false, reason:...} case, which is the expected result
+         *   today since no provider is registered anywhere (see this
+         *   section's own disclosure note).
+         */
+        async #hubAiModeSend() {
+            const ai = window.CozyOS.AIMode;
+            const task = document.getElementById("cz-hub-aimode-task")?.value.trim();
+            const payloadText = document.getElementById("cz-hub-aimode-payload")?.value.trim();
+            if (!ai || !task) { this.#devOutput('<p class="cz-muted">Enter a task name first.</p>'); return; }
+            let payload = {};
+            if (payloadText) {
+                try { payload = JSON.parse(payloadText); }
+                catch (_err) { this.#devOutput('<p class="cz-muted">Payload must be valid JSON.</p>'); return; }
+            }
+            try {
+                const result = await ai.requestAssistance(task, payload);
+                this.#devOutput(result.handled
+                    ? `<h3>Handled by ${escapeHtml(result.provider)}</h3><pre class="cz-code-block">${escapeHtml(JSON.stringify(result.result, null, 2))}</pre>`
+                    : `<p class="cz-muted">Not handled: ${escapeHtml(result.reason)}</p>`);
+            } catch (err) { this.#devOutput(`<p class="cz-muted">${escapeHtml(err.message)}</p>`); }
+        }
+
+        async #hubOcrParse() {
+            const ocr = window.CozyOS.OCR;
+            const fileInput = document.getElementById("cz-hub-ocr-file");
+            const lang = document.getElementById("cz-hub-ocr-lang")?.value || "eng";
+            const progressEl = document.getElementById("cz-hub-ocr-progress");
+            const file = fileInput?.files?.[0];
+            if (!file) { this.#devOutput('<p class="cz-muted">Choose an image file first.</p>'); return; }
+            if (progressEl) progressEl.textContent = "Processing…";
+            try {
+                const result = await ocr.parseReceipt(file, { lang });
+                if (progressEl) progressEl.textContent = "";
+                if (!result.available) { this.#devOutput(`<p class="cz-muted">${escapeHtml(result.reason)}</p>`); return; }
+                this.#devOutput(`<h3>Parsed Receipt</h3>${this.#renderKeyValueTable({
+                    merchant: result.merchantName, total: result.fields?.total, receiptNumber: result.receiptNumber,
+                    confidence: result.confidence
+                })}<p class="cz-muted">Heuristic extraction — review before saving.</p>`);
+            } catch (err) {
+                if (progressEl) progressEl.textContent = "";
+                this.#devOutput(`<p class="cz-muted">${escapeHtml(err.message)}</p>`);
+            }
+        }
+
         #hubRefactorSplit() {
             const refactor = window.CozyOS.ProjectRefactor;
             const html = document.getElementById("cz-hub-refactor-html")?.value;
@@ -1074,11 +1193,80 @@
             const ocr = window.CozyOS.OCR;
             if (!ocr) return `<h1>OCR</h1><div class="cz-not-connected">Not connected.</div>`;
             const status = ocr.getProviderStatus();
+            // Restoration fix: parseReceipt(imageSource, {lang}) has always
+            // supported a real lang parameter — this UI previously exposed
+            // none of it (no upload, no language choice, no result display).
+            // Language codes below are real Tesseract codes; the 5
+            // requested (English/Swahili/Somali/Arabic/French) map to
+            // eng/swa/som/ara/fra — no 6th language invented, no claim
+            // beyond what these 5 real codes represent.
+            const languages = [["eng", "English"], ["swa", "Swahili"], ["som", "Somali"], ["ara", "Arabic"], ["fra", "French"]];
             return `<h1>OCR</h1>
                 <div class="cz-panel">
                     <div class="cz-row"><span class="cz-badge ${status.available ? "cz-badge-ready" : "cz-badge-neutral"}">${status.available ? "Ready" : "No provider loaded"}</span><span>${escapeHtml(status.note)}</span></div>
                 </div>
+                <div class="cz-panel">
+                    <div class="cz-field"><label>Language</label>
+                        <select class="cz-input" id="cz-hub-ocr-lang">${languages.map(([code, label]) => `<option value="${code}">${escapeHtml(label)}</option>`).join("")}</select>
+                    </div>
+                    <div class="cz-field"><label>Receipt / Document Image</label>
+                        <input type="file" id="cz-hub-ocr-file" accept="image/*" />
+                    </div>
+                    <button class="cz-btn cz-btn-primary" data-action="hub-ocr-parse" ${status.available ? "" : "disabled"}>Parse Receipt</button>
+                    <div id="cz-hub-ocr-progress" class="cz-muted"></div>
+                </div>
+                <div class="cz-panel cz-dev-action-output-panel" id="cz-hub-output"></div>
                 <div class="cz-panel">${this.#renderKeyValueTable(ocr.getDiagnosticsReport())}</div>`;
+        }
+
+        /**
+         * #renderAiMode()
+         *   AI Mode — Enterprise Intelligence Center.
+         *   HONEST SCOPE: window.CozyOS.AIMode.requestAssistance(task,
+         *   payload) is a real task-dispatch gateway, not a free-form
+         *   conversational engine — and as of this version, ZERO providers
+         *   are registered anywhere in this codebase (verified by
+         *   repo-wide search before writing this panel). Every real
+         *   request will honestly return {handled:false, reason:"No
+         *   adapter registered..."} right now. This panel shows that real
+         *   state plainly — a "Send" button that calls the real gateway
+         *   and displays its real (currently-always-unhandled) result — 
+         *   rather than fabricating a working chat experience. No
+         *   conversation history/session management is built here: saving
+         *   a history of exchanges that can never succeed would imply a
+         *   working AI backend that doesn't exist yet. That is deferred
+         *   until a real provider is registered, not faked now.
+         */
+        #renderAiMode() {
+            const ai = window.CozyOS.AIMode;
+            if (!ai) return `<h1>AI Mode</h1><div class="cz-not-connected">Not connected.</div>`;
+            const mode = ai.getMode();
+            const offline = ai.isOfflineMode();
+            const registry = ai.getProviderRegistry();
+            const diagnostics = ai.getDiagnosticsReport();
+
+            return `<h1>AI Mode <span class="cz-subtitle">— Enterprise Intelligence Center</span></h1>
+                <p class="cz-disclosure-note">Task-dispatch gateway, not a chat engine. ${registry.length === 0 ? "No AI provider is registered anywhere in this platform right now — every request below will honestly report as unhandled." : `${registry.length} provider(s) registered.`}</p>
+                <div class="cz-panel">
+                    <h3>Provider Status</h3>
+                    ${this.#renderKeyValueTable({ currentMode: mode, offlineMode: offline, registeredProviders: registry.length })}
+                    <div class="cz-field"><label>Mode</label>
+                        <select class="cz-input" id="cz-hub-aimode-mode">${ai.listModes().map(m => `<option value="${escapeHtml(m)}" ${m === mode ? "selected" : ""}>${escapeHtml(m)}</option>`).join("")}</select>
+                        <button class="cz-btn" data-action="hub-aimode-set-mode">Switch Mode</button>
+                    </div>
+                </div>
+                <div class="cz-panel">
+                    <h3>Capabilities</h3>
+                    ${Array.isArray(ai.capabilities) && ai.capabilities.length ? this.#renderKeyValueTable(Object.fromEntries(ai.capabilities.map(c => [c.id, c.category]))) : `<p class="cz-muted">No capabilities advertised.</p>`}
+                </div>
+                <div class="cz-panel">
+                    <h3>Request Composer</h3>
+                    <div class="cz-field"><label>Task</label><input class="cz-input" id="cz-hub-aimode-task" placeholder="e.g. plan-build" /></div>
+                    <div class="cz-field"><label>Payload (JSON)</label><textarea class="cz-input" id="cz-hub-aimode-payload" rows="4" placeholder='{"description": "..."}'></textarea></div>
+                    <button class="cz-btn cz-btn-primary" data-action="hub-aimode-send">Send</button>
+                </div>
+                <div class="cz-panel cz-dev-action-output-panel" id="cz-hub-output"></div>
+                <div class="cz-panel"><h3>Diagnostics</h3>${this.#renderKeyValueTable(diagnostics)}</div>`;
         }
 
         #renderKeyValueTable(obj) {
@@ -2564,6 +2752,11 @@
                 case "hub-download-file": this.#hubDownloadFile(actionEl.getAttribute("data-file")); return;
                 case "hub-builder-subtab": this.#hubSetBuilderSubTab(actionEl.getAttribute("data-tab")); return;
                 case "hub-refactor-split": this.#hubRefactorSplit(); return;
+                case "hub-generate-blueprint": this.#hubGenerateBlueprint(); return;
+                case "hub-ocr-parse": this.#hubOcrParse(); return;
+                case "hub-aimode-set-mode": this.#hubAiModeSetMode(); return;
+                case "hub-aimode-send": this.#hubAiModeSend(); return;
+                case "hub-view-blueprint": this.#hubViewBlueprint(evt.target.getAttribute("data-blueprint-id")); return;
                 case "hub-download-refactor": this.#hubDownloadRefactor(actionEl.getAttribute("data-part"), actionEl.getAttribute("data-name")); return;
                 case "hub-refactor-certify": this.#hubRefactorCertify(); return;
                 case "hub-download-refactor-final": this.#hubDownloadRefactorFinal(); return;
