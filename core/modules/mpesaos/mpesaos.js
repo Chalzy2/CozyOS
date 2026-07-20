@@ -728,4 +728,20 @@
             getNotifications() { return singletonInstance ? singletonInstance.getNotifications() : []; }
         };
     }
+
+    // Business Applications Unification milestone: real, additive
+    // self-registration — this is what makes "automatically appears in
+    // the End User Dashboard" true without any manual dashboard edit.
+    // dashboard:"end-user" matches this file's own documented purpose
+    // ("MpesaOS End-User Module"). Uses the exact real manifest shape
+    // ModuleRegistry.register() expects.
+    if (window.CozyOS.ModuleRegistry && typeof window.CozyOS.ModuleRegistry.register === "function") {
+        try {
+            window.CozyOS.ModuleRegistry.register({
+                id: "mpesaos", name: "MpesaOS", version: MPESAOS_UI_VERSION,
+                folder: "core/modules/mpesaos", html: "mpesaos.html", css: "mpesaos.css", js: "mpesaos.js",
+                theme: "mpesaos", icon: "mpesaos.svg", dashboard: "end-user", enabled: true
+            });
+        } catch (_err) { /* non-fatal */ }
+    }
 })();
