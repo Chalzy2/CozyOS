@@ -2031,6 +2031,7 @@
                 case "platformAudit": return this.#renderPlatformAudit();
                 case "platformOperations": return this.#renderPlatformOperations();
                 case "platformResources": return this.#renderPlatformResources();
+                case "accessibilityCenter": return this.#renderAccessibilityCenter();
                 case "events": return this.#renderEventMonitor();
                 case "search": return this.#renderSearch();
                 case "security": return this.#renderIntegrationSlot(this.getSecurityCenterData(), "Security Center");
@@ -2615,6 +2616,43 @@
                 <div class="cozy-list">${rows}</div>`;
         }
 
+        /**
+         * #renderAccessibilityCenter()
+         *   Real report display only — every number comes from
+         *   AccessibilityEngine's actual WCAG math and real stylesheet
+         *   scan. No fabricated pass/fail shown before a scan has run.
+         */
+        #renderAccessibilityCenter() {
+            const a11y = window.CozyOS && window.CozyOS.AccessibilityEngine ? window.CozyOS.AccessibilityEngine : null;
+            if (!a11y) return `<h2>Accessibility Center</h2>${this.#renderNotConnected("AccessibilityEngine is not loaded on this page.")}`;
+
+            const buttons = `<button type="button" id="cozy-a11y-scan-btn" class="cozy-btn cozy-btn-primary">Run Full Scan</button>`;
+            const report = a11y.getReport();
+            if (!report.available) return `<h2>Accessibility Center</h2>${buttons}<p class="cozy-disclosure-note">No scan has been run yet.</p>`;
+
+            const themeRows = report.themes.map(t => {
+                if (!t.available) return `<div class="cozy-nav-link"><span>${this.#escapeHtml(t.reason)}</span></div>`;
+                return `<div class="cozy-module-row">
+                    <div class="cozy-module-row-main"><b>${this.#escapeHtml(t.theme)}</b>
+                        <span class="cozy-badge ${t.primaryText.passesAANormal ? "cozy-badge-success" : "cozy-badge-neutral"}">Primary text ${t.primaryText.ratio}:1 ${t.primaryText.passesAANormal ? "PASS" : "FAIL"}</span>
+                        ${t.mutedText.available !== false ? `<span class="cozy-badge ${t.mutedText.passesAANormal ? "cozy-badge-success" : "cozy-badge-neutral"}">Muted text ${t.mutedText.ratio}:1 ${t.mutedText.passesAANormal ? "PASS" : "FAIL"}</span>` : ""}
+                    </div></div>`;
+            }).join("");
+
+            const fontViolations = report.fonts.available
+                ? (report.fonts.violations.length
+                    ? report.fonts.violations.map(v => `<div class="cozy-nav-link"><span>${this.#escapeHtml(v.file)} — ${this.#escapeHtml(v.selector)} (${v.sizePx}px)</span></div>`).join("")
+                    : `<p class="cozy-disclosure-note">No sub-14px font sizes found across ${report.fonts.filesScanned} scanned stylesheet(s).</p>`)
+                : `<p class="cozy-disclosure-note">${this.#escapeHtml(report.fonts.reason || "Font scan unavailable.")}</p>`;
+
+            return `<h2>Accessibility Center</h2>${buttons}
+                <p class="cozy-disclosure-note">Scanned at ${this.#escapeHtml(report.scannedAt)}. Real WCAG contrast math against each theme's actual loaded tokens; real same-origin scan of loaded stylesheets. Partial coverage — does not inspect arbitrary rendered component markup.</p>
+                <h3>Theme Contrast (WCAG AA)</h3>
+                <div class="cozy-list">${themeRows}</div>
+                <h3>Font Size Violations (&lt;14px)</h3>
+                ${fontViolations}`;
+        }
+
         #renderNotificationCenter() {
             const feed = this.getNotificationFeed(50);
             return `<h2>Enterprise Notification Center</h2>
@@ -2646,7 +2684,7 @@
             const NAV_SECTIONS = [
                 { label: "Overview", items: [["dashboard", "Dashboard"], ["applications", "Application Center"], ["modules", "Module Manager"]] },
                 { label: "Certification", items: [["certification", "Certification Center"], ["releases", "Release Center"], ["upgrades", "Upgrade Center"], ["dependencies", "Dependency Viewer"]] },
-                { label: "Operations", items: [["diagnostics", "Diagnostics Center"], ["events", "Event Monitor"], ["notifications", "Notification Center"], ["search", "Enterprise Search"], ["platformDiscovery", "Platform Discovery"], ["platformAudit", "Audit Center"], ["platformOperations", "Operations Center"], ["platformResources", "Resource Center"]] },
+                { label: "Operations", items: [["diagnostics", "Diagnostics Center"], ["events", "Event Monitor"], ["notifications", "Notification Center"], ["search", "Enterprise Search"], ["platformDiscovery", "Platform Discovery"], ["platformAudit", "Audit Center"], ["platformOperations", "Operations Center"], ["platformResources", "Resource Center"], ["accessibilityCenter", "Accessibility Center"]] },
                 { label: "Integrations (awaiting coordinators)", items: [["security", "Security Center"], ["storage", "Storage Center"], ["sync", "Synchronization Center"], ["automation", "Automation Center"], ["live", "Live Center"], ["speech", "Speech Center"], ["translation", "Translation Center"], ["subscription", "Subscription / License Center"], ["ai", "AI Center"], ["plugins", "Plugin Center"], ["tenants", "Tenant Center"]] },
                 // Additive: Administrator Workspace expansion per the locked
                 // CozyOS architecture. Nothing above this line was changed.
@@ -2887,6 +2925,19 @@
                         // Synchronous — PlatformAudit only reads already-cached
                         // engine state, no fetch() of its own.
                         this.#render();
+                        return;
+                    }
+                    if (evt.target.id === "cozy-a11y-scan-btn") {
+                        // Real async pass — runFullScan() does a real fetch()
+                        // of loaded stylesheets, same disable-while-running
+                        // pattern as Discovery's scan buttons.
+                        evt.target.disabled = true;
+                        evt.target.textContent = "Scanning…";
+                        if (window.CozyOS.AccessibilityEngine && typeof window.CozyOS.AccessibilityEngine.runFullScan === "function") {
+                            window.CozyOS.AccessibilityEngine.runFullScan().finally(() => this.#render());
+                        } else {
+                            this.#render();
+                        }
                         return;
                     }
                     if (evt.target.closest("#cozy-mobile-menu-btn")) {
