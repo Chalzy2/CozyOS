@@ -1,0 +1,3963 @@
+{
+  "manifestVersion": "1.0.0",
+  "generatedAt": "2026-07-20T04:47:14.585Z",
+  "generatedBy": "developer/discovery-scan.js",
+  "scanRoots": [
+    "core",
+    "applications",
+    "modules",
+    "assets",
+    "themes",
+    "backgrounds",
+    "packs",
+    "plugins",
+    "languages",
+    "knowledge",
+    "ai",
+    "vendor",
+    "config",
+    "data",
+    "docs",
+    "tests",
+    "developer"
+  ],
+  "fileCount": 282,
+  "architecturalIssues": [
+    {
+      "path": "core/core/kernel/bootstrap.js",
+      "issue": "duplicate-nesting"
+    },
+    {
+      "path": "core/core/kernel/compatibility.js",
+      "issue": "duplicate-nesting"
+    },
+    {
+      "path": "core/core/kernel/diagnostics.js",
+      "issue": "duplicate-nesting"
+    },
+    {
+      "path": "core/core/kernel/kernel-bridge.js",
+      "issue": "duplicate-nesting"
+    },
+    {
+      "path": "core/core/kernel/kernel.js",
+      "issue": "duplicate-nesting"
+    },
+    {
+      "path": "core/core/kernel/lifecycle.js",
+      "issue": "duplicate-nesting"
+    },
+    {
+      "path": "core/core/kernel/test/kernel.test.js",
+      "issue": "duplicate-nesting"
+    }
+  ],
+  "files": [
+    {
+      "path": "core/ai/agritechHandler.js",
+      "name": "agritechHandler.js",
+      "extension": "js",
+      "category": "ai-provider",
+      "sizeBytes": 1686,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "../business/permissions.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/ai/businessHandler.js",
+      "name": "businessHandler.js",
+      "extension": "js",
+      "category": "ai-provider",
+      "sizeBytes": 3146,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "../business/permissions.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/ai/churchHandler.js",
+      "name": "churchHandler.js",
+      "extension": "js",
+      "category": "ai-provider",
+      "sizeBytes": 1447,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "../permissions.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/ai/cozy-ai-integration.js",
+      "name": "cozy-ai-integration.js",
+      "extension": "js",
+      "category": "ai-provider",
+      "sizeBytes": 32428,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/ai/cozy-ai-language.js",
+      "name": "cozy-ai-language.js",
+      "extension": "js",
+      "category": "ai-provider",
+      "sizeBytes": 51383,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/ai/cozy-ai-memory.js",
+      "name": "cozy-ai-memory.js",
+      "extension": "js",
+      "category": "ai-provider",
+      "sizeBytes": 16555,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "AIMemory"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/ai/hospitalHandler.js",
+      "name": "hospitalHandler.js",
+      "extension": "js",
+      "category": "ai-provider",
+      "sizeBytes": 1457,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "../permissions.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/ai/hotelHandler.js",
+      "name": "hotelHandler.js",
+      "extension": "js",
+      "category": "ai-provider",
+      "sizeBytes": 1515,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "../permissions.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/ai/mpesaHandler.js",
+      "name": "mpesaHandler.js",
+      "extension": "js",
+      "category": "ai-provider",
+      "sizeBytes": 1543,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "../permissions.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/ai/pharmacyHandler.js",
+      "name": "pharmacyHandler.js",
+      "extension": "js",
+      "category": "ai-provider",
+      "sizeBytes": 1013,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/ai/saccoHandler.js",
+      "name": "saccoHandler.js",
+      "extension": "js",
+      "category": "ai-provider",
+      "sizeBytes": 1596,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "../business/permissions.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/ai/schoolHandler.js",
+      "name": "schoolHandler.js",
+      "extension": "js",
+      "category": "ai-provider",
+      "sizeBytes": 2013,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "../permissions.js",
+        "../../modules/wellbeing.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/ai.js",
+      "name": "ai.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 16892,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "AI"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/api.js",
+      "name": "api.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 2995,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "./permissions.js",
+        "./audit.js",
+        "./storage.js",
+        "./language.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/audit.js",
+      "name": "audit.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 1752,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "./permissions.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/business/audit.js",
+      "name": "audit.js",
+      "extension": "js",
+      "category": "business",
+      "sizeBytes": 1046,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "../storage.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/business/mpesa.js",
+      "name": "mpesa.js",
+      "extension": "js",
+      "category": "business",
+      "sizeBytes": 1795,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "./audit.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/business/offline.js",
+      "name": "offline.js",
+      "extension": "js",
+      "category": "business",
+      "sizeBytes": 2696,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/business/permissions.js",
+      "name": "permissions.js",
+      "extension": "js",
+      "category": "business",
+      "sizeBytes": 1584,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/business/qrScanner.js",
+      "name": "qrScanner.js",
+      "extension": "js",
+      "category": "business",
+      "sizeBytes": 1501,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/config.js",
+      "name": "config.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 1531,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/bandwidth.js",
+      "name": "bandwidth.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 14289,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": true,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/cache.js",
+      "name": "cache.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 7442,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/compression.js",
+      "name": "compression.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 12984,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": true,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/conflict.js",
+      "name": "conflict.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 7057,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/connectivity.js",
+      "name": "connectivity.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 8516,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "./offline.js",
+        "./routing.js",
+        "./queue.js",
+        "./cache.js",
+        "./networkPolicy.js",
+        "./diagnostics.js",
+        "./metrics.js",
+        "./recovery.js",
+        "./scheduler.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/crypto.js",
+      "name": "crypto.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 4253,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/deviceDiscovery.js",
+      "name": "deviceDiscovery.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 528,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/diagnostics.js",
+      "name": "diagnostics.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 5389,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/failover.js",
+      "name": "failover.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 1018,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/heartbeat.js",
+      "name": "heartbeat.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 3064,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/index.js",
+      "name": "index.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 952,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Connectivity"
+      ],
+      "imports": [
+        "./connectivity.js",
+        "./routing.js",
+        "./queue.js",
+        "./cache.js",
+        "./sync.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/metrics.js",
+      "name": "metrics.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 3194,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/networkPolicy.js",
+      "name": "networkPolicy.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 2570,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/offline.js",
+      "name": "offline.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 13358,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "OfflineCoordinator"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/queue.js",
+      "name": "queue.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 11035,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/recovery.js",
+      "name": "recovery.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 9044,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/replication.js",
+      "name": "replication.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 4666,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/routing.js",
+      "name": "routing.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 5390,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Router",
+        "SmartRouter"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/scheduler.js",
+      "name": "scheduler.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 6348,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "./snapshot.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/snapshot.js",
+      "name": "snapshot.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 4657,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/sync.js",
+      "name": "sync.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 8814,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "./compression.js",
+        "./conflict.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/transport.js",
+      "name": "transport.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 14884,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/connectivity/updateManager.js",
+      "name": "updateManager.js",
+      "extension": "js",
+      "category": "connectivity",
+      "sizeBytes": 7538,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/context/cozy-context-engine.js",
+      "name": "cozy-context-engine.js",
+      "extension": "js",
+      "category": "context",
+      "sizeBytes": 15144,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "ContextEngine"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/core/kernel/bootstrap.js",
+      "name": "bootstrap.js",
+      "extension": "js",
+      "category": "kernel",
+      "sizeBytes": 14340,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "./lifecycle.js",
+        "./compatibility.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/core/kernel/compatibility.js",
+      "name": "compatibility.js",
+      "extension": "js",
+      "category": "kernel",
+      "sizeBytes": 9010,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/core/kernel/diagnostics.js",
+      "name": "diagnostics.js",
+      "extension": "js",
+      "category": "kernel",
+      "sizeBytes": 30635,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "./bootstrap.js",
+        "./lifecycle.js"
+      ],
+      "certifiedSignal": true,
+      "readError": false
+    },
+    {
+      "path": "core/core/kernel/kernel-bridge.js",
+      "name": "kernel-bridge.js",
+      "extension": "js",
+      "category": "kernel",
+      "sizeBytes": 3645,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Kernel"
+      ],
+      "imports": [
+        "./bootstrap.js",
+        "./compatibility.js",
+        "./lifecycle.js",
+        "./diagnostics.js",
+        "./kernel.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/core/kernel/kernel.js",
+      "name": "kernel.js",
+      "extension": "js",
+      "category": "kernel",
+      "sizeBytes": 8713,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "./bootstrap.js",
+        "./compatibility.js",
+        "./diagnostics.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/core/kernel/lifecycle.js",
+      "name": "lifecycle.js",
+      "extension": "js",
+      "category": "kernel",
+      "sizeBytes": 19643,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/core/kernel/test/kernel.test.js",
+      "name": "kernel.test.js",
+      "extension": "js",
+      "category": "kernel",
+      "sizeBytes": 9889,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "assert",
+        "../core/kernel/kernel.js",
+        "../core/kernel/bootstrap.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/cozy-components.css",
+      "name": "cozy-components.css",
+      "extension": "css",
+      "category": "uncategorized",
+      "sizeBytes": 2310,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/cozy-shell.html",
+      "name": "cozy-shell.html",
+      "extension": "html",
+      "category": "uncategorized",
+      "sizeBytes": 3010,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/dashboard.css",
+      "name": "dashboard.css",
+      "extension": "css",
+      "category": "uncategorized",
+      "sizeBytes": 2730,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/dashboard.js",
+      "name": "dashboard.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 9334,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "executeVoiceIntent",
+        "DashboardShell"
+      ],
+      "imports": [
+        "./permissions.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/docs/API_REFERENCE.md",
+      "name": "API_REFERENCE.md",
+      "extension": "md",
+      "category": "uncategorized",
+      "sizeBytes": 1,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/docs/CERTIFICATION REPORT md",
+      "name": "CERTIFICATION REPORT md",
+      "extension": "",
+      "category": "uncategorized",
+      "sizeBytes": 3513,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/docs/CHANGELOG.md",
+      "name": "CHANGELOG.md",
+      "extension": "md",
+      "category": "uncategorized",
+      "sizeBytes": 1,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/docs/CORE_ARCHITECTURE.md",
+      "name": "CORE_ARCHITECTURE.md",
+      "extension": "md",
+      "category": "uncategorized",
+      "sizeBytes": 606,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/docs/DATABASE_SCHEMA.md",
+      "name": "DATABASE_SCHEMA.md",
+      "extension": "md",
+      "category": "uncategorized",
+      "sizeBytes": 1,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/docs/DEVELOPMENT_RULES.md",
+      "name": "DEVELOPMENT_RULES.md",
+      "extension": "md",
+      "category": "uncategorized",
+      "sizeBytes": 764,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/docs/FROZEN_MODULES.md",
+      "name": "FROZEN_MODULES.md",
+      "extension": "md",
+      "category": "uncategorized",
+      "sizeBytes": 1125,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/docs/LANGUAGE_SYSTEM.md",
+      "name": "LANGUAGE_SYSTEM.md",
+      "extension": "md",
+      "category": "uncategorized",
+      "sizeBytes": 127,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/docs/MODULE_STRUCTURE.md",
+      "name": "MODULE_STRUCTURE.md",
+      "extension": "md",
+      "category": "uncategorized",
+      "sizeBytes": 1,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/docs/ROADMAP.md",
+      "name": "ROADMAP.md",
+      "extension": "md",
+      "category": "uncategorized",
+      "sizeBytes": 1,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/docs/SECURITY_MODEL.md",
+      "name": "SECURITY_MODEL.md",
+      "extension": "md",
+      "category": "uncategorized",
+      "sizeBytes": 1,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/engines/audio/audio-manager.js",
+      "name": "audio-manager.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 23786,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/engines/audio/provider-inmemory.js",
+      "name": "provider-inmemory.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 4904,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/engines/audio/test/audio-manager.test.js",
+      "name": "audio-manager.test.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 12370,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "assert",
+        "../core/engines/audio/audio-manager.js",
+        "../core/engines/audio/provider-inmemory.js",
+        "../core/kernel/kernel.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/engines/camera/camera-manager.js",
+      "name": "camera-manager.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 19686,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/engines/camera/camera-manager.test.js",
+      "name": "camera-manager.test.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 11983,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "assert",
+        "../core/engines/camera/camera-manager.js",
+        "../core/engines/camera/provider-inmemory.js",
+        "../core/kernel/kernel.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/engines/camera/provider-inmemory.js",
+      "name": "provider-inmemory.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 4320,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/engines/camera/tests/camera-manager.test.js",
+      "name": "camera-manager.test.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 11983,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "assert",
+        "../core/engines/camera/camera-manager.js",
+        "../core/engines/camera/provider-inmemory.js",
+        "../core/kernel/kernel.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/engines/playback/playback-engine.js",
+      "name": "playback-engine.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 12276,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "fs",
+        "path",
+        "../recording/recording-engine.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/engines/playback/tests/playback-engine.test.js",
+      "name": "playback-engine.test.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 11108,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "assert",
+        "fs",
+        "path",
+        "os",
+        "../core/engines/playback/playback-engine.js",
+        "../core/engines/recording/recording-engine.js",
+        "../core/engines/video/video-processor.js",
+        "../core/engines/video/provider-software.js",
+        "../core/engines/scene/scene-manager.js",
+        "../core/engines/camera/camera-manager.js",
+        "../core/engines/audio/audio-manager.js",
+        "../core/engines/camera/provider-inmemory.js",
+        "../core/engines/audio/provider-inmemory.js",
+        "../core/kernel/kernel.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/engines/scene/scene-manager.js",
+      "name": "scene-manager.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 23767,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "../camera/camera-manager.js",
+        "../audio/audio-manager.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/engines/scene/tests/scene-manager.test.js",
+      "name": "scene-manager.test.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 16557,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "assert",
+        "../core/engines/scene/scene-manager.js",
+        "../core/engines/camera/camera-manager.js",
+        "../core/engines/audio/audio-manager.js",
+        "../core/engines/camera/provider-inmemory.js",
+        "../core/engines/audio/provider-inmemory.js",
+        "../core/kernel/kernel.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/events.js",
+      "name": "events.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 423,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/language.js",
+      "name": "language.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 1406,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "./storage.js",
+        "./events.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/languageImporter.js",
+      "name": "languageImporter.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 4248,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/logger.js",
+      "name": "logger.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 707,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/accessibility/cozy-accessibility.js",
+      "name": "cozy-accessibility.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 32427,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "CozyAccessibility"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/aimode/cozy-ai-mode.js",
+      "name": "cozy-ai-mode.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 26987,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "AIMode"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/analytics/cozy-analytics.js",
+      "name": "cozy-analytics.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 32503,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "CozyAnalytics"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/automation/cozy-automation.js",
+      "name": "cozy-automation.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 39968,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "CozyAutomation"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/bugfixer/cozy-bugfixer.js",
+      "name": "cozy-bugfixer.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 66098,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "BugFixer"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/builder/architecture-engine.js",
+      "name": "architecture-engine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 8857,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "ArchitectureEngine"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/builder/builder-ai.js",
+      "name": "builder-ai.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 27338,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "BuilderAI"
+      ],
+      "imports": [],
+      "certifiedSignal": true,
+      "readError": false
+    },
+    {
+      "path": "core/modules/builder/builder-rules.js",
+      "name": "builder-rules.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 19816,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "BuilderRules"
+      ],
+      "imports": [],
+      "certifiedSignal": true,
+      "readError": false
+    },
+    {
+      "path": "core/modules/builder/builder-templates.js",
+      "name": "builder-templates.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 35946,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "BuilderTemplates"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/builder/cozy-builder.js",
+      "name": "cozy-builder.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 24759,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Builder"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/builder/project-refactor.js",
+      "name": "project-refactor.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 39649,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "ProjectRefactor"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/builder/question-engine.js",
+      "name": "question-engine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 16092,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "QuestionEngine"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/builder/requirement-analyzer.js",
+      "name": "requirement-analyzer.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 24099,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "RequirementAnalyzer"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/builder/requirement-reader.js",
+      "name": "requirement-reader.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 25073,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "RequirementReader"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/builder/understanding-engine.js",
+      "name": "understanding-engine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 42976,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "UnderstandingEngine"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/camera/cozy-camera.js",
+      "name": "cozy-camera.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 36433,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Camera"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/certification/certification-dashboard.css",
+      "name": "certification-dashboard.css",
+      "extension": "css",
+      "category": "module",
+      "sizeBytes": 12018,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/certification/certification-dashboard.js",
+      "name": "certification-dashboard.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 219669,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": true,
+      "readError": false
+    },
+    {
+      "path": "core/modules/certification/certification.html",
+      "name": "certification.html",
+      "extension": "html",
+      "category": "module",
+      "sizeBytes": 3171,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/certification/cozy-certification.js",
+      "name": "cozy-certification.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 220385,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "X",
+        "Certification"
+      ],
+      "imports": [],
+      "certifiedSignal": true,
+      "readError": false
+    },
+    {
+      "path": "core/modules/company/cozy-company.js",
+      "name": "cozy-company.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 69785,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Company"
+      ],
+      "imports": [],
+      "certifiedSignal": true,
+      "readError": false
+    },
+    {
+      "path": "core/modules/customer/cozy-customer.js",
+      "name": "cozy-customer.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 52666,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Customer"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/deployment/deployment-manager.js",
+      "name": "deployment-manager.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 29397,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "DeploymentManager"
+      ],
+      "imports": [],
+      "certifiedSignal": true,
+      "readError": false
+    },
+    {
+      "path": "core/modules/developer/cozy-developer.js",
+      "name": "cozy-developer.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 75288,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "DeveloperHub"
+      ],
+      "imports": [],
+      "certifiedSignal": true,
+      "readError": false
+    },
+    {
+      "path": "core/modules/developer/developer-hub.css",
+      "name": "developer-hub.css",
+      "extension": "css",
+      "category": "module",
+      "sizeBytes": 13761,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/developer/developer-hub.html",
+      "name": "developer-hub.html",
+      "extension": "html",
+      "category": "module",
+      "sizeBytes": 7807,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/developer/developer-hub.js",
+      "name": "developer-hub.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 185544,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Modules"
+      ],
+      "imports": [],
+      "certifiedSignal": true,
+      "readError": false
+    },
+    {
+      "path": "core/modules/documents/cozy-document-engine.js",
+      "name": "cozy-document-engine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 38864,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "DocumentEngine"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/documents/cozy-document-storage-provider.js",
+      "name": "cozy-document-storage-provider.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 24802,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "DocumentStorageProvider",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/domain/domain-expert-framework.js",
+      "name": "domain-expert-framework.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 14099,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "DomainExpertFramework"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/emergency/cozy-emergency.js",
+      "name": "cozy-emergency.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 36813,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "CozyEmergency"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/goals/cozy-goals-engine.js",
+      "name": "cozy-goals-engine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 17230,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Goals",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/identity/cozy-identity.js",
+      "name": "cozy-identity.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 94970,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/identity/identity-engine.js",
+      "name": "identity-engine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 56904,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "IdentityEngine"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/innovation/innovation-engine.js",
+      "name": "innovation-engine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 8869,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "InnovationEngine"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/integration/cozy-integration-layer.js",
+      "name": "cozy-integration-layer.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 17312,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Integration",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/language/language-engine.js",
+      "name": "language-engine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 61216,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "LanguageEngine"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/leaning/learning-engine.js",
+      "name": "learning-engine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 8815,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "LearningEngine"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/marketplace/cozy-marketplace-engine.js",
+      "name": "cozy-marketplace-engine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 18924,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Marketplace",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/media/cozy-media.js",
+      "name": "cozy-media.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 37670,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "CozyMedia"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/memory/cozy-memory-engine.js",
+      "name": "cozy-memory-engine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 32798,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "CozyMemory",
+        "BuilderMemory"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/module-registry.js",
+      "name": "module-registry.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 14749,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "ModuleRegistry",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/mpesaos/mpesaos.js",
+      "name": "mpesaos.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 49268,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Modules"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/network/cozy-network.js",
+      "name": "cozy-network.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 30754,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/notification/cozy-notification.js",
+      "name": "cozy-notification.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 32012,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "CozyNotification"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/ocr/cozy-ocr.js",
+      "name": "cozy-ocr.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 24983,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "OCR"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/ocr/document-router.js",
+      "name": "document-router.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 17849,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "DocumentRouter"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/ocr/plugins/tesseract-plugin.js",
+      "name": "tesseract-plugin.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 26524,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/ocrstudio/Ocr-register.js",
+      "name": "Ocr-register.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 10325,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "OCRRegistry"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/ocrstudio/exporter.js",
+      "name": "exporter.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 12805,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "OCRExporter"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/ocrstudio/ocr-cli.js",
+      "name": "ocr-cli.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 10940,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "OCRCLI"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/ocrstudio/ocr-document.js",
+      "name": "ocr-document.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 9785,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "OCRDocument"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/ocrstudio/ocr-engine.js",
+      "name": "ocr-engine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 14987,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "OCREngine"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/ocrstudio/ocr-history.js",
+      "name": "ocr-history.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 12664,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "OCRHistory"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/ocrstudio/ocr-image.js",
+      "name": "ocr-image.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 27165,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "OCR"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/ocrstudio/ocr-language.js",
+      "name": "ocr-language.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 23254,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "OCRLanguage"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/ocrstudio/ocr-result.js",
+      "name": "ocr-result.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 11198,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "OCRResult"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/ocrstudio/orc-runner.js",
+      "name": "orc-runner.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 15293,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "OCRRunner"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/payment-channel/cozy-payment-channel-engine.js",
+      "name": "cozy-payment-channel-engine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 27335,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "PaymentChannel",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/payment-provider/capability-engine.js",
+      "name": "capability-engine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 3759,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "__PaymentProviderInternals"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/payment-provider/cash-provider.js",
+      "name": "cash-provider.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 4601,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "__PaymentProviderAdapters"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/payment-provider/cozy-payment-provider-engine.js",
+      "name": "cozy-payment-provider-engine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 17784,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "PaymentProvider",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/payment-provider/failover-engine.js",
+      "name": "failover-engine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 7726,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "__PaymentProviderInternals"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/payment-provider/health-monitor.js",
+      "name": "health-monitor.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 8449,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "__PaymentProviderInternals"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/payment-provider/mpesa-provider.js",
+      "name": "mpesa-provider.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 4428,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "__PaymentProviderAdapters"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/payment-provider/provider-manager.js",
+      "name": "provider-manager.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 7655,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "__PaymentProviderInternals"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/payment-provider/provider-registry.js",
+      "name": "provider-registry.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 12246,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "__PaymentProviderInternals"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/payment-provider/routing-engine.js",
+      "name": "routing-engine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 5907,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "__PaymentProviderInternals"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/personal-vault/personal-vault.css",
+      "name": "personal-vault.css",
+      "extension": "css",
+      "category": "module",
+      "sizeBytes": 434,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/personal-vault/personal-vault.html",
+      "name": "personal-vault.html",
+      "extension": "html",
+      "category": "module",
+      "sizeBytes": 5604,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/personal-vault/personal-vault.js",
+      "name": "personal-vault.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 19620,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Modules"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/planning/planning-engine.js",
+      "name": "planning-engine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 22765,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "PlanningEngine"
+      ],
+      "imports": [],
+      "certifiedSignal": true,
+      "readError": false
+    },
+    {
+      "path": "core/modules/policy/policy-engine.js",
+      "name": "policy-engine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 15961,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "PolicyEngine"
+      ],
+      "imports": [],
+      "certifiedSignal": true,
+      "readError": false
+    },
+    {
+      "path": "core/modules/power/cozy-power-grid.js",
+      "name": "cozy-power-grid.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 42708,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "PowerGrid"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/quarry/quarry-linker.js",
+      "name": "quarry-linker.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 7177,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/research/cozy-research-engine.js",
+      "name": "cozy-research-engine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 31133,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "ResearchEngine"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/session/cozy-session-service.js",
+      "name": "cozy-session-service.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 13846,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Session",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/session/firebase-session-bridge.js",
+      "name": "firebase-session-bridge.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 3576,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/shopos/shopos.css",
+      "name": "shopos.css",
+      "extension": "css",
+      "category": "module",
+      "sizeBytes": 3210,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/shopos/shopos.html",
+      "name": "shopos.html",
+      "extension": "html",
+      "category": "module",
+      "sizeBytes": 2036,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/shopos/shopos.js",
+      "name": "shopos.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 22341,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Modules"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/speech/cozy-speech.js",
+      "name": "cozy-speech.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 64774,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "CozySpeech"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/storage/cozy-storage.js",
+      "name": "cozy-storage.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 48291,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "CozyStorage"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/sync/cozy-sync.js",
+      "name": "cozy-sync.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 35049,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "CozySync"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/teststudio/test-assert.js",
+      "name": "test-assert.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 7027,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "TestAssert"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/teststudio/test-benchmark.js",
+      "name": "test-benchmark.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 10302,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "TestBenchmark"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/teststudio/test-cli.js",
+      "name": "test-cli.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 14898,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "TestCLI"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/teststudio/test-coverage.js",
+      "name": "test-coverage.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 10050,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "TestCoverage"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/teststudio/test-dashboard.js",
+      "name": "test-dashboard.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 21159,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "TestDashboard"
+      ],
+      "imports": [],
+      "certifiedSignal": true,
+      "readError": false
+    },
+    {
+      "path": "core/modules/teststudio/test-environment.js",
+      "name": "test-environment.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 8893,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "TestEnvironment"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/teststudio/test-exporter.js",
+      "name": "test-exporter.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 15285,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "TestExporter"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/teststudio/test-fixture.js",
+      "name": "test-fixture.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 9974,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "TestFixture"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/teststudio/test-history.js",
+      "name": "test-history.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 12421,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "TestHistory"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/teststudio/test-mock.js",
+      "name": "test-mock.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 10017,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "TestMock"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/teststudio/test-package.js",
+      "name": "test-package.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 10487,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "TestPackage"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/teststudio/test-plugin.js",
+      "name": "test-plugin.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 11349,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "TestPlugin"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/teststudio/test-registry.js",
+      "name": "test-registry.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 8533,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "TestRegistry"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/teststudio/test-reporter.js",
+      "name": "test-reporter.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 14049,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "TestReporter"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/teststudio/test-runner.js",
+      "name": "test-runner.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 5287,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "TestRunner"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/teststudio/test-scheduler.js",
+      "name": "test-scheduler.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 8171,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "TestScheduler"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/teststudio/test-snapshot.js",
+      "name": "test-snapshot.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 10370,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "TestSnapshot"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/teststudio/test-suite.js",
+      "name": "test-suite.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 7054,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "TestSuite"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/teststudio/test-ui.js",
+      "name": "test-ui.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 31356,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "TestUI"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/translate/cozy-translate.js",
+      "name": "cozy-translate.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 50880,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "CozyTranslate"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/vault/cozy-vault-engine.js",
+      "name": "cozy-vault-engine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 17576,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Vault",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/vault/encryption-manager.js",
+      "name": "encryption-manager.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 8876,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "__VaultInternals"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/vault/memory-provider.js",
+      "name": "memory-provider.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 2472,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "__VaultProviders"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/vault/rotation-and-health.js",
+      "name": "rotation-and-health.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 7519,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "__VaultInternals"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/vault/secret-manager.js",
+      "name": "secret-manager.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 9948,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "__VaultInternals"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/vault/secret-registry.js",
+      "name": "secret-registry.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 10999,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "__VaultInternals"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/vault/typed-managers.js",
+      "name": "typed-managers.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 6644,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "__VaultInternals"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules/vision/cozy-vision.js",
+      "name": "cozy-vision.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 74649,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Vision"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/modules.js",
+      "name": "modules.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 222,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/network/cozy-network-orchestrator.js",
+      "name": "cozy-network-orchestrator.js",
+      "extension": "js",
+      "category": "network",
+      "sizeBytes": 68042,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "NetworkV2"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/permissions.js",
+      "name": "permissions.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 3121,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Permissions"
+      ],
+      "imports": [
+        "./audit.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/platform/cozy-discovery.js",
+      "name": "cozy-discovery.js",
+      "extension": "js",
+      "category": "platform-service",
+      "sizeBytes": 15215,
+      "lastModified": "2026-07-20T04:46:02.815Z",
+      "exports": [
+        "Discovery"
+      ],
+      "imports": [],
+      "certifiedSignal": true,
+      "readError": false
+    },
+    {
+      "path": "core/platform/dependency-engine.js",
+      "name": "dependency-engine.js",
+      "extension": "js",
+      "category": "platform-service",
+      "sizeBytes": 7713,
+      "lastModified": "2026-07-20T04:46:22.936Z",
+      "exports": [
+        "DependencyEngine"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/platform/discovery-manifest.json",
+      "name": "discovery-manifest.json",
+      "extension": "json",
+      "category": "platform-service",
+      "sizeBytes": 100868,
+      "lastModified": "2026-07-20T04:39:10.595Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/platform/file-registry.js",
+      "name": "file-registry.js",
+      "extension": "js",
+      "category": "platform-service",
+      "sizeBytes": 6164,
+      "lastModified": "2026-07-20T04:40:08.615Z",
+      "exports": [
+        "FileRegistry"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/platform/health-engine.js",
+      "name": "health-engine.js",
+      "extension": "js",
+      "category": "platform-service",
+      "sizeBytes": 4294,
+      "lastModified": "2026-07-20T04:41:04.047Z",
+      "exports": [
+        "HealthEngine"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/platform/manifest-registry.js",
+      "name": "manifest-registry.js",
+      "extension": "js",
+      "category": "platform-service",
+      "sizeBytes": 10341,
+      "lastModified": "2026-07-20T04:45:00.449Z",
+      "exports": [
+        "ManifestRegistry",
+        "registerManifest",
+        "getManifest",
+        "listManifests"
+      ],
+      "imports": [],
+      "certifiedSignal": true,
+      "readError": false
+    },
+    {
+      "path": "core/platform/usage-engine.js",
+      "name": "usage-engine.js",
+      "extension": "js",
+      "category": "platform-service",
+      "sizeBytes": 4647,
+      "lastModified": "2026-07-20T04:40:48.799Z",
+      "exports": [
+        "UsageEngine"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/pluginManager.js",
+      "name": "pluginManager.js",
+      "extension": "js",
+      "category": "plugin",
+      "sizeBytes": 41367,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "PluginManager"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/plugins/hospitalOS.js",
+      "name": "hospitalOS.js",
+      "extension": "js",
+      "category": "plugin",
+      "sizeBytes": 3203,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/plugins/mpesaOS-float.js",
+      "name": "mpesaOS-float.js",
+      "extension": "js",
+      "category": "plugin",
+      "sizeBytes": 16597,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "MpesaFloat",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/plugins/mpesaOS-paybill.js",
+      "name": "mpesaOS-paybill.js",
+      "extension": "js",
+      "category": "plugin",
+      "sizeBytes": 15999,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "MpesaPaybill",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/plugins/mpesaOS-reporting.js",
+      "name": "mpesaOS-reporting.js",
+      "extension": "js",
+      "category": "plugin",
+      "sizeBytes": 13151,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "MpesaReporting",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/plugins/mpesaOS-till.js",
+      "name": "mpesaOS-till.js",
+      "extension": "js",
+      "category": "plugin",
+      "sizeBytes": 14821,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "MpesaTill",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/plugins/mpesaOS.js",
+      "name": "mpesaOS.js",
+      "extension": "js",
+      "category": "plugin",
+      "sizeBytes": 50885,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/plugins/pharmacyOS.js",
+      "name": "pharmacyOS.js",
+      "extension": "js",
+      "category": "plugin",
+      "sizeBytes": 2442,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/plugins/shopOS-bookkeeping.js",
+      "name": "shopOS-bookkeeping.js",
+      "extension": "js",
+      "category": "plugin",
+      "sizeBytes": 13034,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "ShopBookkeeping",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/plugins/shopOS-core.js",
+      "name": "shopOS-core.js",
+      "extension": "js",
+      "category": "plugin",
+      "sizeBytes": 11778,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "ShopCore",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/plugins/shopOS-dashboard.js",
+      "name": "shopOS-dashboard.js",
+      "extension": "js",
+      "category": "plugin",
+      "sizeBytes": 9386,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "ShopDashboard",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/plugins/shopOS-inventory.js",
+      "name": "shopOS-inventory.js",
+      "extension": "js",
+      "category": "plugin",
+      "sizeBytes": 17949,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "ShopInventory",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/plugins/shopOS-payments.js",
+      "name": "shopOS-payments.js",
+      "extension": "js",
+      "category": "plugin",
+      "sizeBytes": 18957,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "ShopPayments",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/plugins/shopOS-product.js",
+      "name": "shopOS-product.js",
+      "extension": "js",
+      "category": "plugin",
+      "sizeBytes": 14708,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "ShopProduct",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/plugins/shopOS-purchasing.js",
+      "name": "shopOS-purchasing.js",
+      "extension": "js",
+      "category": "plugin",
+      "sizeBytes": 15830,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "ShopPurchasing",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/plugins/shopOS-reconciliation.js",
+      "name": "shopOS-reconciliation.js",
+      "extension": "js",
+      "category": "plugin",
+      "sizeBytes": 15264,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "ShopReconciliation",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/plugins/shopOS-reporting.js",
+      "name": "shopOS-reporting.js",
+      "extension": "js",
+      "category": "plugin",
+      "sizeBytes": 16233,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "ShopReporting",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/plugins/shopOS-sales.js",
+      "name": "shopOS-sales.js",
+      "extension": "js",
+      "category": "plugin",
+      "sizeBytes": 18455,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "ShopSales",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/plugins/shopOS-search.js",
+      "name": "shopOS-search.js",
+      "extension": "js",
+      "category": "plugin",
+      "sizeBytes": 11482,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "ShopSearch",
+        "KernelPlugins"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/registry/cozy-registry.js",
+      "name": "cozy-registry.js",
+      "extension": "js",
+      "category": "registry",
+      "sizeBytes": 16645,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "ServiceRegistry",
+        "registerApplication",
+        "getApplication",
+        "listApplications",
+        "hasApplication",
+        "unregisterApplication",
+        "listApplicationsByCategory",
+        "registerCoordinator",
+        "getCoordinator",
+        "listCoordinators",
+        "hasCoordinator",
+        "unregisterCoordinator"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/router.js",
+      "name": "router.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 206,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/scheduler.js",
+      "name": "scheduler.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 478,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/security/verify.js",
+      "name": "verify.js",
+      "extension": "js",
+      "category": "security",
+      "sizeBytes": 1359,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/services.js",
+      "name": "services.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 5232,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Services"
+      ],
+      "imports": [
+        "./config.js",
+        "./storage.js",
+        "./sync.js",
+        "./audit.js",
+        "./logger.js",
+        "./events.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/shell/cozy-animations.css",
+      "name": "cozy-animations.css",
+      "extension": "css",
+      "category": "shell-ui",
+      "sizeBytes": 569,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/shell/cozy-background.js",
+      "name": "cozy-background.js",
+      "extension": "js",
+      "category": "shell-ui",
+      "sizeBytes": 27994,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Background"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/shell/cozy-components.css",
+      "name": "cozy-components.css",
+      "extension": "css",
+      "category": "shell-ui",
+      "sizeBytes": 2310,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/shell/cozy-layout.css",
+      "name": "cozy-layout.css",
+      "extension": "css",
+      "category": "shell-ui",
+      "sizeBytes": 445,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/shell/cozy-live.js",
+      "name": "cozy-live.js",
+      "extension": "js",
+      "category": "shell-ui",
+      "sizeBytes": 2762,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Live",
+        "CozyLive"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/shell/cozy-navigation.js",
+      "name": "cozy-navigation.js",
+      "extension": "js",
+      "category": "shell-ui",
+      "sizeBytes": 1008,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/shell/cozy-shell.html",
+      "name": "cozy-shell.html",
+      "extension": "html",
+      "category": "shell-ui",
+      "sizeBytes": 20686,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/shell/cozy-theme.css",
+      "name": "cozy-theme.css",
+      "extension": "css",
+      "category": "shell-ui",
+      "sizeBytes": 1151,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/shell/cozy-theme.js",
+      "name": "cozy-theme.js",
+      "extension": "js",
+      "category": "shell-ui",
+      "sizeBytes": 10776,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Theme"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/shell/cozy-toast.js",
+      "name": "cozy-toast.js",
+      "extension": "js",
+      "category": "shell-ui",
+      "sizeBytes": 5893,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Toast",
+        "CozyToast"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/shell/cozy-tokens.css",
+      "name": "cozy-tokens.css",
+      "extension": "css",
+      "category": "shell-ui",
+      "sizeBytes": 8047,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/shell/cozy-ui.js",
+      "name": "cozy-ui.js",
+      "extension": "js",
+      "category": "shell-ui",
+      "sizeBytes": 2065,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "UI"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/shell/cozy-workspace.js",
+      "name": "cozy-workspace.js",
+      "extension": "js",
+      "category": "shell-ui",
+      "sizeBytes": 155730,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "WorkspaceShell"
+      ],
+      "imports": [],
+      "certifiedSignal": true,
+      "readError": false
+    },
+    {
+      "path": "core/storage.js",
+      "name": "storage.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 27489,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/sync.js",
+      "name": "sync.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 5155,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "SyncEngine"
+      ],
+      "imports": [
+        "./firebase.js",
+        "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js",
+        "./audit.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/telemetry.js",
+      "name": "telemetry.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 428,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/templates/receipt/cozy-receipt-template.html",
+      "name": "cozy-receipt-template.html",
+      "extension": "html",
+      "category": "template",
+      "sizeBytes": 91055,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/tenant.js",
+      "name": "tenant.js",
+      "extension": "js",
+      "category": "uncategorized",
+      "sizeBytes": 2169,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "TenantEngine"
+      ],
+      "imports": [
+        "./storage.js",
+        "./audit.js",
+        "./logger.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/ui/cozy-background.js",
+      "name": "cozy-background.js",
+      "extension": "js",
+      "category": "shell-ui",
+      "sizeBytes": 27994,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Background"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/ui/cozy-base-linker.js",
+      "name": "cozy-base-linker.js",
+      "extension": "js",
+      "category": "shell-ui",
+      "sizeBytes": 13363,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/ui/cozy-components.css",
+      "name": "cozy-components.css",
+      "extension": "css",
+      "category": "shell-ui",
+      "sizeBytes": 4782,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/ui/cozy-theme.js",
+      "name": "cozy-theme.js",
+      "extension": "js",
+      "category": "shell-ui",
+      "sizeBytes": 10776,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Theme"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/ui/cozy-tokens.css",
+      "name": "cozy-tokens.css",
+      "extension": "css",
+      "category": "shell-ui",
+      "sizeBytes": 8047,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "core/ui/cozy-ui.js",
+      "name": "cozy-ui.js",
+      "extension": "js",
+      "category": "shell-ui",
+      "sizeBytes": 5882,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "UI"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "applications/developer-hub/developer-hub.css",
+      "name": "developer-hub.css",
+      "extension": "css",
+      "category": "application",
+      "sizeBytes": 822,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "applications/mpesaOS/README.md",
+      "name": "README.md",
+      "extension": "md",
+      "category": "application",
+      "sizeBytes": 4870,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "applications/mpesaOS/assets/dev-storage-shim.js",
+      "name": "dev-storage-shim.js",
+      "extension": "js",
+      "category": "application",
+      "sizeBytes": 3900,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "applications/mpesaOS/assets/exports/go",
+      "name": "go",
+      "extension": "",
+      "category": "application",
+      "sizeBytes": 1,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "applications/mpesaOS/assets/logo/Log",
+      "name": "Log",
+      "extension": "",
+      "category": "application",
+      "sizeBytes": 1,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "applications/mpesaOS/assets/sounds/VOICE",
+      "name": "VOICE",
+      "extension": "",
+      "category": "application",
+      "sizeBytes": 1,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "applications/mpesaOS/assets/templates/rec",
+      "name": "rec",
+      "extension": "",
+      "category": "application",
+      "sizeBytes": 1,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "applications/mpesaOS/icons/PLACEHOLDER.md",
+      "name": "PLACEHOLDER.md",
+      "extension": "md",
+      "category": "application",
+      "sizeBytes": 1,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "applications/mpesaOS/index.html",
+      "name": "index.html",
+      "extension": "html",
+      "category": "application",
+      "sizeBytes": 11477,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "applications/mpesaOS/manifest.json",
+      "name": "manifest.json",
+      "extension": "json",
+      "category": "application",
+      "sizeBytes": 1055,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "applications/mpesaOS/mpesaOS.css",
+      "name": "mpesaOS.css",
+      "extension": "css",
+      "category": "application",
+      "sizeBytes": 6695,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "modules/billingEngine.js",
+      "name": "billingEngine.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 5721,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Billing"
+      ],
+      "imports": [
+        "../core/storage.js",
+        "../core/audit.js",
+        "../core/logger.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "modules/cozy-ocr.js",
+      "name": "cozy-ocr.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 20911,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "OCR"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "modules/live/cozy-live.js",
+      "name": "cozy-live.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 168257,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "modules/live/ourcozy-live.test.js",
+      "name": "ourcozy-live.test.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 56019,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "node:test",
+        "node:assert/strict",
+        "../../core/modules/live/ourcozy-live.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "modules/mpesaAgent.js",
+      "name": "mpesaAgent.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 10802,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "MpesaAgent"
+      ],
+      "imports": [
+        "../core/permissions.js",
+        "../core/audit.js",
+        "../core/storage.js",
+        "../core/sync.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "modules/quarry/ quarry.html`",
+      "name": " quarry.html`",
+      "extension": "html`",
+      "category": "module",
+      "sizeBytes": 17769,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "modules/quarry/index.js",
+      "name": "index.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 106278,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Modules"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "modules/quarry/quarry-audit.js",
+      "name": "quarry-audit.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 1822,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Shared"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "modules/quarry/quarry-contants.js",
+      "name": "quarry-contants.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 18674,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Quarry"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "modules/quarry/quarry-engine-constants.js",
+      "name": "quarry-engine-constants.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 3442,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Shared"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "modules/quarry/quarry-handler.js",
+      "name": "quarry-handler.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 10197,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "modules/quarry/quarry-manager.js",
+      "name": "quarry-manager.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 25182,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Quarry"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "modules/quarry/quarry-transaction.js",
+      "name": "quarry-transaction.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 2604,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Shared"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "modules/quarry/quarry-validation.js",
+      "name": "quarry-validation.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 10986,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Shared"
+      ],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "modules/smallBusiness.js",
+      "name": "smallBusiness.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 7055,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "SmallBiz"
+      ],
+      "imports": [
+        "../core/permissions.js",
+        "../core/audit.js",
+        "../core/storage.js",
+        "../core/sync.js",
+        "../core/events.js",
+        "../core/logger.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "modules/wellbeing.js",
+      "name": "wellbeing.js",
+      "extension": "js",
+      "category": "module",
+      "sizeBytes": 2662,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [
+        "Wellbeing"
+      ],
+      "imports": [
+        "../core/permissions.js",
+        "../core/storage.js",
+        "../core/audit.js"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "developer/cli.js",
+      "name": "cli.js",
+      "extension": "js",
+      "category": "developer-tooling",
+      "sizeBytes": 1687,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [
+        "fs",
+        "crypto"
+      ],
+      "certifiedSignal": false,
+      "readError": false
+    },
+    {
+      "path": "developer/discovery-scan.js",
+      "name": "discovery-scan.js",
+      "extension": "js",
+      "category": "developer-tooling",
+      "sizeBytes": 8755,
+      "lastModified": "2026-07-20T04:39:08.021Z",
+      "exports": [],
+      "imports": [
+        "fs",
+        "path"
+      ],
+      "certifiedSignal": true,
+      "readError": false
+    },
+    {
+      "path": "developer/validation.html",
+      "name": "validation.html",
+      "extension": "html",
+      "category": "developer-tooling",
+      "sizeBytes": 14797,
+      "lastModified": "2026-07-19T17:54:15.000Z",
+      "exports": [],
+      "imports": [],
+      "certifiedSignal": false,
+      "readError": false
+    }
+  ]
+}
