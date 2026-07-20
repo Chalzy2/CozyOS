@@ -180,6 +180,21 @@
 
     const engineInstance = new ShopCoreEngine();
     window.CozyOS.ShopCore = engineInstance;
+    // Business Application Certification Pass: real, additive
+    // registration — was missing entirely, same gap as MpesaOS. Uses the
+    // same id ("shopos") already registered with ModuleRegistry (via
+    // shopos.js) and matching window.CozyOS.Modules["shopos"], so
+    // PlatformOperations.launchApplication("shopos") resolves correctly
+    // end-to-end.
+    if (window.CozyOS.ServiceRegistry && typeof window.CozyOS.ServiceRegistry.registerApplication === "function") {
+        try {
+            window.CozyOS.ServiceRegistry.registerApplication({
+                id: "shopos", name: "ShopOS", version: "1.0.0",
+                category: "business-application", icon: "shopos.svg", enabled: true,
+                launcher: "core/modules/shopos/shopos.js"
+            });
+        } catch (_err) { /* non-fatal */ }
+    }
 
     const manifest = {
         id: "shop-core",
