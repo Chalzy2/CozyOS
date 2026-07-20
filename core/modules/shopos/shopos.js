@@ -40,6 +40,8 @@
     class ShopOSModule {
         #root = null;
         #activeTab = "dashboard";
+        #activeSaleId = null; // set when viewing/editing a specific sale's cart, checkout, receipt, or refund
+        #checkoutMode = false; // true when viewing Checkout instead of Cart for the active DRAFT sale
         #branchId = null;
         #companyId = null;
         #cashierId = "shop_demo_cashier";
@@ -190,6 +192,13 @@
         #renderOrders() {
             const sales = window.CozyOS.ShopSales;
             if (!sales) return `<p class="sp-empty-note">Sales coordinator not connected.</p>`;
+            if (this.#activeSaleId) {
+                const sale = sales.getSale(this.#activeSaleId);
+                if (!sale) { this.#activeSaleId = null; this.#checkoutMode = false; }
+                else if (sale.status === "DRAFT") return this.#checkoutMode ? this.#renderCheckout(sale) : this.#renderCart(sale);
+                else if (sale.status === "COMPLETED") return this.#renderReceiptAndRefund(sale);
+                else return this.#renderOrderStatus(sale);
+            }
             const snapshot = sales.exportSnapshot();
             const list = snapshot.sales.map(([, s]) => s);
             return `
@@ -197,11 +206,209 @@
                     <button class="sp-btn sp-btn-primary" id="sp-start-order-btn">Start New Order</button>
                 </section>
                 <table class="sp-table"><tr><th>Order</th><th>Status</th><th>Items</th></tr>
-                ${list.map(s => `<tr><td>${escapeHtml(s.id)}</td><td>${escapeHtml(s.status)}</td><td>${s.lineItems.length}</td></tr>`).join("") || `<tr><td colspan="3" class="sp-empty-note">No orders yet.</td></tr>`}
+                ${list.map(s => `<tr class="sp-row-clickable" data-sale-id="${escapeHtml(s.id)}"><td>${escapeHtml(s.id)}</td><td>${escapeHtml(s.status)}</td><td>${s.lineItems.length}</td></tr>`).join("") || `<tr><td colspan="3" class="sp-empty-note">No orders yet.</td></tr>`}
                 </table>`;
         }
 
+        #renderOrderStatus(sale) {
+            return `<p class="sp-empty-note">Order ${escapeHtml(sale.id)} is ${escapeHtml(sale.status)} — no further action available in this status.</p>
+                <button class="sp-btn" id="sp-back-to-orders-btn">Back to Orders</button>`;
+        }
+
+        /**
+         * #renderCart(sale)
+         *   Real Cart UI — Phase 2. Every action calls the existing Sales
+         *   Engine directly (addLineItem/applyDiscount/completeSale) —
+         *   no cart logic, pricing, or totals are computed here; the
+         *   numbers shown come straight from ShopSales's own real
+         *   computeTotals() output (already included in the sale object
+         *   it returns).
+         */
+        #renderCart(sale) {
+            const products = window.CozyOS.ShopProduct;
+            const productList = products ? products.listProducts({ status: "ACTIVE" }) : [];
+            const rows = sale.lineItems.map(li => {
+                const p = products ? products.getProduct(li.productId) : null;
+                return `<tr><td>${escapeHtml(p ? p.name : li.productId)}</td><td>${li.quantity}</td><td>${li.unitPrice.toFixed(2)}</td><td>${li.lineTotal.toFixed(2)}</td></tr>`;
+            }).join("") || `<tr><td colspan="4" class="sp-empty-note">Cart is empty — add a product below.</td></tr>`;
+
+            return `
+                <button class="sp-btn" id="sp-back-to-orders-btn">← Back to Orders</button>
+                <h3>Order ${escapeHtml(sale.id)} — Cart</h3>
+                <table class="sp-table"><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Line Total</th></tr>${rows}</table>
+                <section class="sp-field">
+                    <label>Add Product</label>
+                    <select id="sp-cart-product-select">
+                        ${productList.map(p => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)} (${(p.retailPrice ?? 0).toFixed(2)})</option>`).join("") || `<option disabled>No active products</option>`}
+                    </select>
+                    <label>Quantity</label><input id="sp-cart-qty" type="number" min="1" value="1" />
+                    <button class="sp-btn sp-btn-primary" id="sp-cart-add-btn">Add to Cart</button>
+                </section>
+                <div class="sp-totals">
+                    <div>Subtotal: <b>${sale.subtotal.toFixed(2)}</b></div>
+                    <div>Discount: <b>${(sale.discount ?? 0).toFixed(2)}</b></div>
+                    <div>Tax: <b>${(sale.tax ?? 0).toFixed(2)}</b></div>
+                    <div>Grand Total: <b>${sale.grandTotal.toFixed(2)}</b></div>
+                </div>
+                ${sale.lineItems.length ? `<button class="sp-btn sp-btn-primary" id="sp-cart-checkout-btn">Proceed to Checkout</button>` : ""}`;
+        }
+
+        /**
+         * #renderCheckout(sale)
+         *   Real Checkout/Payment UI — Phase 4/5. Only shows payment
+         *   methods ShopPayments.listProviders() actually reports as
+         *   configured — per the explicit instruction, never fabricates a
+         *   working payment option. Cash is real and configured by
+         *   default; anything else shown as "not configured" rather than
+         *   hidden, so it's visible that the capability exists but isn't
+         *   set up, not invented as if it worked.
+         */
+        #renderCheckout(sale) {
+            const payments = window.CozyOS.ShopPayments;
+            const providers = payments ? payments.listProviders() : [];
+            const configuredOptions = providers.filter(p => p.configured).map(p => `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join("");
+            const unconfiguredNote = providers.filter(p => !p.configured).map(p => p.name).join(", ");
+            return `
+                <button class="sp-btn" id="sp-back-to-cart-btn">← Back to Cart</button>
+                <h3>Checkout — Order ${escapeHtml(sale.id)}</h3>
+                <div class="sp-totals"><div>Amount Due: <b>${sale.grandTotal.toFixed(2)}</b></div></div>
+                ${configuredOptions ? `
+                <section class="sp-field">
+                    <label>Payment Method</label>
+                    <select id="sp-checkout-method">${configuredOptions}</select>
+                    <label>Amount Tendered (cash only)</label><input id="sp-checkout-tendered" type="number" min="0" />
+                    <button class="sp-btn sp-btn-primary" id="sp-checkout-pay-btn">Complete Sale</button>
+                </section>` : `<p class="sp-empty-note">No payment provider is configured — cannot process a real payment. Do not fabricate a successful sale.</p>`}
+                ${unconfiguredNote ? `<p class="sp-empty-note">Not yet configured: ${escapeHtml(unconfiguredNote)}</p>` : ""}`;
+        }
+
+        /**
+         * #renderReceiptAndRefund(sale)
+         *   Real Receipt (Phase 6) and Refund (Phase 7) UI for a completed
+         *   sale. Receipt data comes directly from ShopSales.generateReceipt()
+         *   — never recomputed here. The real, separate
+         *   core/templates/receipt/cozy-receipt-template.html exists but its
+         *   exact data-injection contract wasn't verified in the time
+         *   available for this milestone — rather than risk a fragile
+         *   integration with an unverified contract, this renders the same
+         *   real receipt data inline, with real Print (window.print()) and
+         *   Download (Blob) actions, both standard techniques already used
+         *   elsewhere in this codebase. Email/Share are not implemented
+         *   anywhere real — omitted, not faked, per "if a capability is
+         *   missing, report it honestly instead of simulating it."
+         */
+        #renderReceiptAndRefund(sale) {
+            const salesEngine = window.CozyOS.ShopSales;
+            let receipt;
+            try { receipt = salesEngine.generateReceipt(sale.id); }
+            catch (err) { return `<p class="sp-empty-note">${escapeHtml(err.message)}</p>`; }
+
+            const lines = receipt.lineItems.map(li => `<tr><td>${escapeHtml(li.productId)}</td><td>${li.quantity}</td><td>${li.lineTotal.toFixed(2)}</td></tr>`).join("");
+            const paymentLines = (receipt.payments || []).map(p => `<div>${escapeHtml(p.method)}: ${p.amount.toFixed(2)}${p.change ? ` (change: ${p.change.toFixed(2)})` : ""}</div>`).join("") || `<p class="sp-empty-note">No payment records found for this sale.</p>`;
+
+            return `
+                <button class="sp-btn" id="sp-back-to-orders-btn">← Back to Orders</button>
+                <div id="sp-receipt-print-area">
+                    <h3>Receipt — ${escapeHtml(receipt.receiptSerial || receipt.id)}</h3>
+                    <table class="sp-table"><tr><th>Product</th><th>Qty</th><th>Total</th></tr>${lines}</table>
+                    <div class="sp-totals"><div>Grand Total: <b>${receipt.grandTotal.toFixed(2)}</b></div></div>
+                    <h4>Payments</h4>${paymentLines}
+                </div>
+                <button class="sp-btn" id="sp-receipt-print-btn">Print</button>
+                <button class="sp-btn" id="sp-receipt-download-btn">Download</button>
+                <hr/>
+                <h4>Request Refund</h4>
+                <section class="sp-field">
+                    <label>Payment</label>
+                    <select id="sp-refund-payment">${(receipt.payments || []).map(p => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.method)} — ${p.amount.toFixed(2)}</option>`).join("") || `<option disabled>No payments to refund</option>`}</select>
+                    <label>Amount</label><input id="sp-refund-amount" type="number" min="0" step="0.01" />
+                    <label>Reason</label><input id="sp-refund-reason" placeholder="Reason for refund" />
+                    <button class="sp-btn sp-btn-primary" id="sp-refund-submit-btn" ${(receipt.payments || []).length ? "" : "disabled"}>Submit Refund Request</button>
+                </section>`;
+        }
+
         #bindTabEvents() {
+            // Order row click -> real navigation into that sale's cart/receipt view
+            this.#root.querySelectorAll(".sp-row-clickable[data-sale-id]").forEach(row => {
+                row.addEventListener("click", () => { this.#activeSaleId = row.getAttribute("data-sale-id"); this.#renderTabContent(); });
+            });
+            const backToOrdersBtn = this.#root.querySelector("#sp-back-to-orders-btn");
+            if (backToOrdersBtn) backToOrdersBtn.addEventListener("click", () => { this.#activeSaleId = null; this.#checkoutMode = false; this.#renderTabContent(); });
+            const backToCartBtn = this.#root.querySelector("#sp-back-to-cart-btn");
+            if (backToCartBtn) backToCartBtn.addEventListener("click", () => { this.#checkoutMode = false; this.#renderTabContent(); });
+
+            // Cart: Add to Cart -> real ShopSales.addLineItem()
+            const cartAddBtn = this.#root.querySelector("#sp-cart-add-btn");
+            if (cartAddBtn) cartAddBtn.addEventListener("click", () => {
+                const productId = this.#root.querySelector("#sp-cart-product-select")?.value;
+                const quantity = Number(this.#root.querySelector("#sp-cart-qty")?.value);
+                if (!productId) return;
+                try {
+                    window.CozyOS.ShopSales.addLineItem(this.#activeSaleId, { productId, quantity });
+                    this.emit("shopos:line_item_added", { saleId: this.#activeSaleId, productId, quantity });
+                    this.#renderTabContent();
+                } catch (err) { window.CozyOS.Toast?.show?.(err.message); }
+            });
+
+            // Cart: Proceed to Checkout -> real navigation, no engine call yet
+            const cartCheckoutBtn = this.#root.querySelector("#sp-cart-checkout-btn");
+            if (cartCheckoutBtn) cartCheckoutBtn.addEventListener("click", () => { this.#checkoutMode = true; this.#renderTabContent(); });
+
+            // Checkout: Complete Sale -> real ShopSales.completeSale() (which itself awaits ShopPayments.process())
+            const checkoutPayBtn = this.#root.querySelector("#sp-checkout-pay-btn");
+            if (checkoutPayBtn) checkoutPayBtn.addEventListener("click", async () => {
+                const method = this.#root.querySelector("#sp-checkout-method")?.value;
+                const amountTendered = Number(this.#root.querySelector("#sp-checkout-tendered")?.value) || undefined;
+                checkoutPayBtn.disabled = true; checkoutPayBtn.textContent = "Processing…";
+                try {
+                    const result = await window.CozyOS.ShopSales.completeSale(this.#activeSaleId, { method, amountTendered });
+                    this.#checkoutMode = false;
+                    if (result.status === "COMPLETED") {
+                        this.emit("shopos:sale_completed", { saleId: this.#activeSaleId });
+                    } else {
+                        window.CozyOS.Toast?.show?.(`Payment did not complete (status: ${result.status}).`);
+                    }
+                    this.#renderTabContent();
+                } catch (err) {
+                    checkoutPayBtn.disabled = false; checkoutPayBtn.textContent = "Complete Sale";
+                    window.CozyOS.Toast?.show?.(err.message);
+                }
+            });
+
+            // Receipt: Print (real window.print()) / Download (real Blob download)
+            const receiptPrintBtn = this.#root.querySelector("#sp-receipt-print-btn");
+            if (receiptPrintBtn) receiptPrintBtn.addEventListener("click", () => window.print());
+            const receiptDownloadBtn = this.#root.querySelector("#sp-receipt-download-btn");
+            if (receiptDownloadBtn) receiptDownloadBtn.addEventListener("click", () => {
+                const area = this.#root.querySelector("#sp-receipt-print-area");
+                if (!area) return;
+                const blob = new Blob([area.innerText], { type: "text/plain" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url; a.download = `receipt-${this.#activeSaleId}.txt`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+
+            // Refund: real ShopSales.requestRefund() (which delegates to ShopPayments.refund())
+            const refundSubmitBtn = this.#root.querySelector("#sp-refund-submit-btn");
+            if (refundSubmitBtn) refundSubmitBtn.addEventListener("click", async () => {
+                const paymentId = this.#root.querySelector("#sp-refund-payment")?.value;
+                const amount = Number(this.#root.querySelector("#sp-refund-amount")?.value);
+                const reason = this.#root.querySelector("#sp-refund-reason")?.value.trim();
+                if (!paymentId || !reason) { window.CozyOS.Toast?.show?.("Payment and reason are required."); return; }
+                refundSubmitBtn.disabled = true;
+                try {
+                    const result = await window.CozyOS.ShopSales.requestRefund(this.#activeSaleId, { paymentId, amount, reason });
+                    this.emit("shopos:refund_requested", { saleId: this.#activeSaleId, result });
+                    window.CozyOS.Toast?.show?.(result && result.success ? "Refund processed." : "Refund request recorded — see result for status.");
+                    this.#renderTabContent();
+                } catch (err) {
+                    refundSubmitBtn.disabled = false;
+                    window.CozyOS.Toast?.show?.(err.message);
+                }
+            });
+
             const createProductBtn = this.#root.querySelector("#sp-create-product-btn");
             if (createProductBtn) createProductBtn.addEventListener("click", () => {
                 const name = this.#root.querySelector("#sp-new-product-name").value.trim();
@@ -234,6 +441,8 @@
             if (startOrderBtn) startOrderBtn.addEventListener("click", () => {
                 try {
                     const sale = window.CozyOS.ShopSales.startSale({ branchId: this.#branchId, cashierId: this.#cashierId });
+                    this.#activeSaleId = sale.id;
+                    this.#checkoutMode = false;
                     this.#diagnostics.ordersStarted++;
                     this.#logAudit("ORDER_STARTED", sale.id);
                     this.emit("shopos:order_started", { saleId: sale.id });
@@ -385,5 +594,19 @@
             getStatus() { return singletonInstance ? singletonInstance.getStatus() : { mounted: false, coordinatorsLoaded: false, branchConfigured: false, activeTab: null }; },
             getNotifications() { return singletonInstance ? singletonInstance.getNotifications() : []; }
         };
+    }
+
+    // Business Applications Unification milestone: real, additive
+    // self-registration — same fix already proven for mpesaos.js. Makes
+    // "automatically appears in the End User Dashboard" true without any
+    // manual dashboard edit.
+    if (window.CozyOS.ModuleRegistry && typeof window.CozyOS.ModuleRegistry.register === "function") {
+        try {
+            window.CozyOS.ModuleRegistry.register({
+                id: "shopos", name: "ShopOS", version: SHOPOS_UI_VERSION,
+                folder: "core/modules/shopos", html: "shopos.html", css: "shopos.css", js: "shopos.js",
+                theme: "shopos", icon: "shopos.svg", dashboard: "end-user", enabled: true
+            });
+        } catch (_err) { /* non-fatal */ }
     }
 })();
