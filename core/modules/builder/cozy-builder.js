@@ -433,6 +433,17 @@
     }
 
     window.CozyOS.Builder = new CozyOSBuilderEngine();
+    // Application Visibility Registry (core/platform/application-visibility.js)
+    // — real, additive self-declaration. Builder is hosted as an internal
+    // Developer Hub section, not a standalone mountable module, so
+    // launchTarget reflects that honestly: navigate to Developer Hub and
+    // deep-link to its real "builder" section (already real and working —
+    // see cozy-workspace.js's Developer Hub embedded-nav deep-linking).
+    window.CozyOS.Builder.visibility = Object.freeze({
+        appId: "builder", name: "Builder", icon: "🔨", category: "platform-tool",
+        launchTarget: Object.freeze({ center: "developerHub", section: "builder" }),
+        audience: "developer"
+    });
 
     // Auto-register with the Service Registry — retries if it isn't loaded
     // yet (load order isn't guaranteed), instead of only ever trying once.
