@@ -58,7 +58,72 @@
          * 600px triggers reliably while still being a reasonable mobile
          * cutoff for genuinely narrow real phone viewports. */
         @media (min-width: 600px) {
-            .cozy-shell { grid-template-columns: 260px 1fr; }
+            .cozy-shell { grid-template-columns: 260px 1fr; transition: grid-template-columns 0.25s cubic-bezier(0.16,1,0.3,1); }
+            .cozy-shell.cozy-sidebar-collapsed { grid-template-columns: 64px 1fr; }
+        }
+
+        .cozy-sidebar-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .cozy-sidebar-toggle {
+            flex: 0 0 auto; width: 28px; height: 28px; border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.12); background: transparent;
+            color: var(--sidebar-text-muted); cursor: pointer; font-size: 13px;
+        }
+        .cozy-sidebar-toggle:hover { color: #fff; border-color: var(--emerald-glow); }
+
+        /* Accordion nav sections: one open at a time via JS-driven .open class */
+        .cozy-nav-section-label {
+            display: flex; align-items: center; gap: 8px; width: 100%;
+            background: none; border: none; cursor: pointer; text-align: left;
+            color: var(--sidebar-text-muted);
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 10px 12px 4px;
+        }
+        .cozy-nav-section-arrow { display: inline-block; font-size: 9px; transition: transform 0.15s ease; }
+        .cozy-nav-section.open > .cozy-nav-section-label .cozy-nav-section-arrow { transform: rotate(90deg); }
+        .cozy-nav-section-items {
+            display: grid; grid-template-rows: 0fr; overflow: hidden;
+            transition: grid-template-rows 0.25s cubic-bezier(0.16,1,0.3,1);
+        }
+        .cozy-nav-section-items > * { min-height: 0; }
+        .cozy-nav-section.open > .cozy-nav-section-items { grid-template-rows: 1fr; }
+
+        /* Collapsed: icons/labels hidden except via title tooltip, sections
+         * force-expanded so items are still reachable as an icon rail. */
+        .cozy-shell.cozy-sidebar-collapsed .cozy-shell-title,
+        .cozy-shell.cozy-sidebar-collapsed .cozy-rediscover-btn,
+        .cozy-shell.cozy-sidebar-collapsed .cozy-nav-section-label span:not(.cozy-nav-section-arrow),
+        .cozy-shell.cozy-sidebar-collapsed .cozy-nav-link-label {
+            display: none;
+        }
+        .cozy-shell.cozy-sidebar-collapsed .cozy-nav-section-items { grid-template-rows: 1fr !important; }
+        .cozy-shell.cozy-sidebar-collapsed .cozy-sidebar { width: 64px; overflow-x: hidden; }
+        .cozy-shell.cozy-sidebar-collapsed .cozy-nav-link { text-align: center; }
+
+        .cozy-mobile-menu-btn {
+            display: none; width: 32px; height: 32px; border-radius: 6px;
+            border: 1px solid var(--border-color); background: transparent;
+            color: var(--text-primary); cursor: pointer; font-size: 15px; order: -1;
+        }
+
+        .cozy-mobile-overlay { display: none; }
+        @media (max-width: 599px) {
+            .cozy-mobile-menu-btn { display: inline-flex; align-items: center; justify-content: center; }
+            .cozy-sidebar-toggle { display: none; }
+            .cozy-mobile-overlay {
+                display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 25;
+            }
+            .cozy-sidebar {
+                position: fixed; top: 0; bottom: 0; left: 0; width: 240px; z-index: 30;
+                transform: translateX(-100%); transition: transform 0.25s cubic-bezier(0.16,1,0.3,1);
+            }
+            .cozy-shell.cozy-sidebar-mobile-open .cozy-sidebar { transform: translateX(0); }
+            .cozy-shell.cozy-sidebar-mobile-open .cozy-mobile-overlay { display: block; }
+            .cozy-shell.cozy-sidebar-mobile-open .cozy-shell-title,
+            .cozy-shell.cozy-sidebar-mobile-open .cozy-rediscover-btn,
+            .cozy-shell.cozy-sidebar-mobile-open .cozy-nav-link-label { display: initial; }
         }
 
         .cozy-sidebar {
@@ -342,6 +407,19 @@
          without real Identity authorization. -->
     <script src="core/platform/platform-operations.js"></script>
 
+    <!-- Platform Resource Manager (core/platform/platform-resource-manager.js)
+         — manages ownership, allocation, tracking, and release of shared
+         resources. Does not discover, execute operations, or classify
+         health/usage — reuses PlatformDiscovery/FileRegistry/PluginManager/
+         CozyStorage/UsageEngine/HealthEngine for all of that. -->
+    <script src="core/platform/platform-resource-manager.js"></script>
+
+    <!-- Application Visibility Registry (core/platform/application-visibility.js)
+         — single source of truth for which applications/tools exist and who
+         can see them. Reads ServiceRegistry + real self-declared `visibility`
+         metadata; delegates all filtering to IdentityEngine. -->
+    <script src="core/platform/application-visibility.js"></script>
+
     <!-- Certification (activates existing Certification/Release/Upgrade/
          Dependency centers in cozy-workspace.js AND Developer Hub's
          certification tools — same window.CozyOS.Certification instance,
@@ -431,8 +509,46 @@
 
     <!-- 2. PLUGGABLE CORE ARCHITECTURE REGISTRIES (preserved, unchanged paths) -->
     <script src="core/pluginManager.js"></script>
-    <script src="plugins/mpesaOS.js"></script>
-    <script src="plugins/pharmacyOS.js"></script>
+    <!-- Fixed: these files live at core/plugins/, not plugins/ relative to
+         this page — the original path would 404 in a real browser. -->
+    <!-- MpesaOS sub-engines (core/plugins/) — real, required dependencies
+         of the main engine below (verified: mpesaOS.js's own Deposit/
+         Withdrawal/Till/Paybill actions throw "coordinator is not
+         connected" without these — this was a real, functional gap, not
+         a hypothetical one). Loaded first so they're present when
+         mpesaOS.js's runtime checks look for them. -->
+    <script src="core/plugins/mpesaOS-float.js"></script>
+    <script src="core/plugins/mpesaOS-till.js"></script>
+    <script src="core/plugins/mpesaOS-paybill.js"></script>
+    <script src="core/plugins/mpesaOS-reporting.js"></script>
+    <!-- Payment Provider adapter — real, separate integration point for
+         CozyPaymentProviderEngine, not the core business engine. -->
+    <script src="core/modules/payment-provider/mpesa-provider.js"></script>
+    <script src="core/plugins/mpesaOS.js"></script>
+    <!-- MpesaOS embeddable End User module (core/modules/mpesaos/mpesaos.js)
+         — a real, legitimate second UI entry point documented as reusing
+         this same engine with zero duplicated business logic (verified by
+         reading its own header) — not a competing implementation. Was
+         real and complete but never loaded anywhere. -->
+    <script src="core/modules/mpesaos/mpesaos.js"></script>
+
+    <!-- ShopOS (Business Applications Unification milestone) — 11 real
+         coordinators, verified genuinely wired together (shopos.js's own
+         REQUIRED_COORDINATORS list, cross-checked against real direct
+         calls in its code) — none were loaded anywhere before this. -->
+    <script src="core/plugins/shopOS-core.js"></script>
+    <script src="core/plugins/shopOS-product.js"></script>
+    <script src="core/plugins/shopOS-inventory.js"></script>
+    <script src="core/plugins/shopOS-sales.js"></script>
+    <script src="core/plugins/shopOS-purchasing.js"></script>
+    <script src="core/plugins/shopOS-payments.js"></script>
+    <script src="core/plugins/shopOS-bookkeeping.js"></script>
+    <script src="core/plugins/shopOS-reconciliation.js"></script>
+    <script src="core/plugins/shopOS-reporting.js"></script>
+    <script src="core/plugins/shopOS-dashboard.js"></script>
+    <script src="core/plugins/shopOS-search.js"></script>
+    <script src="core/modules/shopos/shopos.js"></script>
+    <script src="core/plugins/pharmacyOS.js"></script>
     <script src="core/dashboard.js"></script>
 
     <!-- 3. BOOTSTRAP: mount the Workspace Shell once it and its scripts have
