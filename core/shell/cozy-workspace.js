@@ -103,7 +103,7 @@
         automation: "CozyAutomation",
         live: "CozyLive",
         speech: "CozySpeech",
-        translation: "CozyTranslate",
+        translation: "LanguageEngine",
         notification: "CozyNotification",
         ai: "CozyAI",
         plugin: null, // no single coordinator convention exists for plugins yet
@@ -128,10 +128,13 @@
         #boundEventSources = new Map(); // name -> liveRef
 
         // ---- shell-local state (NOT business data — navigation/UI only) ----
-        #activeCenter = "dashboard";
+        #activeCenter = (() => { try { return window.localStorage.getItem("cozy.workspace.activeCenter") || "dashboard"; } catch (_err) { return "dashboard"; } })();
         #selectedContext = null; // { type: "module"|"application"|"release", id }
-        #pendingDevHubSection = null; // set when a quick-action requests a specific Developer Hub section on arrival
         #searchTerm = "";
+        #sidebarCollapsed = (() => { try { return window.localStorage.getItem("cozy.workspace.sidebarCollapsed") === "1"; } catch (_err) { return false; } })();
+        #openNavSection = (() => { try { return window.localStorage.getItem("cozy.workspace.openNavSection") || null; } catch (_err) { return null; } })();
+        #sidebarMobileOpen = false;
+        #pendingDevHubSection = null; // set when a quick-action requests a specific Developer Hub section on arrival
 
         // ---- live event stream (real events only, from real emitters) ----
         #eventLog = [];
@@ -1223,15 +1226,11 @@
         getRolesCenterData() { return this.#getIntegrationSlotData("roles"); }
         getPermissionsCenterData() { return this.#getIntegrationSlotData("permissions"); }
 
-        // Monitoring, Configuration, and Audit have no backing coordinator
-        // convention at all yet in CozyOS — same honest treatment as
-        // Plugin/Tenant Center above, not simulated.
+        // Companies, Monitoring, Configuration, and Audit have no backing
+        // coordinator convention at all yet in CozyOS — same honest treatment
+        // as Plugin/Tenant Center above, not simulated.
         getCompaniesCenterData() {
-            const company = window.CozyOS && window.CozyOS.Company ? window.CozyOS.Company : null;
-            if (!company) return { connected: false, message: "No company/organization coordinator is loaded." };
-            if (typeof company.listCompanies !== "function") return { connected: false, message: "Company is connected but doesn't expose listCompanies()." };
-            try { return this.#deepClone({ connected: true, companies: company.listCompanies() }); }
-            catch (_err) { this.#diagnostics.errorsHidden++; return { connected: false, message: "Company.listCompanies() threw." }; }
+            return { connected: false, message: "No company/organization coordinator exists yet in CozyOS. Nothing to show until one is built and registers companies with a documented API." };
         }
         getMonitoringCenterData() {
             return { connected: false, message: "No monitoring coordinator exists yet in CozyOS, distinct from the Diagnostics Center above. Nothing to show until one is built with a documented API." };
@@ -2031,6 +2030,7 @@
                 case "platformDiscovery": return this.#renderPlatformDiscovery();
                 case "platformAudit": return this.#renderPlatformAudit();
                 case "platformOperations": return this.#renderPlatformOperations();
+                case "platformResources": return this.#renderPlatformResources();
                 case "events": return this.#renderEventMonitor();
                 case "search": return this.#renderSearch();
                 case "security": return this.#renderIntegrationSlot(this.getSecurityCenterData(), "Security Center");
@@ -2072,15 +2072,7 @@
                 }
                 case "roles": return this.#renderIntegrationSlot(this.getRolesCenterData(), "Roles");
                 case "permissions": return this.#renderIntegrationSlot(this.getPermissionsCenterData(), "Permissions");
-                case "companies": {
-                    const data = this.getCompaniesCenterData();
-                    if (!data.connected) return `<h2>Companies</h2>${this.#renderNotConnected(data.message)}`;
-                    const rows = this.#renderList(data.companies, c => `
-                        <div class="cozy-module-row">
-                            <div class="cozy-module-row-main"><b>${this.#escapeHtml(c.name || c.id)}</b></div>
-                        </div>`);
-                    return `<h2>Companies</h2>${rows}`;
-                }
+                case "companies": return `<h2>Companies</h2>${this.#renderNotConnected(this.getCompaniesCenterData().message)}`;
                 case "monitoring": return `<h2>Monitoring</h2>${this.#renderNotConnected(this.getMonitoringCenterData().message)}`;
                 case "configuration": return `<h2>Configuration</h2>${this.#renderNotConnected(this.getConfigurationCenterData().message)}`;
                 case "audit": return `<h2>Audit</h2>${this.#renderNotConnected(this.getAuditCenterData().message)}`;
@@ -2113,7 +2105,7 @@
                     // real with zero changes to developer-hub.js itself.
                     const devHubSections = [
                         ["dashboard", "⌂ Dashboard"], ["builder", "🔨 Builder"],
-                        ["understanding", "🧠 Understanding Engine"], ["ocr", "📷 OCR"],
+                        ["understanding", "🧠 Understanding Engine"], ["ocr", "📷 OCR"], ["aimode", "🤖 AI Mode"],
                         ["quickCert", "⚡ Quick Certification"], ["fullCert", "✔ Full Certification"],
                         ["bugfixer", "🐛 BugFixer"], ["workspace", "🗂 Workspace"],
                         ["moduleExplorer", "🧩 Module Explorer"], ["applicationExplorer", "📱 Application Explorer"],
@@ -2411,14 +2403,6 @@
                 <div class="cozy-event-row"><b>${this.#escapeHtml(e.time)}</b> ${this.#escapeHtml(e.source)} → ${this.#escapeHtml(e.eventName)} <span class="cozy-muted">${this.#escapeHtml(e.summary)}</span></div>`)}`;
         }
 
-        /**
-         * #renderPlatformDiscovery()
-         *   Real report display only — every field comes directly from
-         *   PlatformDiscovery.getReport(). No fabricated counts, no assumed
-         *   "all clear" state before a scan has actually run. Shows both
-         *   providers (Runtime = reality, Manifest = design) and the real
-         *   drift between them, per the merged engine's own model.
-         */
         #renderPlatformDiscovery() {
             const disc = window.CozyOS && window.CozyOS.PlatformDiscovery ? window.CozyOS.PlatformDiscovery : null;
             if (!disc) return `<h2>Platform Discovery</h2>${this.#renderNotConnected("PlatformDiscovery is not loaded on this page.")}`;
@@ -2578,6 +2562,59 @@
                 ${historyRows}`;
         }
 
+        /**
+         * #renderPlatformResources()
+         *   Real Resource Registry display only. Every resource shown comes
+         *   from PlatformResourceManager.discoverResources() (called fresh
+         *   on render, real data every time), which itself only pulls from
+         *   genuinely connected sources — Memory/Temporary Files/Language
+         *   Packs/Knowledge Packs/Icons/Images/Fonts have no real data
+         *   source anywhere in CozyOS and are disclosed as such, not shown
+         *   as empty-but-implied-tracked categories.
+         */
+        #renderPlatformResources() {
+            const rm = window.CozyOS && window.CozyOS.PlatformResourceManager ? window.CozyOS.PlatformResourceManager : null;
+            if (!rm) return `<h2>Resource Center</h2>${this.#renderNotConnected("PlatformResourceManager is not loaded on this page.")}`;
+
+            const resources = rm.discoverResources();
+            const byType = {};
+            resources.forEach(r => { (byType[r.type] = byType[r.type] || []).push(r); });
+
+            const rows = resources.map(r => `
+                <div class="cozy-module-row">
+                    <div class="cozy-module-row-main">
+                        <b>${this.#escapeHtml(r.name)}</b>
+                        <span class="cozy-badge cozy-badge-neutral">${this.#escapeHtml(r.type)}</span>
+                        <span class="cozy-badge ${r.status === "allocated" || r.status === "shared" ? "cozy-badge-success" : "cozy-badge-neutral"}">${this.#escapeHtml(r.status)}</span>
+                    </div>
+                    <div class="cozy-module-row-meta">
+                        <span>Owner: ${this.#escapeHtml(r.owner || "—")}</span>
+                        <span>Shared: ${r.shared ? "Yes" : "No"}</span>
+                        <span>Persistent: ${r.persistent ? "Yes" : "No"}</span>
+                        <span>References: ${r.referenceCount}</span>
+                        ${r.size !== null ? `<span>Size: ${this.#escapeHtml(String(r.size))} bytes</span>` : ""}
+                    </div>
+                </div>`).join("");
+
+            const health = rm.getResourceHealth();
+            const healthBlock = `
+                <h3>Resource Health</h3>
+                ${this.#renderKeyValueTable({
+                    missingCount: health.missing.length,
+                    orphanedCount: health.orphaned.length,
+                    invalidOwnershipCount: health.invalidOwnership.length,
+                    healthEngineConnected: health.healthEngineConnected
+                })}`;
+
+            return `<h2>Resource Center</h2>
+                <p class="cozy-disclosure-note">Every resource below comes from a real, connected source (Theme, PluginManager, CozyStorage, CozyAI, OCR, CozyTranslate, FileRegistry). Memory, Temporary Files, Language Packs, Knowledge Packs, Icons, Images, and Fonts have no real tracked data source anywhere in CozyOS yet — they are intentionally absent from this list, not shown empty.</p>
+                <h3>Resources by Type</h3>
+                ${this.#renderKeyValueTable(Object.fromEntries(Object.entries(byType).map(([t, list]) => [t, list.length])))}
+                ${healthBlock}
+                <h3>Full Resource Registry (${resources.length})</h3>
+                <div class="cozy-list">${rows}</div>`;
+        }
+
         #renderNotificationCenter() {
             const feed = this.getNotificationFeed(50);
             return `<h2>Enterprise Notification Center</h2>
@@ -2609,7 +2646,7 @@
             const NAV_SECTIONS = [
                 { label: "Overview", items: [["dashboard", "Dashboard"], ["applications", "Application Center"], ["modules", "Module Manager"]] },
                 { label: "Certification", items: [["certification", "Certification Center"], ["releases", "Release Center"], ["upgrades", "Upgrade Center"], ["dependencies", "Dependency Viewer"]] },
-                { label: "Operations", items: [["diagnostics", "Diagnostics Center"], ["events", "Event Monitor"], ["notifications", "Notification Center"], ["search", "Enterprise Search"], ["platformDiscovery", "Platform Discovery"], ["platformAudit", "Audit Center"], ["platformOperations", "Operations Center"]] },
+                { label: "Operations", items: [["diagnostics", "Diagnostics Center"], ["events", "Event Monitor"], ["notifications", "Notification Center"], ["search", "Enterprise Search"], ["platformDiscovery", "Platform Discovery"], ["platformAudit", "Audit Center"], ["platformOperations", "Operations Center"], ["platformResources", "Resource Center"]] },
                 { label: "Integrations (awaiting coordinators)", items: [["security", "Security Center"], ["storage", "Storage Center"], ["sync", "Synchronization Center"], ["automation", "Automation Center"], ["live", "Live Center"], ["speech", "Speech Center"], ["translation", "Translation Center"], ["subscription", "Subscription / License Center"], ["ai", "AI Center"], ["plugins", "Plugin Center"], ["tenants", "Tenant Center"]] },
                 // Additive: Administrator Workspace expansion per the locked
                 // CozyOS architecture. Nothing above this line was changed.
@@ -2617,15 +2654,33 @@
                 { label: "Development", items: [["developerHub", "Developer Hub"]] }
             ];
 
-            const navHtml = NAV_SECTIONS.map(section => `
-                <div class="cozy-nav-section">
-                    <div class="cozy-nav-section-label">${this.#escapeHtml(section.label)}</div>
-                    ${section.items.map(([id, label]) => `<div class="cozy-nav-link${this.#activeCenter === id ? " active" : ""}" data-center="${id}">${this.#escapeHtml(label)}</div>`).join("")}
-                </div>`).join("");
+            // Accordion: exactly one section open at a time. Default to
+            // whichever section contains the active center; fall back to
+            // the remembered section, then the first section. State lives
+            // in #openNavSection (survives the full innerHTML rebuild
+            // #render() does on every call) and persists across reloads.
+            if (!this.#openNavSection || !NAV_SECTIONS.some(s => s.label === this.#openNavSection)) {
+                const containing = NAV_SECTIONS.find(s => s.items.some(([id]) => id === this.#activeCenter));
+                this.#openNavSection = (containing || NAV_SECTIONS[0]).label;
+            }
+
+            const navHtml = NAV_SECTIONS.map(section => {
+                const isOpen = section.label === this.#openNavSection;
+                return `
+                <div class="cozy-nav-section${isOpen ? " open" : ""}">
+                    <button type="button" class="cozy-nav-section-label" data-nav-section="${this.#escapeHtml(section.label)}">
+                        <span class="cozy-nav-section-arrow">▶</span>${this.#escapeHtml(section.label)}
+                    </button>
+                    <div class="cozy-nav-section-items">
+                        ${section.items.map(([id, label]) => `<div class="cozy-nav-link${this.#activeCenter === id ? " active" : ""}" data-center="${id}" title="${this.#escapeHtml(label)}"><span class="cozy-nav-link-label">${this.#escapeHtml(label)}</span></div>`).join("")}
+                    </div>
+                </div>`;
+            }).join("");
 
             const mainHtml = this.#renderCenter(this.#activeCenter);
             const bar = this.getGlobalStatusBar();
             const statusBarHtml = `<div class="cozy-status-bar">
+                <button type="button" id="cozy-mobile-menu-btn" class="cozy-mobile-menu-btn" aria-label="Open menu">☰</button>
                 <span>v${this.#escapeHtml(bar.workspaceVersion)}</span>
                 <span>Apps: ${this.#escapeHtml(bar.applicationsInstalled)}</span>
                 <span>Coordinators: ${this.#escapeHtml(bar.coordinatorsLoaded)}</span>
@@ -2635,10 +2690,18 @@
                 <span>Sync: ${this.#escapeHtml(bar.synchronizationStatus)}</span>
             </div>`;
 
+            const shellClasses = ["cozy-shell"];
+            if (this.#sidebarCollapsed) shellClasses.push("cozy-sidebar-collapsed");
+            if (this.#sidebarMobileOpen) shellClasses.push("cozy-sidebar-mobile-open");
+
             this.#domRoot.innerHTML = `
-                <div class="cozy-shell">
+                <div class="${shellClasses.join(" ")}">
+                    <div class="cozy-mobile-overlay"></div>
                     <nav class="cozy-sidebar">
-                        <div class="cozy-shell-title">CozyOS Enterprise Control Center</div>
+                        <div class="cozy-sidebar-top">
+                            <div class="cozy-shell-title">CozyOS Enterprise Control Center</div>
+                            <button type="button" id="cozy-sidebar-toggle" class="cozy-sidebar-toggle" aria-label="Toggle sidebar">${this.#sidebarCollapsed ? "▶" : "◀"}</button>
+                        </div>
                         <button type="button" id="cozy-rediscover-btn" class="cozy-rediscover-btn">Rediscover</button>
                         ${navHtml}
                     </nav>
@@ -2770,6 +2833,8 @@
                         }
                         this.#activeCenter = nextCenter;
                         this.#selectedContext = null;
+                        this.#sidebarMobileOpen = false;
+                        try { window.localStorage.setItem("cozy.workspace.activeCenter", nextCenter); } catch (_err) { /* ignore */ }
                         // Additive: deep-link support. If the clicked element
                         // also carries a data-section (e.g. a Dashboard quick
                         // action for "Open Builder"), remember it so the
@@ -2821,6 +2886,30 @@
                     if (evt.target.id === "cozy-audit-run-btn") {
                         // Synchronous — PlatformAudit only reads already-cached
                         // engine state, no fetch() of its own.
+                        this.#render();
+                        return;
+                    }
+                    if (evt.target.closest("#cozy-mobile-menu-btn")) {
+                        this.#sidebarMobileOpen = !this.#sidebarMobileOpen;
+                        this.#render();
+                        return;
+                    }
+                    if (evt.target.closest("#cozy-sidebar-toggle")) {
+                        this.#sidebarCollapsed = !this.#sidebarCollapsed;
+                        try { window.localStorage.setItem("cozy.workspace.sidebarCollapsed", this.#sidebarCollapsed ? "1" : "0"); } catch (_err) { /* ignore */ }
+                        this.#render();
+                        return;
+                    }
+                    if (evt.target.closest(".cozy-mobile-overlay")) {
+                        this.#sidebarMobileOpen = false;
+                        this.#render();
+                        return;
+                    }
+                    const sectionHeader = evt.target.closest("[data-nav-section]");
+                    if (sectionHeader) {
+                        const label = sectionHeader.getAttribute("data-nav-section");
+                        this.#openNavSection = this.#openNavSection === label ? null : label;
+                        try { if (this.#openNavSection) window.localStorage.setItem("cozy.workspace.openNavSection", this.#openNavSection); } catch (_err) { /* ignore */ }
                         this.#render();
                         return;
                     }
