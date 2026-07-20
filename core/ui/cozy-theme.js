@@ -59,6 +59,7 @@
             this.registerTheme("hospitalos");
             this.registerTheme("schoolos", ["educationos"]);
             this.registerTheme("churchos");
+            this.registerTheme("high-contrast");
         }
 
         /**
@@ -167,6 +168,70 @@
                 name: theme.name,
                 aliases: [...theme.aliases]
             }));
+        }
+
+        /**
+         * getThemeTokens(name)
+         *   CozyOS Design Studio foundation (Constitution Addendum, Rule
+         *   45). Real — reuses the exact same probe-element +
+         *   getComputedStyle() technique already established in
+         *   validateTheme() above, extended to also read
+         *   --cozy-font-family (new token, see cozy-tokens.css). Returns
+         *   the theme's REAL, currently-resolved values — never a second,
+         *   hardcoded copy of a theme's colors that could drift from the
+         *   real CSS.
+         */
+        getThemeTokens(name) {
+            const canonical = this.getTheme(name);
+            if (!canonical) return { available: false, reason: `"${name}" is not a registered theme or alias.` };
+            const probe = document.createElement("div");
+            probe.setAttribute("data-cozy-app", canonical);
+            probe.style.position = "absolute";
+            probe.style.width = "0"; probe.style.height = "0";
+            probe.style.visibility = "hidden"; probe.style.pointerEvents = "none";
+            document.body.appendChild(probe);
+            const computed = getComputedStyle(probe);
+            const tokens = {};
+            [...REQUIRED_TOKENS, "--cozy-font-family", "--cozy-font-sans"].forEach(token => {
+                const value = computed.getPropertyValue(token).trim();
+                if (value) tokens[token] = value;
+            });
+            document.body.removeChild(probe);
+            return { available: true, theme: canonical, tokens };
+        }
+
+        /**
+         * setThemeToken(name, tokenName, value)
+         *   Real, SESSION-ONLY live override — writes directly to
+         *   document.documentElement.style, which cascades to any
+         *   element under [data-cozy-app=name] the same way the real
+         *   cozy-tokens.css values do (CSS custom property inheritance,
+         *   not a fabricated mechanism). Does NOT persist anywhere —
+         *   there is no backend/storage layer for this in CozyOS yet;
+         *   a page reload reverts to the real, checked-in cozy-tokens.css
+         *   values. Disclosed here and in the Design Studio UI itself,
+         *   not silently implied as permanent.
+         */
+        setThemeToken(name, tokenName, value) {
+            const canonical = this.getTheme(name);
+            if (!canonical) return { success: false, reason: `"${name}" is not a registered theme or alias.` };
+            if (!tokenName.startsWith("--cozy-")) return { success: false, reason: "Only real --cozy-* tokens can be set." };
+            // Scoped to this theme only, matching how cozy-tokens.css itself
+            // scopes each theme's block to [data-cozy-app="name"] — a global
+            // :root override would leak into every other theme.
+            const styleId = `cozy-theme-studio-override-${canonical}`;
+            let styleEl = document.getElementById(styleId);
+            if (!styleEl) {
+                styleEl = document.createElement("style");
+                styleEl.id = styleId;
+                document.head.appendChild(styleEl);
+                styleEl.dataset.overrides = "{}";
+            }
+            const overrides = JSON.parse(styleEl.dataset.overrides);
+            overrides[tokenName] = value;
+            styleEl.dataset.overrides = JSON.stringify(overrides);
+            styleEl.textContent = `[data-cozy-app="${canonical}"] { ${Object.entries(overrides).map(([k, v]) => `${k}: ${v};`).join(" ")} }`;
+            return { success: true, theme: canonical, tokenName, value, persistent: false };
         }
 
         /**
