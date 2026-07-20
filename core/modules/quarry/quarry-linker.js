@@ -2,6 +2,31 @@
  * CozyOS Quarry Manager Enterprise v2.2.1 - Dedicated Production Module
  * File: /core/modules/quarry/quarry-linker.js
  * Extends CozyBaseLinker v2.4.1 (route/authContext/payload only)
+ *
+ * ══════════════════════════════════════════════════════════════════════
+ * RETIRED — SUPERSEDED (QuarryOS Integration & Unification milestone)
+ * ══════════════════════════════════════════════════════════════════════
+ * This file is NOT loaded or used by the current, production quarry.html
+ * page. Verified by reading both files directly: this linker's
+ * buildDomCache() expects DOM IDs (#production-form, #p-date, #p-shift,
+ * #dashboard-stream-tbody, #chat-box, ...) that do not exist anywhere on
+ * the real page, which has an entirely different, richer multi-view DOM
+ * (#prod-crusher, #view-finance, #view-hr, etc.) with its own inline
+ * script. This linker also assumed route names
+ * ("get_executive_metrics", "process_production_entry") that were never
+ * implemented in the real business engine (core/modules/quarry/index.js
+ * / modules/quarry/index.js) — its actual routes are named differently
+ * (e.g. "log_crusher_production").
+ *
+ * The real page's inline script now calls window.CozyOS.Modules.
+ * QuarryManager.handle({route, authContext, payload}) directly — the one
+ * verified, real business owner — for its two real actions (production
+ * logging, AI advisor query). This file is kept for reference /
+ * historical record, not deleted, but should not be loaded by any page
+ * going forward. If QuarryOS ever needs a page matching THIS linker's
+ * simpler single-form layout, this file would need to be re-verified
+ * against that page's real DOM at that time — not assumed still correct.
+ * ══════════════════════════════════════════════════════════════════════
  */
 
 (function () {
