@@ -118,3 +118,113 @@
     font-size: 0.85rem;
 }
 .cozy-input:focus { outline: none; border-color: var(--cozy-brand-primary); }
+
+/* ==========================================================================
+   Living Button Engine — one reusable system, applied via classes.
+   Never Tailwind, never duplicated per-application. Accessibility note:
+   per the Universal Readability Standard (Rule 44), animation must never
+   reduce readability — every state below preserves full text contrast and
+   size; nothing here fades or shrinks button label text.
+   ========================================================================== */
+.cozy-btn-breathing { animation: cozyBreathe 3.2s ease-in-out infinite; }
+@keyframes cozyBreathe {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.015); }
+}
+
+.cozy-btn-glow { box-shadow: 0 0 0 rgba(59, 130, 246, 0.5); animation: cozyGlow 2.4s ease-in-out infinite; }
+@keyframes cozyGlow {
+    0%, 100% { box-shadow: 0 0 4px rgba(59, 130, 246, 0.4); }
+    50% { box-shadow: 0 0 14px rgba(59, 130, 246, 0.85); }
+}
+
+.cozy-btn-pulse { animation: cozyPulse 1.8s ease-in-out infinite; }
+@keyframes cozyPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.82; }
+}
+
+.cozy-btn-floating { animation: cozyFloat 3s ease-in-out infinite; }
+@keyframes cozyFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+}
+
+/* Ripple: real, click-triggered — JS toggles .cozy-btn-rippling briefly on
+   click (see cozy-components.js helper), this class only defines the
+   visual. */
+.cozy-btn { position: relative; overflow: hidden; }
+.cozy-btn-rippling::after {
+    content: ""; position: absolute; inset: 0; border-radius: inherit;
+    background: radial-gradient(circle, rgba(255,255,255,0.35) 0%, transparent 70%);
+    animation: cozyRipple 0.5s ease-out;
+}
+@keyframes cozyRipple {
+    from { opacity: 1; transform: scale(0.3); }
+    to { opacity: 0; transform: scale(1.8); }
+}
+
+.cozy-btn-gradient {
+    background: linear-gradient(90deg, var(--cozy-brand-primary), var(--cozy-brand-accent));
+    background-size: 200% 100%; animation: cozyGradientShift 3s ease infinite;
+}
+@keyframes cozyGradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+.cozy-btn-loading { position: relative; color: transparent !important; pointer-events: none; }
+.cozy-btn-loading::after {
+    content: ""; position: absolute; top: 50%; left: 50%; width: 14px; height: 14px;
+    margin: -7px 0 0 -7px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff;
+    border-radius: 50%; animation: cozySpin 0.7s linear infinite;
+}
+@keyframes cozySpin { to { transform: rotate(360deg); } }
+
+/* Disabled — per Rule 44, must remain readable, never disappear into the
+   background. Reduced opacity only on the button surface, never on the
+   label text's own contrast ratio. */
+.cozy-btn:disabled, .cozy-btn[disabled] {
+    opacity: 0.55; cursor: not-allowed; animation: none !important;
+    color: var(--cozy-text, inherit);
+}
+
+.cozy-btn-badge { position: relative; }
+.cozy-btn-badge::before {
+    content: attr(data-badge); position: absolute; top: -6px; right: -6px;
+    background: #EF4444; color: #fff; font-size: 10px; font-weight: 700;
+    min-width: 16px; height: 16px; border-radius: 999px; display: flex;
+    align-items: center; justify-content: center; padding: 0 3px;
+}
+
+.cozy-btn-heartbeat { animation: cozyHeartbeat 1.6s ease-in-out infinite; }
+@keyframes cozyHeartbeat {
+    0%, 100% { transform: scale(1); }
+    25% { transform: scale(1.06); }
+    40% { transform: scale(1); }
+    55% { transform: scale(1.04); }
+}
+
+.cozy-btn-shimmer {
+    position: relative;
+    background: linear-gradient(90deg, var(--cozy-glass-bg, rgba(255,255,255,0.06)) 25%, rgba(255,255,255,0.18) 50%, var(--cozy-glass-bg, rgba(255,255,255,0.06)) 75%);
+    background-size: 200% 100%; animation: cozyShimmer 2.2s linear infinite;
+}
+@keyframes cozyShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Global animation off-switch — Administrator control, per Rule 44
+   ("Animations must never reduce readability" / enable-disable requirement).
+   Applied to <body> or any container; every animation class above is
+   neutralized. */
+.cozy-animations-disabled .cozy-btn-breathing,
+.cozy-animations-disabled .cozy-btn-glow,
+.cozy-animations-disabled .cozy-btn-pulse,
+.cozy-animations-disabled .cozy-btn-floating,
+.cozy-animations-disabled .cozy-btn-gradient,
+.cozy-animations-disabled .cozy-btn-heartbeat,
+.cozy-animations-disabled .cozy-btn-shimmer {
+    animation: none !important;
+}
