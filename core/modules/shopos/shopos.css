@@ -25,6 +25,10 @@
 .sp-btn.sp-btn-primary { background: #22c55e; border-color: #22c55e; color: #fff; }
 
 .sp-table { width: 100%; border-collapse: collapse; font-size: 13px; padding: 0 18px; }
+.sp-row-clickable { cursor: pointer; }
+.sp-row-clickable:hover { background: rgba(0,0,0,0.04); }
+.sp-totals { padding: 12px 18px; display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; }
+.sp-totals b { font-size: 15px; }
 .sp-table th, .sp-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--cz-border, #e5e7eb); }
 .sp-table th { color: var(--cz-text-muted, #6b7280); font-weight: 600; font-size: 11px; text-transform: uppercase; }
 
