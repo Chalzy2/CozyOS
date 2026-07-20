@@ -1042,6 +1042,15 @@
     }
 
     window.CozyOS.BugFixer = new CozyOSBugFixerCoordinator();
+    // Application Visibility Registry — real, additive self-declaration.
+    // Same reasoning as Builder: hosted as an internal Developer Hub
+    // section, launchTarget deep-links there rather than pretending this
+    // mounts as a standalone module.
+    window.CozyOS.BugFixer.visibility = Object.freeze({
+        appId: "bugfixer", name: "BugFixer", icon: "🐛", category: "platform-tool",
+        launchTarget: Object.freeze({ center: "developerHub", section: "bugfixer" }),
+        audience: "developer"
+    });
 
     (function registerWithServiceRegistry(descriptor) {
         function attempt() {
