@@ -367,6 +367,18 @@
          consumer yet — it's the app-launch/dashboard-placement resolver for
          a future loadModule() flow, not a catalog/display coordinator. -->
     <script src="core/registry/cozy-registry.js"></script>
+    <!-- Real bug fix: identity-engine.js has never had a script tag on this
+         page, despite every PlatformOperations/PlatformResourceManager/
+         ApplicationVisibility/ContentPresentation permission check
+         depending on window.CozyOS.IdentityEngine. Every one of those
+         checks has been correctly failing closed this whole time (never
+         wrongly open) — but Identity itself needs to actually load for a
+         real login flow to ever succeed here. -->
+    <script src="core/modules/identity/identity-engine.js"></script>
+    <!-- Real bug fix: cozy-context-engine.js was migrated to
+         PlatformEventBus in an early milestone but never received a
+         script tag on this specific page. -->
+    <script src="core/context/cozy-context-engine.js"></script>
     <script src="core/modules/module-registry.js"></script>
 
     <!-- Shared Platform Strengthening: PlatformEventBus / ModuleLoadingManager
@@ -440,7 +452,7 @@
          own Project-namespace file-registration hook — same window.CozyOS.
          CozyMemory instance). Both verified compatible; no code changes
          needed anywhere else. -->
-    <script src="core/certification/cozy-certification.js"></script>
+    <script src="core/modules/certification/cozy-certification.js"></script>
     <script src="core/modules/memory/cozy-memory-engine.js"></script>
 
     <!-- DeveloperHub orchestrator — pure orchestration (verified: every
@@ -535,6 +547,11 @@
     <script src="core/plugins/mpesaOS-reporting.js"></script>
     <!-- Payment Provider adapter — real, separate integration point for
          CozyPaymentProviderEngine, not the core business engine. -->
+    <!-- Real bug fix: mpesa-provider.js (below) is an adapter FOR this
+         engine — added during MpesaOS Unification, but the engine itself
+         was never given a script tag, meaning the adapter registration
+         had nothing real to register into on this page. -->
+    <script src="core/modules/payment-provider/cozy-payment-provider-engine.js"></script>
     <script src="core/modules/payment-provider/mpesa-provider.js"></script>
     <script src="core/plugins/mpesaOS.js"></script>
     <!-- MpesaOS embeddable End User module (core/modules/mpesaos/mpesaos.js)
