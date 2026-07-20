@@ -180,6 +180,18 @@
 
         .cozy-disclosure-note { color: var(--text-secondary); font-size: 0.8rem; font-style: italic; margin: 4px 0 12px; }
 
+        .cozy-devhub-embedded-nav {
+            display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 18px;
+            padding: 10px; background: var(--bg-surface); border: 1px solid var(--border-color);
+            border-radius: 10px;
+        }
+        .cozy-devhub-embedded-nav .cozy-nav-item {
+            padding: 6px 12px; border-radius: 6px; font-size: 0.82rem; text-decoration: none;
+        }
+        .cozy-devhub-embedded-nav .cozy-nav-item.active {
+            background: var(--sidebar-active-bg); color: #ffffff; font-weight: 600;
+        }
+
         /* --- New: Dashboard hero + stat cards + quick actions, matching
          * the reference design's home layout. Real data only — stat
          * numbers come from actual connected coordinators (Certification's
@@ -298,6 +310,26 @@
     <script src="core/shell/platform-event-bus.js"></script>
     <script src="core/shell/module-loading-manager.js"></script>
 
+    <!-- Platform Discovery Engine dependency chain (core/platform/) — load
+         order matters: FileRegistry/ManifestRegistry are pure storage (no
+         dependencies), DependencyEngine/UsageEngine read FileRegistry,
+         HealthEngine reads both of those, and platform-discovery.js
+         (the merged engine) reads/writes all of them. Each degrades
+         honestly if an earlier one in the chain isn't present — see each
+         file's own header for its exact optional-dependency behavior. -->
+    <script src="core/platform/file-registry.js"></script>
+    <script src="core/platform/manifest-registry.js"></script>
+    <script src="core/platform/dependency-engine.js"></script>
+    <script src="core/platform/usage-engine.js"></script>
+    <script src="core/platform/health-engine.js"></script>
+
+    <!-- Platform Discovery Engine (core/shell/platform-discovery.js) — reads
+         and writes to the five files above; does not reimplement any of
+         them. Merged from two independently-built implementations into one
+         authoritative engine — see its own header for the full merge
+         history and the Runtime-vs-Manifest provider model. -->
+    <script src="core/shell/platform-discovery.js"></script>
+
     <!-- Certification (activates existing Certification/Release/Upgrade/
          Dependency centers in cozy-workspace.js AND Developer Hub's
          certification tools — same window.CozyOS.Certification instance,
@@ -348,6 +380,20 @@
          real and part of the same domain; loaded for the same reason
          module-registry.js was loaded before it had an Administrator
          Workspace consumer. -->
+    <!-- 8 real coordinators found in the full repository export, verified
+         against INTEGRATION_SLOTS's already-expected global names (one real
+         mismatch fixed: translation was pointed at a guessed "LanguageEngine"
+         that doesn't exist; corrected to the real CozyTranslate) —
+         previously honestly reporting "Not Connected," now real. -->
+    <script src="core/modules/notification/cozy-notification.js"></script>
+    <script src="core/modules/storage/cozy-storage.js"></script>
+    <script src="core/modules/sync/cozy-sync.js"></script>
+    <script src="core/modules/automation/cozy-automation.js"></script>
+    <script src="core/modules/analytics/cozy-analytics.js"></script>
+    <script src="core/modules/speech/cozy-speech.js"></script>
+    <script src="core/modules/translate/cozy-translate.js"></script>
+    <script src="core/modules/company/cozy-company.js"></script>
+
     <script src="core/modules/ocr/cozy-ocr.js"></script>
     <script src="core/modules/ocr/document-router.js"></script>
 
