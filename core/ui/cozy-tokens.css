@@ -7,6 +7,19 @@
     --cozy-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --cozy-font-mono: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", Courier, monospace;
 
+    /* CozyOS Universal UI Readability & Accessibility Standard —
+       real, shared font-size scale. Every component across every
+       CozyOS application should read from these, not hardcode a
+       size. Never below 14px for normal interface text — the
+       standard's own explicit floor. */
+    --cozy-text-page-title: 30px;
+    --cozy-text-section-title: 23px;
+    --cozy-text-card-title: 19px;
+    --cozy-text-body: 17px;
+    --cozy-text-secondary: 15px;
+    --cozy-text-label: 15px;
+    --cozy-text-button: 16px;
+
     /* Global Layout Metrics */
     --cozy-sidebar-width: 260px;
     --cozy-topbar-height: 56px;
@@ -79,18 +92,18 @@ html[data-cozy-app="platform-admin"], [data-cozy-app="platform-admin"] {
     --cozy-brand-accent: #00A86B;
     --cozy-brand-gold: #F9A825;
     --cozy-brand-glow: rgba(27, 94, 32, 0.15);
-    --cozy-bg-gradient: #f8fafc;
-    --cozy-muted: #475569;
-    --cozy-text-faint: #94A3B8;
-    --cozy-text: #0f172a;
-    --cozy-border: #E2E8F0;
+    --cozy-bg-gradient: #FFFFFF;
+    --cozy-muted: #424242;
+    --cozy-text-faint: #616161;
+    --cozy-text: #212121;
+    --cozy-border: #E0E0E0;
 
     /* Light card/glass treatment — overrides the universal dark-glass
        defaults specifically for this theme. */
     --cozy-glass-bg: #ffffff;
     --cozy-glass-blur: none;
     --cozy-glass-shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.06);
-    --cozy-glass-border: 1px solid #E2E8F0;
+    --cozy-glass-border: 1px solid #E0E0E0;
 
     /* New: sidebar-specific tokens (dark navy sidebar, distinct from the
        light main content area). */
