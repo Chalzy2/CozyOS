@@ -461,6 +461,16 @@
         Object.freeze({ id: "refresh", permission: "discovery:refresh", rollback: false, category: "Discovery" })
     ]);
 
+    // Application Visibility Registry (core/platform/application-visibility.js)
+    // — real, additive self-declaration. Discovery is a native Administrator
+    // Workspace section (rendered directly by cozy-workspace.js), not a
+    // standalone module — launchTarget has no "section," matching that.
+    instance.visibility = Object.freeze({
+        appId: "platformDiscovery", name: "Platform Discovery", icon: "🔍", category: "platform-tool",
+        launchTarget: Object.freeze({ center: "platformDiscovery" }),
+        audience: "admin"
+    });
+
     (function registerWithServiceRegistry(descriptor) {
         function attempt() {
             if (typeof window.CozyOS.registerCoordinator !== "function") return false;
