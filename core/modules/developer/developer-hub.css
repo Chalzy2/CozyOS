@@ -6,11 +6,11 @@
  */
 
 /* 1. Pull in the centralized UI Core Framework styles */
-@import url("../../core/ui/cozy-tokens.css");
-@import url("../../core/ui/cozy-theme.css");
-@import url("../../core/ui/cozy-layout.css");
-@import url("../../core/ui/cozy-components.css");
-@import url("../../core/ui/cozy-animations.css");
+@import url("../../ui/cozy-tokens.css");
+@import url("../../ui/cozy-theme.css");
+@import url("../../ui/cozy-layout.css");
+@import url("../../ui/cozy-components.css");
+@import url("../../ui/cozy-animations.css");
 
 /* 2. Map Legacy Dashboard variables directly to CozyOS Core Enterprise Tokens */
 :root {
