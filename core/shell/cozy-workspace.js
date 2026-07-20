@@ -2030,6 +2030,7 @@
                 case "diagnostics": return this.#renderDiagnosticsCenter();
                 case "platformDiscovery": return this.#renderPlatformDiscovery();
                 case "platformAudit": return this.#renderPlatformAudit();
+                case "platformOperations": return this.#renderPlatformOperations();
                 case "events": return this.#renderEventMonitor();
                 case "search": return this.#renderSearch();
                 case "security": return this.#renderIntegrationSlot(this.getSecurityCenterData(), "Security Center");
@@ -2526,6 +2527,57 @@
                 ${orphanBlock}${deadBlock}${missingModBlock}${disconnectedBlock}${timelineBlock}${sessionBlock}`;
         }
 
+        /**
+         * #renderPlatformOperations()
+         *   Real Operations Registry display — every row comes from
+         *   PlatformOperations.listOperations(), whose `supported` field is
+         *   itself computed live from real capability advertisement, never
+         *   hardcoded here. No operation is executed from this page without
+         *   a real, authenticated userId — none exists yet anywhere in
+         *   CozyOS, so every "Execute" action here will honestly refuse
+         *   until a real login flow supplies one.
+         */
+        #renderPlatformOperations() {
+            const ops = window.CozyOS && window.CozyOS.PlatformOperations ? window.CozyOS.PlatformOperations : null;
+            if (!ops) return `<h2>Operations Center</h2>${this.#renderNotConnected("PlatformOperations is not loaded on this page.")}`;
+
+            const scan = ops.scanCapabilities();
+            const scanBlock = `
+                <h3>Capability Scanner</h3>
+                ${this.#renderKeyValueTable({ capabilitiesDiscovered: scan.capabilitiesDiscovered, advertisingCoordinators: scan.advertisingCoordinators.map(a => a.name).join(", ") || "none" })}
+                ${scan.reason ? `<p class="cozy-disclosure-note">${this.#escapeHtml(scan.reason)}</p>` : ""}`;
+
+            const operations = ops.listOperations();
+            const rows = operations.map(op => `
+                <div class="cozy-module-row">
+                    <div class="cozy-module-row-main">
+                        <b>${this.#escapeHtml(op.name)}</b>
+                        <span class="cozy-badge ${op.supported ? "cozy-badge-success" : "cozy-badge-neutral"}">${op.supported ? "Supported" : "Not Supported"}</span>
+                        <span class="cozy-badge cozy-badge-neutral">${this.#escapeHtml(op.category)}</span>
+                    </div>
+                    <div class="cozy-module-row-meta">
+                        <span>Owner: ${this.#escapeHtml(op.owner || "—")}</span>
+                        ${op.permission ? `<span>Permission: ${this.#escapeHtml(op.permission)}</span>` : ""}
+                        <span>Rollback: ${op.supported ? (op.advertisedRollback ? "Yes" : "No") : "—"}</span>
+                        ${!op.supported ? `<span>Reason: ${this.#escapeHtml(op.reason)}</span>` : ""}
+                        ${op.requiredFutureOwner ? `<span>Required Future Owner: ${this.#escapeHtml(op.requiredFutureOwner)}</span>` : ""}
+                    </div>
+                </div>`).join("");
+
+            const history = ops.getHistory(20);
+            const historyRows = history.length ? history.map(h => `
+                <div class="cozy-nav-link"><span>${this.#escapeHtml(h.timestamp)} — ${this.#escapeHtml(h.operation)} (${this.#escapeHtml(h.target)}): ${h.success ? "✅ success" : "❌ " + this.#escapeHtml(h.reason || "failed")}</span></div>`).join("")
+                : `<p class="cozy-disclosure-note">No operations have been run yet this session.</p>`;
+
+            return `<h2>Operations Center</h2>
+                <p class="cozy-disclosure-note">The execution layer — every operation delegates to a real, already-connected platform owner. Nothing here is simulated. "Execute" requires a real, authenticated, authorized user — no login screen exists yet anywhere in CozyOS, so every mutating operation will honestly refuse until one does.</p>
+                ${scanBlock}
+                <h3>Operations Registry (${operations.filter(o => o.supported).length} supported / ${operations.length} total)</h3>
+                <div class="cozy-list">${rows}</div>
+                <h3>Recent Operation History</h3>
+                ${historyRows}`;
+        }
+
         #renderNotificationCenter() {
             const feed = this.getNotificationFeed(50);
             return `<h2>Enterprise Notification Center</h2>
@@ -2557,7 +2609,7 @@
             const NAV_SECTIONS = [
                 { label: "Overview", items: [["dashboard", "Dashboard"], ["applications", "Application Center"], ["modules", "Module Manager"]] },
                 { label: "Certification", items: [["certification", "Certification Center"], ["releases", "Release Center"], ["upgrades", "Upgrade Center"], ["dependencies", "Dependency Viewer"]] },
-                { label: "Operations", items: [["diagnostics", "Diagnostics Center"], ["events", "Event Monitor"], ["notifications", "Notification Center"], ["search", "Enterprise Search"], ["platformDiscovery", "Platform Discovery"], ["platformAudit", "Audit Center"]] },
+                { label: "Operations", items: [["diagnostics", "Diagnostics Center"], ["events", "Event Monitor"], ["notifications", "Notification Center"], ["search", "Enterprise Search"], ["platformDiscovery", "Platform Discovery"], ["platformAudit", "Audit Center"], ["platformOperations", "Operations Center"]] },
                 { label: "Integrations (awaiting coordinators)", items: [["security", "Security Center"], ["storage", "Storage Center"], ["sync", "Synchronization Center"], ["automation", "Automation Center"], ["live", "Live Center"], ["speech", "Speech Center"], ["translation", "Translation Center"], ["subscription", "Subscription / License Center"], ["ai", "AI Center"], ["plugins", "Plugin Center"], ["tenants", "Tenant Center"]] },
                 // Additive: Administrator Workspace expansion per the locked
                 // CozyOS architecture. Nothing above this line was changed.
