@@ -103,7 +103,7 @@
         automation: "CozyAutomation",
         live: "CozyLive",
         speech: "CozySpeech",
-        translation: "LanguageEngine",
+        translation: "CozyTranslate",
         notification: "CozyNotification",
         ai: "CozyAI",
         plugin: null, // no single coordinator convention exists for plugins yet
@@ -130,6 +130,7 @@
         // ---- shell-local state (NOT business data — navigation/UI only) ----
         #activeCenter = "dashboard";
         #selectedContext = null; // { type: "module"|"application"|"release", id }
+        #pendingDevHubSection = null; // set when a quick-action requests a specific Developer Hub section on arrival
         #searchTerm = "";
 
         // ---- live event stream (real events only, from real emitters) ----
@@ -1222,11 +1223,15 @@
         getRolesCenterData() { return this.#getIntegrationSlotData("roles"); }
         getPermissionsCenterData() { return this.#getIntegrationSlotData("permissions"); }
 
-        // Companies, Monitoring, Configuration, and Audit have no backing
-        // coordinator convention at all yet in CozyOS — same honest treatment
-        // as Plugin/Tenant Center above, not simulated.
+        // Monitoring, Configuration, and Audit have no backing coordinator
+        // convention at all yet in CozyOS — same honest treatment as
+        // Plugin/Tenant Center above, not simulated.
         getCompaniesCenterData() {
-            return { connected: false, message: "No company/organization coordinator exists yet in CozyOS. Nothing to show until one is built and registers companies with a documented API." };
+            const company = window.CozyOS && window.CozyOS.Company ? window.CozyOS.Company : null;
+            if (!company) return { connected: false, message: "No company/organization coordinator is loaded." };
+            if (typeof company.listCompanies !== "function") return { connected: false, message: "Company is connected but doesn't expose listCompanies()." };
+            try { return this.#deepClone({ connected: true, companies: company.listCompanies() }); }
+            catch (_err) { this.#diagnostics.errorsHidden++; return { connected: false, message: "Company.listCompanies() threw." }; }
         }
         getMonitoringCenterData() {
             return { connected: false, message: "No monitoring coordinator exists yet in CozyOS, distinct from the Diagnostics Center above. Nothing to show until one is built with a documented API." };
@@ -2023,6 +2028,8 @@
                 case "upgrades": return this.#renderUpgradeCenter();
                 case "dependencies": return this.#renderDependencyViewer();
                 case "diagnostics": return this.#renderDiagnosticsCenter();
+                case "platformDiscovery": return this.#renderPlatformDiscovery();
+                case "platformAudit": return this.#renderPlatformAudit();
                 case "events": return this.#renderEventMonitor();
                 case "search": return this.#renderSearch();
                 case "security": return this.#renderIntegrationSlot(this.getSecurityCenterData(), "Security Center");
@@ -2064,7 +2071,15 @@
                 }
                 case "roles": return this.#renderIntegrationSlot(this.getRolesCenterData(), "Roles");
                 case "permissions": return this.#renderIntegrationSlot(this.getPermissionsCenterData(), "Permissions");
-                case "companies": return `<h2>Companies</h2>${this.#renderNotConnected(this.getCompaniesCenterData().message)}`;
+                case "companies": {
+                    const data = this.getCompaniesCenterData();
+                    if (!data.connected) return `<h2>Companies</h2>${this.#renderNotConnected(data.message)}`;
+                    const rows = this.#renderList(data.companies, c => `
+                        <div class="cozy-module-row">
+                            <div class="cozy-module-row-main"><b>${this.#escapeHtml(c.name || c.id)}</b></div>
+                        </div>`);
+                    return `<h2>Companies</h2>${rows}`;
+                }
                 case "monitoring": return `<h2>Monitoring</h2>${this.#renderNotConnected(this.getMonitoringCenterData().message)}`;
                 case "configuration": return `<h2>Configuration</h2>${this.#renderNotConnected(this.getConfigurationCenterData().message)}`;
                 case "audit": return `<h2>Audit</h2>${this.#renderNotConnected(this.getAuditCenterData().message)}`;
@@ -2081,7 +2096,37 @@
                 case "developerHub": {
                     const hub = window.CozyOS.Modules && window.CozyOS.Modules["developer-hub"];
                     if (!hub) return `<h2>Developer Hub</h2>${this.#renderNotConnected("developer-hub.js is not loaded on this page — Developer Hub cannot mount.")}`;
-                    return typeof hub.getDashboard === "function" ? hub.getDashboard() : '<div id="cozy-developer-hub-root" class="cozy-developer-hub-shell"></div>';
+                    // Developer Hub's own #setSection() is private, and its
+                    // real internal nav sidebar (Builder/BugFixer/etc.) only
+                    // ever existed as static markup in the standalone
+                    // developer-hub.html — never rendered at all when
+                    // embedded here, meaning its internal navigation was
+                    // completely unusable inside the Administrator
+                    // Workspace until now. developer-hub.js's own click
+                    // listener is bound on `document` and matches ANY
+                    // ".cozy-nav-item[data-section]" element anywhere on
+                    // the page (verified by reading its #bindShellNavigation()
+                    // implementation) — so rendering the exact same real
+                    // section list here, dual-classed with .cozy-nav-link
+                    // for this page's own visual styling, makes it work for
+                    // real with zero changes to developer-hub.js itself.
+                    const devHubSections = [
+                        ["dashboard", "⌂ Dashboard"], ["builder", "🔨 Builder"],
+                        ["understanding", "🧠 Understanding Engine"], ["ocr", "📷 OCR"],
+                        ["quickCert", "⚡ Quick Certification"], ["fullCert", "✔ Full Certification"],
+                        ["bugfixer", "🐛 BugFixer"], ["workspace", "🗂 Workspace"],
+                        ["moduleExplorer", "🧩 Module Explorer"], ["applicationExplorer", "📱 Application Explorer"],
+                        ["serviceRegistry", "📇 Service Registry"], ["releaseCenter", "🚀 Release Center"],
+                        ["goldenVault", "🏆 Golden Vault"], ["certHistory", "📜 Certification History"],
+                        ["repairHistory", "🛠 Repair History"], ["reviewQueue", "📥 Knowledge Review Queue"],
+                        ["patternLibrary", "📚 Enterprise Pattern Library"], ["developerQueue", "🧑‍💻 Developer Queue"],
+                        ["research", "🔍 Research"], ["memory", "💾 Memory"],
+                        ["search", "🔎 Search"], ["settings", "⚙ Settings"]
+                    ];
+                    const devHubNavHtml = `<div class="cozy-devhub-embedded-nav">${devHubSections.map(([id, label]) =>
+                        `<a href="#" class="cozy-nav-item cozy-nav-link" data-section="${id}">${this.#escapeHtml(label)}</a>`).join("")}</div>`;
+                    const rootHtml = typeof hub.getDashboard === "function" ? hub.getDashboard() : '<div id="cozy-developer-hub-root" class="cozy-developer-hub-shell"></div>';
+                    return `${devHubNavHtml}${rootHtml}`;
                 }
 
                 default: return this.#renderNotConnected(`Unknown center "${centerId}".`);
@@ -2152,9 +2197,9 @@
                         <button type="button" class="cozy-btn cozy-btn-primary" data-center="developerHub">Open Developer Hub →</button>
                     </div>
                     <div class="cozy-quick-grid" style="margin-top:14px;">
-                        <div class="cozy-quick-card" data-center="developerHub"><div class="cozy-card-label">Builder</div><div style="font-size:0.8rem;color:var(--text-secondary);">Code generation</div></div>
-                        <div class="cozy-quick-card" data-center="developerHub"><div class="cozy-card-label">BugFixer</div><div style="font-size:0.8rem;color:var(--text-secondary);">Repair tools</div></div>
-                        <div class="cozy-quick-card" data-center="developerHub"><div class="cozy-card-label">Memory</div><div style="font-size:0.8rem;color:var(--text-secondary);">Knowledge search</div></div>
+                        <div class="cozy-quick-card" data-center="developerHub" data-section="builder"><div class="cozy-card-label">Builder</div><div style="font-size:0.8rem;color:var(--text-secondary);">Code generation</div></div>
+                        <div class="cozy-quick-card" data-center="developerHub" data-section="bugfixer"><div class="cozy-card-label">BugFixer</div><div style="font-size:0.8rem;color:var(--text-secondary);">Repair tools</div></div>
+                        <div class="cozy-quick-card" data-center="developerHub" data-section="memory"><div class="cozy-card-label">Memory</div><div style="font-size:0.8rem;color:var(--text-secondary);">Knowledge search</div></div>
                     </div>
                 </div>
                 <div class="cozy-feature-card" style="border-left:4px solid #3b82f6;">
@@ -2365,6 +2410,122 @@
                 <div class="cozy-event-row"><b>${this.#escapeHtml(e.time)}</b> ${this.#escapeHtml(e.source)} → ${this.#escapeHtml(e.eventName)} <span class="cozy-muted">${this.#escapeHtml(e.summary)}</span></div>`)}`;
         }
 
+        /**
+         * #renderPlatformDiscovery()
+         *   Real report display only — every field comes directly from
+         *   PlatformDiscovery.getReport(). No fabricated counts, no assumed
+         *   "all clear" state before a scan has actually run. Shows both
+         *   providers (Runtime = reality, Manifest = design) and the real
+         *   drift between them, per the merged engine's own model.
+         */
+        #renderPlatformDiscovery() {
+            const disc = window.CozyOS && window.CozyOS.PlatformDiscovery ? window.CozyOS.PlatformDiscovery : null;
+            if (!disc) return `<h2>Platform Discovery</h2>${this.#renderNotConnected("PlatformDiscovery is not loaded on this page.")}`;
+
+            const buttons = `
+                <div style="display:flex;gap:8px;margin-bottom:16px;">
+                    <button type="button" id="cozy-discovery-scan-btn" class="cozy-btn cozy-btn-primary">Scan Now</button>
+                    <button type="button" id="cozy-discovery-scan-sources-btn" class="cozy-btn">Scan Source Files for Duplicates</button>
+                </div>`;
+
+            const report = disc.getReport();
+            if (!report.available) {
+                return `<h2>Platform Discovery</h2>${buttons}<p class="cozy-disclosure-note">${this.#escapeHtml(report.message)}</p>`;
+            }
+
+            const listBlock = (title, names, emptyMsg) => `
+                <h3>${this.#escapeHtml(title)}</h3>
+                ${names.length ? `<div class="cozy-list">${names.map(n => `<div class="cozy-nav-link"><span>${this.#escapeHtml(n)}</span></div>`).join("")}</div>` : `<p class="cozy-disclosure-note">${this.#escapeHtml(emptyMsg)}</p>`}`;
+
+            const runtimeBlock = `
+                <h3>Runtime Provider — Reality</h3>
+                ${this.#renderKeyValueTable({ liveCoordinators: report.runtime.live.count, declaredCoordinators: report.runtime.coordinators.declaredCount, declaredApplications: report.runtime.applications.declaredCount, declaredModules: report.runtime.modules.declaredCount, declaredPlugins: report.runtime.plugins.declaredCount })}
+                ${listBlock("Loaded but Not Declared in ServiceRegistry", report.runtime.coordinators.loadedButUndeclared, "None — everything loaded is also declared.")}
+                ${listBlock("Declared but Not Actually Loaded (possible broken registration)", report.runtime.coordinators.declaredButMissing, "None — every declared coordinator is actually present.")}`;
+
+            const manifestBlock = report.manifest.manifestAvailable ? `
+                <h3>Manifest Provider — Design</h3>
+                ${this.#renderKeyValueTable({ generatedAt: report.manifest.generatedAt, generatedBy: report.manifest.generatedBy, fileCount: report.manifest.fileCount })}
+                ${report.manifest.architecturalIssues.length ? listBlock("Architectural Issues Declared in Manifest", report.manifest.architecturalIssues.map(i => `${i.path} — ${i.issue}`), "") : `<p class="cozy-disclosure-note">No architectural issues declared in the manifest.</p>`}`
+                : `<h3>Manifest Provider — Design</h3><p class="cozy-disclosure-note">${this.#escapeHtml(report.manifest.reason)}</p>`;
+
+            const driftBlock = report.drift.comparisonPossible ? `
+                <h3>Drift — Where Reality and Design Disagree</h3>
+                ${listBlock("In Manifest, Not Currently Live (possibly stale)", report.drift.manifestStaleEntries, "None — everything the manifest describes as loaded is actually live right now.")}
+                ${listBlock("Live Now, Not in Last Manifest Scan (new since manifest was generated)", report.drift.newSinceManifest, "None — nothing live is missing from the manifest.")}`
+                : `<h3>Drift</h3><p class="cozy-disclosure-note">Drift comparison needs both providers connected (Manifest Provider + FileRegistry) — not available this scan.</p>`;
+
+            const usageBlock = report.usage ? `
+                <h3>Usage Classification (via UsageEngine)</h3>
+                ${this.#renderKeyValueTable(report.usage.summary)}`
+                : `<h3>Usage Classification</h3><p class="cozy-disclosure-note">UsageEngine is not loaded — dead/orphan/duplicate-candidate classification unavailable.</p>`;
+
+            const dependencyBlock = report.dependency ? `
+                <h3>Dependency Analysis (via DependencyEngine)</h3>
+                ${listBlock("Missing Dependencies", report.dependency.missing.missing.map(m => `${m.path} → ${m.dependency}`), "None found.")}
+                ${listBlock("Circular Dependency Chains (possible — see DependencyEngine's own bestEffort disclosure)", report.dependency.circular.cycles.map(c => c.join(" → ")), "None found.")}`
+                : `<h3>Dependency Analysis</h3><p class="cozy-disclosure-note">DependencyEngine is not loaded — missing/circular dependency detection unavailable.</p>`;
+
+            const sourceBlock = report.sourceAnalysis ? `
+                <h3>Source File Analysis (scanSources — duplicate global assignments)</h3>
+                ${this.#renderKeyValueTable({ filesScanned: report.sourceAnalysis.filesScanned, filesFetchedOk: report.sourceAnalysis.filesFetchedOk })}
+                ${listBlock("Duplicate window.CozyOS.<Name> Assignments Found", report.sourceAnalysis.duplicateAssignments.map(d => `${d.name} — registered in ${d.files.length} files: ${d.files.join(", ")}`), "None found across scanned files.")}`
+                : `<p class="cozy-disclosure-note">Source file analysis hasn't been run yet — click "Scan Source Files for Duplicates."</p>`;
+
+            return `<h2>Platform Discovery</h2>${buttons}
+                <p class="cozy-disclosure-note">Scanned at ${this.#escapeHtml(report.scannedAt)} (${report.durationMs}ms)</p>
+                ${runtimeBlock}${manifestBlock}${driftBlock}${usageBlock}${dependencyBlock}${sourceBlock}`;
+        }
+
+        /**
+         * #renderPlatformAudit()
+         *   Real report display only, same discipline as
+         *   #renderPlatformDiscovery(): every field comes directly from
+         *   PlatformAudit's real methods, each of which itself only reads
+         *   from an already-connected engine. No fabricated diagnosis.
+         */
+        #renderPlatformAudit() {
+            const audit = window.CozyOS && window.CozyOS.PlatformAudit ? window.CozyOS.PlatformAudit : null;
+            if (!audit) return `<h2>Audit Center</h2>${this.#renderNotConnected("PlatformAudit is not loaded on this page.")}`;
+
+            const buttons = `<button type="button" id="cozy-audit-run-btn" class="cozy-btn cozy-btn-primary" style="margin-bottom:16px;">Run Full Audit</button>`;
+            const listBlock = (title, names, emptyMsg) => `
+                <h3>${this.#escapeHtml(title)}</h3>
+                ${names.length ? `<div class="cozy-list">${names.map(n => `<div class="cozy-nav-link"><span>${this.#escapeHtml(n)}</span></div>`).join("")}</div>` : `<p class="cozy-disclosure-note">${this.#escapeHtml(emptyMsg)}</p>`}`;
+
+            const full = audit.getFullAuditReport();
+
+            const orphanBlock = full.orphanedApplications.available
+                ? listBlock("Orphaned (loaded, nothing depends on them)", full.orphanedApplications.orphans.map(o => o.path), "None found.")
+                : `<h3>Orphaned</h3><p class="cozy-disclosure-note">${this.#escapeHtml(full.orphanedApplications.reason)}</p>`;
+            const deadBlock = full.deadFiles.available
+                ? listBlock("Dead Files (never loaded, nothing depends on them)", full.deadFiles.deadFiles.map(f => f.path), "None found.")
+                : `<h3>Dead Files</h3><p class="cozy-disclosure-note">${this.#escapeHtml(full.deadFiles.reason)}</p>`;
+            const missingModBlock = full.missingModules.available
+                ? listBlock("Missing Modules (declared, no corresponding file or live coordinator found)", full.missingModules.missing.map(m => m.id || m.name), "None found.")
+                : `<h3>Missing Modules</h3><p class="cozy-disclosure-note">${this.#escapeHtml(full.missingModules.reason)}</p>`;
+            const disconnectedBlock = full.disconnectedServices.available
+                ? listBlock("Disconnected Services (declared, not actually live)", full.disconnectedServices.disconnected, "None found.")
+                : `<h3>Disconnected Services</h3><p class="cozy-disclosure-note">${this.#escapeHtml(full.disconnectedServices.reason)}</p>`;
+
+            const timelineBlock = full.failureTimeline.available ? `
+                <h3>Failure Timeline (best-effort — see note)</h3>
+                <p class="cozy-disclosure-note">Checked: ${full.failureTimeline.coordinatorsChecked.join(", ") || "none"}. ${full.failureTimeline.note}</p>
+                ${listBlock("Real Logged Failures Found", full.failureTimeline.timeline.map(e => `[${e.source}] ${e.timestamp} — ${e.action}: ${e.msg}`), "None found in any reachable coordinator's audit log.")}`
+                : "";
+
+            const sessionBlock = full.sessionChanges.available ? `
+                <h3>Changed This Session</h3>
+                <p class="cozy-disclosure-note">${this.#escapeHtml(full.sessionChanges.scope)}</p>
+                ${listBlock("Newly Live", full.sessionChanges.newlyLive, "None.")}
+                ${listBlock("No Longer Live", full.sessionChanges.noLongerLive, "None.")}`
+                : `<h3>Changed This Session</h3><p class="cozy-disclosure-note">${this.#escapeHtml(full.sessionChanges.reason)}</p>`;
+
+            return `<h2>Audit Center</h2>${buttons}
+                <p class="cozy-disclosure-note">Generated at ${this.#escapeHtml(full.generatedAt)}. This engine discovers nothing itself — every section below reads from an already-connected Discovery/Dependency/Usage/Health engine.</p>
+                ${orphanBlock}${deadBlock}${missingModBlock}${disconnectedBlock}${timelineBlock}${sessionBlock}`;
+        }
+
         #renderNotificationCenter() {
             const feed = this.getNotificationFeed(50);
             return `<h2>Enterprise Notification Center</h2>
@@ -2396,7 +2557,7 @@
             const NAV_SECTIONS = [
                 { label: "Overview", items: [["dashboard", "Dashboard"], ["applications", "Application Center"], ["modules", "Module Manager"]] },
                 { label: "Certification", items: [["certification", "Certification Center"], ["releases", "Release Center"], ["upgrades", "Upgrade Center"], ["dependencies", "Dependency Viewer"]] },
-                { label: "Operations", items: [["diagnostics", "Diagnostics Center"], ["events", "Event Monitor"], ["notifications", "Notification Center"], ["search", "Enterprise Search"]] },
+                { label: "Operations", items: [["diagnostics", "Diagnostics Center"], ["events", "Event Monitor"], ["notifications", "Notification Center"], ["search", "Enterprise Search"], ["platformDiscovery", "Platform Discovery"], ["platformAudit", "Audit Center"]] },
                 { label: "Integrations (awaiting coordinators)", items: [["security", "Security Center"], ["storage", "Storage Center"], ["sync", "Synchronization Center"], ["automation", "Automation Center"], ["live", "Live Center"], ["speech", "Speech Center"], ["translation", "Translation Center"], ["subscription", "Subscription / License Center"], ["ai", "AI Center"], ["plugins", "Plugin Center"], ["tenants", "Tenant Center"]] },
                 // Additive: Administrator Workspace expansion per the locked
                 // CozyOS architecture. Nothing above this line was changed.
@@ -2443,6 +2604,18 @@
             if (this.#activeCenter === "developerHub") {
                 const hub = window.CozyOS.Modules && window.CozyOS.Modules["developer-hub"];
                 if (hub && typeof hub.init === "function") { try { hub.init(); } catch (_err) { /* non-fatal */ } }
+                // Additive: real deep-link — simulates an actual click on the
+                // matching real .cozy-nav-item[data-section] element (the one
+                // just rendered above), so Developer Hub's own real
+                // #setSection() handles it exactly as if the user clicked it
+                // themselves. Never calls any private Developer Hub method
+                // directly; this shell still only ever interacts with it
+                // through real, public surfaces (here, a real DOM click).
+                if (this.#pendingDevHubSection) {
+                    const targetEl = this.#domRoot.querySelector(`.cozy-nav-item[data-section="${this.#pendingDevHubSection}"]`);
+                    if (targetEl) { try { targetEl.click(); } catch (_err) { /* non-fatal */ } }
+                    this.#pendingDevHubSection = null;
+                }
             }
             if (this.#activeCenter === "dashboard") {
                 this.#syncTerminalTelemetry();
@@ -2545,6 +2718,13 @@
                         }
                         this.#activeCenter = nextCenter;
                         this.#selectedContext = null;
+                        // Additive: deep-link support. If the clicked element
+                        // also carries a data-section (e.g. a Dashboard quick
+                        // action for "Open Builder"), remember it so the
+                        // post-render hook below can land the user directly
+                        // on that Developer Hub section instead of just its
+                        // home view — real navigation, not a fake shortcut.
+                        this.#pendingDevHubSection = nextCenter === "developerHub" ? centerEl.getAttribute("data-section") : null;
                         this.#render();
                         return;
                     }
@@ -2557,6 +2737,38 @@
                     }
                     if (evt.target.id === "cozy-rediscover-btn") {
                         this.rediscover();
+                        this.#render();
+                        return;
+                    }
+                    if (evt.target.id === "cozy-discovery-scan-btn") {
+                        // scan() is now async (Manifest Provider does a real
+                        // fetch) — same disable-while-running pattern as
+                        // scanSources() below, so a second click can't
+                        // overlap an in-flight scan.
+                        evt.target.disabled = true;
+                        evt.target.textContent = "Scanning…";
+                        if (window.CozyOS.PlatformDiscovery && typeof window.CozyOS.PlatformDiscovery.scan === "function") {
+                            window.CozyOS.PlatformDiscovery.scan().finally(() => this.#render());
+                        } else {
+                            this.#render();
+                        }
+                        return;
+                    }
+                    if (evt.target.id === "cozy-discovery-scan-sources-btn") {
+                        // Real async pass — disable the button while it runs so a
+                        // second click can't overlap fetch() calls already in flight.
+                        evt.target.disabled = true;
+                        evt.target.textContent = "Scanning source files…";
+                        if (window.CozyOS.PlatformDiscovery && typeof window.CozyOS.PlatformDiscovery.scanSources === "function") {
+                            window.CozyOS.PlatformDiscovery.scanSources().finally(() => this.#render());
+                        } else {
+                            this.#render();
+                        }
+                        return;
+                    }
+                    if (evt.target.id === "cozy-audit-run-btn") {
+                        // Synchronous — PlatformAudit only reads already-cached
+                        // engine state, no fetch() of its own.
                         this.#render();
                         return;
                     }
