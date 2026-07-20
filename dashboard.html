@@ -330,6 +330,12 @@
          history and the Runtime-vs-Manifest provider model. -->
     <script src="core/shell/platform-discovery.js"></script>
 
+    <!-- Platform Audit Engine (core/platform/audit-engine.js) — pure
+         consumer, sits above Discovery/Dependency/Usage/Health/Registry in
+         the chain. Discovers nothing itself; answers diagnostic questions
+         by correlating what those engines already report. -->
+    <script src="core/platform/audit-engine.js"></script>
+
     <!-- Certification (activates existing Certification/Release/Upgrade/
          Dependency centers in cozy-workspace.js AND Developer Hub's
          certification tools — same window.CozyOS.Certification instance,
