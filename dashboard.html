@@ -34,7 +34,7 @@
         body {
             background-color: var(--bg-primary);
             color: var(--text-primary);
-            font-family: var(--cozy-font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif);
+            font-family: var(--cozy-font-family, var(--cozy-font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif));
             margin: 0;
             padding: 0;
             overflow-x: hidden;
@@ -424,6 +424,13 @@
          — real WCAG contrast math against actual loaded theme tokens, real
          same-origin stylesheet scanning for sub-14px font sizes. -->
     <script src="core/platform/accessibility-engine.js"></script>
+
+    <!-- Content Presentation Engine (core/platform/content-presentation-engine.js)
+         — Phase 1 only, real content CRUD + real Accessibility publish gate.
+         See the file's own header for the full, honest scope of what's
+         deferred (most content categories, holiday templates, animation
+         rendering, placement modes, reports). -->
+    <script src="core/platform/content-presentation-engine.js"></script>
 
     <!-- Certification (activates existing Certification/Release/Upgrade/
          Dependency centers in cozy-workspace.js AND Developer Hub's
