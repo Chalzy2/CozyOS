@@ -7,17 +7,29 @@
  * PURPOSE
  * -------
  * The Lifecycle Engine owns RUNTIME STATE only, per the frozen CozyOS
- * Kernel Standard (Rule 12). It begins managing a service the moment
- * Bootstrap hands it a validated, compatibility-checked manifest, and
- * takes it from REGISTERED through INITIALIZING, VERIFYING, READY,
- * RUNNING, PAUSED, STOPPING, STOPPED, RESTARTING, FAILED, RECOVERING.
+ * Kernel Standard (Rule 12), and is the single, permanent Lifecycle
+ * owner for the entire platform (Constitution v7 — "Lifecycle Ownership
+ * Rule"). It begins managing a component the moment its owning system
+ * (Bootstrap for services; other owning engines for other kinds) hands
+ * it a validated manifest, and takes it from REGISTERED through
+ * INITIALIZING, VERIFYING, READY, RUNNING, PAUSED, STOPPING, STOPPED,
+ * RESTARTING, FAILED, RECOVERING.
+ *
+ * Originally scoped to kernel services only, this file's scope was
+ * generalized in place (rather than spinning up a second lifecycle
+ * engine elsewhere) to also track applications, modules, coordinators,
+ * engines, plugins, themes, backgrounds, resources, and AI/OCR/speech/
+ * translation providers — all through the SAME state machine and event
+ * taxonomy below. See "Component Kinds — Platform Lifecycle Ownership
+ * Expansion" further down for exactly what's wired vs. deferred.
  *
  * It never renders UI. It never loads applications. It never registers
  * services and it never performs compatibility checks — those belong to
  * Bootstrap (core/kernel/bootstrap.js) and Compatibility
  * (core/kernel/compatibility.js) respectively (Rule 1: Single
  * Responsibility). Lifecycle assumes any manifest it receives has
- * already passed both.
+ * already passed both. It also does not discover, audit, or execute —
+ * those remain separate, currently-unbuilt platform concerns.
  *
  * DESIGN RULES
  * -------------
@@ -95,6 +107,71 @@ const RESTART_POLICIES = Object.freeze({
 });
 
 const VALID_RETRY_LIMITS = Object.freeze([1, 2, 3, 5, 10]);
+
+// -----------------------------------------------------------------------------
+// Component Kinds — Platform Lifecycle Ownership Expansion
+// -----------------------------------------------------------------------------
+//
+// CANONICAL LIFECYCLE OWNERSHIP DECLARATION
+// ═══════════════════════════════════════════════════════════════════════
+//   Every platform component has exactly ONE authoritative lifecycle
+//   owner: THIS module. No second lifecycle engine may be created
+//   anywhere in CozyOS (Constitution v7 — "No Duplicate Systems" and the
+//   "Lifecycle Ownership Rule").
+//
+//   This module's scope was originally "kernel services accepted by
+//   Bootstrap" only. It is now generalized to cover every registrable
+//   platform component kind below, using the SAME state machine
+//   (STATES/TRANSITIONS above — unchanged), the SAME event taxonomy
+//   (EVENTS above — unchanged), and the SAME mutation functions
+//   (initializeService/verifyService/startService/... below — unchanged).
+//   A component's `kind` is metadata carried on its record, not a second
+//   code path or a second set of states. There is still exactly one
+//   state machine and one event bus in this file.
+//
+//   WIRED today (real, callable, exercised by tests):
+//     - service — via Bootstrap -> acceptRegisteredService() (unchanged
+//       signature and behavior; now a thin wrapper over acceptComponent()).
+//     - plugin  — via the optional bridgePluginManagerEvents() bridge
+//       below, which mirrors PluginManager's real, existing
+//       cozyos:plugin:{install,enable,disable,error,timeout,remove}
+//       window events. PluginManager remains the sole owner of plugin
+//       execution; this bridge only mirrors state for visibility
+//       (Rule: Lifecycle manages state only, never execution).
+//
+//   DEFERRED — kind exists in COMPONENT_KINDS and acceptComponent() will
+//   accept it, but nothing in the platform calls it automatically yet.
+//   No Discovery Engine exists in this codebase to auto-register these
+//   (honest scope — not fabricated). Owning engines may call
+//   acceptComponent() directly once they're ready to participate:
+//     application, module, coordinator, engine, theme, background,
+//     resource, ai_provider, ocr_provider, speech_provider,
+//     translation_provider
+//
+//   This module still does not discover, audit, or execute anything.
+//   Discovery/Audit/Operations remain separate, currently-unbuilt
+//   concerns and are explicitly out of scope here.
+// ═══════════════════════════════════════════════════════════════════════
+
+const COMPONENT_KINDS = Object.freeze({
+  SERVICE: 'service',
+  APPLICATION: 'application',
+  MODULE: 'module',
+  COORDINATOR: 'coordinator',
+  ENGINE: 'engine',
+  PLUGIN: 'plugin',
+  THEME: 'theme',
+  BACKGROUND: 'background',
+  RESOURCE: 'resource',
+  AI_PROVIDER: 'ai_provider',
+  OCR_PROVIDER: 'ocr_provider',
+  SPEECH_PROVIDER: 'speech_provider',
+  TRANSLATION_PROVIDER: 'translation_provider'
+});
+
+function isValidKind(kind) {
+  return Object.values(COMPONENT_KINDS).includes(kind);
+}
 
 const EVENTS = Object.freeze({
   REGISTERED: 'service:registered',
@@ -228,14 +305,53 @@ function now() {
  * @param {number} [runtimeOptions.maxRetries] - One of VALID_RETRY_LIMITS.
  */
 function acceptRegisteredService(token, manifest, runtimeOptions = {}) {
+  // Thin wrapper — kept for 100% backward compatibility with every existing
+  // caller (Bootstrap). All real logic now lives in acceptComponent().
+  return acceptComponent(token, COMPONENT_KINDS.SERVICE, manifest, runtimeOptions);
+}
+
+/**
+ * Accepts ANY platform component into Lifecycle's runtime tracking at
+ * REGISTERED state. This is the generalized form of the original
+ * acceptRegisteredService() (Lifecycle Ownership Rule) — identical
+ * validation, identical record shape, identical REGISTERED-state
+ * behavior, plus a `kind` tag so queries/reports/events can distinguish
+ * component types sharing this single registry.
+ *
+ * This is NOT registration in the Manifest/Discovery sense — whatever
+ * owning system calls this (Bootstrap for services, a future owning
+ * engine for other kinds) has already done its own identity/manifest
+ * validation. Lifecycle just starts owning runtime state from here.
+ *
+ * @param {*} token - Bootstrap's authorization token.
+ * @param {string} kind - One of COMPONENT_KINDS.
+ * @param {object} manifest
+ * @param {string} manifest.name
+ * @param {string} [manifest.version]
+ * @param {string} [manifest.apiVersion]
+ * @param {number} [manifest.priority]
+ * @param {boolean} [manifest.mandatory]
+ * @param {string} [manifest.minKernelVersion]
+ * @param {string[]} [manifest.dependencies]
+ * @param {object} [runtimeOptions]
+ * @param {string} [runtimeOptions.restartPolicy] - One of RESTART_POLICIES.
+ * @param {number} [runtimeOptions.maxRetries] - One of VALID_RETRY_LIMITS.
+ */
+function acceptComponent(token, kind, manifest, runtimeOptions = {}) {
   authorizeCaller(token);
+
+  if (!isValidKind(kind)) {
+    throw new Error(
+      `[Lifecycle] Unknown component kind: "${kind}". Must be one of ${Object.values(COMPONENT_KINDS).join(', ')}`
+    );
+  }
 
   const name = manifest?.name;
   if (!name || typeof name !== 'string') {
-    throw new Error('[Lifecycle] acceptRegisteredService requires manifest.name (non-empty string).');
+    throw new Error('[Lifecycle] acceptComponent requires manifest.name (non-empty string).');
   }
   if (registry.has(name)) {
-    throw new Error(`[Lifecycle] Service "${name}" already has a runtime record.`);
+    throw new Error(`[Lifecycle] Component "${name}" already has a runtime record.`);
   }
 
   const restartPolicy = runtimeOptions.restartPolicy || RESTART_POLICIES.ON_FAILURE;
@@ -250,12 +366,14 @@ function acceptRegisteredService(token, manifest, runtimeOptions = {}) {
 
   const record = {
     name,
+    kind,
     state: STATES.REGISTERED,
     dependencies: Array.isArray(manifest.dependencies) ? [...manifest.dependencies] : [],
     version: manifest.version || '0.0.0',
     apiVersion: manifest.apiVersion || '1.0.0',
     // Carried for diagnostics reporting only (Rule 13) — Lifecycle does not
-    // interpret or enforce these; Bootstrap already did (Rules 9 & 14).
+    // interpret or enforce these; the caller already did (e.g. Bootstrap
+    // per Rules 9 & 14 for services).
     priority: manifest.priority ?? null,
     mandatory: Boolean(manifest.mandatory),
     minKernelVersion: manifest.minKernelVersion || null,
@@ -274,7 +392,7 @@ function acceptRegisteredService(token, manifest, runtimeOptions = {}) {
   };
 
   registry.set(name, record);
-  emit(EVENTS.REGISTERED, { name, state: record.state });
+  emit(EVENTS.REGISTERED, { name, kind: record.kind, state: record.state });
   return getServiceState(name);
 }
 
@@ -287,7 +405,7 @@ function initializeService(token, name) {
   const record = assertRegistered(name);
   transition(record, STATES.INITIALIZING);
   record.startTime = now();
-  emit(EVENTS.INITIALIZING, { name, state: record.state });
+  emit(EVENTS.INITIALIZING, { name, kind: record.kind, state: record.state });
   return getServiceState(name);
 }
 
@@ -304,7 +422,7 @@ async function verifyService(token, name, verifyFn) {
   authorizeCaller(token);
   const record = assertRegistered(name);
   transition(record, STATES.VERIFYING);
-  emit(EVENTS.VERIFYING, { name, state: record.state });
+  emit(EVENTS.VERIFYING, { name, kind: record.kind, state: record.state });
 
   let dependenciesSatisfied = true;
   for (const dep of record.dependencies) {
@@ -327,7 +445,7 @@ async function verifyService(token, name, verifyFn) {
   if (dependenciesSatisfied && customCheckPassed) {
     transition(record, STATES.READY);
     record.readyTime = now();
-    emit(EVENTS.READY, { name, state: record.state });
+    emit(EVENTS.READY, { name, kind: record.kind, state: record.state });
   } else {
     return failService(token, name, new Error('Dependency verification failed'));
   }
@@ -340,7 +458,7 @@ function startService(token, name) {
   const record = assertRegistered(name);
   transition(record, STATES.RUNNING);
   record.runningTime = now();
-  emit(EVENTS.RUNNING, { name, state: record.state });
+  emit(EVENTS.RUNNING, { name, kind: record.kind, state: record.state });
   return getServiceState(name);
 }
 
@@ -348,7 +466,7 @@ function pauseService(token, name) {
   authorizeCaller(token);
   const record = assertRegistered(name);
   transition(record, STATES.PAUSED);
-  emit(EVENTS.PAUSED, { name, state: record.state });
+  emit(EVENTS.PAUSED, { name, kind: record.kind, state: record.state });
   return getServiceState(name);
 }
 
@@ -356,7 +474,7 @@ function resumeService(token, name) {
   authorizeCaller(token);
   const record = assertRegistered(name);
   transition(record, STATES.RUNNING);
-  emit(EVENTS.RESUMED, { name, state: record.state });
+  emit(EVENTS.RESUMED, { name, kind: record.kind, state: record.state });
   return getServiceState(name);
 }
 
@@ -365,7 +483,7 @@ function stopService(token, name) {
   const record = assertRegistered(name);
   transition(record, STATES.STOPPING);
   transition(record, STATES.STOPPED);
-  emit(EVENTS.STOPPED, { name, state: record.state });
+  emit(EVENTS.STOPPED, { name, kind: record.kind, state: record.state });
   return getServiceState(name);
 }
 
@@ -383,14 +501,14 @@ async function restartService(token, name, verifyFn) {
   if (record.state === STATES.RUNNING) {
     transition(record, STATES.STOPPING);
     transition(record, STATES.STOPPED);
-    emit(EVENTS.STOPPED, { name, state: record.state });
+    emit(EVENTS.STOPPED, { name, kind: record.kind, state: record.state });
   }
   transition(record, STATES.RESTARTING);
   transition(record, STATES.INITIALIZING);
   record.startTime = now();
   record.restartCount += 1;
   record.lastRestart = now();
-  emit(EVENTS.INITIALIZING, { name, state: record.state });
+  emit(EVENTS.INITIALIZING, { name, kind: record.kind, state: record.state });
 
   await verifyService(token, name, verifyFn);
 
@@ -401,7 +519,7 @@ function removeService(token, name) {
   authorizeCaller(token);
   const record = assertRegistered(name);
   transition(record, STATES.REMOVED);
-  emit(EVENTS.REMOVED, { name, state: record.state });
+  emit(EVENTS.REMOVED, { name, kind: record.kind, state: record.state });
   registry.delete(name);
   return true;
 }
@@ -421,7 +539,7 @@ function failService(token, name, error) {
     stack: error?.stack || null,
     retryCount: record.retryCount
   };
-  emit(EVENTS.FAILED, { name, state: record.state, error: record.lastFailure });
+  emit(EVENTS.FAILED, { name, kind: record.kind, state: record.state, error: record.lastFailure });
 
   if (record.restartPolicy === RESTART_POLICIES.NONE) {
     return escalateToPermanentFailure(record);
@@ -436,7 +554,7 @@ function failService(token, name, error) {
 
 function escalateToPermanentFailure(record) {
   transition(record, STATES.PERMANENT_FAILURE);
-  emit(EVENTS.PERMANENT_FAILURE, { name: record.name, state: record.state });
+  emit(EVENTS.PERMANENT_FAILURE, { name: record.name, kind: record.kind, state: record.state });
   // ASSUMPTION: Bootstrap subscribes to PLATFORM_DEGRADED to flip overall
   // platform health. Reconcile the payload shape against bootstrap.js.
   emit(EVENTS.PLATFORM_DEGRADED, {
@@ -460,7 +578,7 @@ async function recoverService(token, name, verifyFn) {
 
   record.retryCount += 1;
   transition(record, STATES.RECOVERING);
-  emit(EVENTS.RECOVERING, { name, state: record.state });
+  emit(EVENTS.RECOVERING, { name, kind: record.kind, state: record.state });
 
   transition(record, STATES.READY);
   record.readyTime = now();
@@ -480,17 +598,56 @@ function getServiceState(name) {
   return record.state;
 }
 
-function getLifecycleReport(name) {
+/**
+ * @param {string} [name] - If given, returns a single component's report
+ *   regardless of kind (names are unique across the whole registry).
+ * @param {string|null} [kindFilter] - When `name` is omitted, filters the
+ *   list by kind. Defaults to 'service' so existing callers (e.g.
+ *   Bootstrap.getPlatformReport()'s `services:` field) see EXACTLY the
+ *   same result set as before this file supported other kinds. Pass
+ *   `null` explicitly to get every component regardless of kind (used by
+ *   getPlatformComponentsReport() below).
+ */
+function getLifecycleReport(name, kindFilter = COMPONENT_KINDS.SERVICE) {
   if (name) {
     const record = assertRegistered(name);
     return buildDiagnosticEntry(record);
   }
-  return Array.from(registry.values()).map(buildDiagnosticEntry);
+  const all = Array.from(registry.values());
+  const filtered = kindFilter === null ? all : all.filter((r) => r.kind === kindFilter);
+  return filtered.map(buildDiagnosticEntry);
+}
+
+/**
+ * Full multi-kind platform report — every tracked component regardless
+ * of kind, optionally narrowed to one kind. This is the query the new
+ * Platform Lifecycle Center (Administrator Workspace) should use instead
+ * of getLifecycleReport(), which stays service-scoped by default for
+ * backward compatibility.
+ * @param {string|null} [kind] - One of COMPONENT_KINDS, or null (default) for all.
+ */
+function getPlatformComponentsReport(kind = null) {
+  if (kind !== null && !isValidKind(kind)) {
+    throw new Error(`[Lifecycle] Unknown component kind: "${kind}".`);
+  }
+  return getLifecycleReport(undefined, kind);
+}
+
+function getComponentsByKind(kind) {
+  if (!isValidKind(kind)) {
+    throw new Error(`[Lifecycle] Unknown component kind: "${kind}".`);
+  }
+  const results = [];
+  for (const record of registry.values()) {
+    if (record.kind === kind) results.push(record.name);
+  }
+  return results;
 }
 
 function buildDiagnosticEntry(record) {
   return Object.freeze({
     serviceName: record.name,
+    kind: record.kind,
     currentState: record.state,
     startTime: record.startTime,
     readyTime: record.readyTime,
@@ -510,27 +667,156 @@ function buildDiagnosticEntry(record) {
 }
 
 function getRunningServices() {
-  return filterByState(STATES.RUNNING);
+  return filterByState(STATES.RUNNING, COMPONENT_KINDS.SERVICE);
 }
 
 function getFailedServices() {
-  return filterByState(STATES.FAILED);
+  return filterByState(STATES.FAILED, COMPONENT_KINDS.SERVICE);
 }
 
 function getPausedServices() {
-  return filterByState(STATES.PAUSED);
+  return filterByState(STATES.PAUSED, COMPONENT_KINDS.SERVICE);
 }
 
 function getStoppedServices() {
-  return filterByState(STATES.STOPPED);
+  return filterByState(STATES.STOPPED, COMPONENT_KINDS.SERVICE);
 }
 
-function filterByState(state) {
+/**
+ * Generic, multi-kind version of getRunningServices()/getFailedServices()/
+ * etc. — names of every component in `state`, optionally narrowed to one
+ * kind (pass null for all kinds).
+ */
+function getComponentsByState(state, kind = null) {
+  return filterByState(state, kind);
+}
+
+function filterByState(state, kind = null) {
   const results = [];
   for (const record of registry.values()) {
-    if (record.state === state) results.push(record.name);
+    if (record.state !== state) continue;
+    if (kind !== null && record.kind !== kind) continue;
+    results.push(record.name);
   }
   return results;
+}
+
+// -----------------------------------------------------------------------------
+// Public API — Optional Integration Bridges
+// -----------------------------------------------------------------------------
+
+let pluginBridgeActive = false;
+const pluginBridgeHandlers = [];
+
+/**
+ * Mirrors PluginManager's real cozyos:plugin:{install,enable,disable,
+ * error,timeout,remove} window events (verified against
+ * core/pluginManager.js — not fabricated) into this Lifecycle registry
+ * under kind: 'plugin'. PluginManager remains the sole owner of plugin
+ * execution, health, and crash isolation; this bridge only mirrors state
+ * for cross-platform visibility (e.g. the Platform Lifecycle Center),
+ * per the rule that Lifecycle manages state only and integrates with
+ * existing lifecycle-emitting systems rather than replacing them.
+ *
+ * Best-effort by design: every mirrored transition only fires if it is
+ * LEGAL under TRANSITIONS for the plugin's current recorded state. An
+ * event that would require an illegal jump is skipped and logged rather
+ * than forced — this bridge never fabricates a transition that didn't
+ * legitimately happen.
+ *
+ * Must be called explicitly (e.g. by Bootstrap during platform startup).
+ * This file does not attach the bridge on load, matching this
+ * codebase's convention of explicit wiring over implicit side effects
+ * (see module-loading-manager.js's init()).
+ *
+ * @param {*} token - Bootstrap's authorization token.
+ */
+function bridgePluginManagerEvents(token) {
+  authorizeCaller(token);
+  if (pluginBridgeActive) return; // idempotent
+  if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') {
+    return; // no window available (e.g. non-browser test context)
+  }
+
+  const attach = (eventName, handler) => {
+    const wrapped = (evt) => handler(evt?.detail || {});
+    window.addEventListener(`cozyos:plugin:${eventName}`, wrapped);
+    pluginBridgeHandlers.push([`cozyos:plugin:${eventName}`, wrapped]);
+  };
+
+  const idOf = (detail) => detail.pluginId || detail.name;
+
+  async function safelyWalkTo(name, target) {
+    if (!name || !registry.has(name)) return;
+    try {
+      if (target === STATES.RUNNING) {
+        if (registry.get(name)?.state === STATES.REGISTERED) initializeService(token, name);
+        if (registry.get(name)?.state === STATES.INITIALIZING) await verifyService(token, name, () => true);
+        if (registry.get(name)?.state === STATES.READY) startService(token, name);
+      } else if (target === STATES.PAUSED) {
+        if (registry.get(name)?.state === STATES.RUNNING) pauseService(token, name);
+      } else if (target === STATES.REMOVED) {
+        if (registry.get(name)?.state === STATES.RUNNING) stopService(token, name);
+        const current = registry.get(name)?.state;
+        if (current && (TRANSITIONS[current] || []).includes(STATES.REMOVED)) removeService(token, name);
+      }
+    } catch (err) {
+      // Fail-soft: this bridge mirrors PluginManager, it never throws back
+      // into it. A skipped mirror is a diagnostics gap, not a crash.
+      // eslint-disable-next-line no-console
+      console.warn(`[Lifecycle] Plugin bridge could not mirror "${name}" toward ${target}:`, err.message);
+    }
+  }
+
+  attach('install', (detail) => {
+    const name = idOf(detail);
+    if (!name || registry.has(name)) return; // unnamed or already tracked
+    try {
+      acceptComponent(token, COMPONENT_KINDS.PLUGIN, { name, version: detail.version });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(`[Lifecycle] Plugin bridge could not register "${name}":`, err.message);
+    }
+  });
+
+  attach('enable', (detail) => { safelyWalkTo(idOf(detail), STATES.RUNNING); });
+  attach('disable', (detail) => { safelyWalkTo(idOf(detail), STATES.PAUSED); });
+  attach('remove', (detail) => { safelyWalkTo(idOf(detail), STATES.REMOVED); });
+
+  attach('error', (detail) => {
+    const name = idOf(detail);
+    if (!name || !registry.has(name)) return;
+    try {
+      failService(token, name, new Error(detail.message || 'Plugin reported an error'));
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(`[Lifecycle] Plugin bridge could not mark "${name}" FAILED:`, err.message);
+    }
+  });
+
+  attach('timeout', (detail) => {
+    const name = idOf(detail);
+    if (!name || !registry.has(name)) return;
+    try {
+      failService(token, name, new Error('Plugin execution timed out'));
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(`[Lifecycle] Plugin bridge could not mark "${name}" FAILED (timeout):`, err.message);
+    }
+  });
+
+  pluginBridgeActive = true;
+}
+
+/** Test/teardown helper — detaches the plugin bridge listeners. */
+function unbridgePluginManagerEvents() {
+  if (typeof window !== 'undefined') {
+    for (const [eventName, wrapped] of pluginBridgeHandlers) {
+      window.removeEventListener(eventName, wrapped);
+    }
+  }
+  pluginBridgeHandlers.length = 0;
+  pluginBridgeActive = false;
 }
 
 // -----------------------------------------------------------------------------
@@ -542,6 +828,7 @@ const LifecycleEngine = Object.freeze({
   STATES,
   EVENTS,
   RESTART_POLICIES,
+  COMPONENT_KINDS,
 
   // security
   setBootstrapToken,
@@ -552,8 +839,12 @@ const LifecycleEngine = Object.freeze({
   // acceptance into runtime — called by Bootstrap only, after it has
   // already registered and compatibility-checked the manifest
   acceptRegisteredService,
+  // generalized acceptance for any component kind (Lifecycle Ownership Rule)
+  acceptComponent,
 
-  // transitions (require Bootstrap token)
+  // transitions (require Bootstrap token) — kind-agnostic; operate on any
+  // registered component regardless of kind, since the state machine and
+  // its legality rules are the same for every kind
   initializeService,
   verifyService,
   startService,
@@ -573,7 +864,16 @@ const LifecycleEngine = Object.freeze({
   getRunningServices,
   getFailedServices,
   getPausedServices,
-  getStoppedServices
+  getStoppedServices,
+
+  // generalized, multi-kind queries (read-only, no token required)
+  getPlatformComponentsReport,
+  getComponentsByKind,
+  getComponentsByState,
+
+  // optional integration bridges (require Bootstrap token to attach)
+  bridgePluginManagerEvents,
+  unbridgePluginManagerEvents
 });
 
 export default LifecycleEngine;
