@@ -426,6 +426,13 @@
          CozyStorage/UsageEngine/HealthEngine for all of that. -->
     <script src="core/platform/platform-resource-manager.js"></script>
 
+    <!-- Reference Integrity Engine (core/platform/reference-integrity-engine.js)
+         — proactively checks real script/stylesheet/image tag resolution.
+         The exact class of check that would have caught the mpesaOS.js,
+         developer-hub.css, QuarryOS, and Certification path bugs before
+         deployment. -->
+    <script src="core/platform/reference-integrity-engine.js"></script>
+
     <!-- Application Visibility Registry (core/platform/application-visibility.js)
          — single source of truth for which applications/tools exist and who
          can see them. Reads ServiceRegistry + real self-declared `visibility`
