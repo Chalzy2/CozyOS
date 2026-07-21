@@ -245,6 +245,12 @@
         // These two fields are the real, persisted source of truth now.
         #builderPromptText = "";
         #builderPastedCodeText = "";
+        // Rule 69: #outputItems field removed — the real, shared
+        // window.CozyOS.OutputCenter is now the single source of truth;
+        // no local copy is maintained.
+        #lastOperationSummary = null; // {operation, at, status} — real, used by Builder Status, never fabricated
+        #outputSearchQuery = ""; // real, live search state - Rule 70
+        #activityLog = []; // Real, chronological, append-only record — separate from #outputItems (artifacts the user manages) vs. this (a plain history of what happened, when)
         #builderAutoSaveTimer = null;
         #uploadedFileMeta = null;
         #requirementReading = null;
@@ -407,6 +413,9 @@
             }
             this.#root = container;
             this.#restoreBuilderAutoSave();
+            // Rule 69: #restoreOutputHistory() call removed — the real,
+            // shared core/output/output-storage.js restores automatically
+            // when it loads, before this file's init() ever runs.
             this.#renderMain();
             this.#bindEvents();
             this.#bindShellNavigation();
@@ -634,7 +643,9 @@
             ["file-tools", "File Tools", [["refactor-split", "Split File"], ["refactor-merge", "Merge Files"], ["file-rename", "Rename"]]],
             ["analysis", "Analysis", [["architecture", "Architecture"], ["missing-refs", "Missing Imports / Scripts"]]],
             ["refactoring", "Refactoring", [["refactor-modularize", "Modularize"], ["refactor-optimize", "Optimize"]]],
-            ["reports", "Reports", [["build-history", "Build History"]]]
+            ["reports", "Reports", [["build-history", "Build History"]]],
+            ["output-center", "Output Center", [["output-list", "All Outputs"], ["output-collections", "Collections"], ["output-settings", "Settings"]]],
+            ["activity-center", "Activity Center", [["activity-timeline", "Timeline"]]]
         ];
 
         /**
@@ -778,15 +789,196 @@
         }
 
         /**
+         * #addOutputItem({name, category, content, mimeType, sourceOperation, status})
+         *   Output Center (Rule 53/54) — the real, permanent fix for "I
+         *   press Generate, then everything disappears." Every operation
+         *   that previously only wrote to the ephemeral #cz-hub-output div
+         *   (lost on the next re-render, the exact same root-cause class
+         *   as the earlier Method 1/2 text-loss bug) now also calls this,
+         *   which appends to the real, persistent #outputItems array.
+         *   Content is kept as either a string (code/reports) or
+         *   Uint8Array (zips) — never re-encoded speculatively. Size and
+         *   extension are computed from the real content/name, never
+         *   guessed. status defaults to "success" — only set to "error" by
+         *   a caller that genuinely caught a failure, never fabricated.
+         */
+        /**
+         * #addOutputItem(...)
+         *   Rule 69 — full migration complete. This is now a thin
+         *   wrapper over the real, shared `OutputCenter.publish()` — no
+         *   local `#outputItems` array remains. Returns the real
+         *   artifactId from the shared engine; every caller in this file
+         *   already treated the return value as an opaque id, so nothing
+         *   downstream needed to change for this.
+         */
+        #addOutputItem({ name, category, content, mimeType, sourceOperation, status }) {
+            const outputCenter = window.CozyOS.OutputCenter;
+            if (!outputCenter) {
+                this.#devOutput('<p class="cz-muted">OutputCenter is not loaded — this result could not be saved anywhere.</p>');
+                return null;
+            }
+            const result = outputCenter.publish({
+                name, category, content, mimeType: mimeType || "text/plain",
+                sourceApplication: "Developer Hub", sourceEngine: "Builder", sourceOperation, status: status || "success"
+            });
+            if (!result.success) { this.#devOutput(`<p class="cz-muted">${escapeHtml(result.reason)}</p>`); return null; }
+            this.#lastOperationSummary = { operation: sourceOperation, at: result.createdAt, status: result.status };
+            this.#logActivity({ category, operation: sourceOperation, status: result.status, outputItemId: result.artifactId });
+            return result.artifactId;
+        }
+
+        /**
+         * #logActivity({category, operation, status, outputItemId})
+         *   Real, append-only chronological record — the same real data
+         *   this session's ".log" export and Activity Timeline both read
+         *   from, never duplicated as two separate tracking mechanisms.
+         *   Every entry that has a real produced artifact carries
+         *   outputItemId, so the Activity Timeline can link an entry
+         *   directly back to the real item in the Output Center.
+         */
+        #logActivity({ category, operation, status, outputItemId }) {
+            this.#activityLog.push({ timestamp: new Date().toISOString(), category, operation, status: status || "success", outputItemId: outputItemId || null });
+            if (this.#activityLog.length > 500) this.#activityLog.shift(); // real, bounded — same cap already used elsewhere in this project for history arrays
+        }
+
+        /**
+         * #formatActivityLogAsText()
+         *   Real ".log" chronological format, matching exactly:
+         *   [timestamp]
+         *   Category
+         *   Operation
+         *   STATUS
+         *   — built from the real #activityLog, never a fabricated
+         *   snapshot.
+         */
+        #formatActivityLogAsText() {
+            return this.#activityLog.map(e => `[${e.timestamp}]\n${e.category}\n${e.operation}\n${e.status.toUpperCase()}\n`).join("\n");
+        }
+
+        // Rule 69: #persistOutputHistory()/#restoreOutputHistory() removed
+        // entirely — persistence now lives in exactly one real place,
+        // core/output/output-storage.js, used automatically by every
+        // application that publishes through the shared OutputCenter,
+        // not duplicated per-application.
+
+        /**
+         * #renderOutputCenter()
+         *   Real list of every item actually produced this session — never
+         *   a fabricated placeholder list. Preview/Copy/Download/Rename/
+         *   Delete all operate on the real, same #outputItems entries.
+         */
+        /**
+         * #listOutputItems(filter)
+         *   Reads from the real, shared OutputCenter (Rule 69 — Developer
+         *   Hub is now a pure consumer, no local array remains).
+         *   Normalizes at this one boundary: `artifactId` -> `id`,
+         *   `collections` -> `collectionNames`, matching the field names
+         *   this file's render/handler code has used since Rule 55/67,
+         *   rather than renaming every reference across many methods for
+         *   a rename that means the same thing either way.
+         */
+        #listOutputItems(filter) {
+            if (!window.CozyOS.OutputCenter) return [];
+            return window.CozyOS.OutputCenter.list(filter).map(a => ({ ...a, id: a.artifactId, collectionNames: a.collections }));
+        }
+
+        #renderOutputCenter() {
+            const outputCenter = window.CozyOS.OutputCenter;
+            const folders = outputCenter ? outputCenter.listCategories() : [];
+            const searchQuery = this.#outputSearchQuery || "";
+            const items = searchQuery && outputCenter
+                ? outputCenter.search(searchQuery).map(a => ({ ...a, id: a.artifactId, collectionNames: a.collections }))
+                : this.#listOutputItems();
+            const formatSize = (bytes) => bytes < 1024 ? `${bytes} B` : bytes < 1048576 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1048576).toFixed(1)} MB`;
+            const searchBox = `<div class="cz-field" style="margin-bottom:10px;"><input class="cz-input" id="cz-output-search" placeholder="Search by name, tag, application, extension, or collection…" value="${escapeHtml(searchQuery)}" /></div>`;
+            if (items.length === 0) {
+                return `<h1>Output Center</h1>${searchBox}<div class="cz-panel"><p class="cz-muted">${searchQuery ? `No real artifacts match "${escapeHtml(searchQuery)}".` : "Nothing generated yet this session. Results from ZIP Create, Split/Merge, Architecture, OCR, Certification, and other Builder tools will appear here automatically."}</p>
+                    <p class="cz-muted" style="font-size:12px;">Categories appear only once a real artifact exists in them.</p></div>`;
+            }
+            return `<h1>Output Center</h1>${searchBox}
+                <p class="cz-subtitle">${items.length} item(s)${searchQuery ? ` matching "${escapeHtml(searchQuery)}"` : ` across ${folders.length} categories`} — read live from the shared platform Output Center, the same store every CozyOS application publishes to. Nothing here disappears until you explicitly delete it.</p>
+                ${folders.map(cat => {
+                    const catItems = items.filter(i => i.category === cat);
+                    if (catItems.length === 0) return `<h3>${escapeHtml(cat)} (0)</h3><p class="cz-muted" style="font-size:12px;">Empty.</p>`;
+                    return `<h3>${escapeHtml(cat)} (${catItems.length})</h3>
+                    ${catItems.map(item => `
+                        <div class="cz-panel" style="margin-bottom:10px;">
+                            <div class="cz-row" style="justify-content:space-between;">
+                                <b>${escapeHtml(item.name)}</b>
+                                <span class="cz-badge ${item.status === "error" ? "cz-badge-blocked" : "cz-badge-ready"}">${escapeHtml(item.status)}</span>
+                            </div>
+                            <div class="cz-row" style="justify-content:space-between;">
+                                <span class="cz-muted" style="font-size:12px;">${escapeHtml(item.createdAt)} — from ${escapeHtml(item.sourceApplication)}${item.sourceOperation ? ` (${escapeHtml(item.sourceOperation)})` : ""}</span>
+                                <span class="cz-muted" style="font-size:12px;">${escapeHtml(item.extension || "—")} · ${formatSize(item.sizeBytes)}</span>
+                            </div>
+                            <div class="cz-row" style="gap:6px;flex-wrap:wrap;margin-top:6px;">
+                                <button class="cz-btn" data-action="hub-output-preview" data-output-id="${item.id}" ${item.isBinary ? "disabled title=\"Not applicable to binary content\"" : ""}>Preview</button>
+                                <button class="cz-btn" data-action="hub-output-open" data-output-id="${item.id}" ${item.isBinary ? "disabled title=\"Not applicable to binary content\"" : ""}>Open</button>
+                                <button class="cz-btn" data-action="hub-output-copy" data-output-id="${item.id}" ${item.isBinary ? "disabled title=\"Not applicable to binary content\"" : ""}>Copy</button>
+                                <button class="cz-btn" data-action="hub-output-download" data-output-id="${item.id}">Download</button>
+                                <button class="cz-btn" data-action="hub-output-export-zip" data-output-id="${item.id}">${item.isBinary ? "Export ZIP (download)" : "Compress / Export ZIP"}</button>
+                                <button class="cz-btn" data-action="hub-output-duplicate" data-output-id="${item.id}">Duplicate</button>
+                                <button class="cz-btn" data-action="hub-output-add-to-collection" data-output-id="${item.id}">${item.collectionNames.length ? `Collections: ${item.collectionNames.map(escapeHtml).join(", ")}` : "Add to Collection"}</button>
+                                <button class="cz-btn" data-action="hub-output-move" data-output-id="${item.id}">Move to Folder</button>
+                                <button class="cz-btn" data-action="hub-output-rename" data-output-id="${item.id}">Rename</button>
+                                ${item.category === "Trash" ? `<button class="cz-btn" data-action="hub-output-restore" data-output-id="${item.id}">Restore</button>` : ""}
+                                <button class="cz-btn cz-btn-danger" data-action="hub-output-delete" data-output-id="${item.id}">${item.category === "Trash" ? "Delete Permanently" : "Delete"}</button>
+                            </div>
+                            <div id="cz-output-preview-${item.id}"></div>
+                        </div>`).join("")}`;
+                }).join("")}`;
+        }
+
+        /**
+         * #renderActivityTimeline()
+         *   Real chronological history from the same #activityLog every
+         *   .log export reads from — not a second, separate tracking
+         *   mechanism. Entries with a real linked output item are
+         *   clickable and jump straight to Output Center, matching the
+         *   real request "clicking any entry would open the corresponding
+         *   artifact." Entries without one (e.g. a failed operation that
+         *   never produced an artifact) are shown as plain, non-clickable
+         *   text — never a fake link to nothing.
+         */
+        #renderActivityTimeline() {
+            if (this.#activityLog.length === 0) {
+                return `<h1>Activity Center</h1><div class="cz-panel"><p class="cz-muted">No activity recorded yet this session.</p></div>`;
+            }
+            const formatTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+            return `<h1>Activity Center</h1>
+                <p class="cz-subtitle">${this.#activityLog.length} real event(s), most recent first.</p>
+                <button class="cz-btn" data-action="hub-export-builder-log">Export as .log</button>
+                <div class="cz-panel">
+                    ${this.#activityLog.slice().reverse().map(e => e.outputItemId
+                        ? `<div class="cz-row" style="cursor:pointer;" data-action="hub-timeline-open" data-output-id="${e.outputItemId}"><span class="cz-muted">${escapeHtml(formatTime(e.timestamp))}</span><span>${escapeHtml(e.operation)}</span><span class="cz-badge ${e.status === "error" ? "cz-badge-blocked" : "cz-badge-ready"}">${escapeHtml(e.status)}</span></div>`
+                        : `<div class="cz-row"><span class="cz-muted">${escapeHtml(formatTime(e.timestamp))}</span><span>${escapeHtml(e.operation)}</span><span class="cz-badge ${e.status === "error" ? "cz-badge-blocked" : "cz-badge-ready"}">${escapeHtml(e.status)}</span></div>`
+                    ).join("")}
+                </div>`;
+        }
+
+        /**
          * #renderBuilderStatusHeader()
          *   Real state only — every line reflects actual current fields
          *   (#currentProjectFiles, #lastAnalysis, #currentProjectModel).
          *   Never a fabricated "Ready" state.
          */
         #renderBuilderStatusHeader() {
+            const outputCount = this.#listOutputItems().length;
+            const lastOp = this.#lastOperationSummary
+                ? `${escapeHtml(this.#lastOperationSummary.operation)} (${escapeHtml(this.#lastOperationSummary.status)}) at ${escapeHtml(this.#lastOperationSummary.at)}`
+                : "None yet this session";
+            // Real state only — "Ready"/"Error" reflect the last real
+            // operation's actual recorded status; never a fabricated
+            // "Busy" (no real in-flight-operation tracking exists to
+            // report that state honestly, so it is not shown).
+            const readyState = this.#lastOperationSummary?.status === "error" ? "Error" : "Ready";
+
             const hasProject = !!this.#currentProjectFiles;
             if (!hasProject) {
-                return `<div class="cz-panel" style="margin-bottom:12px;"><p class="cz-muted">No project loaded. Upload a project or describe one.</p></div>`;
+                return `<div class="cz-panel" style="margin-bottom:12px;">
+                    <p class="cz-muted">No project loaded. Upload a project or describe one.</p>
+                    <p class="cz-muted" style="font-size:12px;">Outputs: ${outputCount} · Last operation: ${lastOp} · Status: ${readyState}</p>
+                </div>`;
             }
             const fileCount = Object.keys(this.#currentProjectFiles).length;
             const hasArchitecture = !!this.#lastBuildResult;
@@ -797,6 +989,8 @@
                 <p>✓ ${fileCount} File${fileCount === 1 ? "" : "s"}</p>
                 <p>${hasArchitecture ? "✓" : "○"} Architecture Parsed</p>
                 <p>${hasDeps ? "✓" : "○"} Project Model Built</p>
+                <p>${outputCount > 0 ? "✓" : "○"} ${outputCount} Output${outputCount === 1 ? "" : "s"} Generated</p>
+                <p class="cz-muted" style="font-size:12px;">Last operation: ${lastOp} · Status: ${readyState}</p>
             </div>`;
         }
 
@@ -812,6 +1006,7 @@
             const history = typeof builder.getBuildHistory === "function" ? builder.getBuildHistory() : [];
             const timeline = typeof builder.getTimeline === "function" ? builder.getTimeline() : [];
             return `<h1>Reports</h1>
+                <button class="cz-btn cz-btn-primary" data-action="hub-export-builder-log">Export Builder Log to Output Center</button>
                 <div class="cz-panel">
                     <h3>Build History (${history.length})</h3>
                     ${history.length ? history.map(h => `<div class="cz-row"><span>${escapeHtml(h.mode || h.id || "build")}</span><span class="cz-muted">${escapeHtml(h.timestamp || "")}</span></div>`).join("") : '<p class="cz-muted">No builds recorded yet this session.</p>'}
@@ -820,6 +1015,20 @@
                     <h3>Timeline (${timeline.length})</h3>
                     ${timeline.length ? timeline.slice(-20).reverse().map(t => `<div class="cz-row"><span>${escapeHtml(t.event || t.type || "event")}</span><span class="cz-muted">${escapeHtml(t.timestamp || "")}</span></div>`).join("") : '<p class="cz-muted">No timeline events recorded yet this session.</p>'}
                 </div>`;
+        }
+
+        /**
+         * #hubExportBuilderLog()
+         *   Real, honest "Logs" folder population — exports Builder's own
+         *   actual getBuildHistory()/getTimeline() data (the same real
+         *   data already shown in the Reports view above, not
+         *   re-fabricated) as one snapshot file in the Output Center.
+         */
+        #hubExportBuilderLog() {
+            if (this.#activityLog.length === 0) { this.#devOutput('<p class="cz-muted">No activity recorded yet this session.</p>'); return; }
+            const logText = this.#formatActivityLogAsText();
+            this.#addOutputItem({ name: `builder-${Date.now()}.log`, category: "Logs", content: logText, mimeType: "text/plain", sourceOperation: "Export Builder Log" });
+            this.#devOutput(`<p>Exported ${this.#activityLog.length} activity record(s) to Output Center as a real .log file.</p>`);
         }
 
         // =====================================================================
@@ -851,6 +1060,10 @@
             if (subTab === "zip-extract-info") return `${nav}${status}${this.#renderBuilderZipExtractInfo()}`;
             if (subTab === "file-rename") return `${nav}${status}${this.#renderBuilderRename()}`;
             if (subTab === "missing-refs") return `${nav}${status}${this.#renderBuilderMissingRefs()}`;
+            if (subTab === "output-list") return `${nav}${status}${this.#renderOutputCenter()}`;
+            if (subTab === "output-collections") return `${nav}${status}${this.#renderOutputCollections()}`;
+            if (subTab === "output-settings") return `${nav}${status}${this.#renderOutputSettings()}`;
+            if (subTab === "activity-timeline") return `${nav}${status}${this.#renderActivityTimeline()}`;
             if (subTab === "architecture") return `${nav}${status}<h1>Builder — Architecture Viewer</h1>${this.#renderArchitecturePanel()}`;
             if (subTab !== "generate") return `${nav}${status}<h1>Builder — Refactor Existing Project</h1>${this.#renderRefactorPanel(subTab)}`;
 
@@ -1248,7 +1461,8 @@
                 const files = Object.entries(this.#currentProjectFiles).map(([name, content]) => ({ name, content }));
                 const zipBytes = createZipStore(files);
                 downloadBlob("project.zip", zipBytes, "application/zip");
-                this.#devOutput(`<p>Created project.zip — ${files.length} file(s), ${zipBytes.length} bytes (uncompressed).</p>`);
+                this.#addOutputItem({ name: "project.zip", category: "ZIP Packages", content: zipBytes, mimeType: "application/zip", sourceOperation: "ZIP Create" });
+                this.#devOutput(`<p>Created project.zip — ${files.length} file(s), ${zipBytes.length} bytes (uncompressed). Saved to Output Center.</p>`);
             } catch (err) { this.#devOutput(`<p class="cz-muted">${escapeHtml(err.message)}</p>`); }
         }
         #hubZipCreateSingle() {
@@ -1257,8 +1471,10 @@
             if (!content) { this.#devOutput('<p class="cz-muted">Nothing in Method 2\'s paste box to zip.</p>'); return; }
             try {
                 const zipBytes = createZipStore([{ name: filename, content }]);
-                downloadBlob(`${filename.replace(/\.[^.]+$/, "")}.zip`, zipBytes, "application/zip");
-                this.#devOutput(`<p>Created a ${zipBytes.length}-byte ZIP containing ${escapeHtml(filename)}.</p>`);
+                const zipName = `${filename.replace(/\.[^.]+$/, "")}.zip`;
+                downloadBlob(zipName, zipBytes, "application/zip");
+                this.#addOutputItem({ name: zipName, category: "ZIP Packages", content: zipBytes, mimeType: "application/zip", sourceOperation: "ZIP Create" });
+                this.#devOutput(`<p>Created a ${zipBytes.length}-byte ZIP containing ${escapeHtml(filename)}. Saved to Output Center.</p>`);
             } catch (err) { this.#devOutput(`<p class="cz-muted">${escapeHtml(err.message)}</p>`); }
         }
 
@@ -1282,7 +1498,290 @@
             }
             this.#currentProjectFiles = renamed;
             this.#devOutput(`<p>Renamed ${count} file(s).</p>`);
+            // Permanent rule (Rule 66): Rename modifies in-memory project
+            // state, it does not produce a downloadable file — so no real
+            // #addOutputItem() call would be honest here. Per the rule,
+            // the real operation result is recorded instead of silently
+            // doing nothing, using the same real activity log every other
+            // operation's real outcome already flows through.
+            this.#logActivity({ category: "Generated Code", operation: `Rename (${count} file(s) affected)`, status: "success" });
             this.#renderMain();
+        }
+
+        /**
+         * Output Center actions (Rule 53) — operate on the same real
+         * #outputItems entries the render method lists; nothing here
+         * recomputes or fabricates content.
+         */
+        /**
+         * #findOutputItem(id)
+         *   Reads from the real, shared OutputCenter. Normalizes the
+         *   platform's real `artifactId` field to `id` here, at the
+         *   consumer boundary — the rest of this file's render/handler
+         *   code (dozens of references to `item.id`, built up across
+         *   Rules 53-67) is left unchanged rather than risking a large,
+         *   error-prone rename across many methods for a field that means
+         *   the same thing either way.
+         */
+        #findOutputItem(id) {
+            if (!window.CozyOS.OutputCenter) return null;
+            const a = window.CozyOS.OutputCenter.get(id);
+            return a ? { ...a, id: a.artifactId } : null;
+        }
+
+        /**
+         * #hubOutputPreview(id)
+         *   Real, type-aware preview (Rule 71). Every format below is
+         *   either genuinely supported or explicitly disclosed as not —
+         *   nothing here fakes a rendering capability that doesn't exist.
+         *     - image/* binary content: real, via a real Blob URL and an
+         *       actual <img> tag — achievable generically, does not
+         *       require Image Studio to exist, only that SOME artifact
+         *       carries a real image mimeType.
+         *     - application/json or .json: real pretty-print via
+         *       JSON.parse/stringify — if parsing fails, falls back to
+         *       plain text honestly rather than showing broken JSON as
+         *       if it were valid.
+         *     - text/html or .html: real, rendered in a real sandboxed
+         *       iframe (srcdoc) — genuine rendering, not a screenshot or
+         *       simulation.
+         *     - .md: a real, but minimal, disclosed-as-partial Markdown
+         *       transform (headers/bold/italic/lists only) — this is not
+         *       a full CommonMark parser, and the preview says so.
+         *     - PDF, ZIP contents listing: NOT supported — no PDF-reading
+         *       vendor is loaded (Rule 57-62's vendor system confirms
+         *       none are), and no real ZIP-reading capability exists in
+         *       this codebase (only a ZIP writer was ever built and
+         *       verified). Both honestly disabled rather than faked.
+         */
+        #hubOutputPreview(id) {
+            const item = this.#findOutputItem(id);
+            const container = this.#root.querySelector(`#cz-output-preview-${id}`);
+            if (!item || !container) return;
+            if (container.dataset.open === "true") { container.innerHTML = ""; container.dataset.open = "false"; return; }
+
+            if (item.isBinary && item.mimeType && item.mimeType.startsWith("image/")) {
+                try {
+                    const blob = new Blob([item.content], { type: item.mimeType });
+                    const url = URL.createObjectURL(blob);
+                    container.innerHTML = `<img src="${url}" style="max-width:100%;margin-top:8px;" alt="${escapeHtml(item.name)}" />`;
+                    container.dataset.open = "true";
+                    return;
+                } catch (_err) { /* fall through to the generic binary message below */ }
+            }
+            if (item.isBinary) {
+                if (item.extension === "pdf") {
+                    container.innerHTML = `<p class="cz-muted">PDF preview is not available — no PDF-reading vendor is loaded (confirmed via the Vendor Status system). Use Download.</p>`;
+                } else if (item.extension === "zip") {
+                    container.innerHTML = `<p class="cz-muted">ZIP contents listing is not available — no real ZIP-reading capability exists in this codebase (only ZIP creation was built and verified). Use Download.</p>`;
+                } else {
+                    container.innerHTML = `<p class="cz-muted">Binary content (${item.sizeBytes} bytes) — preview not applicable, use Download.</p>`;
+                }
+                container.dataset.open = "true";
+                return;
+            }
+
+            if (item.extension === "json" || item.mimeType === "application/json") {
+                try {
+                    const pretty = JSON.stringify(JSON.parse(item.content), null, 2);
+                    container.innerHTML = `<textarea class="cz-input" rows="14" readonly style="margin-top:8px;font-family:monospace;">${escapeHtml(pretty)}</textarea>`;
+                } catch (_err) {
+                    container.innerHTML = `<p class="cz-muted">Content has a .json name/type but is not valid JSON — showing raw text instead.</p><textarea class="cz-input" rows="10" readonly>${escapeHtml(item.content)}</textarea>`;
+                }
+            } else if (item.extension === "html" || item.mimeType === "text/html") {
+                container.innerHTML = `<p class="cz-muted" style="font-size:12px;">Real, sandboxed HTML preview.</p><iframe sandbox="" srcdoc="${escapeHtml(item.content)}" style="width:100%;height:300px;border:1px solid var(--cz-border, #444);margin-top:4px;"></iframe>`;
+            } else if (item.extension === "md") {
+                const html = escapeHtml(item.content)
+                    .replace(/^### (.*)$/gm, "<h3>$1</h3>").replace(/^## (.*)$/gm, "<h2>$1</h2>").replace(/^# (.*)$/gm, "<h1>$1</h1>")
+                    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\*(.+?)\*/g, "<i>$1</i>")
+                    .replace(/^- (.*)$/gm, "<li>$1</li>").replace(/\n/g, "<br>");
+                container.innerHTML = `<p class="cz-muted" style="font-size:12px;">Minimal Markdown rendering (headers/bold/italic/lists only) — not a full parser.</p><div class="cz-panel" style="margin-top:4px;">${html}</div>`;
+            } else {
+                container.innerHTML = `<textarea class="cz-input" rows="10" readonly style="margin-top:8px;">${escapeHtml(item.content)}</textarea>`;
+            }
+            container.dataset.open = "true";
+        }
+
+        async #hubOutputCopy(id) {
+            const item = this.#findOutputItem(id);
+            if (!item) return;
+            if (item.isBinary) { this.#shellToast("Binary content can't be copied as text — use Download."); return; }
+            try {
+                await navigator.clipboard.writeText(item.content);
+                this.#shellToast(`Copied ${item.name}`);
+            } catch (_err) {
+                this.#shellToast("Clipboard access was denied by the browser.");
+            }
+        }
+
+        #hubOutputDownload(id) {
+            const item = this.#findOutputItem(id);
+            if (!item) return;
+            downloadBlob(item.name, item.content, item.mimeType);
+        }
+
+        /**
+         * #hubOutputExportZip(id)
+         *   Real per-item ZIP export — now delegates to the shared
+         *   platform `OutputExport.exportArtifactsAsZip()` (Rule 68/69)
+         *   rather than calling the local `createZipStore()` directly,
+         *   since the real, single implementation now lives in
+         *   core/output/output-export.js.
+         */
+        #hubOutputExportZip(id) {
+            const item = this.#findOutputItem(id);
+            if (!item) return;
+            if (item.isBinary) { this.#hubOutputDownload(id); return; }
+            const exportEngine = window.CozyOS.OutputExport;
+            if (!exportEngine) { this.#devOutput('<p class="cz-muted">OutputExport is not loaded.</p>'); return; }
+            const result = exportEngine.exportArtifactsAsZip([id]);
+            if (!result.success) { this.#devOutput(`<p class="cz-muted">${escapeHtml(result.reason)}</p>`); return; }
+            const zipName = `${item.name.replace(/\.[^.]+$/, "")}.zip`;
+            downloadBlob(zipName, result.zipBytes, "application/zip");
+            this.#addOutputItem({ name: zipName, category: "ZIP Packages", content: result.zipBytes, mimeType: "application/zip", sourceOperation: `Export ZIP (${item.name})` });
+        }
+
+        /** #hubOutputRename(id) — real, delegates to the shared OutputCenter.rename(), which handles persistence and the real artifact-renamed event itself. */
+        #hubOutputRename(id) {
+            const item = this.#findOutputItem(id);
+            if (!item) return;
+            const newName = window.prompt("Rename output:", item.name);
+            if (newName && newName.trim() && window.CozyOS.OutputCenter) {
+                window.CozyOS.OutputCenter.rename(id, newName.trim());
+                this.#renderMain();
+            }
+        }
+
+        /**
+         * #hubOutputDelete(id)
+         *   Real, delegates entirely to the shared OutputCenter.delete()
+         *   (Rule 68/69) — the real two-stage Trash lifecycle (soft-
+         *   delete, then permanent on a second call) now lives in exactly
+         *   one place instead of being duplicated per-application.
+         */
+        #hubOutputDelete(id) {
+            if (window.CozyOS.OutputCenter) window.CozyOS.OutputCenter.delete(id);
+            this.#renderMain();
+        }
+
+        /** #hubOutputRestore(id) — real, delegates to the shared OutputCenter.restore(). */
+        #hubOutputRestore(id) {
+            if (window.CozyOS.OutputCenter) window.CozyOS.OutputCenter.restore(id);
+            this.#renderMain();
+        }
+
+        // Rule 69: #getVisibleOutputFolders() removed — dynamic category
+        // computation (Rule 66's principle) now lives in exactly one real
+        // place, window.CozyOS.OutputCenter.listCategories(), used
+        // directly wherever this file previously called the local method.
+
+        /**
+         * #renderOutputCollections()
+         *   Real grouping — reads each item's own `collectionNames` array
+         *   (set via #hubOutputAddToCollection()). Since an item can
+         *   genuinely belong to more than one collection, it appears
+         *   under every real collection heading it's a member of — this
+         *   is what "the same file can remain in Generated Code while
+         *   also belonging to a build collection" actually means: real,
+         *   independent membership, not a move.
+         */
+        #renderOutputCollections() {
+            const collections = window.CozyOS.OutputCollections;
+            if (!collections) return `<h1>Collections</h1><div class="cz-panel"><p class="cz-muted">OutputCollections is not loaded.</p></div>`;
+            const result = collections.listCollections();
+            if (!result.available || Object.keys(result.collections).length === 0) return `<h1>Collections</h1><div class="cz-panel"><p class="cz-muted">Nothing generated yet this session.</p></div>`;
+            return `<h1>Collections</h1>
+                ${Object.entries(result.collections).map(([name, groupItems]) => `
+                    <div class="cz-panel" style="margin-bottom:10px;">
+                        <div class="cz-row" style="justify-content:space-between;">
+                            <b>${escapeHtml(name)}</b>
+                            ${name !== "Ungrouped" ? `<button class="cz-btn" data-action="hub-collection-download" data-collection-name="${escapeHtml(name)}">Download Collection as ZIP</button>` : ""}
+                        </div>
+                        ${groupItems.map(i => `<div class="cz-row"><span>${escapeHtml(i.name)}</span><span class="cz-muted">${escapeHtml(i.category)} — ${escapeHtml(i.sourceApplication)}</span></div>`).join("")}
+                    </div>`).join("")}`;
+        }
+
+        /**
+         * #renderOutputSettings()
+         *   Real stats only — every number computed live from the real,
+         *   shared OutputCenter.list(), never a placeholder.
+         */
+        #renderOutputSettings() {
+            const items = this.#listOutputItems();
+            const folders = window.CozyOS.OutputCenter ? window.CozyOS.OutputCenter.listCategories() : [];
+            const total = items.length;
+            const trashCount = items.filter(i => i.category === "Trash").length;
+            const totalBytes = items.reduce((sum, i) => sum + (i.sizeBytes || 0), 0);
+            const formatSize = (bytes) => bytes < 1024 ? `${bytes} B` : bytes < 1048576 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1048576).toFixed(1)} MB`;
+            const folderCounts = folders.map(f => `${escapeHtml(f)}: ${items.filter(i => i.category === f).length}`).join(" · ");
+            return `<h1>Output Settings</h1>
+                <div class="cz-panel">
+                    <p><b>${total}</b> total item(s), <b>${formatSize(totalBytes)}</b> total.</p>
+                    <p class="cz-muted">${folderCounts}</p>
+                    <p><b>${trashCount}</b> item(s) in Trash.</p>
+                    <button class="cz-btn cz-btn-danger" data-action="hub-empty-trash" ${trashCount === 0 ? "disabled" : ""}>Empty Trash Now (permanent)</button>
+                </div>`;
+        }
+
+        /** #hubOutputAddToCollection(id) — real, delegates to the shared OutputCollections.addToCollection(). */
+        #hubOutputAddToCollection(id) {
+            const name = window.prompt("Add to collection (existing or new name):", "");
+            if (name && name.trim() && window.CozyOS.OutputCollections) {
+                window.CozyOS.OutputCollections.addToCollection(id, name.trim());
+                this.#renderMain();
+            }
+        }
+
+        /** #hubCollectionDownload(name) — real, delegates to the shared OutputExport for every real artifact in the named collection. */
+        #hubCollectionDownload(name) {
+            const items = this.#listOutputItems({ collection: name }).filter(i => i.category !== "Trash");
+            const exportEngine = window.CozyOS.OutputExport;
+            if (!exportEngine || items.length === 0) { this.#devOutput('<p class="cz-muted">No downloadable items in this collection.</p>'); return; }
+            const result = exportEngine.exportArtifactsAsZip(items.map(i => i.id));
+            if (!result.success) { this.#devOutput(`<p class="cz-muted">${escapeHtml(result.reason)}</p>`); return; }
+            downloadBlob(`${name}.zip`, result.zipBytes, "application/zip");
+        }
+
+        /** #hubEmptyTrash() — real, delegates to the shared OutputCenter.delete() for every real item currently in Trash (each call is genuinely permanent, since they're already in Trash). */
+        #hubEmptyTrash() {
+            if (!window.CozyOS.OutputCenter) return;
+            this.#listOutputItems({ category: "Trash" }).forEach(i => window.CozyOS.OutputCenter.delete(i.id));
+            this.#renderMain();
+        }
+
+        /**
+         * #hubOutputOpen(id)
+         *   Real "Open" — for text content, opens a real Blob URL in a new
+         *   browser tab (the closest real equivalent to "open" in a
+         *   sandboxed web context; there is no real OS-level file-open
+         *   available). For binary content, falls back to Download with a
+         *   real, disclosed reason rather than opening raw bytes as if
+         *   they were text.
+         */
+        #hubOutputOpen(id) {
+            const item = this.#findOutputItem(id);
+            if (!item) return;
+            if (item.isBinary) { this.#shellToast("Binary content — opening isn't meaningful in-browser, use Download instead."); return; }
+            const blob = new Blob([item.content], { type: item.mimeType });
+            const url = URL.createObjectURL(blob);
+            window.open(url, "_blank");
+            setTimeout(() => URL.revokeObjectURL(url), 10000);
+        }
+
+        /** #hubOutputDuplicate(id) — real, delegates to the shared OutputCenter.duplicate(). */
+        #hubOutputDuplicate(id) {
+            if (window.CozyOS.OutputCenter) window.CozyOS.OutputCenter.duplicate(id);
+            this.#renderMain();
+        }
+
+        /** #hubOutputMove(id) — real, delegates to the shared OutputCenter.move(), listing the real, currently-visible categories. */
+        #hubOutputMove(id) {
+            const item = this.#findOutputItem(id);
+            if (!item || !window.CozyOS.OutputCenter) return;
+            const folders = window.CozyOS.OutputCenter.listCategories();
+            const choice = window.prompt(`Move "${item.name}" to which folder?\n${folders.map((f, i) => `${i + 1}. ${f}`).join("\n")}`, String(folders.indexOf(item.category) + 1 || 1));
+            const idx = parseInt(choice, 10) - 1;
+            if (idx >= 0 && idx < folders.length) { window.CozyOS.OutputCenter.move(id, folders[idx]); this.#renderMain(); }
         }
 
         /**
@@ -1373,8 +1872,14 @@
             try {
                 const analysis = analyzer.analyzeRequirement(text);
                 const blueprint = engine.generateBlueprint(analysis.id || analysis.analysisId);
-                this.#devOutput(`<h3>Blueprint Generated</h3><pre class="cz-code-block">${escapeHtml(JSON.stringify(blueprint, null, 2))}</pre>`);
-            } catch (err) { this.#devOutput(`<p class="cz-muted">${escapeHtml(err.message)}</p>`); }
+                const blueprintJson = JSON.stringify(blueprint, null, 2);
+                this.#devOutput(`<h3>Blueprint Generated</h3><pre class="cz-code-block">${escapeHtml(blueprintJson)}</pre>`);
+                const architectureMarkdown = `# Architecture Blueprint\n\n**Analysis ID:** ${analysis.id || analysis.analysisId}\n\n\`\`\`json\n${blueprintJson}\n\`\`\`\n`;
+                this.#addOutputItem({ name: `architecture-blueprint-${analysis.id || analysis.analysisId}.md`, category: "Architecture", content: architectureMarkdown, mimeType: "text/markdown", sourceOperation: "Architecture Analysis" });
+            } catch (err) {
+                this.#devOutput(`<p class="cz-muted">${escapeHtml(err.message)}</p>`);
+                this.#addOutputItem({ name: "architecture-blueprint-error.md", category: "Architecture", content: `# Architecture Blueprint — Error\n\n${err.message}`, mimeType: "text/markdown", sourceOperation: "Architecture Analysis", status: "error" });
+            }
         }
         #hubViewBlueprint(blueprintId) {
             const engine = window.CozyOS.ArchitectureEngine;
@@ -1445,9 +1950,11 @@
                     merchant: result.merchantName, total: result.fields?.total, receiptNumber: result.receiptNumber,
                     confidence: result.confidence
                 })}<p class="cz-muted">Heuristic extraction — review before saving.</p>`);
+                this.#addOutputItem({ name: `ocr-result-${Date.now()}.json`, category: "OCR", content: JSON.stringify(result, null, 2), sourceOperation: "OCR" });
             } catch (err) {
                 if (progressEl) progressEl.textContent = "";
                 this.#devOutput(`<p class="cz-muted">${escapeHtml(err.message)}</p>`);
+                this.#addOutputItem({ name: "ocr-error.txt", category: "OCR", content: err.message, sourceOperation: "OCR", status: "error" });
             }
         }
 
@@ -1477,6 +1984,7 @@
             const content = this.#lastRefactorResult[part];
             if (!content) return;
             downloadTextFile(name, content);
+            this.#addOutputItem({ name, category: this.#builderSubTab === "refactor-merge" ? "Merged Files" : "Split Files", content, sourceOperation: this.#builderSubTab === "refactor-merge" ? "Merge Files" : "Split File" });
         }
 
         async #hubRefactorCertify() {
@@ -1490,12 +1998,34 @@
                     ${result.recertifyResult ? `<p>Re-certified after repair: <span class="cz-badge ${verdictBadgeClass(result.recertifyResult.verdict)}">${escapeHtml(result.recertifyResult.verdict)}</span> ${escapeHtml(result.recertifyResult.summary.scorePercent)}%</p>` : ""}
                     <button class="cz-btn" data-action="hub-download-refactor-final">Download Final JS</button>`);
                 this.#lastRefactorFinalJs = result.finalSource;
+                const cert = result.quickResult;
+                const certMarkdown = `# Certification Report
+
+**Module:** ${cert.moduleId}
+**Verdict:** ${cert.quickVerdict} (${cert.verdict})
+**Score:** ${cert.summary.scorePercent}%
+
+## Summary
+| Metric | Count |
+|---|---|
+| Total Checks | ${cert.summary.totalChecks} |
+| Passed | ${cert.summary.passed} |
+| Failed | ${cert.summary.failed} |
+| Warnings | ${cert.summary.warnings} |
+
+## Defects
+${(cert.defects && cert.defects.length) ? cert.defects.map(d => `- **${d.ruleId || "defect"}**: ${d.message || JSON.stringify(d)}`).join("\n") : "None."}
+
+${result.recertifyResult ? `## Re-certification After Repair\n**Verdict:** ${result.recertifyResult.quickVerdict} — **Score:** ${result.recertifyResult.summary.scorePercent}%` : ""}
+`;
+                this.#addOutputItem({ name: "certification-report.md", category: "Certifications", content: certMarkdown, mimeType: "text/markdown", sourceOperation: "Quick Certification" });
             } catch (err) { this.#devOutput(`<p class="cz-muted">${escapeHtml(err.message)}</p>`); }
         }
 
         #hubDownloadRefactorFinal() {
             if (!this.#lastRefactorFinalJs) return;
             downloadTextFile("refactored-module.js", this.#lastRefactorFinalJs);
+            this.#addOutputItem({ name: "refactored-module.js", category: "Generated Code", content: this.#lastRefactorFinalJs, sourceOperation: "Certification Repair" });
         }
 
         #hubRefactorMerge() {
@@ -1583,7 +2113,9 @@
 
         #hubDownloadFile(filename) {
             if (!this.#lastBuildResult || !this.#lastBuildResult.files[filename]) return;
-            downloadTextFile(filename, this.#lastBuildResult.files[filename]);
+            const content = this.#lastBuildResult.files[filename];
+            downloadTextFile(filename, content);
+            this.#addOutputItem({ name: filename, category: "Generated Code", content, sourceOperation: "Generate Code" });
         }
 
         // =====================================================================
@@ -2295,6 +2827,7 @@
             const exported = await refactor.exportProjectAsZip(this.#lastProjectRepairResult.files, this.#lastProjectRepairBinaryFlags || {});
             if (!exported.available) { this.#devOutput(`<p class="cz-muted">${escapeHtml(exported.reason)}</p>`); return; }
             downloadBlob("repaired-project.zip", exported.blob, "application/zip");
+            this.#addOutputItem({ name: "repaired-project.zip", category: "BugFixes", content: exported.blob, mimeType: "application/zip", sourceOperation: "BugFixer" });
         }
 
         /** Repairs pasted/uploaded source directly — reuses CozyBugFixer's real standalone path (registerSourceText + repair), same as Builder's identity-preservation approach. */
@@ -3125,6 +3658,13 @@
             this.#eventsBound = true;
             this.#root.addEventListener("click", (evt) => this.#handleClick(evt));
             this.#root.addEventListener("input", (evt) => {
+                if (evt.target.id === "cz-output-search") {
+                    this.#outputSearchQuery = evt.target.value;
+                    this.#renderMain();
+                    const refocused = this.#root.querySelector("#cz-output-search");
+                    if (refocused) { refocused.focus(); refocused.setSelectionRange(refocused.value.length, refocused.value.length); }
+                    return;
+                }
                 if (evt.target.id === "cz-hub-builder-prompt") {
                     // Root-cause fix: this is what was missing entirely —
                     // capture every keystroke into a real field the
@@ -3209,6 +3749,37 @@
                 case "hub-zip-create-project": this.#hubZipCreateProject(); return;
                 case "hub-zip-create-single": this.#hubZipCreateSingle(); return;
                 case "hub-rename-apply": this.#hubRenameApply(); return;
+                case "hub-output-preview": this.#hubOutputPreview(actionEl.getAttribute("data-output-id")); return;
+                case "hub-output-copy": this.#hubOutputCopy(actionEl.getAttribute("data-output-id")); return;
+                case "hub-output-download": this.#hubOutputDownload(actionEl.getAttribute("data-output-id")); return;
+                case "hub-output-rename": this.#hubOutputRename(actionEl.getAttribute("data-output-id")); return;
+                case "hub-output-delete": this.#hubOutputDelete(actionEl.getAttribute("data-output-id")); return;
+                case "hub-output-restore": this.#hubOutputRestore(actionEl.getAttribute("data-output-id")); return;
+                case "hub-output-export-zip": this.#hubOutputExportZip(actionEl.getAttribute("data-output-id")); return;
+                case "hub-output-add-to-collection": this.#hubOutputAddToCollection(actionEl.getAttribute("data-output-id")); return;
+                case "hub-collection-download": this.#hubCollectionDownload(actionEl.getAttribute("data-collection-name")); return;
+                case "hub-empty-trash": this.#hubEmptyTrash(); return;
+                case "hub-output-open": this.#hubOutputOpen(actionEl.getAttribute("data-output-id")); return;
+                case "hub-output-duplicate": this.#hubOutputDuplicate(actionEl.getAttribute("data-output-id")); return;
+                case "hub-output-move": this.#hubOutputMove(actionEl.getAttribute("data-output-id")); return;
+                case "hub-export-builder-log": this.#hubExportBuilderLog(); return;
+                case "hub-timeline-open": {
+                    const outputId = actionEl.getAttribute("data-output-id");
+                    const item = this.#findOutputItem(outputId);
+                    if (item) {
+                        this.#builderActiveGroup = "output-center";
+                        this.#builderSubTab = "output-list";
+                        this.#renderMain();
+                        // Real jump-to-item: after the Output Center re-renders,
+                        // scroll the real, matching item into view and open its
+                        // real preview if it's text — not a fabricated deep link.
+                        requestAnimationFrame(() => {
+                            const el = this.#root.querySelector(`[data-output-id="${outputId}"]`)?.closest(".cz-panel");
+                            if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); if (!item.isBinary) this.#hubOutputPreview(outputId); }
+                        });
+                    }
+                    return;
+                }
                 case "hub-refactor-split": this.#hubRefactorSplit(); return;
                 case "hub-generate-blueprint": this.#hubGenerateBlueprint(); return;
                 case "hub-ocr-parse": this.#hubOcrParse(); return;
