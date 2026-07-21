@@ -2039,6 +2039,7 @@
                 case "platformAudit": return this.#renderPlatformAudit();
                 case "platformOperations": return this.#renderPlatformOperations();
                 case "platformResources": return this.#renderPlatformResources();
+                case "referenceIntegrityCenter": return this.#renderReferenceIntegrityCenter();
                 case "accessibilityCenter": return this.#renderAccessibilityCenter();
                 case "contentStudio": return this.#renderContentStudio();
                 case "themeStudio": return this.#renderThemeStudio();
@@ -2737,6 +2738,56 @@
         }
 
         /**
+         * #renderReferenceIntegrityCenter()
+         *   Real report display only. Every field is labeled with whether
+         *   it's genuinely new (broken references/imports/content
+         *   duplicates) or delegated from an existing real engine
+         *   (circular dependencies, missing modules) — never presented as
+         *   if this engine computed all of it itself.
+         */
+        #renderReferenceIntegrityCenter() {
+            const ri = window.CozyOS && window.CozyOS.ReferenceIntegrity ? window.CozyOS.ReferenceIntegrity : null;
+            if (!ri) return `<h2>Reference Integrity Center</h2>${this.#renderNotConnected("ReferenceIntegrity is not loaded on this page.")}`;
+
+            const buttons = `<button type="button" id="cozy-ri-scan-btn" class="cozy-btn cozy-btn-primary">Run Full Integrity Scan</button>`;
+            const report = ri.getReport();
+            if (!report.available) return `<h2>Reference Integrity Center</h2>${buttons}<p class="cozy-disclosure-note">No scan has been run yet.</p>`;
+
+            const brokenRows = report.brokenReferences.available && report.brokenReferences.broken.length
+                ? report.brokenReferences.broken.map(b => `<div class="cozy-nav-link"><span>[${this.#escapeHtml(b.kind)}] ${this.#escapeHtml(b.url)} — ${b.status ?? this.#escapeHtml(b.error || "unreachable")}</span></div>`).join("")
+                : `<p class="cozy-disclosure-note">No broken script/stylesheet/image references found.</p>`;
+
+            const importRows = report.brokenImports.brokenImports.length
+                ? report.brokenImports.brokenImports.map(b => `<div class="cozy-nav-link"><span>${this.#escapeHtml(b.fromFile)} → ${this.#escapeHtml(b.importPath)} (${b.status ?? "unreachable"})</span></div>`).join("")
+                : `<p class="cozy-disclosure-note">No broken ES-module imports found (heuristic scan).</p>`;
+
+            const contentDupes = report.contentDuplicates.duplicateGroups.length
+                ? report.contentDuplicates.duplicateGroups.map(g => `<div class="cozy-nav-link"><span>Identical content: ${g.map(u => this.#escapeHtml(u)).join(", ")}</span></div>`).join("")
+                : `<p class="cozy-disclosure-note">No byte-identical script files found among currently-loaded scripts.</p>`;
+
+            const circular = report.circularDependencies.available
+                ? `<p class="cozy-disclosure-note">Source: ${this.#escapeHtml(report.circularDependencies.source)}</p>${this.#renderKeyValueTable(report.circularDependencies.result)}`
+                : `<p class="cozy-disclosure-note">${this.#escapeHtml(report.circularDependencies.reason)}</p>`;
+
+            const missing = report.missingModules.available
+                ? `<p class="cozy-disclosure-note">Source: ${this.#escapeHtml(report.missingModules.source)}</p>${this.#renderKeyValueTable({ declaredButMissing: report.missingModules.declaredButMissing, loadedButUndeclared: report.missingModules.loadedButUndeclared })}`
+                : `<p class="cozy-disclosure-note">${this.#escapeHtml(report.missingModules.reason)}</p>`;
+
+            return `<h2>Reference Integrity Center</h2>${buttons}
+                <p class="cozy-disclosure-note">Scanned at ${this.#escapeHtml(report.scannedAt)}. The proactive check this project's own history showed was missing — the same class of bug found manually in mpesaOS.js, developer-hub.css, QuarryOS, and Certification.</p>
+                <h3>Broken References (script/stylesheet/image) — new</h3>
+                ${brokenRows}
+                <h3>Broken ES-Module Imports — new, heuristic</h3>
+                ${importRows}
+                <h3>Byte-Identical Script Content — new</h3>
+                ${contentDupes}
+                <h3>Circular Dependencies — delegated</h3>
+                ${circular}
+                <h3>Missing / Undeclared Modules — delegated</h3>
+                ${missing}`;
+        }
+
+        /**
          * #renderAccessibilityCenter()
          *   Real report display only — every number comes from
          *   AccessibilityEngine's actual WCAG math and real stylesheet
@@ -2901,7 +2952,7 @@
             const NAV_SECTIONS = [
                 { label: "Overview", items: [["dashboard", "Dashboard"], ["applications", "Application Center"], ["modules", "Module Manager"]] },
                 { label: "Certification", items: [["certification", "Certification Center"], ["releases", "Release Center"], ["upgrades", "Upgrade Center"], ["dependencies", "Dependency Viewer"]] },
-                { label: "Operations", items: [["diagnostics", "Diagnostics Center"], ["events", "Event Monitor"], ["notifications", "Notification Center"], ["search", "Enterprise Search"], ["platformDiscovery", "Platform Discovery"], ["platformAudit", "Audit Center"], ["platformOperations", "Operations Center"], ["platformResources", "Resource Center"]] },
+                { label: "Operations", items: [["diagnostics", "Diagnostics Center"], ["events", "Event Monitor"], ["notifications", "Notification Center"], ["search", "Enterprise Search"], ["platformDiscovery", "Platform Discovery"], ["platformAudit", "Audit Center"], ["platformOperations", "Operations Center"], ["platformResources", "Resource Center"], ["referenceIntegrityCenter", "Reference Integrity Center"]] },
                 { label: "Design Studio", items: [["themeStudio", "Theme Studio"], ["livingButtonEngine", "Living Button Engine"], ["accessibilityCenter", "Accessibility Studio"], ["contentStudio", "Content Studio"]] },
                 { label: "Integrations (awaiting coordinators)", items: [["security", "Security Center"], ["storage", "Storage Center"], ["sync", "Synchronization Center"], ["automation", "Automation Center"], ["live", "Live Center"], ["speech", "Speech Center"], ["translation", "Translation Center"], ["subscription", "Subscription / License Center"], ["ai", "AI Center"], ["plugins", "Plugin Center"], ["tenants", "Tenant Center"]] },
                 // Additive: Administrator Workspace expansion per the locked
@@ -3153,6 +3204,20 @@
                         evt.target.textContent = "Scanning…";
                         if (window.CozyOS.AccessibilityEngine && typeof window.CozyOS.AccessibilityEngine.runFullScan === "function") {
                             window.CozyOS.AccessibilityEngine.runFullScan().finally(() => this.#render());
+                        } else {
+                            this.#render();
+                        }
+                        return;
+                    }
+                    if (evt.target.id === "cozy-ri-scan-btn") {
+                        // Real async pass — a real fetch() for every real
+                        // script/stylesheet/image tag on this page, same
+                        // disable-while-running pattern as every other
+                        // scan button on this dashboard.
+                        evt.target.disabled = true;
+                        evt.target.textContent = "Scanning…";
+                        if (window.CozyOS.ReferenceIntegrity && typeof window.CozyOS.ReferenceIntegrity.runFullIntegrityScan === "function") {
+                            window.CozyOS.ReferenceIntegrity.runFullIntegrityScan().finally(() => this.#render());
                         } else {
                             this.#render();
                         }
