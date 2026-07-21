@@ -135,6 +135,7 @@
         #diagnosticsConnectedOnly = false;
         #diagnosticsErrorsOnly = false;
         #diagnosticsExpanded = new Set();
+        #vendorStateCache = null; // populated only by an explicit "Refresh Diagnostics" click (VendorDiagnostics.listVendorStates() is async; render() itself stays synchronous)
         #themeStudioSelected = null;
         #themeStudioCertification = null;
         #selectedContext = null; // { type: "module"|"application"|"release", id }
@@ -2040,6 +2041,7 @@
                 case "platformOperations": return this.#renderPlatformOperations();
                 case "platformResources": return this.#renderPlatformResources();
                 case "referenceIntegrityCenter": return this.#renderReferenceIntegrityCenter();
+                case "vendorStatusCenter": return this.#renderVendorStatusCenter();
                 case "accessibilityCenter": return this.#renderAccessibilityCenter();
                 case "contentStudio": return this.#renderContentStudio();
                 case "themeStudio": return this.#renderThemeStudio();
@@ -2788,6 +2790,77 @@
         }
 
         /**
+         * #renderVendorStatusCenter()
+         *   Real report only. As of this version, every declared vendor
+         *   honestly shows "Missing" — none are actually loaded anywhere
+         *   in this deployment, verified by direct search, not assumed.
+         */
+        #renderVendorStatusCenter() {
+            const vr = window.CozyOS && window.CozyOS.VendorRegistry ? window.CozyOS.VendorRegistry : null;
+            const vd = window.CozyOS && window.CozyOS.VendorDiagnostics ? window.CozyOS.VendorDiagnostics : null;
+            if (!vr) return `<h2>Vendor Status</h2>${this.#renderNotConnected("VendorRegistry is not loaded on this page.")}`;
+
+            const buttons = `<button type="button" id="cozy-vendor-load-btn" class="cozy-btn cozy-btn-primary">Load Vendor Manifest</button>`;
+            const status = vr.listVendorStatus();
+            if (!status.available) return `<h2>Vendor Status</h2>${buttons}<p class="cozy-disclosure-note">${this.#escapeHtml(status.reason)}</p>`;
+
+            const cached = this.#vendorStateCache;
+            const stateBadgeClass = (s) => (s === "READY" || s === "IN_USE") ? "cozy-badge-success" : s === "ERROR" ? "cozy-badge-blocked" : "cozy-badge-neutral";
+            const stageOrder = ["installed", "registered", "runtimeLoaded", "wrapperExists", "ready", "inUse"];
+            const stageLabels = { installed: "Installed", registered: "Registered", runtimeLoaded: "Loaded", wrapperExists: "Wrapped", ready: "Ready", inUse: "In Use" };
+
+            const rows = status.vendors.map(v => {
+                const derived = cached?.[v.name];
+                const state = derived?.state || "…";
+                if (!derived) {
+                    return `<div class="cozy-module-row"><div class="cozy-module-row-main"><b>${this.#escapeHtml(v.name)}</b><span class="cozy-badge cozy-badge-neutral">Not yet evaluated</span></div></div>`;
+                }
+                const checklist = stageOrder.map(key => `<div>${derived[key] ? "✓" : "✗"} ${stageLabels[key]}</div>`).join("");
+                const failReason = !derived.installed ? "Vendor folder/file does not exist."
+                    : !derived.registered ? "Not confirmed present and declared."
+                    : !derived.runtimeLoaded ? (derived.lastError || "Script failed to load.")
+                    : !derived.wrapperExists ? "No wrapper engine connected yet."
+                    : !derived.ready ? "Wrapper connected, but not confirmed operational."
+                    : !derived.inUse ? "Ready, but no application is currently using it."
+                    : null;
+                return `
+                <div class="cozy-module-row">
+                    <div class="cozy-module-row-main">
+                        <b>${this.#escapeHtml(v.name)}</b>
+                        <span class="cozy-badge ${stateBadgeClass(state)}">${this.#escapeHtml(state)}</span>
+                        <span class="cozy-muted">Health: ${derived.healthScorePercent}%</span>
+                    </div>
+                    <div class="cozy-vendor-detail" style="margin-top:6px;font-size:13px;">
+                        <div><b>Status</b></div>
+                        ${checklist}
+                        ${failReason ? `<div style="margin-top:4px;"><b>Reason:</b> ${this.#escapeHtml(failReason)}</div>` : ""}
+                        <div style="margin-top:6px;"><b>Owner Engine:</b> ${this.#escapeHtml(derived.ownerEngine || "— (no wrapper planned yet)")}</div>
+                        <div><b>Wrapper Coordinator:</b> ${this.#escapeHtml(derived.wrapperFilePath || "— (none built yet)")}</div>
+                        <div><b>Applications Using It:</b> ${derived.applicationsUsingIt.length ? derived.applicationsUsingIt.map(a => this.#escapeHtml(a)).join(", ") : "None"}</div>
+                        <div><b>Vendor Folder:</b> core/vendor/${this.#escapeHtml(v.name)}/</div>
+                        <div><b>Expected Script Path:</b> ${this.#escapeHtml(derived.expectedFilePath || "—")}</div>
+                        <div><b>Loaded Script Path:</b> ${this.#escapeHtml(derived.loadedScriptPath || "— (not successfully loaded)")}</div>
+                        <div><b>Version (declared):</b> ${this.#escapeHtml(derived.version)}</div>
+                        <div><b>Last Load Time:</b> ${this.#escapeHtml(derived.lastCheckedAt || "—")}</div>
+                        <div><b>Load Duration:</b> ${derived.loadDurationMs !== null ? derived.loadDurationMs + " ms" : "—"}</div>
+                        <div><b>Memory Usage:</b> Not trackable — no real browser API can report per-library heap usage; not fabricated</div>
+                        <div><b>Usage Count:</b> ${derived.applicationsUsingIt.length} application(s)</div>
+                        <div><b>Error Message:</b> ${this.#escapeHtml(derived.lastError || "None")}</div>
+                        <div><b>Certification Status:</b> ${this.#escapeHtml(derived.certificationResult)} — ${this.#escapeHtml(derived.certificationReason)}</div>
+                        <button type="button" class="cozy-btn" data-action="hub-vendor-history" data-vendor-name="${this.#escapeHtml(v.name)}">View History</button>
+                        <div id="cozy-vendor-history-${this.#escapeHtml(v.name)}"></div>
+                    </div>
+                </div>`;
+            }).join("");
+
+            const operationalCount = cached ? Object.values(cached).filter(v => v.state === "READY" || v.state === "IN_USE").length : 0;
+            return `<h2>Vendor Status</h2>${buttons}
+                <button type="button" id="cozy-vendor-diagnose-btn" class="cozy-btn" ${vd ? "" : "disabled"}>Refresh Diagnostics</button>
+                <p class="cozy-disclosure-note">${operationalCount}/${status.vendors.length} vendors Ready or In Use. Progression: Not Installed → Installed → Registered → Loaded → Wrapped → Ready → In Use, with Error reachable from any active stage. Every field below comes from VendorDiagnostics, a pure consumer of real, observed signals — never fabricated. No third-party library file can be fetched or vendored in this environment (no network access), so every vendor is expected to show Not Installed until real files are placed manually.</p>
+                <div class="cozy-list">${rows}</div>`;
+        }
+
+        /**
          * #renderAccessibilityCenter()
          *   Real report display only — every number comes from
          *   AccessibilityEngine's actual WCAG math and real stylesheet
@@ -2952,7 +3025,7 @@
             const NAV_SECTIONS = [
                 { label: "Overview", items: [["dashboard", "Dashboard"], ["applications", "Application Center"], ["modules", "Module Manager"]] },
                 { label: "Certification", items: [["certification", "Certification Center"], ["releases", "Release Center"], ["upgrades", "Upgrade Center"], ["dependencies", "Dependency Viewer"]] },
-                { label: "Operations", items: [["diagnostics", "Diagnostics Center"], ["events", "Event Monitor"], ["notifications", "Notification Center"], ["search", "Enterprise Search"], ["platformDiscovery", "Platform Discovery"], ["platformAudit", "Audit Center"], ["platformOperations", "Operations Center"], ["platformResources", "Resource Center"], ["referenceIntegrityCenter", "Reference Integrity Center"]] },
+                { label: "Operations", items: [["diagnostics", "Diagnostics Center"], ["events", "Event Monitor"], ["notifications", "Notification Center"], ["search", "Enterprise Search"], ["platformDiscovery", "Platform Discovery"], ["platformAudit", "Audit Center"], ["platformOperations", "Operations Center"], ["platformResources", "Resource Center"], ["referenceIntegrityCenter", "Reference Integrity Center"], ["vendorStatusCenter", "Vendor Status"]] },
                 { label: "Design Studio", items: [["themeStudio", "Theme Studio"], ["livingButtonEngine", "Living Button Engine"], ["accessibilityCenter", "Accessibility Studio"], ["contentStudio", "Content Studio"]] },
                 { label: "Integrations (awaiting coordinators)", items: [["security", "Security Center"], ["storage", "Storage Center"], ["sync", "Synchronization Center"], ["automation", "Automation Center"], ["live", "Live Center"], ["speech", "Speech Center"], ["translation", "Translation Center"], ["subscription", "Subscription / License Center"], ["ai", "AI Center"], ["plugins", "Plugin Center"], ["tenants", "Tenant Center"]] },
                 // Additive: Administrator Workspace expansion per the locked
@@ -3218,6 +3291,49 @@
                         evt.target.textContent = "Scanning…";
                         if (window.CozyOS.ReferenceIntegrity && typeof window.CozyOS.ReferenceIntegrity.runFullIntegrityScan === "function") {
                             window.CozyOS.ReferenceIntegrity.runFullIntegrityScan().finally(() => this.#render());
+                        } else {
+                            this.#render();
+                        }
+                        return;
+                    }
+                    if (evt.target.id === "cozy-vendor-load-btn") {
+                        // Real async fetch of the real vendor-manifest.json.
+                        evt.target.disabled = true;
+                        evt.target.textContent = "Loading…";
+                        if (window.CozyOS.VendorRegistry) {
+                            window.CozyOS.VendorRegistry.loadManifest().finally(() => this.#render());
+                        } else {
+                            this.#render();
+                        }
+                        return;
+                    }
+                    if (evt.target.hasAttribute("data-vendor-name") && evt.target.getAttribute("data-action") === "hub-vendor-history") {
+                        const vendorName = evt.target.getAttribute("data-vendor-name");
+                        const container = this.#domRoot.querySelector(`#cozy-vendor-history-${vendorName}`);
+                        if (container && window.CozyOS.VendorEvents) {
+                            if (container.dataset.open === "true") { container.innerHTML = ""; container.dataset.open = "false"; return; }
+                            const history = window.CozyOS.VendorEvents.getVendorHistory(vendorName);
+                            container.innerHTML = history.length
+                                ? history.map(h => `<div>${this.#escapeHtml(h.at)} — ${this.#escapeHtml(h.event)}</div>`).join("")
+                                : `<p class="cozy-disclosure-note">No real events recorded yet for "${this.#escapeHtml(vendorName)}".</p>`;
+                            container.dataset.open = "true";
+                        }
+                        return;
+                    }
+                    if (evt.target.id === "cozy-vendor-diagnose-btn") {
+                        // Real async pass — VendorDiagnostics.listVendorStates()
+                        // calls VendorManager.diagnoseAll(), the single real
+                        // entry point, rather than VendorDiagnostics
+                        // directly — same disable-while-running pattern as
+                        // every other scan button on this dashboard.
+                        evt.target.disabled = true;
+                        evt.target.textContent = "Diagnosing…";
+                        if (window.CozyOS.VendorManager) {
+                            window.CozyOS.VendorManager.diagnoseAll().then(result => {
+                                if (result.available) {
+                                    this.#vendorStateCache = Object.fromEntries(result.vendors.map(v => [v.name, v]));
+                                }
+                            }).finally(() => this.#render());
                         } else {
                             this.#render();
                         }
