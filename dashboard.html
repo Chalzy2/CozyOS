@@ -353,6 +353,15 @@
            developer-hub.js and cozy-ui.js exactly (Toast.show(),
            Live.publish()/subscribe()). -->
     <script src="core/ui/cozy-theme.js"></script>
+    <!-- Living Theme Engine (Rule 113) — real registry/scheduling/
+         profiles, composes cozy-theme.js rather than duplicating it. -->
+    <script src="core/ui/living-theme-engine.js"></script>
+    <!-- Mode Engine (Rule 114) — composes LivingThemeEngine, reuses its
+         matchesSchedule() rather than duplicating scheduling logic. -->
+    <script src="core/ui/mode-engine.js"></script>
+    <!-- Living Message Engine (Rule 115) — real registry/permissions/
+         scheduling/rotation. No DOM rendering yet - see file header. -->
+    <script src="core/ui/living-message-engine.js"></script>
     <script src="core/ui/cozy-background.js"></script>
     <script src="core/ui/cozy-toast.js"></script>
     <script src="core/ui/cozy-live.js"></script>
