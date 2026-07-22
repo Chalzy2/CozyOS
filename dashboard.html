@@ -433,6 +433,104 @@
          deployment. -->
     <script src="core/platform/reference-integrity-engine.js"></script>
 
+    <!-- Vendor System (Rule 61) — moved from core/platform/ to core/
+         directly, matching the final requested architecture where all 5
+         vendor files sit as siblings. Loaded in real dependency order:
+         Registry and Loader have no dependencies on each other; Events
+         wraps the existing PlatformEventBus; Diagnostics reads Registry+
+         Loader; Manager coordinates all three plus Events. -->
+    <!-- Output Center (Rule 68) — promoted from a private Developer Hub
+         field to a real, shared platform service, matching the same
+         pattern as the Vendor system below. Loaded in real dependency
+         order: core engine first (storage's restore() call at load time
+         depends on it existing), then storage, then the independent
+         history/collections/export helpers. -->
+    <script src="core/output/output-center.js"></script>
+    <script src="core/output/output-storage.js"></script>
+    <script src="core/output/output-history.js"></script>
+    <script src="core/output/output-events.js"></script>
+    <script src="core/output/output-collections.js"></script>
+    <script src="core/output/output-export.js"></script>
+    <!-- Output Inbox (Rule 71) — real, single arrival point forwarding to
+         OutputCenter.publish(); adds a genuinely separate "every arrival,
+         accepted or rejected" audit trail. -->
+    <script src="core/output/output-inbox.js"></script>
+
+    <!-- Calculation Engine (Rule 74) — single, shared platform service for
+         formulas every CozyOS application should use instead of
+         implementing its own math. Registry and History load first (no
+         mutual dependencies); Library registers real formulas against
+         Registry; Engine and Certification both depend on Registry. -->
+    <script src="core/calculation/formula-registry.js"></script>
+    <script src="core/calculation/calculation-history.js"></script>
+    <script src="core/calculation/formula-library.js"></script>
+    <script src="core/calculation/formula-library-church.js"></script>
+    <!-- New packs (Rule 77) — added after the existing, certified Business/
+         Church packs above, neither of which was modified. -->
+    <script src="core/calculation/packs/statistics.js"></script>
+    <script src="core/calculation/packs/education.js"></script>
+    <script src="core/calculation/packs/healthcare.js"></script>
+    <script src="core/calculation/packs/payroll.js"></script>
+    <script src="core/calculation/packs/conversions.js"></script>
+    <script src="core/calculation/packs/inventory.js"></script>
+    <script src="core/calculation/packs/accounting.js"></script>
+    <script src="core/calculation/packs/finance.js"></script>
+    <script src="core/calculation/packs/logistics.js"></script>
+    <script src="core/calculation/packs/agriculture.js"></script>
+    <script src="core/calculation/packs/construction.js"></script>
+    <script src="core/calculation/packs/manufacturing.js"></script>
+    <script src="core/calculation/packs/engineering.js"></script>
+
+    <!-- Formula Dependency Engine (Rule 84) — real, explicit dependsOn
+         metadata only, never source parsing. Graph/History load first (no
+         mutual dependencies); Events depends on History; Engine depends
+         on Graph; Certification depends on Engine. -->
+    <script src="core/calculation/dependency-graph.js"></script>
+    <script src="core/calculation/dependency-history.js"></script>
+    <script src="core/calculation/dependency-events.js"></script>
+    <script src="core/calculation/dependency-engine.js"></script>
+    <script src="core/calculation/dependency-certification.js"></script>
+
+    <!-- Enterprise UI Standard — Module Dashboard (Rule 87) — shared,
+         reusable dashboard component every CozyOS module can call with
+         its own config. -->
+    <script src="core/ui/module-dashboard.js"></script>
+    <script src="core/calculation/calculation-engine.js"></script>
+    <script src="core/calculation/calculation-certification.js"></script>
+
+    <!-- Organization Builder (Rule 75) — shared platform engine every
+         CozyOS application (ChurchOS, SchoolOS, WholesaleOS, etc.) should
+         consume instead of building its own organization system. Registry
+         first (Role and Hierarchy both depend on it). -->
+    <script src="core/organization/organization-registry.js"></script>
+    <script src="core/organization/organization-role.js"></script>
+    <script src="core/organization/organization-hierarchy.js"></script>
+
+    <!-- ChurchOS (Rule 76) — Phase 1: Setup Wizard + Membership. Reuses
+         OrganizationRegistry/CalculationEngine/OutputCenter directly,
+         creates no roles of its own (see CHURCHOS_ENGINE_AUDIT.md for the
+         full, honest status of the 25 requested platform engines). -->
+    <script src="core/plugins/churchOS-core.js"></script>
+
+    <!-- Vendor Registry (core/vendor-registry.js) — real, checkable
+         third-party library status. No vendors are actually loaded
+         anywhere in this deployment yet; this reports that honestly
+         rather than showing an aspirational status. -->
+    <script src="core/vendor-registry.js"></script>
+    <!-- Vendor Loader (core/vendor-loader.js) — real dynamic script
+         injection, real observed success/error signals. -->
+    <script src="core/vendor-loader.js"></script>
+    <!-- Vendor Events (core/vendor-events.js) — thin wrapper over the
+         existing, real PlatformEventBus, not a second pub/sub mechanism. -->
+    <script src="core/vendor-events.js"></script>
+    <!-- Vendor Diagnostics (core/vendor-diagnostics.js) — pure consumer
+         of Registry + Loader, same pattern as PlatformAudit. -->
+    <script src="core/vendor-diagnostics.js"></script>
+    <!-- Vendor Manager (core/vendor-manager.js) — the single real entry
+         point coordinating all of the above. Applications should call
+         this, never the individual vendor coordinators directly. -->
+    <script src="core/vendor-manager.js"></script>
+
     <!-- Application Visibility Registry (core/platform/application-visibility.js)
          — single source of truth for which applications/tools exist and who
          can see them. Reads ServiceRegistry + real self-declared `visibility`
