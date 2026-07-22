@@ -409,47 +409,41 @@
          */
         /**
          * #checkAccess(userId)
-         *   Real, fail-closed authorization (Rule 91 — CozyBuilder Access
-         *   Policy). Checks the real, existing `IdentityEngine.
-         *   isPlatformAdmin()`/`isDeveloper()` — no new role model is
-         *   invented; these are the same real methods already used
-         *   elsewhere in CozyOS for exactly this distinction.
+         *   Real authorization (Rule 105) — now delegates to the real,
+         *   single entry point `AuthCoordinator.authorize({policy:
+         *   "open-builder"})`, which itself composes IdentityEngine/
+         *   CozyOS.Auth/SessionManager/AuthPolicyEngine/DevAccessService.
+         *   This file no longer makes its own authorization decision —
+         *   it asks the coordinator and trusts the real result.
          *
-         *   HONEST, LOAD-BEARING DISCLOSURE: `IdentityEngine` has no real
-         *   "current session"/"current user" concept anywhere in its API,
-         *   and no real login UI exists anywhere in CozyOS (a gap
-         *   disclosed repeatedly across this project's history). This
-         *   means there is currently no real mechanism that could
-         *   automatically supply a verified `userId` to this check. The
-         *   honest consequence: this check fails closed whenever no real,
-         *   explicit `userId` is provided.
-         *
-         *   REAL, EXPLICIT FALLBACK (Rule 93): if no explicit `userId` is
-         *   given, this now consults the real `DevAccessService`, whose
-         *   own priority chain is: a real `CozyOS.Auth` session always
-         *   wins; otherwise Development Mode only grants access when the
-         *   environment genuinely reads Development (see
-         *   dev-access-service.js's own header for the honest limits of
-         *   that check in a static, client-side deployment). If neither
-         *   `DevAccessService` nor an explicit `userId` can establish
-         *   access, this still fails closed exactly as before.
+         *   REAL, DISCLOSED FALLBACK: if `AuthCoordinator` itself isn't
+         *   loaded (a genuine load-order or deployment gap, not the
+         *   normal case), this reverts to the exact original Rule 91/93
+         *   logic rather than failing in a new, confusing way — still
+         *   fail-closed, still honest about which path was used.
          */
-        #checkAccess(userId) {
+        async #checkAccess(userId) {
+            const coordinator = window.CozyOS.AuthCoordinator;
+            if (coordinator && typeof coordinator.authorize === "function") {
+                const result = await coordinator.authorize({ policy: "open-builder", context: { userId } });
+                return { allowed: result.authorized === true, reason: (result.diagnostics && result.diagnostics.reason) || (result.authorized ? "Authorized via AuthenticationCoordinator." : "Denied via AuthenticationCoordinator.") };
+            }
+            // Real, disclosed fallback — AuthCoordinator is not loaded.
             const identity = window.CozyOS.IdentityEngine;
             if (userId) {
                 if (!identity || typeof identity.isPlatformAdmin !== "function") {
-                    return { allowed: false, reason: "IdentityEngine is not loaded — access cannot be verified, so it is honestly refused rather than assumed safe." };
+                    return { allowed: false, reason: "AuthenticationCoordinator and IdentityEngine are both unavailable — access cannot be verified, so it is honestly refused rather than assumed safe." };
                 }
                 const allowed = identity.isPlatformAdmin(userId) || identity.isDeveloper(userId);
-                return { allowed, reason: allowed ? "Verified Platform Administrator or Developer." : `User "${userId}" is not a Platform Administrator or authorized Developer.` };
+                return { allowed, reason: allowed ? "Verified Platform Administrator or Developer (fallback path — AuthenticationCoordinator not loaded)." : `User "${userId}" is not a Platform Administrator or authorized Developer.` };
             }
             const devAccess = window.CozyOS.DevAccessService;
             if (devAccess && typeof devAccess.checkAccess === "function") {
                 const result = devAccess.checkAccess();
-                if (result.allowed) return { allowed: true, reason: `Access granted via ${result.method === "real-session" ? "a real, verified administrator session" : "Development Mode (environment: " + result.environment + ")"}.` };
+                if (result.allowed) return { allowed: true, reason: `Access granted via ${result.method === "real-session" ? "a real, verified administrator session" : "Development Mode (environment: " + result.environment + ")"} (fallback path — AuthenticationCoordinator not loaded).` };
                 return { allowed: false, reason: `${result.reason} (environment: ${result.environment}, development mode: ${result.developmentMode})` };
             }
-            return { allowed: false, reason: "No real, verified userId was provided, and DevAccessService is not loaded — access is refused by default." };
+            return { allowed: false, reason: "AuthenticationCoordinator, DevAccessService, and an explicit userId are all unavailable — access is refused by default." };
         }
 
         /**
@@ -480,14 +474,13 @@
          *   real, honest reason derived from whether that hostname
          *   matches a known Development host.
          */
-        #renderEnvironmentStatus() {
+        #renderEnvironmentStatus(access) {
             const devAccess = window.CozyOS.DevAccessService;
             const auth = window.CozyOS.Auth;
             const environment = devAccess && typeof devAccess.getEnvironment === "function" ? devAccess.getEnvironment() : "Unknown (DevAccessService not loaded)";
             const hostname = (typeof window !== "undefined" && window.location && window.location.hostname) || "Unknown";
             const devStatus = devAccess && typeof devAccess.getStatus === "function" ? devAccess.getStatus() : null;
             const session = auth && typeof auth.getCurrentAdministrator === "function" ? auth.getCurrentAdministrator() : null;
-            const access = this.#checkAccess();
 
             const reason = environment === "Production"
                 ? "Public deployment detected — hostname does not match any known Development host."
@@ -516,7 +509,7 @@
          *   condition is blocking them) and is available while inside
          *   Developer Hub.
          */
-        #renderAuthenticationStatus() {
+        #renderAuthenticationStatus(access) {
             const devAccess = window.CozyOS.DevAccessService;
             const auth = window.CozyOS.Auth;
             const identity = window.CozyOS.IdentityEngine;
@@ -530,7 +523,6 @@
             const currentRole = session ? (session.roles || []).join(", ") : (devStatus && devStatus.configuredAdministrator ? devStatus.configuredAdministrator.role : "None");
             const sessionActive = !!session;
 
-            const access = this.#checkAccess();
             const roles = session ? session.roles || [] : [];
 
             // Real, dynamic Authentication Method - not a static label.
@@ -616,6 +608,43 @@
          *   `init()` to re-check access with the new real state, rather
          *   than assuming success.
          */
+        /**
+         * #renderAdminLoginForm()
+         *   Real Administrator Login — collects credentials only,
+         *   authenticates via AuthCoordinator.login() (which composes
+         *   IdentityEngine.login() directly; SessionManager/CozyOS.Auth
+         *   update automatically via their existing event bridges).
+         *   Distinct from #renderDeveloperLoginForm (Rule 93's disclosed,
+         *   non-cryptographic dev convenience).
+         */
+        #renderAdminLoginForm() {
+            if (!window.CozyOS.AuthCoordinator) return "";
+            return `<div class="cz-panel" style="margin:16px auto;max-width:480px;">
+                <h3>Administrator Login</h3>
+                <input type="text" id="cz-admin-login-username" placeholder="Username" style="width:100%;margin-bottom:8px;" />
+                <input type="password" id="cz-admin-login-password" placeholder="Password" style="width:100%;margin-bottom:8px;" />
+                <label style="display:block;margin-bottom:8px;font-size:13px;"><input type="checkbox" id="cz-admin-login-remember" /> Remember this device (30 days)</label>
+                <button class="cz-btn" id="cz-admin-login-submit">Sign In</button>
+                <p id="cz-admin-login-error" class="cz-muted" style="font-size:13px;color:var(--cozy-error,#ef4444);"></p>
+            </div>`;
+        }
+
+        #bindAdminLoginForm(container) {
+            const submitBtn = container.querySelector("#cz-admin-login-submit");
+            if (!submitBtn) return;
+            submitBtn.addEventListener("click", async () => {
+                const username = container.querySelector("#cz-admin-login-username")?.value || "";
+                const password = container.querySelector("#cz-admin-login-password")?.value || "";
+                const remember = container.querySelector("#cz-admin-login-remember")?.checked || false;
+                const errorEl = container.querySelector("#cz-admin-login-error");
+                const coordinator = window.CozyOS.AuthCoordinator;
+                if (!coordinator) { if (errorEl) errorEl.textContent = "AuthenticationCoordinator is not loaded."; return; }
+                const result = await coordinator.login({ username, password, rememberDevice: remember, deviceNickname: "Browser Session" });
+                if (!result.success) { if (errorEl) errorEl.textContent = result.reason; return; }
+                await this.init(container); // re-check access now that a real session exists
+            });
+        }
+
         #renderDeveloperLoginForm(container) {
             const devAccess = window.CozyOS.DevAccessService;
             if (!devAccess || typeof devAccess.getEnvironment !== "function" || devAccess.getEnvironment() !== "Development") return "";
@@ -652,17 +681,18 @@
             });
         }
 
-        init(container, userId) {
+        async init(container, userId) {
             if (!container || typeof container.addEventListener !== "function") {
                 throw new Error("[DeveloperHubUI] init(): a valid DOM container element is required.");
             }
-            const access = this.#checkAccess(userId);
+            const access = await this.#checkAccess(userId);
             if (!access.allowed) {
                 container.innerHTML = `<div class="cz-panel" style="margin:40px auto;max-width:480px;text-align:center;">
                     <h2>Access Denied</h2>
                     <p>CozyBuilder is a Platform Administrator-only tool.</p>
                     <p class="cz-muted" style="font-size:13px;">${access.reason.replace(/</g, "&lt;")}</p>
-                </div>${this.#renderEnvironmentStatus()}${this.#renderAuthenticationStatus()}${this.#renderDeveloperLoginForm(container)}`;
+                </div>${this.#renderEnvironmentStatus(access)}${this.#renderAuthenticationStatus(access)}${this.#renderAdminLoginForm()}${this.#renderDeveloperLoginForm(container)}`;
+                this.#bindAdminLoginForm(container);
                 this.#bindDeveloperLoginForm(container);
                 return;
             }
@@ -4186,12 +4216,12 @@ ${result.recertifyResult ? `## Re-certification After Repair\n**Verdict:** ${res
          *     standalone fallback below — may still pass an explicit
          *     container element; that path is unchanged from before.
          */
-        init(container, userId) {
+        async init(container, userId) {
             const resolvedContainer = container
                 || document.getElementById("cozy-developer-hub-root")
                 || document.getElementById("cozy-app-root");
             if (!singletonInstance) singletonInstance = new CozyDeveloperHubUI();
-            singletonInstance.init(resolvedContainer, userId);
+            await singletonInstance.init(resolvedContainer, userId);
             window.CozyDeveloperHubUI = singletonInstance; // preserved for any existing code that reads this directly
             return singletonInstance;
         },
