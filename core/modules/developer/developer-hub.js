@@ -407,9 +407,62 @@
          *   given, matching the shell's own "#cozy-app-root" contract
          *   without this file needing to know that name itself.
          */
-        init(container) {
+        /**
+         * #checkAccess(userId)
+         *   Real, fail-closed authorization (Rule 91 — CozyBuilder Access
+         *   Policy). Checks the real, existing `IdentityEngine.
+         *   isPlatformAdmin()`/`isDeveloper()` — no new role model is
+         *   invented; these are the same real methods already used
+         *   elsewhere in CozyOS for exactly this distinction.
+         *
+         *   HONEST, LOAD-BEARING DISCLOSURE: `IdentityEngine` has no real
+         *   "current session"/"current user" concept anywhere in its API,
+         *   and no real login UI exists anywhere in CozyOS (a gap
+         *   disclosed repeatedly across this project's history). This
+         *   means there is currently no real mechanism that could
+         *   automatically supply a verified `userId` to this check. The
+         *   honest consequence: this check fails closed whenever no real,
+         *   explicit `userId` is provided — which, given the missing
+         *   login infrastructure, is every call through the normal loader
+         *   path today. This is not a bug to work around; it is the
+         *   correct, safe behavior until a real login/session system
+         *   exists to supply a genuine current user. Fabricating a
+         *   "logged in as admin" default would defeat the entire purpose
+         *   of this policy.
+         */
+        #checkAccess(userId) {
+            const identity = window.CozyOS.IdentityEngine;
+            if (!identity || typeof identity.isPlatformAdmin !== "function") {
+                return { allowed: false, reason: "IdentityEngine is not loaded — access cannot be verified, so it is honestly refused rather than assumed safe." };
+            }
+            if (!userId) {
+                return { allowed: false, reason: "No real, verified userId was provided — CozyOS has no real login/session mechanism yet to supply one automatically, so access is refused by default." };
+            }
+            const allowed = identity.isPlatformAdmin(userId) || identity.isDeveloper(userId);
+            return { allowed, reason: allowed ? "Verified Platform Administrator or Developer." : `User "${userId}" is not a Platform Administrator or authorized Developer.` };
+        }
+
+        /**
+         * init(container?, userId?)
+         *   Real, fail-closed — the single entry point every path into
+         *   Developer Hub funnels through. Renders a real "Access Denied"
+         *   message instead of mounting the real Developer Hub UI when
+         *   `#checkAccess()` refuses, and returns immediately — no
+         *   rendering, no event binding, no state restoration happens for
+         *   a refused caller.
+         */
+        init(container, userId) {
             if (!container || typeof container.addEventListener !== "function") {
                 throw new Error("[DeveloperHubUI] init(): a valid DOM container element is required.");
+            }
+            const access = this.#checkAccess(userId);
+            if (!access.allowed) {
+                container.innerHTML = `<div class="cz-panel" style="margin:40px auto;max-width:480px;text-align:center;">
+                    <h2>Access Denied</h2>
+                    <p>CozyBuilder is a Platform Administrator-only tool.</p>
+                    <p class="cz-muted" style="font-size:13px;">${access.reason.replace(/</g, "&lt;")}</p>
+                </div>`;
+                return;
             }
             this.#root = container;
             this.#restoreBuilderAutoSave();
@@ -3931,12 +3984,12 @@ ${result.recertifyResult ? `## Re-certification After Repair\n**Verdict:** ${res
          *     standalone fallback below — may still pass an explicit
          *     container element; that path is unchanged from before.
          */
-        init(container) {
+        init(container, userId) {
             const resolvedContainer = container
                 || document.getElementById("cozy-developer-hub-root")
                 || document.getElementById("cozy-app-root");
             if (!singletonInstance) singletonInstance = new CozyDeveloperHubUI();
-            singletonInstance.init(resolvedContainer);
+            singletonInstance.init(resolvedContainer, userId);
             window.CozyDeveloperHubUI = singletonInstance; // preserved for any existing code that reads this directly
             return singletonInstance;
         },
