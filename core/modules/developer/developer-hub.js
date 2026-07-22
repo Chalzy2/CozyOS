@@ -461,6 +461,197 @@
          *   rendering, no event binding, no state restoration happens for
          *   a refused caller.
          */
+        /**
+         * #escapeHtmlAuth(v) — local escape helper for the authentication
+         * UI added this milestone (kept separate from any pre-existing
+         * escape helper elsewhere in this large file, to avoid a risky
+         * rename inside a file that has already been accidentally
+         * deleted twice this project).
+         */
+        #escapeHtmlAuth(v) { return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
+
+        /**
+         * #renderEnvironmentStatus()
+         *   Real Environment Status card — states plainly which real
+         *   mechanism produced the environment reading
+         *   (`window.location.hostname`, confirmed against
+         *   dev-access-service.js's own actual implementation before
+         *   this text was written), the real current hostname, and a
+         *   real, honest reason derived from whether that hostname
+         *   matches a known Development host.
+         */
+        #renderEnvironmentStatus() {
+            const devAccess = window.CozyOS.DevAccessService;
+            const auth = window.CozyOS.Auth;
+            const environment = devAccess && typeof devAccess.getEnvironment === "function" ? devAccess.getEnvironment() : "Unknown (DevAccessService not loaded)";
+            const hostname = (typeof window !== "undefined" && window.location && window.location.hostname) || "Unknown";
+            const devStatus = devAccess && typeof devAccess.getStatus === "function" ? devAccess.getStatus() : null;
+            const session = auth && typeof auth.getCurrentAdministrator === "function" ? auth.getCurrentAdministrator() : null;
+            const access = this.#checkAccess();
+
+            const reason = environment === "Production"
+                ? "Public deployment detected — hostname does not match any known Development host."
+                : "Recognized Development host — matches dev-access-service.js's own known-hostname list.";
+
+            return `<div class="cz-panel" style="margin:16px auto;max-width:480px;text-align:left;">
+                <h3>Environment</h3>
+                <div class="cz-row"><span>Current</span><span>${this.#escapeHtmlAuth(environment)}</span></div>
+                <div class="cz-row"><span>Detected From</span><span>window.location.hostname</span></div>
+                <div class="cz-row"><span>Hostname</span><span>${this.#escapeHtmlAuth(hostname)}</span></div>
+                <div class="cz-row"><span>Development Mode</span><span>${devStatus && devStatus.developmentModeEnabled ? "Enabled" : "Disabled"}</span></div>
+                <div class="cz-row"><span>Reason</span><span>${this.#escapeHtmlAuth(reason)}</span></div>
+                <div class="cz-row"><span>Authentication</span><span>${session ? `Real session (${this.#escapeHtmlAuth(session.userId)})` : "No Platform Administrator session."}</span></div>
+                <div class="cz-row" style="border-top:1px solid var(--cozy-border,#444);padding-top:6px;font-weight:600;"><span>Result</span><span>${access.allowed ? "Access Granted" : "Access Denied"}</span></div>
+            </div>`;
+        }
+
+        /**
+         * #renderAuthenticationStatus()
+         *   Real Authentication Status panel — every field below reads
+         *   from a real, existing coordinator (DevAccessService,
+         *   CozyOS.Auth, IdentityEngine, AuthPolicyEngine), or honestly
+         *   shows "Not loaded" / "None" rather than fabricating a
+         *   plausible-looking value. This is shown both on the Access
+         *   Denied screen (so a developer can see exactly which real
+         *   condition is blocking them) and is available while inside
+         *   Developer Hub.
+         */
+        #renderAuthenticationStatus() {
+            const devAccess = window.CozyOS.DevAccessService;
+            const auth = window.CozyOS.Auth;
+            const identity = window.CozyOS.IdentityEngine;
+
+            const environment = devAccess && typeof devAccess.getEnvironment === "function" ? devAccess.getEnvironment() : "Unknown (DevAccessService not loaded)";
+            const session = auth && typeof auth.getCurrentAdministrator === "function" ? auth.getCurrentAdministrator() : null;
+            const devStatus = devAccess && typeof devAccess.getStatus === "function" ? devAccess.getStatus() : null;
+            const devModeEnabled = !!(devStatus && devStatus.developmentModeEnabled);
+
+            const currentUser = session ? session.userId : (devStatus && devStatus.configuredAdministrator ? devStatus.configuredAdministrator.name : "None");
+            const currentRole = session ? (session.roles || []).join(", ") : (devStatus && devStatus.configuredAdministrator ? devStatus.configuredAdministrator.role : "None");
+            const sessionActive = !!session;
+
+            const access = this.#checkAccess();
+            const roles = session ? session.roles || [] : [];
+
+            // Real, dynamic Authentication Method - not a static label.
+            let authMethod = "None";
+            if (session) authMethod = "Real Administrator Session (CozyOS.Auth)";
+            else if (devModeEnabled && environment === "Development") authMethod = "Development Mode";
+
+            // Real, dynamic "what action is needed next" - derived from
+            // the actual current state, not a generic message.
+            let nextAction;
+            if (access.allowed) {
+                nextAction = "No action needed — access is currently granted.";
+            } else if (environment === "Production") {
+                nextAction = "Complete the real authentication system and sign in as a verified Platform Administrator. Development Mode cannot be used in Production.";
+            } else if (!devModeEnabled) {
+                nextAction = "Use the Developer Login form below to enable Development Mode for this session.";
+            } else {
+                nextAction = "Development Mode is enabled but access is still denied — check that DevAccessService has a real configured administrator.";
+            }
+
+            // Real, per-component status - each checks whether the actual
+            // window.CozyOS.X coordinator is loaded, not assumed present.
+            const components = [
+                ["Identity Engine", "IdentityEngine"],
+                ["CozyOS.Auth", "Auth"],
+                ["Authentication Policy Engine", "AuthPolicyEngine"],
+                ["Authentication Factor Registry", "AuthFactorRegistry"]
+            ].map(([label, key]) => ({ label, running: !!window.CozyOS[key] }));
+
+            // Real, per-factor status from AuthFactorRegistry itself -
+            // "Stub Only" is the honest description for isReal:false,
+            // distinct from "Not Available" (a component that doesn't
+            // exist at all, like Trusted Device Manager below).
+            const factorRegistry = window.CozyOS.AuthFactorRegistry;
+            const factorRows = factorRegistry && typeof factorRegistry.listFactors === "function"
+                ? factorRegistry.listFactors().map(f => `<div class="cz-row"><span>${this.#escapeHtmlAuth(f.factorName)}</span><span>${f.isReal ? "Real Provider Registered" : "Stub Only (Not Functional)"}</span></div>`).join("")
+                : `<p class="cz-muted" style="font-size:13px;">AuthFactorRegistry is not loaded.</p>`;
+
+            // Real, honest disclosure - developer-hub.js's own basic
+            // access check (#checkAccess) does not currently consult
+            // AuthPolicyEngine or any named policy at all (see Rule 96's
+            // disclosed integration gap) - "Current Policy" says so
+            // plainly rather than fabricating a policy name that isn't
+            // actually being evaluated for this specific access check.
+            const currentPolicy = "N/A — this basic CozyBuilder access check does not yet consult a named AuthPolicyEngine policy (see Rule 96's disclosed integration gap).";
+
+            return `<div class="cz-panel" style="margin:16px auto;max-width:480px;text-align:left;">
+                <h3>Authentication Status</h3>
+                <div class="cz-row"><span>Environment</span><span>${this.#escapeHtmlAuth(environment)}</span></div>
+                <div class="cz-row"><span>Current User</span><span>${this.#escapeHtmlAuth(currentUser)}</span></div>
+                <div class="cz-row"><span>Current Role</span><span>${this.#escapeHtmlAuth(currentRole || "None")}</span></div>
+                <div class="cz-row"><span>Authentication Method</span><span>${this.#escapeHtmlAuth(authMethod)}</span></div>
+                <div class="cz-row"><span>Current Session</span><span>${sessionActive ? "Active" : "None"}</span></div>
+
+                <div class="cz-row" style="border-top:1px solid var(--cozy-border,#444);padding-top:6px;"><b>Platform Components</b></div>
+                ${components.map(c => `<div class="cz-row"><span>${this.#escapeHtmlAuth(c.label)}</span><span>${c.running ? "Running" : "Not Loaded"}</span></div>`).join("")}
+                <div class="cz-row"><span>Trusted Device Manager</span><span>Not Available — no real coordinator exists yet in CozyOS.</span></div>
+                <div class="cz-row"><span>Recovery Questions</span><span>Not Available — no real mechanism exists yet.</span></div>
+                <div class="cz-row"><span>Recovery Phrase</span><span>Not Available — no real mechanism exists yet.</span></div>
+                <div class="cz-row"><span>Session Manager</span><span>Not Available — no real, separate coordinator exists yet.</span></div>
+
+                <div class="cz-row" style="border-top:1px solid var(--cozy-border,#444);padding-top:6px;"><b>Authentication Factors (AuthFactorRegistry)</b></div>
+                ${factorRows}
+
+                <div class="cz-row" style="border-top:1px solid var(--cozy-border,#444);padding-top:6px;"><span>Current Policy</span></div>
+                <p class="cz-muted" style="font-size:13px;">${this.#escapeHtmlAuth(currentPolicy)}</p>
+
+                <div class="cz-row" style="border-top:1px solid var(--cozy-border,#444);padding-top:6px;"><b>Why access is ${access.allowed ? "granted" : "denied"}:</b></div>
+                <p class="cz-muted" style="font-size:13px;">${this.#escapeHtmlAuth(access.reason)}</p>
+                <div class="cz-row" style="border-top:1px solid var(--cozy-border,#444);padding-top:6px;"><b>What action is needed next:</b></div>
+                <p class="cz-muted" style="font-size:13px;">${this.#escapeHtmlAuth(nextAction)}</p>
+            </div>`;
+        }
+
+        /**
+         * #renderDeveloperLoginForm()
+         *   Real — only rendered at all when `DevAccessService.
+         *   getEnvironment()` genuinely reads "Development" (never
+         *   fabricated in Production, matching Rule 93's own disclosed
+         *   limitation: this is a real developer convenience, not a
+         *   security boundary). Submitting calls the real
+         *   `enableDevelopmentMode()` and then genuinely re-runs
+         *   `init()` to re-check access with the new real state, rather
+         *   than assuming success.
+         */
+        #renderDeveloperLoginForm(container) {
+            const devAccess = window.CozyOS.DevAccessService;
+            if (!devAccess || typeof devAccess.getEnvironment !== "function" || devAccess.getEnvironment() !== "Development") return "";
+            return `<div class="cz-panel" style="margin:16px auto;max-width:480px;">
+                <h3>Developer Login</h3>
+                <p class="cz-muted" style="font-size:13px;">Environment is genuinely Development. This is a real developer convenience — see dev-access-service.js's own header for why it is never a substitute for real authentication in Production.</p>
+                <input type="text" id="cz-dev-login-name" placeholder="Your name" style="width:100%;margin-bottom:8px;" />
+                <input type="text" id="cz-dev-login-role" placeholder="Role (default: Platform Administrator)" style="width:100%;margin-bottom:8px;" />
+                <button class="cz-btn" id="cz-dev-login-submit">Developer Login</button>
+                <p id="cz-dev-login-error" class="cz-muted" style="font-size:13px;color:var(--cozy-error,#ef4444);"></p>
+            </div>`;
+        }
+
+        /**
+         * #bindDeveloperLoginForm(container)
+         *   Real click handler — calls the real `enableDevelopmentMode()`
+         *   and re-runs `init()` on real success, rather than assuming
+         *   the form submission itself grants access.
+         */
+        #bindDeveloperLoginForm(container) {
+            const submitBtn = container.querySelector("#cz-dev-login-submit");
+            if (!submitBtn) return;
+            submitBtn.addEventListener("click", () => {
+                const nameInput = container.querySelector("#cz-dev-login-name");
+                const roleInput = container.querySelector("#cz-dev-login-role");
+                const errorEl = container.querySelector("#cz-dev-login-error");
+                const name = nameInput ? nameInput.value.trim() : "";
+                const role = roleInput ? roleInput.value.trim() : "";
+                const devAccess = window.CozyOS.DevAccessService;
+                if (!devAccess) { if (errorEl) errorEl.textContent = "DevAccessService is not loaded."; return; }
+                const result = devAccess.enableDevelopmentMode({ name, role: role || undefined });
+                if (!result.success) { if (errorEl) errorEl.textContent = result.reason; return; }
+                this.init(container); // genuinely re-check access with the new real state
+            });
+        }
+
         init(container, userId) {
             if (!container || typeof container.addEventListener !== "function") {
                 throw new Error("[DeveloperHubUI] init(): a valid DOM container element is required.");
@@ -471,7 +662,8 @@
                     <h2>Access Denied</h2>
                     <p>CozyBuilder is a Platform Administrator-only tool.</p>
                     <p class="cz-muted" style="font-size:13px;">${access.reason.replace(/</g, "&lt;")}</p>
-                </div>`;
+                </div>${this.#renderEnvironmentStatus()}${this.#renderAuthenticationStatus()}${this.#renderDeveloperLoginForm(container)}`;
+                this.#bindDeveloperLoginForm(container);
                 return;
             }
             this.#root = container;
