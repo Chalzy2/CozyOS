@@ -383,6 +383,9 @@
          checks has been correctly failing closed this whole time (never
          wrongly open) — but Identity itself needs to actually load for a
          real login flow to ever succeed here. -->
+    <!-- Identity Storage (Rule 116) - real IndexedDB persistence,
+         must load before identity-engine.js which composes it. -->
+    <script src="core/modules/identity/identity-storage.js"></script>
     <script src="core/modules/identity/identity-engine.js"></script>
     <!-- CozyOS.Auth (Rule 92) — real administrator session bridge over
          IdentityEngine's own private events, republishing onto the
