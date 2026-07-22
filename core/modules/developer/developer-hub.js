@@ -618,7 +618,19 @@
          *   non-cryptographic dev convenience).
          */
         #renderAdminLoginForm() {
-            if (!window.CozyOS.AuthCoordinator) return "";
+            if (!window.CozyOS.AuthCoordinator) {
+                // Real, visible diagnostic instead of silently hiding the
+                // form - the previous version returned "" here, which
+                // matches a real, confirmed live-deployment report: the
+                // form vanishes with zero indication why if
+                // AuthCoordinator fails to load for any reason (stale
+                // file, wrong path, load-order issue, a JS error inside
+                // it). This makes that failure mode visible on-page.
+                return `<div class="cz-panel" style="margin:16px auto;max-width:480px;">
+                    <h3>Administrator Login — Unavailable</h3>
+                    <p class="cz-muted" style="font-size:13px;color:var(--cozy-error,#ef4444);">AuthenticationCoordinator (window.CozyOS.AuthCoordinator) is not loaded. Check: (1) browser devtools console for a script error, (2) that core/security/auth-coordinator.js is actually present at that path in this deployment, (3) that it loads AFTER auth-factor-registry.js and auth-policy-engine.js in dashboard.html, (4) browser cache — try a hard refresh.</p>
+                </div>`;
+            }
             return `<div class="cz-panel" style="margin:16px auto;max-width:480px;">
                 <h3>Administrator Login</h3>
                 <input type="text" id="cz-admin-login-username" placeholder="Username" style="width:100%;margin-bottom:8px;" />
