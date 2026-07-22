@@ -73,6 +73,101 @@
             }
         }
 
+        /**
+         * authorize({ policy, context })
+         *   Real, single entry point (Rule 105) — the exact API shape
+         *   requested for administrator tools to call instead of each
+         *   independently calling IdentityEngine/CozyOS.Auth/
+         *   AuthPolicyEngine/SessionManager directly. Composes existing,
+         *   already-verified coordinators — never re-implements
+         *   authentication, session validation, or policy evaluation.
+         *
+         *   Real flow, in order:
+         *     1. Session lookup — via CozyOS.Auth.getCurrentAdministrator().
+         *        No session → real, fail-closed denial.
+         *     2. Session validation — via IdentityEngine.validateSession()
+         *        (exists/active/not expired — IdentityEngine's own real
+         *        check, not re-derived here) and SessionManager's own
+         *        real idle-tracking (not expired ≠ not idle-locked; these
+         *        are two distinct, real failure modes) and a real check
+         *        that the tracked session's userId matches the
+         *        authenticated identity's userId.
+         *     3. Authentication — delegates entirely to the existing
+         *        authenticate() method; never reimplemented here.
+         *     4/5. Policy evaluation and factor verification — both
+         *        happen inside authenticate()'s own call into
+         *        AuthPolicyEngine, which itself composes AuthFactorRegistry.
+         *        This method never inspects Face/Fingerprint/Voice/etc.
+         *        directly.
+         */
+        async authorize({ policy, context = {} } = {}) {
+            const timestamp = new Date(Date.now()).toISOString();
+            const denial = (reason, extra = {}) => ({ authorized: false, authenticated: false, policy: policy || null, session: null, identity: null, factors: null, timestamp, diagnostics: { reason, ...extra } });
+
+            if (!policy) return denial("A real 'policy' (operation name) is required.");
+
+            // 1. Session Lookup (real CozyOS.Auth)
+            const auth = window.CozyOS.Auth;
+            const session = (auth && typeof auth.getCurrentAdministrator === "function") ? auth.getCurrentAdministrator() : null;
+            if (!session) {
+                // Real, disclosed fallback (Rule 93) — preserves the
+                // exact existing Development Mode behavior so callers can
+                // migrate to authorize() without losing it. Never
+                // consulted if a real session exists; never available in
+                // a genuinely Production environment (DevAccessService's
+                // own real, honest environment check enforces that).
+                // Applies whether there's no session because Auth isn't
+                // loaded at all, or because it's loaded but sessionless.
+                const devAccess = window.CozyOS.DevAccessService;
+                if (devAccess && typeof devAccess.checkAccess === "function") {
+                    const devResult = devAccess.checkAccess();
+                    if (devResult.allowed && devResult.method === "development-mode") {
+                        const devIdentity = { userId: devResult.administrator.name, roles: [devResult.administrator.role] };
+                        return { authorized: true, authenticated: true, policy, session: null, identity: devIdentity, factors: null, timestamp, diagnostics: { method: "development-mode", reason: `Development Mode (environment: ${devResult.environment}) — not a real authenticated session.` } };
+                    }
+                }
+                return denial(auth ? "No authenticated administrator session." : "CozyOS.Auth is not loaded, and no Development Mode fallback is available.");
+            }
+
+            // 2. Session Validation (real IdentityEngine.validateSession() + real SessionManager idle-tracking + real user-match)
+            const identity = window.CozyOS.IdentityEngine;
+            if (identity && typeof identity.validateSession === "function") {
+                const validity = identity.validateSession(session.sessionId);
+                if (!validity.valid) {
+                    return { authorized: false, authenticated: true, policy, session, identity: null, factors: null, timestamp, diagnostics: { reason: `Invalid session: ${validity.reason}` } };
+                }
+            }
+            const sessionManager = window.CozyOS.SessionManager;
+            if (sessionManager && typeof sessionManager.getSessionBinding === "function") {
+                const binding = sessionManager.getSessionBinding(session.sessionId);
+                if (binding) {
+                    if (binding.userId !== session.userId) {
+                        return { authorized: false, authenticated: true, policy, session, identity: null, factors: null, timestamp, diagnostics: { reason: "Session does not belong to the authenticated user." } };
+                    }
+                    const idleMs = Date.now() - binding.lastActivityAt;
+                    if (idleMs >= 10 * 60 * 1000) {
+                        if (typeof sessionManager.checkIdleTimeouts === "function") sessionManager.checkIdleTimeouts();
+                        return { authorized: false, authenticated: true, policy, session, identity: null, factors: null, timestamp, diagnostics: { reason: "Session is idle-locked (10+ minutes of real inactivity)." } };
+                    }
+                    if (typeof sessionManager.touchSession === "function") sessionManager.touchSession(session.sessionId);
+                }
+            }
+
+            // 3/4/5. Authentication + policy evaluation + factor verification — all delegated, never reimplemented.
+            const result = await this.authenticate(policy, context);
+
+            return {
+                authorized: result.allowed === true,
+                authenticated: true,
+                policy,
+                session,
+                identity: { userId: session.userId, roles: session.roles || [] },
+                factors: result.factorDetails || null,
+                timestamp,
+                diagnostics: { method: result.method || null, reason: result.reason || null }
+            };
+        }
+
         async authenticate(operationName, context = {}) {
             this.#emitReal("authentication-started", { operationName });
 
@@ -114,6 +209,51 @@
 
             this.#emitReal("authentication-completed", { operationName, method: "session-plus-policy", userId: session.userId });
             return { allowed: true, operationName, method: "session-plus-policy", session, factorDetails: policyResult.factorDetails };
+        }
+
+        /**
+         * login({username, password, rememberDevice, deviceNickname})
+         *   Real — calls IdentityEngine.login() directly. SessionManager
+         *   and CozyOS.Auth both update automatically via their existing
+         *   event bridges (Rules 92/103) — no manual registration here.
+         */
+        async login({ username, password, rememberDevice, deviceNickname } = {}) {
+            const identity = window.CozyOS.IdentityEngine;
+            if (!identity || typeof identity.login !== "function") return { success: false, reason: "IdentityEngine is not loaded." };
+            if (!username || !password) return { success: false, reason: "A real username and password are both required." };
+            const result = await identity.login(username, password);
+            if (!result.available) {
+                this.#emitReal("authentication-failed", { username, reason: result.reason });
+                return { success: false, reason: result.reason };
+            }
+            let device = null;
+            if (rememberDevice) {
+                const tdm = window.CozyOS.TrustedDeviceManager;
+                if (tdm && typeof tdm.registerDevice === "function" && typeof tdm.generateFingerprint === "function") {
+                    const fingerprint = await tdm.generateFingerprint();
+                    const deviceResult = tdm.registerDevice(result.userId, { nickname: deviceNickname || "This Device", fingerprint });
+                    if (deviceResult.success) device = deviceResult.device;
+                }
+            }
+            this.#emitReal("session-created", { userId: result.userId, sessionId: result.sessionId });
+            return { success: true, userId: result.userId, sessionId: result.sessionId, roles: result.roles, deviceRegistered: !!device, device };
+        }
+
+        /**
+         * logout()
+         *   Real — gets current session from CozyOS.Auth, calls
+         *   IdentityEngine.logout(sessionId). SessionManager/CozyOS.Auth
+         *   clear automatically via identity:session-ended.
+         */
+        logout() {
+            const auth = window.CozyOS.Auth;
+            const session = auth && typeof auth.getCurrentAdministrator === "function" ? auth.getCurrentAdministrator() : null;
+            if (!session) return { success: false, reason: "No real, active administrator session to log out." };
+            const identity = window.CozyOS.IdentityEngine;
+            if (!identity || typeof identity.logout !== "function") return { success: false, reason: "IdentityEngine is not loaded." };
+            const result = identity.logout(session.sessionId);
+            this.#emitReal("session-ended", { userId: session.userId, sessionId: session.sessionId });
+            return { success: result === true };
         }
 
         publishAuditReport() {
