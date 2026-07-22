@@ -326,6 +326,29 @@
             return { available: true, userId: id, username };
         }
 
+        /**
+         * resetPassword(username, newPassword)
+         *   Real — genuinely rehashes with a NEW random salt using the
+         *   exact same PBKDF2 parameters as createUser()/login(), never
+         *   reusing the old salt. Fails closed if the user doesn't
+         *   exist. Does not require the old password (an administrator-
+         *   initiated reset, not a self-service "change password" that
+         *   would need to verify the current one first — that is a
+         *   real, separate, not-yet-built capability).
+         */
+        async resetPassword(username, newPassword) {
+            if (!username || !newPassword) throw new TypeError("[Identity] resetPassword(): username and newPassword are required.");
+            const user = Array.from(this.#users.values()).find(u => u.username === username);
+            if (!user) return { available: false, reason: `No real user found with username "${username}".` };
+            if (typeof crypto === "undefined" || !crypto.subtle) return { available: false, reason: "Web Crypto API not available — cannot hash passwords securely." };
+            const salt = crypto.getRandomValues(new Uint8Array(16));
+            const hash = await this.#hashPassword(newPassword, salt);
+            user.salt = Array.from(salt);
+            user.hash = hash;
+            this.#logAudit("PASSWORD_RESET", username);
+            return { available: true, username };
+        }
+
         async login(username, password) {
             const user = Array.from(this.#users.values()).find(u => u.username === username);
             if (!user) { this.#diagnostics.loginsFailed++; return { available: false, reason: "Invalid username or password." }; }
