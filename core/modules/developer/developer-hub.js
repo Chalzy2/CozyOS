@@ -422,24 +422,34 @@
          *   means there is currently no real mechanism that could
          *   automatically supply a verified `userId` to this check. The
          *   honest consequence: this check fails closed whenever no real,
-         *   explicit `userId` is provided — which, given the missing
-         *   login infrastructure, is every call through the normal loader
-         *   path today. This is not a bug to work around; it is the
-         *   correct, safe behavior until a real login/session system
-         *   exists to supply a genuine current user. Fabricating a
-         *   "logged in as admin" default would defeat the entire purpose
-         *   of this policy.
+         *   explicit `userId` is provided.
+         *
+         *   REAL, EXPLICIT FALLBACK (Rule 93): if no explicit `userId` is
+         *   given, this now consults the real `DevAccessService`, whose
+         *   own priority chain is: a real `CozyOS.Auth` session always
+         *   wins; otherwise Development Mode only grants access when the
+         *   environment genuinely reads Development (see
+         *   dev-access-service.js's own header for the honest limits of
+         *   that check in a static, client-side deployment). If neither
+         *   `DevAccessService` nor an explicit `userId` can establish
+         *   access, this still fails closed exactly as before.
          */
         #checkAccess(userId) {
             const identity = window.CozyOS.IdentityEngine;
-            if (!identity || typeof identity.isPlatformAdmin !== "function") {
-                return { allowed: false, reason: "IdentityEngine is not loaded — access cannot be verified, so it is honestly refused rather than assumed safe." };
+            if (userId) {
+                if (!identity || typeof identity.isPlatformAdmin !== "function") {
+                    return { allowed: false, reason: "IdentityEngine is not loaded — access cannot be verified, so it is honestly refused rather than assumed safe." };
+                }
+                const allowed = identity.isPlatformAdmin(userId) || identity.isDeveloper(userId);
+                return { allowed, reason: allowed ? "Verified Platform Administrator or Developer." : `User "${userId}" is not a Platform Administrator or authorized Developer.` };
             }
-            if (!userId) {
-                return { allowed: false, reason: "No real, verified userId was provided — CozyOS has no real login/session mechanism yet to supply one automatically, so access is refused by default." };
+            const devAccess = window.CozyOS.DevAccessService;
+            if (devAccess && typeof devAccess.checkAccess === "function") {
+                const result = devAccess.checkAccess();
+                if (result.allowed) return { allowed: true, reason: `Access granted via ${result.method === "real-session" ? "a real, verified administrator session" : "Development Mode (environment: " + result.environment + ")"}.` };
+                return { allowed: false, reason: `${result.reason} (environment: ${result.environment}, development mode: ${result.developmentMode})` };
             }
-            const allowed = identity.isPlatformAdmin(userId) || identity.isDeveloper(userId);
-            return { allowed, reason: allowed ? "Verified Platform Administrator or Developer." : `User "${userId}" is not a Platform Administrator or authorized Developer.` };
+            return { allowed: false, reason: "No real, verified userId was provided, and DevAccessService is not loaded — access is refused by default." };
         }
 
         /**
