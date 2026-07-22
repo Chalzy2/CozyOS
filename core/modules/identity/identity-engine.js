@@ -320,9 +320,17 @@
             const salt = crypto.getRandomValues(new Uint8Array(16));
             const hash = await this.#hashPassword(password, salt);
             const id = this.#generateId("user");
-            this.#users.set(id, { id, username: this.#escapeHtml(username), orgId: orgId || null, roles, salt: Array.from(salt), hash, createdAt: new Date().toISOString(), delegates: [] });
+            const user = { id, username: this.#escapeHtml(username), orgId: orgId || null, roles, salt: Array.from(salt), hash, createdAt: new Date().toISOString(), delegates: [] };
+            this.#users.set(id, user);
             this.#diagnostics.usersCreated++;
             this.#logAudit("USER_CREATED", username);
+            // Real persistence (Rule 116) — composes IdentityStorage;
+            // never blocks the real, in-memory result if storage is
+            // unavailable or fails, since in-memory operation must
+            // continue to work exactly as it always has.
+            if (window.CozyOS.IdentityStorage && typeof window.CozyOS.IdentityStorage.save === "function") {
+                try { await window.CozyOS.IdentityStorage.save("users", user); } catch (_err) { /* honestly non-fatal - in-memory state remains authoritative for this session */ }
+            }
             return { available: true, userId: id, username };
         }
 
@@ -346,7 +354,30 @@
             user.salt = Array.from(salt);
             user.hash = hash;
             this.#logAudit("PASSWORD_RESET", username);
+            if (window.CozyOS.IdentityStorage && typeof window.CozyOS.IdentityStorage.save === "function") {
+                try { await window.CozyOS.IdentityStorage.save("users", user); } catch (_err) { /* honestly non-fatal */ }
+            }
             return { available: true, username };
+        }
+
+        /**
+         * restorePersistedUsers()
+         *   Real — loads every real, previously-persisted user back into
+         *   #users. Must be awaited before this engine is trusted to
+         *   know "does any user exist" (e.g., before rendering First-Run
+         *   Setup vs. Login). Honestly a no-op if IdentityStorage isn't
+         *   loaded or has nothing persisted yet — never fabricates users.
+         */
+        async restorePersistedUsers() {
+            const storage = window.CozyOS.IdentityStorage;
+            if (!storage || typeof storage.loadAll !== "function") return { restored: 0, reason: "IdentityStorage is not loaded." };
+            const result = await storage.loadAll("users");
+            if (!result.success) return { restored: 0, reason: result.reason };
+            let restored = 0;
+            for (const user of result.records) {
+                if (!this.#users.has(user.id)) { this.#users.set(user.id, user); restored++; }
+            }
+            return { restored };
         }
 
         async login(username, password) {
@@ -834,6 +865,19 @@
 
     if (window.CozyOS.IdentityEngine?.getVersion) { if (window.CozyOS.IdentityEngine.getVersion() !== IE_VERSION) throw new Error("[CozyOS Framework Execution Error] VERSION_CONFLICT: IdentityEngine."); return; }
     window.CozyOS.IdentityEngine = new CozyOSIdentityEngine();
+
+    /**
+     * window.CozyOS.IdentityEngine.ready (Rule 116)
+     *   A real, public promise — resolves once real persisted users have
+     *   been loaded back into memory (or immediately, honestly, if
+     *   IdentityStorage isn't loaded/has nothing persisted). Any code
+     *   that needs to know "does a real user already exist" (e.g.
+     *   developer-hub.js deciding whether to show First-Run Setup or the
+     *   Login form) must await this before checking listUsers(), or it
+     *   may act on a still-empty in-memory state that real persisted
+     *   users haven't been restored into yet.
+     */
+    window.CozyOS.IdentityEngine.ready = window.CozyOS.IdentityEngine.restorePersistedUsers();
 
     (function reg(d) {
         function attempt() { if (typeof window.CozyOS.registerCoordinator !== "function") return false; try { window.CozyOS.registerCoordinator(d); } catch (_e) { /* non-fatal */ } return true; }
