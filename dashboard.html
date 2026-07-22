@@ -398,6 +398,32 @@
     <!-- Authentication Coordinator (Rule 96) — real, single facade over
          CozyOS.Auth, AuthPolicyEngine, and AuthFactorRegistry. -->
     <script src="core/security/auth-coordinator.js"></script>
+    <!-- Trusted Device Manager (Rule 100) — real device lifecycle,
+         registers a genuine "trusted-device" provider with
+         AuthFactorRegistry, replacing that factor's stub. -->
+    <script src="core/security/trusted-device-manager.js"></script>
+    <!-- Recovery Question Manager (Rule 101) — real, single source of
+         truth for administrator recovery questions. Registers a real
+         "recovery-questions" provider with AuthFactorRegistry. -->
+    <script src="core/security/recovery-question-manager.js"></script>
+    <!-- Recovery Phrase Manager (Rule 102) — real, single source of
+         truth for administrator recovery phrases. Registers a real
+         "recovery-phrase" provider with AuthFactorRegistry. -->
+    <script src="core/security/recovery-phrase-manager.js"></script>
+    <!-- Session Manager (Rule 103) — real composition layer over
+         IdentityEngine's own already-complete session backend. Adds
+         idle-timeout automation, trusted-device binding, and
+         administrator bulk operations. -->
+    <script src="core/security/session-manager.js"></script>
+    <!-- Authentication Factor Providers (Rule 104) — the shared base
+         must load first; each provider is a thin, real coordinator
+         composing it. All 4 register with AuthFactorRegistry
+         automatically, honestly starting as isReal:false. -->
+    <script src="core/security/factor-provider-base.js"></script>
+    <script src="core/security/face-provider.js"></script>
+    <script src="core/security/fingerprint-provider.js"></script>
+    <script src="core/security/voice-provider.js"></script>
+    <script src="core/security/google-account-provider.js"></script>
     <!-- Real bug fix: cozy-context-engine.js was migrated to
          PlatformEventBus in an early milestone but never received a
          script tag on this specific page. -->
