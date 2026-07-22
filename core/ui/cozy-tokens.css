@@ -57,6 +57,11 @@
     --cozy-info: #3b82f6;
     --cozy-warning: #f59e0b;
     --cozy-error: #ef4444;
+    /* Added for the CozyOS Enterprise UI Standard's 5-color status
+       language — the 5th meaning (In Progress / Pending) had no real
+       token yet; the other 4 (Certified/Healthy, Warning, Information,
+       Failed/Critical) already existed above and are reused as-is. */
+    --cozy-pending: #f97316;
 }
 
 /* ==========================================================================
