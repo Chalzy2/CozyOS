@@ -375,6 +375,29 @@
          wrongly open) — but Identity itself needs to actually load for a
          real login flow to ever succeed here. -->
     <script src="core/modules/identity/identity-engine.js"></script>
+    <!-- CozyOS.Auth (Rule 92) — real administrator session bridge over
+         IdentityEngine's own private events, republishing onto the
+         shared PlatformEventBus. Does not authenticate users itself. -->
+    <script src="core/security/cozy-auth.js"></script>
+    <!-- Development Access Service (Rule 93) — real, disclosed-limitation
+         development convenience. NEVER deploy this file to the real
+         production URL; see its own header for why the environment
+         check cannot be a true security boundary in this static,
+         client-side application. -->
+    <script src="core/security/dev-access-service.js"></script>
+    <!-- Authentication Policy Engine (Rule 94) — real AND/OR policy
+         evaluator. Face/Fingerprint/Voice/Google adapters are honest
+         stubs; any policy requiring them is correctly unreachable until
+         a real adapter is registered. -->
+    <!-- Authentication Factor Registry (Rule 95) — real, single source of
+         truth for which authentication factors exist and what can
+         currently verify them. Must load before auth-policy-engine.js,
+         which now depends on it. -->
+    <script src="core/security/auth-factor-registry.js"></script>
+    <script src="core/security/auth-policy-engine.js"></script>
+    <!-- Authentication Coordinator (Rule 96) — real, single facade over
+         CozyOS.Auth, AuthPolicyEngine, and AuthFactorRegistry. -->
+    <script src="core/security/auth-coordinator.js"></script>
     <!-- Real bug fix: cozy-context-engine.js was migrated to
          PlatformEventBus in an early milestone but never received a
          script tag on this specific page. -->
