@@ -617,6 +617,99 @@
          *   Distinct from #renderDeveloperLoginForm (Rule 93's disclosed,
          *   non-cryptographic dev convenience).
          */
+        /**
+         * #renderFirstRunSetup()
+         *   Real — shown only when IdentityEngine genuinely has zero
+         *   users (checked via the real listUsers().length, never
+         *   displaying the actual list to an unauthenticated visitor).
+         *   Creates the first real administrator account via the real
+         *   createUser(). Avoids requiring browser console access
+         *   entirely, per the reported mobile-device limitation.
+         */
+        #renderFirstRunSetup() {
+            const identity = window.CozyOS.IdentityEngine;
+            if (!identity || typeof identity.listUsers !== "function") return "";
+            if (identity.listUsers().length > 0) return "";
+            return `<div class="cz-panel" style="margin:16px auto;max-width:480px;">
+                <h3>Create First Administrator Account</h3>
+                <p class="cz-muted" style="font-size:13px;">No real administrator account exists yet.</p>
+                <input type="text" id="cz-setup-username" placeholder="Username" style="width:100%;margin-bottom:8px;" />
+                <input type="password" id="cz-setup-password" placeholder="Password" style="width:100%;margin-bottom:8px;" />
+                <input type="password" id="cz-setup-confirm" placeholder="Confirm Password" style="width:100%;margin-bottom:8px;" />
+                <button class="cz-btn" id="cz-setup-submit">Create Account</button>
+                <p id="cz-setup-error" class="cz-muted" style="font-size:13px;color:var(--cozy-error,#ef4444);"></p>
+            </div>`;
+        }
+
+        #bindFirstRunSetup(container) {
+            const submitBtn = container.querySelector("#cz-setup-submit");
+            if (!submitBtn) return;
+            submitBtn.addEventListener("click", async () => {
+                const username = container.querySelector("#cz-setup-username")?.value || "";
+                const password = container.querySelector("#cz-setup-password")?.value || "";
+                const confirm = container.querySelector("#cz-setup-confirm")?.value || "";
+                const errorEl = container.querySelector("#cz-setup-error");
+                const identity = window.CozyOS.IdentityEngine;
+                if (!identity) { if (errorEl) errorEl.textContent = "IdentityEngine is not loaded."; return; }
+                if (!username || !password) { if (errorEl) errorEl.textContent = "Username and password are both required."; return; }
+                if (password !== confirm) { if (errorEl) errorEl.textContent = "Passwords do not match."; return; }
+                try {
+                    await identity.createUser({ username, password, roles: ["platform-admin"] });
+                    await this.init(container);
+                } catch (err) {
+                    if (errorEl) errorEl.textContent = err.message;
+                }
+            });
+        }
+
+        /**
+         * #renderForgotPasswordForm()
+         *   Real — a genuine reset via IdentityEngine.resetPassword(),
+         *   not a self-service "verify current password first" flow
+         *   (that is a real, separate, not-yet-built capability, stated
+         *   honestly rather than implied). Hidden by default; toggled
+         *   via the "Forgot Password?" link on the login form.
+         */
+        #renderForgotPasswordForm() {
+            const identity = window.CozyOS.IdentityEngine;
+            if (!identity || typeof identity.resetPassword !== "function") return "";
+            return `<div id="cz-forgot-panel" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--cozy-border,#444);">
+                <h4>Reset Password</h4>
+                <input type="text" id="cz-reset-username" placeholder="Username" style="width:100%;margin-bottom:8px;" />
+                <input type="password" id="cz-reset-password" placeholder="New Password" style="width:100%;margin-bottom:8px;" />
+                <input type="password" id="cz-reset-confirm" placeholder="Confirm New Password" style="width:100%;margin-bottom:8px;" />
+                <button class="cz-btn" id="cz-reset-submit">Reset Password</button>
+                <p id="cz-reset-error" class="cz-muted" style="font-size:13px;color:var(--cozy-error,#ef4444);"></p>
+                <p id="cz-reset-success" class="cz-muted" style="font-size:13px;color:var(--cozy-success,#22c55e);"></p>
+            </div>`;
+        }
+
+        #bindForgotPasswordForm(container) {
+            const toggleLink = container.querySelector("#cz-forgot-toggle");
+            const panel = container.querySelector("#cz-forgot-panel");
+            if (toggleLink && panel) {
+                toggleLink.addEventListener("click", () => { panel.style.display = panel.style.display === "none" ? "block" : "none"; });
+            }
+            const submitBtn = container.querySelector("#cz-reset-submit");
+            if (!submitBtn) return;
+            submitBtn.addEventListener("click", async () => {
+                const username = container.querySelector("#cz-reset-username")?.value || "";
+                const password = container.querySelector("#cz-reset-password")?.value || "";
+                const confirm = container.querySelector("#cz-reset-confirm")?.value || "";
+                const errorEl = container.querySelector("#cz-reset-error");
+                const successEl = container.querySelector("#cz-reset-success");
+                if (errorEl) errorEl.textContent = "";
+                if (successEl) successEl.textContent = "";
+                const identity = window.CozyOS.IdentityEngine;
+                if (!identity) { if (errorEl) errorEl.textContent = "IdentityEngine is not loaded."; return; }
+                if (!username || !password) { if (errorEl) errorEl.textContent = "Username and new password are both required."; return; }
+                if (password !== confirm) { if (errorEl) errorEl.textContent = "Passwords do not match."; return; }
+                const result = await identity.resetPassword(username, password);
+                if (!result.available) { if (errorEl) errorEl.textContent = result.reason; return; }
+                if (successEl) successEl.textContent = "Password reset. You can now sign in with your new password.";
+            });
+        }
+
         #renderAdminLoginForm() {
             if (!window.CozyOS.AuthCoordinator) {
                 // Real, visible diagnostic instead of silently hiding the
@@ -638,6 +731,8 @@
                 <label style="display:block;margin-bottom:8px;font-size:13px;"><input type="checkbox" id="cz-admin-login-remember" /> Remember this device (30 days)</label>
                 <button class="cz-btn" id="cz-admin-login-submit">Sign In</button>
                 <p id="cz-admin-login-error" class="cz-muted" style="font-size:13px;color:var(--cozy-error,#ef4444);"></p>
+                <a href="#" id="cz-forgot-toggle" style="font-size:13px;">Forgot Password?</a>
+                ${this.#renderForgotPasswordForm()}
             </div>`;
         }
 
@@ -703,8 +798,10 @@
                     <h2>Access Denied</h2>
                     <p>CozyBuilder is a Platform Administrator-only tool.</p>
                     <p class="cz-muted" style="font-size:13px;">${access.reason.replace(/</g, "&lt;")}</p>
-                </div>${this.#renderEnvironmentStatus(access)}${this.#renderAuthenticationStatus(access)}${this.#renderAdminLoginForm()}${this.#renderDeveloperLoginForm(container)}`;
+                </div>${this.#renderEnvironmentStatus(access)}${this.#renderAuthenticationStatus(access)}${this.#renderFirstRunSetup()}${this.#renderAdminLoginForm()}${this.#renderDeveloperLoginForm(container)}`;
+                this.#bindFirstRunSetup(container);
                 this.#bindAdminLoginForm(container);
+                this.#bindForgotPasswordForm(container);
                 this.#bindDeveloperLoginForm(container);
                 return;
             }
