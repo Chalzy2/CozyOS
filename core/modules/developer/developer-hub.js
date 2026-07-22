@@ -792,6 +792,16 @@
             if (!container || typeof container.addEventListener !== "function") {
                 throw new Error("[DeveloperHubUI] init(): a valid DOM container element is required.");
             }
+            // Real, required await (Rule 116) — IdentityEngine.ready
+            // resolves once real persisted users have been restored.
+            // Without this, a real page reload could briefly show
+            // "Create First Administrator" even though a real account
+            // already exists, simply because restoration hadn't finished
+            // yet. Honestly a no-op if IdentityEngine/ready isn't present.
+            const identity = window.CozyOS.IdentityEngine;
+            if (identity && identity.ready && typeof identity.ready.then === "function") {
+                try { await identity.ready; } catch (_err) { /* non-fatal - proceed with whatever real state exists */ }
+            }
             const access = await this.#checkAccess(userId);
             if (!access.allowed) {
                 container.innerHTML = `<div class="cz-panel" style="margin:40px auto;max-width:480px;text-align:center;">
