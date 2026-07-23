@@ -609,15 +609,6 @@
          *   than assuming success.
          */
         /**
-         * #renderAdminLoginForm()
-         *   Real Administrator Login — collects credentials only,
-         *   authenticates via AuthCoordinator.login() (which composes
-         *   IdentityEngine.login() directly; SessionManager/CozyOS.Auth
-         *   update automatically via their existing event bridges).
-         *   Distinct from #renderDeveloperLoginForm (Rule 93's disclosed,
-         *   non-cryptographic dev convenience).
-         */
-        /**
          * #renderFirstRunSetup()
          *   Real — shown only when IdentityEngine genuinely has zero
          *   users (checked via the real listUsers().length, never
@@ -663,92 +654,38 @@
         }
 
         /**
-         * #renderForgotPasswordForm()
-         *   Real — a genuine reset via IdentityEngine.resetPassword(),
-         *   not a self-service "verify current password first" flow
-         *   (that is a real, separate, not-yet-built capability, stated
-         *   honestly rather than implied). Hidden by default; toggled
-         *   via the "Forgot Password?" link on the login form.
+         * #renderOpenAdminLoginButton() / #bindOpenAdminLoginButton()
+         *   Milestone 130, Decision 1 — Developer Hub does not own
+         *   authentication and never re-implements it. Replaces the
+         *   removed duplicate Administrator Login form (which called a
+         *   non-existent `AuthCoordinator.login()`) and the removed
+         *   standalone "Reset Password" panel. This mounts the one, real
+         *   `window.CozyOS.LoginGate` (core/shell/cozy-login-gate.js) —
+         *   the only canonical Administrator Login — directly into this
+         *   same container. Forgot-password recovery is owned entirely
+         *   by LoginGate's own "Forgot Password?" link; this file never
+         *   touches IdentityEngine.resetPassword() or any recovery
+         *   factor directly.
          */
-        #renderForgotPasswordForm() {
-            const identity = window.CozyOS.IdentityEngine;
-            if (!identity || typeof identity.resetPassword !== "function") return "";
-            return `<div id="cz-forgot-panel" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--cozy-border,#444);">
-                <h4>Reset Password</h4>
-                <input type="text" id="cz-reset-username" placeholder="Username" style="width:100%;margin-bottom:8px;" />
-                <input type="password" id="cz-reset-password" placeholder="New Password" style="width:100%;margin-bottom:8px;" />
-                <input type="password" id="cz-reset-confirm" placeholder="Confirm New Password" style="width:100%;margin-bottom:8px;" />
-                <button class="cz-btn" id="cz-reset-submit">Reset Password</button>
-                <p id="cz-reset-error" class="cz-muted" style="font-size:13px;color:var(--cozy-error,#ef4444);"></p>
-                <p id="cz-reset-success" class="cz-muted" style="font-size:13px;color:var(--cozy-success,#22c55e);"></p>
-            </div>`;
-        }
-
-        #bindForgotPasswordForm(container) {
-            const toggleLink = container.querySelector("#cz-forgot-toggle");
-            const panel = container.querySelector("#cz-forgot-panel");
-            if (toggleLink && panel) {
-                toggleLink.addEventListener("click", () => { panel.style.display = panel.style.display === "none" ? "block" : "none"; });
-            }
-            const submitBtn = container.querySelector("#cz-reset-submit");
-            if (!submitBtn) return;
-            submitBtn.addEventListener("click", async () => {
-                const username = container.querySelector("#cz-reset-username")?.value || "";
-                const password = container.querySelector("#cz-reset-password")?.value || "";
-                const confirm = container.querySelector("#cz-reset-confirm")?.value || "";
-                const errorEl = container.querySelector("#cz-reset-error");
-                const successEl = container.querySelector("#cz-reset-success");
-                if (errorEl) errorEl.textContent = "";
-                if (successEl) successEl.textContent = "";
-                const identity = window.CozyOS.IdentityEngine;
-                if (!identity) { if (errorEl) errorEl.textContent = "IdentityEngine is not loaded."; return; }
-                if (!username || !password) { if (errorEl) errorEl.textContent = "Username and new password are both required."; return; }
-                if (password !== confirm) { if (errorEl) errorEl.textContent = "Passwords do not match."; return; }
-                const result = await identity.resetPassword(username, password);
-                if (!result.available) { if (errorEl) errorEl.textContent = result.reason; return; }
-                if (successEl) successEl.textContent = "Password reset. You can now sign in with your new password.";
-            });
-        }
-
-        #renderAdminLoginForm() {
-            if (!window.CozyOS.AuthCoordinator) {
-                // Real, visible diagnostic instead of silently hiding the
-                // form - the previous version returned "" here, which
-                // matches a real, confirmed live-deployment report: the
-                // form vanishes with zero indication why if
-                // AuthCoordinator fails to load for any reason (stale
-                // file, wrong path, load-order issue, a JS error inside
-                // it). This makes that failure mode visible on-page.
+        #renderOpenAdminLoginButton() {
+            if (!window.CozyOS.LoginGate || typeof window.CozyOS.LoginGate.mountIfNeeded !== "function") {
                 return `<div class="cz-panel" style="margin:16px auto;max-width:480px;">
                     <h3>Administrator Login — Unavailable</h3>
-                    <p class="cz-muted" style="font-size:13px;color:var(--cozy-error,#ef4444);">AuthenticationCoordinator (window.CozyOS.AuthCoordinator) is not loaded. Check: (1) browser devtools console for a script error, (2) that core/security/auth-coordinator.js is actually present at that path in this deployment, (3) that it loads AFTER auth-factor-registry.js and auth-policy-engine.js in dashboard.html, (4) browser cache — try a hard refresh.</p>
+                    <p class="cz-muted" style="font-size:13px;color:var(--cozy-error,#ef4444);">CozyOS.LoginGate (core/shell/cozy-login-gate.js) is not loaded — cannot open the canonical Administrator Login. Check that cozy-login-gate.js is present and loads after auth-coordinator.js.</p>
                 </div>`;
             }
-            return `<div class="cz-panel" style="margin:16px auto;max-width:480px;">
+            return `<div class="cz-panel" style="margin:16px auto;max-width:480px;text-align:center;">
                 <h3>Administrator Login</h3>
-                <input type="text" id="cz-admin-login-username" placeholder="Username" style="width:100%;margin-bottom:8px;" />
-                <input type="password" id="cz-admin-login-password" placeholder="Password" style="width:100%;margin-bottom:8px;" />
-                <label style="display:block;margin-bottom:8px;font-size:13px;"><input type="checkbox" id="cz-admin-login-remember" /> Remember this device (30 days)</label>
-                <button class="cz-btn" id="cz-admin-login-submit">Sign In</button>
-                <p id="cz-admin-login-error" class="cz-muted" style="font-size:13px;color:var(--cozy-error,#ef4444);"></p>
-                <a href="#" id="cz-forgot-toggle" style="font-size:13px;">Forgot Password?</a>
-                ${this.#renderForgotPasswordForm()}
+                <p class="cz-muted" style="font-size:13px;">Developer Hub does not authenticate on its own. This opens the one, real Administrator Login Gate.</p>
+                <button class="cz-btn" id="cz-open-admin-login">Open Administrator Login</button>
             </div>`;
         }
 
-        #bindAdminLoginForm(container) {
-            const submitBtn = container.querySelector("#cz-admin-login-submit");
-            if (!submitBtn) return;
-            submitBtn.addEventListener("click", async () => {
-                const username = container.querySelector("#cz-admin-login-username")?.value || "";
-                const password = container.querySelector("#cz-admin-login-password")?.value || "";
-                const remember = container.querySelector("#cz-admin-login-remember")?.checked || false;
-                const errorEl = container.querySelector("#cz-admin-login-error");
-                const coordinator = window.CozyOS.AuthCoordinator;
-                if (!coordinator) { if (errorEl) errorEl.textContent = "AuthenticationCoordinator is not loaded."; return; }
-                const result = await coordinator.login({ username, password, rememberDevice: remember, deviceNickname: "Browser Session" });
-                if (!result.success) { if (errorEl) errorEl.textContent = result.reason; return; }
-                await this.init(container); // re-check access now that a real session exists
+        #bindOpenAdminLoginButton(container) {
+            const btn = container.querySelector("#cz-open-admin-login");
+            if (!btn) return;
+            btn.addEventListener("click", async () => {
+                await window.CozyOS.LoginGate.mountIfNeeded(container, async () => { await this.init(container); });
             });
         }
 
@@ -808,10 +745,9 @@
                     <h2>Access Denied</h2>
                     <p>CozyBuilder is a Platform Administrator-only tool.</p>
                     <p class="cz-muted" style="font-size:13px;">${access.reason.replace(/</g, "&lt;")}</p>
-                </div>${this.#renderEnvironmentStatus(access)}${this.#renderAuthenticationStatus(access)}${this.#renderFirstRunSetup()}${this.#renderAdminLoginForm()}${this.#renderDeveloperLoginForm(container)}`;
+                </div>${this.#renderEnvironmentStatus(access)}${this.#renderAuthenticationStatus(access)}${this.#renderFirstRunSetup()}${this.#renderOpenAdminLoginButton()}${this.#renderDeveloperLoginForm(container)}`;
                 this.#bindFirstRunSetup(container);
-                this.#bindAdminLoginForm(container);
-                this.#bindForgotPasswordForm(container);
+                this.#bindOpenAdminLoginButton(container);
                 this.#bindDeveloperLoginForm(container);
                 return;
             }
