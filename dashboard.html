@@ -385,7 +385,11 @@
          (core/ui/cozy-base-linker.js, modules/quarry/*) but never
          implemented until now. Listens to IdentityEngine/
          AdminRecoveryPolicy session events; loaded after both. -->
-    <script src="core/modules/identity/cozy-auth.js"></script>
+    <!-- Milestone 131c bug fix: this tag pointed at the wrong folder
+         (core/modules/identity/) since Milestone 124's original fix
+         regressed at some point before this zip; the real file has
+         always lived at core/security/cozy-auth.js. -->
+    <script src="core/security/cozy-auth.js"></script>
     <!-- Milestone 120: real session snapshot service. Loaded before
          AuthCoordinator so establishFromIdentity()/establishFromExternalAuth()
          are available the first time AuthCoordinator needs them. -->
@@ -407,26 +411,16 @@
          changelog, not expanded on further here); AdminRecoveryWizard
          loaded last since it composes all of the above. -->
     <!-- ============================================================
-         Milestone 131a — Shell Ownership Review DECISION:
-         core/cozy-shell.html is now the one canonical production entry
-         point and the one real Login Gate. This page (dashboard.html)
-         is LEGACY and should not receive new feature work.
-
-         The Login Gate bootstrap below is INTENTIONALLY left wired
-         here, unretired, for one real reason: PharmacyOS,
-         CozyPaymentProviderEngine, WorkspaceShell, and Developer Hub
-         are only reachable through this page today — cozy-shell.html
-         does not yet load them. Removing this gate now would either
-         (a) leave those four reachable with no login at all, or
-         (b) make them unreachable altogether. Both are worse than the
-         current, real, working, gated state. A follow-up milestone
-         should port those four into cozy-shell.html; once that's
-         verified, this entire bootstrap script and its LoginGate/
-         AdminRecoveryWizard/core-security script tags below should be
-         deleted from this page for real, leaving cozy-shell.html as
-         the only Login Gate, per the "one Login Gate only" rule.
-         See changelog.md / migration-log-addendum.md for the full
-         Ownership Report.
+         Milestone 131d — Architecture Decision (LOCKED):
+         dashboard.html is the permanent CozyOS production shell. The
+         earlier "131a" claim that core/cozy-shell.html would become
+         canonical (and 131c's work migrating the auth chain there) is
+         withdrawn per this explicit, final decision. core/cozy-shell.html
+         is a shared shell COMPONENT only — it does not authenticate and
+         is not a production entry point. All future authentication work
+         (CozyOS Authenticator, Administrator Recovery, Login Gate,
+         Passkeys, Trusted Devices, WebAuthn) targets this page. This
+         decision is final unless explicitly changed again.
          ============================================================ -->
     <script src="core/security/factor-provider-base.js"></script>
     <script src="core/security/auth-factor-registry.js"></script>
