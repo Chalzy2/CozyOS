@@ -1,12 +1,3 @@
-<!-- ================================================================
-     Milestone 131a — Shell Ownership Review DECISION:
-     This file is a STALE DUPLICATE of core/cozy-shell.html (confirmed:
-     identical except this copy is missing the MpesaOS/ShopOS plugin
-     chain, and now also missing the real Login Gate / auth / recovery
-     chain added to core/cozy-shell.html). Do not add new features
-     here — core/cozy-shell.html is canonical. Recommend deleting this
-     file in a future milestone once nothing references this path.
-     ================================================================ -->
 <!DOCTYPE html>
 <html lang="en" data-cozy-app="cozyos">
 <head>
@@ -86,6 +77,10 @@
 </head>
 <body>
 
+    <!-- Milestone 131d — Architecture Decision (LOCKED): dashboard.html
+         is the permanent CozyOS production shell. This file is a shared
+         shell COMPONENT only — it does not authenticate and is not a
+         production entry point. Do not add an auth chain here. -->
     <!--
       CozyOS Shared Shell — the permanent foundation for every current and
       future end-user CozyOS application (ShopOS, QuarryOS, HospitalOS,
@@ -163,6 +158,32 @@
          script-execution time. -->
     <script src="core/shell/platform-event-bus.js"></script>
     <script src="core/shell/module-loading-manager.js"></script>
+
+    <!-- MpesaOS (Business Applications Unification milestone) — real
+         sub-engines, then the main engine, then the embeddable End User
+         module. Same chain as dashboard.html, since ModuleRegistry-driven
+         app visibility is shared across both workspaces. -->
+    <script src="core/plugins/mpesaOS-float.js"></script>
+    <script src="core/plugins/mpesaOS-till.js"></script>
+    <script src="core/plugins/mpesaOS-paybill.js"></script>
+    <script src="core/plugins/mpesaOS-reporting.js"></script>
+    <script src="core/modules/payment-provider/mpesa-provider.js"></script>
+    <script src="core/plugins/mpesaOS.js"></script>
+    <script src="core/modules/mpesaos/mpesaos.js"></script>
+
+    <!-- ShopOS — same chain as dashboard.html. -->
+    <script src="core/plugins/shopOS-core.js"></script>
+    <script src="core/plugins/shopOS-product.js"></script>
+    <script src="core/plugins/shopOS-inventory.js"></script>
+    <script src="core/plugins/shopOS-sales.js"></script>
+    <script src="core/plugins/shopOS-purchasing.js"></script>
+    <script src="core/plugins/shopOS-payments.js"></script>
+    <script src="core/plugins/shopOS-bookkeeping.js"></script>
+    <script src="core/plugins/shopOS-reconciliation.js"></script>
+    <script src="core/plugins/shopOS-reporting.js"></script>
+    <script src="core/plugins/shopOS-dashboard.js"></script>
+    <script src="core/plugins/shopOS-search.js"></script>
+    <script src="core/modules/shopos/shopos.js"></script>
 
     <!-- Context Engine — new, real, shell-owned, zero fabricated content (see its own header). -->
     <script src="core/context/cozy-context-engine.js"></script>
