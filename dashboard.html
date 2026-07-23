@@ -385,7 +385,7 @@
          (core/ui/cozy-base-linker.js, modules/quarry/*) but never
          implemented until now. Listens to IdentityEngine/
          AdminRecoveryPolicy session events; loaded after both. -->
-    <script src="core/modules/identity/cozy-auth.js"></script>
+    <script src="core/security/cozy-auth.js"></script>
     <!-- Milestone 120: real session snapshot service. Loaded before
          AuthCoordinator so establishFromIdentity()/establishFromExternalAuth()
          are available the first time AuthCoordinator needs them. -->
@@ -716,6 +716,12 @@
     <script src="core/modules/shopos/shopos.js"></script>
     <script src="core/plugins/pharmacyOS.js"></script>
     <script src="core/dashboard.js"></script>
+
+    <!-- Milestone 124: real Administrator Login Gate. Loaded after
+         AuthCoordinator/WorkspaceShell so mountIfNeeded() can call both;
+         the bootstrap block below already checks for LoginGate and falls
+         back to unconditional mount if this script is ever absent. -->
+    <script src="core/shell/cozy-login-gate.js"></script>
 
     <!-- 3. BOOTSTRAP: mount the Workspace Shell once it and its scripts have
          loaded. Bounded retry (same convention already used elsewhere in
