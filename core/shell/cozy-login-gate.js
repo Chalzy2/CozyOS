@@ -43,7 +43,7 @@
     "use strict";
 
     window.CozyOS = window.CozyOS || {};
-    const GATE_VERSION = "1.0.0-ENTERPRISE";
+    const GATE_VERSION = "1.1.0-ENTERPRISE"; // Milestone 125a: Remember Me, Login History, Change Password UI
 
     function escapeHtml(v) {
         return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -75,6 +75,10 @@
                     <label style="font-size:12px;color:#444;">Password
                         <input id="cozy-login-password" type="password" autocomplete="current-password" required
                             style="display:block;width:100%;box-sizing:border-box;padding:8px;margin-top:4px;border:1px solid #ccc;border-radius:6px;">
+                    </label>
+                    <label style="font-size:12px;color:#444;display:flex;align-items:center;gap:6px;">
+                        <input id="cozy-login-remember-me" type="checkbox" checked>
+                        Remember me on this device
                     </label>
                     <button type="submit" style="padding:9px;border:none;border-radius:6px;background:#2563eb;color:#fff;font-weight:600;cursor:pointer;">
                         Sign In
@@ -110,16 +114,78 @@
         el.style.display = "block";
     }
 
+    function closeModal() { document.getElementById("cozy-auth-modal")?.remove(); }
+
+    function openModal(title, bodyHtml) {
+        closeModal();
+        const modal = document.createElement("div");
+        modal.id = "cozy-auth-modal";
+        modal.style.cssText = "position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;";
+        modal.innerHTML = `
+            <div style="background:#fff;max-width:420px;width:90%;max-height:80vh;overflow:auto;border-radius:10px;padding:20px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <h3 style="margin:0;font-size:16px;">${escapeHtml(title)}</h3>
+                    <button id="cozy-auth-modal-close" style="border:none;background:none;font-size:16px;cursor:pointer;">✕</button>
+                </div>
+                ${bodyHtml}
+            </div>`;
+        document.body.appendChild(modal);
+        document.getElementById("cozy-auth-modal-close").addEventListener("click", closeModal);
+        return modal;
+    }
+
+    /** Login History (Milestone 125a) — reads AuthCoordinator.getLoginHistory(), which itself reads IdentityEngine's existing audit log. No new storage. */
+    function openLoginHistory(userId) {
+        const result = window.CozyOS.AuthCoordinator.getLoginHistory(userId);
+        const rows = (result.entries || []).slice().reverse().map(e =>
+            `<tr><td style="padding:4px 8px;font-size:12px;">${escapeHtml(e.timestamp)}</td><td style="padding:4px 8px;font-size:12px;">${escapeHtml(e.action)}</td></tr>`
+        ).join("") || `<tr><td colspan="2" style="padding:8px;font-size:12px;color:#666;">No login history recorded yet.</td></tr>`;
+        openModal("Login History", `<table style="width:100%;border-collapse:collapse;">${rows}</table>`);
+    }
+
+    /** Change Password (Milestone 125a) — real self-service change via AuthCoordinator.changePassword() → IdentityEngine.changePassword(), which verifies the current password. */
+    function openChangePassword(userId) {
+        const modal = openModal("Change Password", `
+            <form id="cozy-change-password-form" style="display:flex;flex-direction:column;gap:10px;">
+                <label style="font-size:12px;color:#444;">Current Password
+                    <input id="cozy-cp-old" type="password" autocomplete="current-password" required style="display:block;width:100%;box-sizing:border-box;padding:8px;margin-top:4px;border:1px solid #ccc;border-radius:6px;">
+                </label>
+                <label style="font-size:12px;color:#444;">New Password
+                    <input id="cozy-cp-new" type="password" autocomplete="new-password" required style="display:block;width:100%;box-sizing:border-box;padding:8px;margin-top:4px;border:1px solid #ccc;border-radius:6px;">
+                </label>
+                <button type="submit" style="padding:9px;border:none;border-radius:6px;background:#2563eb;color:#fff;font-weight:600;cursor:pointer;">Change Password</button>
+                <div id="cozy-cp-error" style="display:none;color:#b91c1c;font-size:12px;"></div>
+            </form>`);
+        modal.querySelector("#cozy-change-password-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const oldPassword = modal.querySelector("#cozy-cp-old").value;
+            const newPassword = modal.querySelector("#cozy-cp-new").value;
+            const result = await window.CozyOS.AuthCoordinator.changePassword(userId, oldPassword, newPassword);
+            if (!result.available) {
+                const err = modal.querySelector("#cozy-cp-error");
+                err.textContent = result.reason || "Change password failed.";
+                err.style.display = "block";
+                return;
+            }
+            closeModal();
+        });
+    }
+
     function renderSignedInBar(userId) {
         if (document.getElementById("cozy-auth-bar")) return;
         const bar = document.createElement("div");
         bar.id = "cozy-auth-bar";
         bar.style.cssText = "position:fixed;top:0;right:0;z-index:99999;padding:8px 14px;font:12px system-ui,sans-serif;background:#111827;color:#fff;border-bottom-left-radius:8px;display:flex;gap:10px;align-items:center;";
-        bar.innerHTML = `<span>Signed in: ${escapeHtml(userId || "administrator")}</span><button id="cozy-logout-button" style="padding:4px 10px;border:none;border-radius:5px;background:#ef4444;color:#fff;cursor:pointer;font-size:12px;">Logout</button>`;
+        bar.innerHTML = `<span>Signed in: ${escapeHtml(userId || "administrator")}</span>
+            <button id="cozy-login-history-button" style="padding:4px 10px;border:none;border-radius:5px;background:#374151;color:#fff;cursor:pointer;font-size:12px;">Login History</button>
+            <button id="cozy-change-password-button" style="padding:4px 10px;border:none;border-radius:5px;background:#374151;color:#fff;cursor:pointer;font-size:12px;">Change Password</button>
+            <button id="cozy-logout-button" style="padding:4px 10px;border:none;border-radius:5px;background:#ef4444;color:#fff;cursor:pointer;font-size:12px;">Logout</button>`;
         document.body.appendChild(bar);
         document.getElementById("cozy-logout-button").addEventListener("click", () => {
             try { window.CozyOS.AuthCoordinator.logout(); } finally { window.location.reload(); }
         });
+        document.getElementById("cozy-login-history-button").addEventListener("click", () => openLoginHistory(userId));
+        document.getElementById("cozy-change-password-button").addEventListener("click", () => openChangePassword(userId));
     }
 
     const CozyOSLoginGate = {
@@ -156,7 +222,8 @@
                 e.preventDefault();
                 const username = container.querySelector("#cozy-login-username").value;
                 const password = container.querySelector("#cozy-login-password").value;
-                const result = await window.CozyOS.AuthCoordinator.loginWithCredentials(username, password);
+                const rememberMe = !!container.querySelector("#cozy-login-remember-me")?.checked;
+                const result = await window.CozyOS.AuthCoordinator.loginWithCredentials(username, password, { rememberMe });
                 if (!result.available) { showError(container, result.reason || "Sign-in failed."); return; }
                 proceed();
             });
