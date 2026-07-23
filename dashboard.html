@@ -353,15 +353,6 @@
            developer-hub.js and cozy-ui.js exactly (Toast.show(),
            Live.publish()/subscribe()). -->
     <script src="core/ui/cozy-theme.js"></script>
-    <!-- Living Theme Engine (Rule 113) — real registry/scheduling/
-         profiles, composes cozy-theme.js rather than duplicating it. -->
-    <script src="core/ui/living-theme-engine.js"></script>
-    <!-- Mode Engine (Rule 114) — composes LivingThemeEngine, reuses its
-         matchesSchedule() rather than duplicating scheduling logic. -->
-    <script src="core/ui/mode-engine.js"></script>
-    <!-- Living Message Engine (Rule 115) — real registry/permissions/
-         scheduling/rotation. No DOM rendering yet - see file header. -->
-    <script src="core/ui/living-message-engine.js"></script>
     <script src="core/ui/cozy-background.js"></script>
     <script src="core/ui/cozy-toast.js"></script>
     <script src="core/ui/cozy-live.js"></script>
@@ -383,59 +374,32 @@
          checks has been correctly failing closed this whole time (never
          wrongly open) — but Identity itself needs to actually load for a
          real login flow to ever succeed here. -->
-    <!-- Identity Storage (Rule 116) - real IndexedDB persistence,
-         must load before identity-engine.js which composes it. -->
-    <script src="core/modules/identity/identity-storage.js"></script>
     <script src="core/modules/identity/identity-engine.js"></script>
-    <!-- CozyOS.Auth (Rule 92) — real administrator session bridge over
-         IdentityEngine's own private events, republishing onto the
-         shared PlatformEventBus. Does not authenticate users itself. -->
-    <script src="core/security/cozy-auth.js"></script>
-    <!-- Development Access Service (Rule 93) — real, disclosed-limitation
-         development convenience. NEVER deploy this file to the real
-         production URL; see its own header for why the environment
-         check cannot be a true security boundary in this static,
-         client-side application. -->
-    <script src="core/security/dev-access-service.js"></script>
-    <!-- Authentication Policy Engine (Rule 94) — real AND/OR policy
-         evaluator. Face/Fingerprint/Voice/Google adapters are honest
-         stubs; any policy requiring them is correctly unreachable until
-         a real adapter is registered. -->
-    <!-- Authentication Factor Registry (Rule 95) — real, single source of
-         truth for which authentication factors exist and what can
-         currently verify them. Must load before auth-policy-engine.js,
-         which now depends on it. -->
-    <script src="core/security/auth-factor-registry.js"></script>
-    <script src="core/security/auth-policy-engine.js"></script>
-    <!-- Authentication Coordinator (Rule 96) — real, single facade over
-         CozyOS.Auth, AuthPolicyEngine, and AuthFactorRegistry. -->
-    <script src="core/security/auth-coordinator.js"></script>
-    <!-- Trusted Device Manager (Rule 100) — real device lifecycle,
-         registers a genuine "trusted-device" provider with
-         AuthFactorRegistry, replacing that factor's stub. -->
-    <script src="core/security/trusted-device-manager.js"></script>
-    <!-- Recovery Question Manager (Rule 101) — real, single source of
-         truth for administrator recovery questions. Registers a real
-         "recovery-questions" provider with AuthFactorRegistry. -->
-    <script src="core/security/recovery-question-manager.js"></script>
-    <!-- Recovery Phrase Manager (Rule 102) — real, single source of
-         truth for administrator recovery phrases. Registers a real
-         "recovery-phrase" provider with AuthFactorRegistry. -->
-    <script src="core/security/recovery-phrase-manager.js"></script>
-    <!-- Session Manager (Rule 103) — real composition layer over
-         IdentityEngine's own already-complete session backend. Adds
-         idle-timeout automation, trusted-device binding, and
-         administrator bulk operations. -->
-    <script src="core/security/session-manager.js"></script>
-    <!-- Authentication Factor Providers (Rule 104) — the shared base
-         must load first; each provider is a thin, real coordinator
-         composing it. All 4 register with AuthFactorRegistry
-         automatically, honestly starting as isReal:false. -->
-    <script src="core/security/factor-provider-base.js"></script>
-    <script src="core/security/face-provider.js"></script>
-    <script src="core/security/fingerprint-provider.js"></script>
-    <script src="core/security/voice-provider.js"></script>
-    <script src="core/security/google-account-provider.js"></script>
+    <!-- Platform Administrator trusted-device login, new-device
+         verification, and emergency recovery. Reads
+         window.CozyOS.IdentityEngine.isPlatformAdmin() for role checks;
+         loaded right after it so that dependency is always ready first. -->
+    <script src="core/modules/identity/admin-recovery-policy.js"></script>
+    <!-- Real implementation of window.CozyOS.Auth.getCurrentIdentity(),
+         a contract already referenced elsewhere in this codebase
+         (core/ui/cozy-base-linker.js, modules/quarry/*) but never
+         implemented until now. Listens to IdentityEngine/
+         AdminRecoveryPolicy session events; loaded after both. -->
+    <script src="core/modules/identity/cozy-auth.js"></script>
+    <!-- Milestone 120: real session snapshot service. Loaded before
+         AuthCoordinator so establishFromIdentity()/establishFromExternalAuth()
+         are available the first time AuthCoordinator needs them. -->
+    <script src="core/modules/session/cozy-session-service.js"></script>
+    <!-- Milestone 120: thin Administrator Login orchestration only.
+         Composes IdentityEngine, CozyOS.Auth, CozyOS.Session, and
+         AdminRecoveryPolicy — does not duplicate or replace any of them.
+         Loaded last in this chain since it depends on all four. -->
+    <script src="core/modules/identity/auth-coordinator.js"></script>
+    <!-- Milestone 121: real Administrator Login gate. No login form existed
+         anywhere in this codebase before this — WorkspaceShell was mounting
+         unconditionally regardless of sign-in state. Loaded after
+         AuthCoordinator since it composes it, never re-implements it. -->
+    <script src="core/shell/cozy-login-gate.js"></script>
     <!-- Real bug fix: cozy-context-engine.js was migrated to
          PlatformEventBus in an early milestone but never received a
          script tag on this specific page. -->
@@ -610,6 +574,18 @@
          rendering, placement modes, reports). -->
     <script src="core/platform/content-presentation-engine.js"></script>
 
+    <!-- Living Engine Integration milestone: LivingThemeEngine, LivingMessageEngine,
+         ModeEngine — these coordinators' backend implementation was already complete;
+         this is only the wiring (script load + Design Studio pages + dashboard +
+         discovery), no new engines created. Order matters: LivingThemeEngine must load
+         before ModeEngine (Mode composes LivingThemeEngine.activateTheme()) and before
+         LivingMessageEngine (reuses LivingThemeEngine.matchesSchedule()). Both real
+         dependencies these files compose — CozyOS.Theme, CozyOS.ServiceRegistry,
+         CozyOS.IdentityEngine — are already loaded above this line. -->
+    <script src="core/ui/living-theme-engine.js"></script>
+    <script src="core/ui/living-message-engine.js"></script>
+    <script src="core/ui/mode-engine.js"></script>
+
     <!-- Certification (activates existing Certification/Release/Upgrade/
          Dependency centers in cozy-workspace.js AND Developer Hub's
          certification tools — same window.CozyOS.Certification instance,
@@ -760,12 +736,24 @@
                 }
                 return false;
             }
-            if (tryMount()) return;
-            let attempts = 0;
-            const intervalId = setInterval(() => {
-                attempts++;
-                if (tryMount() || attempts >= 40) clearInterval(intervalId);
-            }, 250);
+            function mountWorkspaceWhenReady() {
+                if (tryMount()) return;
+                let attempts = 0;
+                const intervalId = setInterval(() => {
+                    attempts++;
+                    if (tryMount() || attempts >= 40) clearInterval(intervalId);
+                }, 250);
+            }
+            // Milestone 121: gate real WorkspaceShell mounting behind real
+            // Administrator Login. If LoginGate itself fails to load, this
+            // still waits (bounded, above) rather than mounting the
+            // Workspace open regardless — but does not invent a login
+            // requirement out of thin air if LoginGate is genuinely absent.
+            if (window.CozyOS && window.CozyOS.LoginGate && typeof window.CozyOS.LoginGate.mountIfNeeded === "function") {
+                window.CozyOS.LoginGate.mountIfNeeded(root, mountWorkspaceWhenReady);
+            } else {
+                mountWorkspaceWhenReady();
+            }
         })();
     </script>
 </body>
