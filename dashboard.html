@@ -395,11 +395,6 @@
          AdminRecoveryPolicy — does not duplicate or replace any of them.
          Loaded last in this chain since it depends on all four. -->
     <script src="core/modules/identity/auth-coordinator.js"></script>
-    <!-- Milestone 121: real Administrator Login gate. No login form existed
-         anywhere in this codebase before this — WorkspaceShell was mounting
-         unconditionally regardless of sign-in state. Loaded after
-         AuthCoordinator since it composes it, never re-implements it. -->
-    <script src="core/shell/cozy-login-gate.js"></script>
     <!-- Real bug fix: cozy-context-engine.js was migrated to
          PlatformEventBus in an early milestone but never received a
          script tag on this specific page. -->
