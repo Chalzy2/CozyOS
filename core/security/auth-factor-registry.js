@@ -54,7 +54,9 @@
                 ["google-account", "No real OAuth round-trip is possible — no server exists to hold a client secret."],
                 ["device-certificate", "No real device-certificate issuance/verification exists yet."],
                 ["security-key", "No real FIDO2/WebAuthn integration exists yet (future factor)."],
-                ["otp", "No real one-time-passcode delivery mechanism exists yet (future factor)."]
+                ["otp", "No real one-time-passcode delivery mechanism exists yet (future factor)."],
+                ["recovery-key", "No real recovery-key file storage/verification exists yet — see RecoveryKeyManager (Milestone 130)."],
+                ["emergency-recovery-code", "No real emergency recovery code storage/verification exists yet — see EmergencyRecoveryCodeManager (Milestone 130)."]
             ];
             for (const [name, note] of initial) this.#providers.set(name, makeStubProvider(name, note));
         }

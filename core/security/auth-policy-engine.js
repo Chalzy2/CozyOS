@@ -154,6 +154,15 @@
     engine.definePolicy("normal-login", { all: ["trusted-device", { any: ["face", "fingerprint", "voice"] }] });
     engine.definePolicy("high-security-operation", { all: ["trusted-device", "face", "voice"] });
     engine.definePolicy("emergency-recovery", { all: ["google-account", "face", "recovery-questions", "recovery-phrase"] });
+    // Milestone 130 — Administrator Recovery Wizard: at least ONE of six
+    // independent methods must succeed. A distinct operation name from
+    // "emergency-recovery" above (that policy requires ALL of four
+    // factors for an unrelated, already-authenticated high-security
+    // case). Administrator policy enables/disables individual recovery
+    // methods honestly via the existing updatePolicy() — removing a
+    // factor name from this "any" list is enough; no separate on/off
+    // switch mechanism was built or is needed.
+    engine.definePolicy("administrator-recovery-wizard", { any: ["trusted-device", "recovery-phrase", "recovery-questions", "recovery-key", "emergency-recovery-code", "security-key"] });
     engine.definePolicy("delete-application", { all: ["trusted-device", "face", "voice"] });
     engine.definePolicy("release-production-build", { all: ["trusted-device", "face", "fingerprint", "voice"] });
 

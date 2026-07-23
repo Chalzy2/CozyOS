@@ -191,4 +191,29 @@
             });
         } catch (_err) { /* non-fatal */ }
     }
+
+    // Milestone 130 — real "trusted-device" provider, replacing the
+    // stub that previously read "No real device-trust mechanism exists
+    // yet." Requires the device to genuinely belong to this userId
+    // (ownership check via listDevicesForUser), be currently trusted
+    // (30-day window), and not idle-locked (10-minute inactivity) —
+    // fails closed, with the real reason, on any of the three.
+    if (window.CozyOS.AuthFactorRegistry && typeof window.CozyOS.AuthFactorRegistry.registerFactor === "function") {
+        window.CozyOS.AuthFactorRegistry.registerFactor("trusted-device", {
+            isReal: true,
+            note: "Real TrustedDeviceManager-backed provider — verifies ownership, trust (30-day), and idle-lock (10-minute) via context.userId and context.deviceId.",
+            verify(context) {
+                if (!context || !context.userId || !context.deviceId) {
+                    return { available: true, verified: false, reason: "context.userId and context.deviceId are both required." };
+                }
+                const owns = window.CozyOS.TrustedDeviceManager.listDevicesForUser(context.userId).some(d => d.deviceId === context.deviceId);
+                if (!owns) return { available: true, verified: false, reason: "This device is not registered to this administrator." };
+                const trust = window.CozyOS.TrustedDeviceManager.isTrusted(context.deviceId);
+                if (!trust.trusted) return { available: true, verified: false, reason: trust.reason };
+                const lock = window.CozyOS.TrustedDeviceManager.isLocked(context.deviceId);
+                if (lock.locked) return { available: true, verified: false, reason: "Device is idle-locked (10-minute inactivity) — unlock it on-device first." };
+                return { available: true, verified: true, reason: null };
+            }
+        });
+    }
 })();
