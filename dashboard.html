@@ -385,7 +385,7 @@
          (core/ui/cozy-base-linker.js, modules/quarry/*) but never
          implemented until now. Listens to IdentityEngine/
          AdminRecoveryPolicy session events; loaded after both. -->
-    <script src="core/security/cozy-auth.js"></script>
+    <script src="core/modules/identity/cozy-auth.js"></script>
     <!-- Milestone 120: real session snapshot service. Loaded before
          AuthCoordinator so establishFromIdentity()/establishFromExternalAuth()
          are available the first time AuthCoordinator needs them. -->
@@ -395,6 +395,50 @@
          AdminRecoveryPolicy — does not duplicate or replace any of them.
          Loaded last in this chain since it depends on all four. -->
     <script src="core/modules/identity/auth-coordinator.js"></script>
+    <!-- Milestone 130: Administrator Recovery Wizard dependency chain.
+         Real, dependency-ordered load: factor-provider-base before any
+         provider that composes it; auth-factor-registry and
+         auth-policy-engine before every real provider that registers
+         itself into them; recovery managers and WebAuthn provider next;
+         cozy-login-gate.js (this page's bootstrap script at the bottom
+         already calls window.CozyOS.LoginGate.mountIfNeeded() but had
+         no script tag anywhere on this page until now — a real,
+         separate, pre-existing gap, disclosed in this milestone's
+         changelog, not expanded on further here); AdminRecoveryWizard
+         loaded last since it composes all of the above. -->
+    <!-- ============================================================
+         Milestone 131a — Shell Ownership Review DECISION:
+         core/cozy-shell.html is now the one canonical production entry
+         point and the one real Login Gate. This page (dashboard.html)
+         is LEGACY and should not receive new feature work.
+
+         The Login Gate bootstrap below is INTENTIONALLY left wired
+         here, unretired, for one real reason: PharmacyOS,
+         CozyPaymentProviderEngine, WorkspaceShell, and Developer Hub
+         are only reachable through this page today — cozy-shell.html
+         does not yet load them. Removing this gate now would either
+         (a) leave those four reachable with no login at all, or
+         (b) make them unreachable altogether. Both are worse than the
+         current, real, working, gated state. A follow-up milestone
+         should port those four into cozy-shell.html; once that's
+         verified, this entire bootstrap script and its LoginGate/
+         AdminRecoveryWizard/core-security script tags below should be
+         deleted from this page for real, leaving cozy-shell.html as
+         the only Login Gate, per the "one Login Gate only" rule.
+         See changelog.md / migration-log-addendum.md for the full
+         Ownership Report.
+         ============================================================ -->
+    <script src="core/security/factor-provider-base.js"></script>
+    <script src="core/security/auth-factor-registry.js"></script>
+    <script src="core/security/auth-policy-engine.js"></script>
+    <script src="core/security/recovery-phrase-manager.js"></script>
+    <script src="core/security/recovery-question-manager.js"></script>
+    <script src="core/security/trusted-device-manager.js"></script>
+    <script src="core/security/recovery-key-manager.js"></script>
+    <script src="core/security/emergency-recovery-code-manager.js"></script>
+    <script src="core/security/webauthn-provider.js"></script>
+    <script src="core/shell/cozy-login-gate.js"></script>
+    <script src="core/shell/cozy-admin-recovery-wizard.js"></script>
     <!-- Real bug fix: cozy-context-engine.js was migrated to
          PlatformEventBus in an early milestone but never received a
          script tag on this specific page. -->
@@ -716,12 +760,6 @@
     <script src="core/modules/shopos/shopos.js"></script>
     <script src="core/plugins/pharmacyOS.js"></script>
     <script src="core/dashboard.js"></script>
-
-    <!-- Milestone 124: real Administrator Login Gate. Loaded after
-         AuthCoordinator/WorkspaceShell so mountIfNeeded() can call both;
-         the bootstrap block below already checks for LoginGate and falls
-         back to unconditional mount if this script is ever absent. -->
-    <script src="core/shell/cozy-login-gate.js"></script>
 
     <!-- 3. BOOTSTRAP: mount the Workspace Shell once it and its scripts have
          loaded. Bounded retry (same convention already used elsewhere in
