@@ -86,6 +86,14 @@
             return m ? this.#deepClone(m) : null;
         }
 
+        /**
+         * listModes()
+         *   Added during the Design Studio integration milestone (real
+         *   enumeration needed for the admin Mode list UI). Read-only,
+         *   purely additive.
+         */
+        listModes() { return [...this.#modes.values()].map((m) => this.#deepClone(m)); }
+
         /** isModeScheduledNow(modeId) — real, reuses LivingThemeEngine.matchesSchedule() rather than re-implementing date matching. */
         isModeScheduledNow(modeId) {
             const mode = this.#modes.get(modeId);

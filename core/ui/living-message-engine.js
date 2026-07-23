@@ -146,6 +146,16 @@
             return m ? this.#deepClone(m) : null;
         }
 
+        /**
+         * listMessages()
+         *   Added during the Design Studio integration milestone — real,
+         *   unfiltered enumeration of every message (including disabled/
+         *   archived) for the admin list UI. Distinct from
+         *   getEligibleMessages(), which intentionally filters to
+         *   enabled + currently-scheduled only. Purely additive.
+         */
+        listMessages() { return [...this.#messages.values()].map((m) => this.#deepClone(m)); }
+
         /** isMessageScheduledNow(messageId) — real, reuses LivingThemeEngine.matchesSchedule() (Rule 80/81), not re-implemented. */
         isMessageScheduledNow(messageId) {
             const message = this.#messages.get(messageId);
