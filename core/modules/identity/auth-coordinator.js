@@ -71,11 +71,15 @@
     "use strict";
 
     window.CozyOS = window.CozyOS || {};
-    const COORDINATOR_VERSION = "1.0.0-ENTERPRISE";
+    const COORDINATOR_VERSION = "1.1.0-ENTERPRISE"; // Milestone 125a: rememberMe, getLoginHistory, changePassword
     const STORAGE_KEY = "cozyos.authCoordinator.session";
 
     function safeLocalStorage() {
         try { return (typeof window !== "undefined" && window.localStorage) ? window.localStorage : null; }
+        catch (_err) { return null; }
+    }
+    function safeSessionStorage() {
+        try { return (typeof window !== "undefined" && window.sessionStorage) ? window.sessionStorage : null; }
         catch (_err) { return null; }
     }
 
@@ -94,21 +98,34 @@
         #session() { return window.CozyOS && window.CozyOS.Session ? window.CozyOS.Session : null; }
         #auth() { return window.CozyOS && window.CozyOS.Auth ? window.CozyOS.Auth : null; }
 
-        #persistPointer(pointer) {
-            const ls = safeLocalStorage();
-            if (!ls) return false;
+        /**
+         * Remember Me (Milestone 125a): rememberMe=true persists to
+         * localStorage (survives browser restart, prior default
+         * behavior, unchanged). rememberMe=false persists to
+         * sessionStorage only (cleared when the tab/browser closes).
+         * Clearing always clears both, so stale pointers never linger
+         * in the storage that wasn't actively used.
+         */
+        #persistPointer(pointer, rememberMe = true) {
+            const ls = safeLocalStorage(); const ss = safeSessionStorage();
             try {
-                if (pointer) ls.setItem(STORAGE_KEY, JSON.stringify(pointer));
-                else ls.removeItem(STORAGE_KEY);
+                if (pointer) {
+                    if (rememberMe) { if (ls) ls.setItem(STORAGE_KEY, JSON.stringify(pointer)); if (ss) ss.removeItem(STORAGE_KEY); }
+                    else { if (ss) ss.setItem(STORAGE_KEY, JSON.stringify(pointer)); if (ls) ls.removeItem(STORAGE_KEY); }
+                } else {
+                    if (ls) ls.removeItem(STORAGE_KEY);
+                    if (ss) ss.removeItem(STORAGE_KEY);
+                }
                 return true;
             } catch (_err) { return false; }
         }
         #readPointer() {
-            const ls = safeLocalStorage();
-            if (!ls) return null;
+            const ls = safeLocalStorage(); const ss = safeSessionStorage();
             try {
-                const raw = ls.getItem(STORAGE_KEY);
-                return raw ? JSON.parse(raw) : null;
+                const rawLocal = ls ? ls.getItem(STORAGE_KEY) : null;
+                if (rawLocal) return JSON.parse(rawLocal);
+                const rawSession = ss ? ss.getItem(STORAGE_KEY) : null;
+                return rawSession ? JSON.parse(rawSession) : null;
             } catch (_err) { return null; }
         }
 
@@ -122,7 +139,7 @@
          *   CozyOS.Auth updates itself — this coordinator never touches
          *   CozyOS.Auth's pointer directly.
          */
-        async loginWithCredentials(username, password) {
+        async loginWithCredentials(username, password, { rememberMe = true } = {}) {
             this.#diagnostics.credentialLoginAttempts++;
             const identity = this.#identity();
             if (!identity) { this.#diagnostics.credentialLoginFailures++; return { available: false, reason: "IdentityEngine is not loaded — cannot authenticate. Failing closed." }; }
@@ -136,9 +153,33 @@
                 catch (err) { this.#diagnostics.credentialLoginFailures++; return { available: false, reason: `Session establishment failed: ${err.message}` }; }
             }
 
-            this.#persistPointer({ source: "identity", sessionId: result.sessionId, userId: result.userId, since: new Date().toISOString() });
+            this.#persistPointer({ source: "identity", sessionId: result.sessionId, userId: result.userId, since: new Date().toISOString() }, !!rememberMe);
             this.#diagnostics.credentialLoginSuccesses++;
             return { available: true, source: "identity", sessionId: result.sessionId, userId: result.userId, roles: result.roles };
+        }
+
+        /**
+         * getLoginHistory(username) — real passthrough to IdentityEngine's
+         * existing audit log (no separate history store). Filters to
+         * login-relevant actions for the given username only.
+         */
+        getLoginHistory(username) {
+            const identity = this.#identity();
+            if (!identity) return { available: false, reason: "IdentityEngine is not loaded.", entries: [] };
+            const actions = new Set(["LOGIN_SUCCESS", "LOGIN_FAILED", "LOGIN_BLOCKED_LOCKED", "ACCOUNT_LOCKED", "LOGOUT", "PASSWORD_CHANGED", "PASSWORD_RESET"]);
+            const entries = identity.getAuditLog(e => actions.has(e.action) && e.msg === username);
+            return { available: true, entries };
+        }
+
+        /**
+         * changePassword(username, oldPassword, newPassword) — thin
+         * passthrough. IdentityEngine owns verification/hashing; this
+         * coordinator never re-implements it.
+         */
+        async changePassword(username, oldPassword, newPassword) {
+            const identity = this.#identity();
+            if (!identity) return { available: false, reason: "IdentityEngine is not loaded — cannot change password. Failing closed." };
+            return identity.changePassword(username, oldPassword, newPassword);
         }
 
         /**

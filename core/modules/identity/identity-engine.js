@@ -45,7 +45,7 @@
 (function () {
     "use strict";
     window.CozyOS = window.CozyOS || {};
-    const IE_VERSION = "1.0.0-ENTERPRISE";
+    const IE_VERSION = "1.1.0-ENTERPRISE"; // Milestone 125a: account lock, changePassword
     const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
     class CozyOSIdentityEngine {
@@ -320,7 +320,7 @@
             const salt = crypto.getRandomValues(new Uint8Array(16));
             const hash = await this.#hashPassword(password, salt);
             const id = this.#generateId("user");
-            const user = { id, username: this.#escapeHtml(username), orgId: orgId || null, roles, salt: Array.from(salt), hash, createdAt: new Date().toISOString(), delegates: [] };
+            const user = { id, username: this.#escapeHtml(username), orgId: orgId || null, roles, salt: Array.from(salt), hash, createdAt: new Date().toISOString(), delegates: [], failedAttempts: 0, lockedUntil: null };
             this.#users.set(id, user);
             this.#diagnostics.usersCreated++;
             this.#logAudit("USER_CREATED", username);
@@ -380,11 +380,40 @@
             return { restored };
         }
 
+        /**
+         * Account Lock (Milestone 125a) — real, per-user, in-memory
+         * counter on the same user record login() already reads. Fails
+         * closed: once locked, login() denies even with the correct
+         * password until lockedUntil passes. No separate store, no
+         * duplicated ownership — this is IdentityEngine's own credential
+         * state, same as the password hash it sits next to.
+         */
+        static #MAX_FAILED_ATTEMPTS = 5;
+        static #LOCK_DURATION_MS = 15 * 60 * 1000;
+
         async login(username, password) {
             const user = Array.from(this.#users.values()).find(u => u.username === username);
             if (!user) { this.#diagnostics.loginsFailed++; return { available: false, reason: "Invalid username or password." }; }
+            if (user.lockedUntil) {
+                if (Date.now() < new Date(user.lockedUntil).getTime()) {
+                    this.#diagnostics.loginsFailed++; this.#logAudit("LOGIN_BLOCKED_LOCKED", username);
+                    return { available: false, locked: true, reason: `Account locked until ${user.lockedUntil}.` };
+                }
+                user.lockedUntil = null; user.failedAttempts = 0;
+            }
             const hash = await this.#hashPassword(password, new Uint8Array(user.salt));
-            if (JSON.stringify(hash) !== JSON.stringify(user.hash)) { this.#diagnostics.loginsFailed++; this.#logAudit("LOGIN_FAILED", username); return { available: false, reason: "Invalid username or password." }; }
+            if (JSON.stringify(hash) !== JSON.stringify(user.hash)) {
+                this.#diagnostics.loginsFailed++;
+                user.failedAttempts = (user.failedAttempts || 0) + 1;
+                if (user.failedAttempts >= CozyOSIdentityEngine.#MAX_FAILED_ATTEMPTS) {
+                    user.lockedUntil = new Date(Date.now() + CozyOSIdentityEngine.#LOCK_DURATION_MS).toISOString();
+                    this.#logAudit("ACCOUNT_LOCKED", username);
+                    return { available: false, locked: true, reason: `Account locked until ${user.lockedUntil} after ${user.failedAttempts} failed attempts.` };
+                }
+                this.#logAudit("LOGIN_FAILED", username);
+                return { available: false, reason: "Invalid username or password.", attemptsRemaining: CozyOSIdentityEngine.#MAX_FAILED_ATTEMPTS - user.failedAttempts };
+            }
+            user.failedAttempts = 0; user.lockedUntil = null;
             const sessionId = this.#generateId("session");
             const session = { sessionId, userId: user.id, status: "active", createdAt: new Date().toISOString(), expiresAt: null };
             this.#sessions.set(sessionId, session);
@@ -393,6 +422,29 @@
             this.emit("identity:login", { userId: user.id });
             this.emit("identity:session-created", { sessionId, userId: user.id });
             return { available: true, sessionId, userId: user.id, roles: user.roles };
+        }
+
+        /**
+         * changePassword(username, oldPassword, newPassword) — real
+         * self-service change. Unlike resetPassword() (admin-initiated,
+         * no old password), this VERIFIES the current password first and
+         * fails closed if it doesn't match. Never logs plaintext.
+         */
+        async changePassword(username, oldPassword, newPassword) {
+            if (!username || !oldPassword || !newPassword) throw new TypeError("[Identity] changePassword(): username, oldPassword, and newPassword are required.");
+            const user = Array.from(this.#users.values()).find(u => u.username === username);
+            if (!user) return { available: false, reason: `No real user found with username "${username}".` };
+            if (typeof crypto === "undefined" || !crypto.subtle) return { available: false, reason: "Web Crypto API not available — cannot hash passwords securely." };
+            const oldHash = await this.#hashPassword(oldPassword, new Uint8Array(user.salt));
+            if (JSON.stringify(oldHash) !== JSON.stringify(user.hash)) { this.#logAudit("CHANGE_PASSWORD_FAILED", username); return { available: false, reason: "Current password is incorrect." }; }
+            const salt = crypto.getRandomValues(new Uint8Array(16));
+            const hash = await this.#hashPassword(newPassword, salt);
+            user.salt = Array.from(salt); user.hash = hash;
+            this.#logAudit("PASSWORD_CHANGED", username);
+            if (window.CozyOS.IdentityStorage && typeof window.CozyOS.IdentityStorage.save === "function") {
+                try { await window.CozyOS.IdentityStorage.save("users", user); } catch (_err) { /* honestly non-fatal */ }
+            }
+            return { available: true, username };
         }
 
         logout(sessionId) { const existed = this.#sessions.delete(sessionId); if (existed) { this.#logAudit("LOGOUT", sessionId); this.emit("identity:session-ended", { sessionId, reason: "logout" }); } return existed; }
