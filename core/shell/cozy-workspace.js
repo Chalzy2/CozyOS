@@ -90,7 +90,8 @@
     const SUGGESTED_COORDINATORS = [
         "Certification", "Identity", "Storage", "Sync", "Automation", "Analytics",
         "Security", "Live", "Speech", "Translate", "Notification", "Meeting",
-        "Attendance", "Media", "Vision", "Camera", "Network", "Emergency", "Accessibility"
+        "Attendance", "Media", "Vision", "Camera", "Network", "Emergency", "Accessibility",
+        "LivingThemeEngine", "LivingMessageEngine", "ModeEngine"
     ];
 
     // Centers whose data this shell can only ever read generically, because
@@ -126,6 +127,7 @@
         // persists ACROSS discovery cycles (unlike #coordinators) so
         // rediscover() never double-subscribes to the same live coordinator ----
         #boundEventSources = new Map(); // name -> liveRef
+        #livingEventsBound = false; // guards the one-time PlatformEventBus subscription below (LivingThemeEngine/LivingMessageEngine/ModeEngine emit only through the bus, not their own on/off/emit)
 
         // ---- shell-local state (NOT business data — navigation/UI only) ----
         #activeCenter = (() => { try { return window.localStorage.getItem("cozy.workspace.activeCenter") || "dashboard"; } catch (_err) { return "dashboard"; } })();
@@ -138,6 +140,10 @@
         #vendorStateCache = null; // populated only by an explicit "Refresh Diagnostics" click (VendorDiagnostics.listVendorStates() is async; render() itself stays synchronous)
         #themeStudioSelected = null;
         #themeStudioCertification = null;
+        #modeEngineLastError = null; // last real registerMode()/activateMode() failure reason, cleared on the next attempt
+        #livingThemeEngineLastError = null; // last real registerTheme() failure reason
+        #livingMessageEngineLastError = null; // last real createMessage()/setStatus()/deleteMessage() failure reason
+        #livingMessageEnginePreview = null; // last real pickNextMessage() result shown on the Living Message Engine page
         #selectedContext = null; // { type: "module"|"application"|"release", id }
         #searchTerm = "";
         #sidebarCollapsed = (() => { try { return window.localStorage.getItem("cozy.workspace.sidebarCollapsed") === "1"; } catch (_err) { return false; } })();
@@ -413,6 +419,29 @@
                     }
                     this.#boundEventSources.set(name, liveRef);
                 }
+            }
+
+            // LivingThemeEngine/LivingMessageEngine/ModeEngine don't expose
+            // their own on()/off() — they only emit through
+            // window.CozyOS.PlatformEventBus (namespaced theme:*/message:*/
+            // mode:*). Subscribe to those real, documented event names
+            // directly, once, so real activity from these three coordinators
+            // genuinely reaches Event Monitor/Recent Activity rather than
+            // being silently invisible.
+            const bus = window.CozyOS && window.CozyOS.PlatformEventBus;
+            if (bus && typeof bus.on === "function" && !this.#livingEventsBound) {
+                const livingEvents = [
+                    ["LivingThemeEngine", ["theme:theme-changed", "theme:theme-scheduled", "theme:theme-activated", "theme:theme-deactivated", "theme:theme-expired", "theme:profile-created", "theme:profile-applied"]],
+                    ["LivingMessageEngine", ["message:message-created", "message:message-updated", "message:message-deleted", "message:message-published", "message:message-expired", "message:message-viewed", "message:message-dismissed"]],
+                    ["ModeEngine", ["mode:mode-activated", "mode:mode-changed", "mode:mode-scheduled", "mode:mode-completed"]]
+                ];
+                for (const [source, eventNames] of livingEvents) {
+                    for (const eventName of eventNames) {
+                        try { bus.on(eventName, (payload) => this.#recordEvent(source, eventName, payload)); }
+                        catch (_err) { this.#diagnostics.errorsHidden++; }
+                    }
+                }
+                this.#livingEventsBound = true;
             }
 
             this.#logAudit("DISCOVERY_CYCLE", `Discovered ${liveKeys.length} live coordinator(s) on window.CozyOS.`);
@@ -2045,6 +2074,9 @@
                 case "accessibilityCenter": return this.#renderAccessibilityCenter();
                 case "contentStudio": return this.#renderContentStudio();
                 case "themeStudio": return this.#renderThemeStudio();
+                case "livingThemeEngine": return this.#renderLivingThemeEngine();
+                case "livingMessageEngine": return this.#renderLivingMessageEngine();
+                case "modeEngine": return this.#renderModeEngine();
                 case "livingButtonEngine": return this.#renderLivingButtonEngine();
                 case "events": return this.#renderEventMonitor();
                 case "search": return this.#renderSearch();
@@ -2338,12 +2370,65 @@
                     </div>
                 </section>`;
 
+            // Living Platform panel — every value below comes from a real
+            // call into LivingThemeEngine/LivingMessageEngine/ModeEngine
+            // (or honestly reads "Not loaded"). No "Next Scheduled
+            // Theme/Mode/Message" row: none of the three engines expose a
+            // schedule-lookahead API, and computing one here would mean
+            // re-implementing their own scheduling logic a second time —
+            // exactly what Rule 80/81 (reuse, don't duplicate) forbids.
+            const lte = window.CozyOS && window.CozyOS.LivingThemeEngine ? window.CozyOS.LivingThemeEngine : null;
+            const lme = window.CozyOS && window.CozyOS.LivingMessageEngine ? window.CozyOS.LivingMessageEngine : null;
+            const modeEng = window.CozyOS && window.CozyOS.ModeEngine ? window.CozyOS.ModeEngine : null;
+            const lteActive = lte ? lte.getActiveTheme() : null;
+            const modeActive = modeEng ? modeEng.getActiveMode() : null;
+
+            // Milestone 122: Engine Status and Last Activity — both read
+            // directly from the three engines' own real getVersion()/
+            // getHistory() (already real, already exposed); nothing new is
+            // tracked or duplicated here, only aggregated for display.
+            const livingEnginesForStatus = [
+                ["Living Theme Engine", lte], ["Living Message Engine", lme], ["Mode Engine", modeEng]
+            ];
+            const connectedCount = livingEnginesForStatus.filter(([, e]) => !!e).length;
+            const engineStatusRows = livingEnginesForStatus
+                .map(([label, e]) => `${this.#escapeHtml(label)}: ${e ? "Connected" : "Not loaded"}`)
+                .join(" · ");
+
+            const lastActivityEntries = [];
+            for (const [source, engine] of livingEnginesForStatus) {
+                if (!engine || typeof engine.getHistory !== "function") continue;
+                const history = engine.getHistory();
+                const latest = history[history.length - 1];
+                if (latest) lastActivityEntries.push({ source, event: latest.event, at: latest.at });
+            }
+            lastActivityEntries.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+            const lastActivity = lastActivityEntries[0] || null;
+
+            const livingPlatformHtml = `
+                <div class="cozy-panel" style="margin-top:20px;">
+                    <h3 style="margin:0 0 10px;">Living Platform</h3>
+                    <div class="cozy-stat-grid">
+                        <div class="cozy-stat-card"><div class="cozy-card-label">Active Theme</div><div class="cozy-card-value" style="font-size:16px;">${lte ? this.#escapeHtml(lteActive ? lteActive.themeId : "None active") : "Not loaded"}</div></div>
+                        <div class="cozy-stat-card"><div class="cozy-card-label">Active Mode</div><div class="cozy-card-value" style="font-size:16px;">${modeEng ? this.#escapeHtml(modeActive ? modeActive.modeId : "None active") : "Not loaded"}</div></div>
+                        <div class="cozy-stat-card"><div class="cozy-card-label">Registered Messages</div><div class="cozy-card-value">${lme ? lme.listMessages().length : "—"}</div></div>
+                        <div class="cozy-stat-card"><div class="cozy-card-label">Engine Status</div><div class="cozy-card-value" style="font-size:14px;">${connectedCount}/3 connected</div><div class="cozy-muted" style="font-size:11px;margin-top:4px;">${engineStatusRows}</div></div>
+                        <div class="cozy-stat-card"><div class="cozy-card-label">Last Activity</div><div class="cozy-card-value" style="font-size:13px;">${lastActivity ? `${this.#escapeHtml(lastActivity.source)}: ${this.#escapeHtml(lastActivity.event)}` : "No activity yet this session"}</div>${lastActivity ? `<div class="cozy-muted" style="font-size:11px;margin-top:4px;">${this.#escapeHtml(lastActivity.at)}</div>` : ""}</div>
+                    </div>
+                    <div class="cozy-quick-grid" style="margin-top:14px;">
+                        <div class="cozy-quick-card" data-center="livingThemeEngine"><div class="cozy-card-label">Living Theme Engine</div></div>
+                        <div class="cozy-quick-card" data-center="livingMessageEngine"><div class="cozy-card-label">Living Message Engine</div></div>
+                        <div class="cozy-quick-card" data-center="modeEngine"><div class="cozy-card-label">Mode Engine</div></div>
+                    </div>
+                </div>`;
+
             return `${heroHtml}${statsHtml}
                 ${summaryCardsHtml}
                 <h3 style="margin:20px 0 10px;">Platform Capabilities</h3>
                 ${featureCardsHtml}
                 ${quickActionsHtml}
                 <div class="cozy-grid" style="grid-template-columns:1fr 1fr;margin-top:20px;">${systemStatusHtml}${recentActivityHtml}</div>
+                ${livingPlatformHtml}
                 <h3 style="margin:24px 0 10px;">Coordinator Status</h3>
                 <p style="color:var(--text-secondary,#475569);font-size:0.85rem;">${data.discoveredCount}/${data.totalCount} coordinators discovered.</p>
                 ${banner}<div class="cozy-list">${rows}</div>${terminalHtml}`;
@@ -2994,6 +3079,169 @@
                 ${certBlock}`;
         }
 
+        /**
+         * #renderLivingThemeEngine()
+         *   Real registry/schedule/activation state from the real
+         *   LivingThemeEngine — never a second copy of its data. Seeding
+         *   picks an actual, already-registered CozyOS.Theme name (never
+         *   a fabricated one); if none is available or all are already
+         *   registered here, the real failure reason is shown, not
+         *   swallowed.
+         */
+        #renderLivingThemeEngine() {
+            const engine = window.CozyOS && window.CozyOS.LivingThemeEngine ? window.CozyOS.LivingThemeEngine : null;
+            if (!engine) return `<h2>Living Theme Engine</h2>${this.#renderNotConnected("LivingThemeEngine is not loaded on this page.")}`;
+
+            const themes = engine.listThemes();
+            const active = engine.getActiveTheme();
+
+            const rows = themes.map(t => {
+                const scheduledNow = engine.isThemeScheduledNow(t.themeId).scheduled;
+                const isActive = !!(active && active.themeId === t.themeId);
+                return `<div class="cozy-module-row">
+                    <div class="cozy-module-row-main">
+                        <b>${this.#escapeHtml(t.themeId)}</b>
+                        <span class="cozy-badge cozy-badge-neutral">${this.#escapeHtml(t.cozyThemeName)}</span>
+                        <span class="cozy-badge ${isActive ? "cozy-badge-success" : "cozy-badge-neutral"}">${isActive ? "ACTIVE" : "inactive"}</span>
+                        <span class="cozy-badge ${scheduledNow ? "cozy-badge-success" : "cozy-badge-neutral"}">${scheduledNow ? "Scheduled now" : "Not scheduled now"}</span>
+                    </div>
+                    <div class="cozy-module-row-meta">
+                        <span>Schedule: ${this.#escapeHtml(t.schedule?.type || "continuous")}</span>
+                        <span>Scope: ${this.#escapeHtml(t.scope)}</span>
+                        <button type="button" class="cozy-btn" data-lte-activate="${this.#escapeHtml(t.themeId)}">Activate</button>
+                    </div>
+                </div>`;
+            }).join("") || `<p class="cozy-disclosure-note">No themes registered in LivingThemeEngine yet.</p>`;
+
+            const historyRows = engine.getHistory().slice(-10).reverse()
+                .map(h => `<div class="cozy-nav-link"><span>${this.#escapeHtml(h.at)} — ${this.#escapeHtml(h.event)}</span></div>`)
+                .join("") || `<p class="cozy-disclosure-note">No history yet this session.</p>`;
+
+            const errBlock = this.#livingThemeEngineLastError
+                ? `<p class="cozy-disclosure-note" style="color:#b91c1c;">${this.#escapeHtml(this.#livingThemeEngineLastError)}</p>` : "";
+
+            return `<h2>Living Theme Engine</h2>
+                <p class="cozy-disclosure-note">Real theme registry, scheduling (one-time window + weekly/annual recurring), scope, and profiles. Activation genuinely composes CozyOS.Theme.setTheme() — never re-implemented. A registration here must reference an already-real, already-registered CozyOS.Theme name (see Theme Studio for that real list). NOT built: Live Preview (per-device rendering), Theme Marketplace import/export, seasonal/holiday template galleries, usage analytics.</p>
+                ${errBlock}
+                <button type="button" id="cozy-lte-seed-btn" class="cozy-btn cozy-btn-primary">Register a Schedule From an Existing CozyOS.Theme</button>
+                <h3>Active Theme</h3>
+                <p>${active ? `${this.#escapeHtml(active.themeId)} (${this.#escapeHtml(active.cozyThemeName)})` : "None active."}</p>
+                <h3>Registered Themes (${themes.length})</h3>
+                <div class="cozy-list">${rows}</div>
+                <h3>History</h3>
+                <div class="cozy-list">${historyRows}</div>`;
+        }
+
+        /**
+         * #renderLivingMessageEngine()
+         *   Real message registry/rotation/history from the real
+         *   LivingMessageEngine. Create/enable/disable/delete all route
+         *   through its real, fail-closed permission check — with no
+         *   real login screen anywhere in CozyOS yet, these will
+         *   honestly refuse and show why, exactly like Content Studio's
+         *   equivalent actions.
+         */
+        #renderLivingMessageEngine() {
+            const engine = window.CozyOS && window.CozyOS.LivingMessageEngine ? window.CozyOS.LivingMessageEngine : null;
+            if (!engine) return `<h2>Living Message Engine</h2>${this.#renderNotConnected("LivingMessageEngine is not loaded on this page.")}`;
+
+            const messages = engine.listMessages();
+            const rows = messages.map(m => `
+                <div class="cozy-module-row">
+                    <div class="cozy-module-row-main">
+                        <b>${this.#escapeHtml(m.category)}</b>
+                        <span class="cozy-badge cozy-badge-neutral">${this.#escapeHtml(m.priority)}</span>
+                        <span class="cozy-badge ${m.status === "enabled" ? "cozy-badge-success" : "cozy-badge-neutral"}">${this.#escapeHtml(m.status)}</span>
+                        <span class="cozy-badge cozy-badge-neutral">${m.orgId ? this.#escapeHtml(m.orgId) : "platform-wide"}</span>
+                    </div>
+                    <div class="cozy-module-row-meta">
+                        <span>${this.#escapeHtml(m.text)}</span>
+                        <span>Views: ${m.viewCount} · Dismissed: ${m.dismissCount}</span>
+                        ${m.status === "enabled"
+                            ? `<button type="button" class="cozy-btn" data-lme-disable="${this.#escapeHtml(m.messageId)}">Disable</button>`
+                            : `<button type="button" class="cozy-btn" data-lme-enable="${this.#escapeHtml(m.messageId)}">Enable</button>`}
+                        <button type="button" class="cozy-btn" data-lme-delete="${this.#escapeHtml(m.messageId)}">Delete</button>
+                    </div>
+                </div>`).join("") || `<p class="cozy-disclosure-note">No messages registered yet.</p>`;
+
+            const historyRows = engine.getHistory().slice(-10).reverse()
+                .map(h => `<div class="cozy-nav-link"><span>${this.#escapeHtml(h.at)} — ${this.#escapeHtml(h.event)}</span></div>`)
+                .join("") || `<p class="cozy-disclosure-note">No history yet this session.</p>`;
+
+            const preview = this.#livingMessageEnginePreview;
+            const previewBlock = preview
+                ? (preview.messageId
+                    ? `<div class="cozy-module-row"><b>${this.#escapeHtml(preview.category)}</b><p>${this.#escapeHtml(preview.text)}</p></div>`
+                    : `<p class="cozy-disclosure-note">No eligible message right now (none enabled + currently scheduled).</p>`)
+                : `<p class="cozy-disclosure-note">Not previewed yet this session.</p>`;
+
+            const errBlock = this.#livingMessageEngineLastError
+                ? `<p class="cozy-disclosure-note" style="color:#b91c1c;">${this.#escapeHtml(this.#livingMessageEngineLastError)}</p>` : "";
+
+            return `<h2>Living Message Engine</h2>
+                <p class="cozy-disclosure-note">Real message registry, org-scoped fail-closed permissions (Organization Administrators restricted to their own real orgId), scheduling (reuses LivingThemeEngine.matchesSchedule()), and rotation (sequential/random/weighted/priority-first). Does not render anything to the DOM — the floating-message display and "smart empty space" detection are separate, disclosed future work. NOT built: AI-generated messages, RSS/API sources. No real login screen exists yet anywhere in CozyOS, so create/enable/disable/delete below correctly fail closed rather than fake success.</p>
+                ${errBlock}
+                <button type="button" id="cozy-lme-seed-btn" class="cozy-btn cozy-btn-primary">Create a Demonstration Message</button>
+                <button type="button" id="cozy-lme-preview-btn" class="cozy-btn">Preview Next Eligible Message (priority-first)</button>
+                <h3>Preview</h3>
+                ${previewBlock}
+                <h3>Messages (${messages.length})</h3>
+                <div class="cozy-list">${rows}</div>
+                <h3>History</h3>
+                <div class="cozy-list">${historyRows}</div>`;
+        }
+
+        /**
+         * #renderModeEngine()
+         *   Real mode registry/activation/history from the real
+         *   ModeEngine. Activation genuinely composes
+         *   LivingThemeEngine.activateTheme() when a mode references a
+         *   theme — never re-applies theme state itself.
+         */
+        #renderModeEngine() {
+            const engine = window.CozyOS && window.CozyOS.ModeEngine ? window.CozyOS.ModeEngine : null;
+            if (!engine) return `<h2>Mode Engine</h2>${this.#renderNotConnected("ModeEngine is not loaded on this page.")}`;
+
+            const modes = engine.listModes();
+            const active = engine.getActiveMode();
+
+            const rows = modes.map(m => {
+                const scheduledNow = engine.isModeScheduledNow(m.modeId).scheduled;
+                const isActive = !!(active && active.modeId === m.modeId);
+                return `<div class="cozy-module-row">
+                    <div class="cozy-module-row-main">
+                        <b>${this.#escapeHtml(m.modeId)}</b>
+                        <span class="cozy-badge cozy-badge-neutral">${m.themeId ? this.#escapeHtml(m.themeId) : "no theme"}</span>
+                        <span class="cozy-badge ${isActive ? "cozy-badge-success" : "cozy-badge-neutral"}">${isActive ? "ACTIVE" : "inactive"}</span>
+                        <span class="cozy-badge ${scheduledNow ? "cozy-badge-success" : "cozy-badge-neutral"}">${scheduledNow ? "Scheduled now" : "Not scheduled now"}</span>
+                    </div>
+                    <div class="cozy-module-row-meta">
+                        <span>App priority: ${m.appPriority.length ? this.#escapeHtml(m.appPriority.join(", ")) : "none set"}</span>
+                        <span>Notifications: ${m.notificationsEnabled ? "enabled" : "disabled"}</span>
+                        <button type="button" class="cozy-btn" data-mode-activate="${this.#escapeHtml(m.modeId)}">Activate</button>
+                    </div>
+                </div>`;
+            }).join("") || `<p class="cozy-disclosure-note">No modes registered yet.</p>`;
+
+            const historyRows = engine.getHistory().slice(-10).reverse()
+                .map(h => `<div class="cozy-nav-link"><span>${this.#escapeHtml(h.at)} — ${this.#escapeHtml(h.event)}</span></div>`)
+                .join("") || `<p class="cozy-disclosure-note">No history yet this session.</p>`;
+
+            const errBlock = this.#modeEngineLastError
+                ? `<p class="cozy-disclosure-note" style="color:#b91c1c;">${this.#escapeHtml(this.#modeEngineLastError)}</p>` : "";
+
+            return `<h2>Mode Engine</h2>
+                <p class="cozy-disclosure-note">Real mode registry — a Mode is a named bundle: which real LivingThemeEngine theme to activate, an authoritative (not self-enforced) app-priority list, and a notifications-enabled flag. Scheduling reuses LivingThemeEngine.matchesSchedule() rather than duplicating date logic. NOT built, named honestly: sound/animation control, AI personality switching, brightness control, location-based activation, and application shells actually reading/enforcing "prioritize these apps" — all disclosed future work, not silently omitted.</p>
+                ${errBlock}
+                <button type="button" id="cozy-mode-seed-btn" class="cozy-btn cozy-btn-primary">Register a Demonstration Mode</button>
+                <h3>Active Mode</h3>
+                <p>${active ? this.#escapeHtml(active.modeId) : "None active."}</p>
+                <h3>Registered Modes (${modes.length})</h3>
+                <div class="cozy-list">${rows}</div>
+                <h3>History</h3>
+                <div class="cozy-list">${historyRows}</div>`;
+        }
+
         #renderNotificationCenter() {
             const feed = this.getNotificationFeed(50);
             return `<h2>Enterprise Notification Center</h2>
@@ -3026,7 +3274,7 @@
                 { label: "Overview", items: [["dashboard", "Dashboard"], ["applications", "Application Center"], ["modules", "Module Manager"]] },
                 { label: "Certification", items: [["certification", "Certification Center"], ["releases", "Release Center"], ["upgrades", "Upgrade Center"], ["dependencies", "Dependency Viewer"]] },
                 { label: "Operations", items: [["diagnostics", "Diagnostics Center"], ["events", "Event Monitor"], ["notifications", "Notification Center"], ["search", "Enterprise Search"], ["platformDiscovery", "Platform Discovery"], ["platformAudit", "Audit Center"], ["platformOperations", "Operations Center"], ["platformResources", "Resource Center"], ["referenceIntegrityCenter", "Reference Integrity Center"], ["vendorStatusCenter", "Vendor Status"]] },
-                { label: "Design Studio", items: [["themeStudio", "Theme Studio"], ["livingButtonEngine", "Living Button Engine"], ["accessibilityCenter", "Accessibility Studio"], ["contentStudio", "Content Studio"]] },
+                { label: "Design Studio", items: [["themeStudio", "Theme Studio"], ["livingThemeEngine", "Living Theme Engine"], ["livingMessageEngine", "Living Message Engine"], ["modeEngine", "Mode Engine"], ["livingButtonEngine", "Living Button Engine"], ["accessibilityCenter", "Accessibility Studio"], ["contentStudio", "Content Studio"]] },
                 { label: "Integrations (awaiting coordinators)", items: [["security", "Security Center"], ["storage", "Storage Center"], ["sync", "Synchronization Center"], ["automation", "Automation Center"], ["live", "Live Center"], ["speech", "Speech Center"], ["translation", "Translation Center"], ["subscription", "Subscription / License Center"], ["ai", "AI Center"], ["plugins", "Plugin Center"], ["tenants", "Tenant Center"]] },
                 // Additive: Administrator Workspace expansion per the locked
                 // CozyOS architecture. Nothing above this line was changed.
@@ -3405,6 +3653,108 @@
                     }
                     if (evt.target.id === "cozy-lbe-toggle-btn") {
                         document.body.classList.toggle("cozy-animations-disabled");
+                        this.#render();
+                        return;
+                    }
+                    if (evt.target.id === "cozy-lte-seed-btn") {
+                        const engine = window.CozyOS.LivingThemeEngine;
+                        const themeController = window.CozyOS.Theme;
+                        this.#livingThemeEngineLastError = null;
+                        if (engine && themeController && typeof themeController.listThemes === "function") {
+                            const registeredNames = new Set(engine.listThemes().map(t => t.cozyThemeName));
+                            const candidate = themeController.listThemes().find(t => !registeredNames.has(t.name));
+                            if (!candidate) {
+                                this.#livingThemeEngineLastError = "Every real CozyOS.Theme is already registered here, or no themes exist in CozyOS.Theme yet.";
+                            } else {
+                                const result = engine.registerTheme(`schedule_${candidate.name}_${Date.now()}`, { cozyThemeName: candidate.name });
+                                if (!result.success) this.#livingThemeEngineLastError = result.reason;
+                            }
+                        } else {
+                            this.#livingThemeEngineLastError = "CozyOS.Theme is not loaded — cannot look up a real theme name to register.";
+                        }
+                        this.#render();
+                        return;
+                    }
+                    if (evt.target.hasAttribute("data-lte-activate")) {
+                        const engine = window.CozyOS.LivingThemeEngine;
+                        const themeId = evt.target.getAttribute("data-lte-activate");
+                        this.#livingThemeEngineLastError = null;
+                        if (engine) {
+                            const result = engine.activateTheme(themeId);
+                            if (!result.success) this.#livingThemeEngineLastError = result.reason;
+                        }
+                        this.#render();
+                        return;
+                    }
+                    if (evt.target.id === "cozy-mode-seed-btn") {
+                        const engine = window.CozyOS.ModeEngine;
+                        const themeEngine = window.CozyOS.LivingThemeEngine;
+                        this.#modeEngineLastError = null;
+                        if (engine) {
+                            const existingTheme = themeEngine ? themeEngine.listThemes()[0] : null;
+                            const result = engine.registerMode(`mode_${Date.now()}`, existingTheme ? { themeId: existingTheme.themeId } : {});
+                            if (!result.success) this.#modeEngineLastError = result.reason;
+                        }
+                        this.#render();
+                        return;
+                    }
+                    if (evt.target.hasAttribute("data-mode-activate")) {
+                        const engine = window.CozyOS.ModeEngine;
+                        const modeId = evt.target.getAttribute("data-mode-activate");
+                        this.#modeEngineLastError = null;
+                        if (engine) {
+                            const result = engine.activateMode(modeId);
+                            if (!result.success) this.#modeEngineLastError = result.reason;
+                        }
+                        this.#render();
+                        return;
+                    }
+                    if (evt.target.id === "cozy-lme-seed-btn") {
+                        const engine = window.CozyOS.LivingMessageEngine;
+                        this.#livingMessageEngineLastError = null;
+                        if (engine) {
+                            const result = engine.createMessage(this.#currentUserId || null, { category: "general", text: "Welcome to CozyOS — this is a real demonstration message." });
+                            if (!result.success) this.#livingMessageEngineLastError = result.reason;
+                        }
+                        this.#render();
+                        return;
+                    }
+                    if (evt.target.id === "cozy-lme-preview-btn") {
+                        const engine = window.CozyOS.LivingMessageEngine;
+                        if (engine) this.#livingMessageEnginePreview = engine.pickNextMessage({ mode: "priority-first" }) || { messageId: null };
+                        this.#render();
+                        return;
+                    }
+                    if (evt.target.hasAttribute("data-lme-enable")) {
+                        const engine = window.CozyOS.LivingMessageEngine;
+                        const messageId = evt.target.getAttribute("data-lme-enable");
+                        this.#livingMessageEngineLastError = null;
+                        if (engine) {
+                            const result = engine.setStatus(this.#currentUserId || null, messageId, "enabled");
+                            if (!result.success) this.#livingMessageEngineLastError = result.reason;
+                        }
+                        this.#render();
+                        return;
+                    }
+                    if (evt.target.hasAttribute("data-lme-disable")) {
+                        const engine = window.CozyOS.LivingMessageEngine;
+                        const messageId = evt.target.getAttribute("data-lme-disable");
+                        this.#livingMessageEngineLastError = null;
+                        if (engine) {
+                            const result = engine.setStatus(this.#currentUserId || null, messageId, "disabled");
+                            if (!result.success) this.#livingMessageEngineLastError = result.reason;
+                        }
+                        this.#render();
+                        return;
+                    }
+                    if (evt.target.hasAttribute("data-lme-delete")) {
+                        const engine = window.CozyOS.LivingMessageEngine;
+                        const messageId = evt.target.getAttribute("data-lme-delete");
+                        this.#livingMessageEngineLastError = null;
+                        if (engine) {
+                            const result = engine.deleteMessage(this.#currentUserId || null, messageId);
+                            if (!result.success) this.#livingMessageEngineLastError = result.reason;
+                        }
                         this.#render();
                         return;
                     }
