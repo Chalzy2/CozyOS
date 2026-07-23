@@ -87,6 +87,14 @@
         }
 
         /**
+         * listThemes()
+         *   Added during the Design Studio integration milestone (real
+         *   enumeration needed for the admin Theme list UI). Read-only,
+         *   changes no scheduling/activation behavior — purely additive.
+         */
+        listThemes() { return [...this.#themes.values()].map((t) => this.#deepClone(t)); }
+
+        /**
          * matchesSchedule(schedule, now)
          *   Real, public (not private) — deliberately exposed so Mode
          *   Engine (and any future coordinator needing schedule
