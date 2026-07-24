@@ -409,41 +409,50 @@
          */
         /**
          * #checkAccess(userId)
-         *   Real authorization (Rule 105) — now delegates to the real,
-         *   single entry point `AuthCoordinator.authorize({policy:
+         *   Real authorization (Rule 105) — delegates to the real,
+         *   single entry point `AuthorizationCoordinator.authorize({policy:
          *   "open-builder"})`, which itself composes IdentityEngine/
          *   CozyOS.Auth/SessionManager/AuthPolicyEngine/DevAccessService.
          *   This file no longer makes its own authorization decision —
          *   it asks the coordinator and trusts the real result.
          *
-         *   REAL, DISCLOSED FALLBACK: if `AuthCoordinator` itself isn't
-         *   loaded (a genuine load-order or deployment gap, not the
-         *   normal case), this reverts to the exact original Rule 91/93
-         *   logic rather than failing in a new, confusing way — still
-         *   fail-closed, still honest about which path was used.
+         *   Milestone 132a Ownership Report: this coordinator is
+         *   window.CozyOS.AuthorizationCoordinator (core/security/
+         *   auth-coordinator.js), NOT window.CozyOS.AuthCoordinator
+         *   (core/modules/identity/auth-coordinator.js, which owns login
+         *   orchestration only and has no authorize() method). Prior to
+         *   this fix, this file referenced the wrong global and always
+         *   fell through to the fallback path below.
+         *
+         *   REAL, DISCLOSED FALLBACK: if `AuthorizationCoordinator`
+         *   itself isn't loaded (a genuine load-order or deployment gap,
+         *   not the normal case), this reverts to the exact original
+         *   Rule 91/93 logic rather than failing in a new, confusing
+         *   way — still fail-closed, still honest about which path was
+         *   used.
          */
         async #checkAccess(userId) {
-            const coordinator = window.CozyOS.AuthCoordinator;
+            const coordinator = window.CozyOS.AuthorizationCoordinator;
             if (coordinator && typeof coordinator.authorize === "function") {
                 const result = await coordinator.authorize({ policy: "open-builder", context: { userId } });
-                return { allowed: result.authorized === true, reason: (result.diagnostics && result.diagnostics.reason) || (result.authorized ? "Authorized via AuthenticationCoordinator." : "Denied via AuthenticationCoordinator.") };
+                return { allowed: result.authorized === true, reason: (result.diagnostics && result.diagnostics.reason) || (result.authorized ? "Authorized via AuthorizationCoordinator." : "Denied via AuthorizationCoordinator.") };
             }
-            // Real, disclosed fallback — AuthCoordinator is not loaded.
+            // Real, disclosed fallback — AuthorizationCoordinator is not loaded.
             const identity = window.CozyOS.IdentityEngine;
             if (userId) {
                 if (!identity || typeof identity.isPlatformAdmin !== "function") {
-                    return { allowed: false, reason: "AuthenticationCoordinator and IdentityEngine are both unavailable — access cannot be verified, so it is honestly refused rather than assumed safe." };
+                    return { allowed: false, reason: "AuthorizationCoordinator and IdentityEngine are both unavailable — access cannot be verified, so it is honestly refused rather than assumed safe." };
                 }
                 const allowed = identity.isPlatformAdmin(userId) || identity.isDeveloper(userId);
-                return { allowed, reason: allowed ? "Verified Platform Administrator or Developer (fallback path — AuthenticationCoordinator not loaded)." : `User "${userId}" is not a Platform Administrator or authorized Developer.` };
+                return { allowed, reason: allowed ? "Verified Platform Administrator or Developer (fallback path — AuthorizationCoordinator not loaded)." : `User "${userId}" is not a Platform Administrator or authorized Developer.` };
             }
             const devAccess = window.CozyOS.DevAccessService;
             if (devAccess && typeof devAccess.checkAccess === "function") {
                 const result = devAccess.checkAccess();
-                if (result.allowed) return { allowed: true, reason: `Access granted via ${result.method === "real-session" ? "a real, verified administrator session" : "Development Mode (environment: " + result.environment + ")"} (fallback path — AuthenticationCoordinator not loaded).` };
+                if (result.allowed) return { allowed: true, reason: `Access granted via ${result.method === "real-session" ? "a real, verified administrator session" : "Development Mode (environment: " + result.environment + ")"} (fallback path — AuthorizationCoordinator not loaded).` };
                 return { allowed: false, reason: `${result.reason} (environment: ${result.environment}, development mode: ${result.developmentMode})` };
             }
-            return { allowed: false, reason: "AuthenticationCoordinator, DevAccessService, and an explicit userId are all unavailable — access is refused by default." };
+            return { allowed: false, reason: "AuthorizationCoordinator, DevAccessService, and an explicit userId are all unavailable — access is refused by default." };
         }
 
         /**
