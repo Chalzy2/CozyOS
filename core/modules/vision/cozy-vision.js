@@ -287,6 +287,8 @@ const _results         = new Map(); // resultId       → ResultRecord
 const _confidence      = new Map(); // confidenceId   → ConfidenceRecord
 const _models          = new Map(); // modelId        → VisionModelRecord
 const _adapters        = new Map(); // adapterId      → AdapterRecord
+const _providers       = new Map(); // providerName   → ProviderAdapter (Milestone 139 — backs open()/close()/getCapabilities())
+const _openHandles     = new Map(); // sessionId       → { mode, requestId, handle } (Milestone 139 — tracks Vision.open() calls)
 const _plugins         = new Map(); // pluginId       → PluginRecord
 const _integrations    = new Map(); // integrationId  → IntegrationRecord
 const _timeline        = [];        // TimelineEvent[] — append-only
@@ -1816,7 +1818,160 @@ const _kernel = {
         });
     },
 
-    // ── § 5.33  VERSION ───────────────────────────────────────────────────────
+    // ── § 5.33  PUBLIC FACADE (Milestone 139) ───────────────────────────────
+    // The ONLY surface applications should call. Delegates to a registered
+    // "camera" provider (see registerProvider) — Vision never talks to
+    // hardware itself. If no provider is registered, or the provider
+    // reports it has nothing to offer, these methods fail closed with a
+    // real Error rather than fabricating success (Rule 6).
+
+    /**
+     * Open a vision capture context in the given mode. Delegates to the
+     * registered "camera" provider; QR/OCR/document/AI interpretation of
+     * the opened stream is explicitly out of scope (Milestone 139).
+     * @param {{mode: "photo"|"video"|"qr"|"document"}} config
+     * @returns {Promise<{sessionId:string, requestId:string, mode:string, provider:object}>}
+     */
+    async open(config = {}) {
+        _securityCheck(config, "open");
+        _requireString(config?.mode, "mode");
+        const mode = config.mode;
+
+        const provider = _providers.get("camera");
+        if (!provider) {
+            throw new Error("[CozyVision] open(): no 'camera' provider registered. Call Vision.registerProvider('camera', <adapter>) first.");
+        }
+
+        const sessionId = this.createVisionSession({ label: `open:${mode}` });
+        this.startVisionSession(sessionId);
+        const requestId = this.registerVisionRequest({ sessionId, type: mode });
+
+        let outcome;
+        try {
+            outcome = await provider.open({ mode, sessionId, requestId });
+        } catch (err) {
+            this.stopVisionSession(sessionId);
+            throw new Error(`[CozyVision] open(): camera provider threw: ${err && err.message ? err.message : String(err)}`);
+        }
+
+        if (!outcome || outcome.success !== true) {
+            this.stopVisionSession(sessionId);
+            throw new Error(`[CozyVision] open(): camera provider reported failure — ${(outcome && outcome.reason) || 'no reason given'}`);
+        }
+
+        _openHandles.set(sessionId, { mode, requestId, handle: outcome });
+        _audit_log("VISION_OPENED", "session", sessionId, { mode });
+        _timeline_push("open", { sessionId, requestId, mode });
+        return { sessionId, requestId, mode, provider: outcome };
+    },
+
+    /**
+     * Close a vision capture context opened via open().
+     * @param {string} sessionId
+     * @returns {Promise<boolean>}
+     */
+    async close(sessionId) {
+        _requireString(sessionId, "sessionId");
+        const openEntry = _openHandles.get(sessionId);
+        if (!openEntry) {
+            throw new Error(`[CozyVision] close(): no open handle for sessionId "${sessionId}".`);
+        }
+
+        const provider = _providers.get("camera");
+        try {
+            if (provider && typeof provider.close === "function") {
+                await provider.close(openEntry.handle);
+            }
+        } catch (_err) { /* non-fatal — session torn down regardless */ }
+
+        _openHandles.delete(sessionId);
+        this.stopVisionSession(sessionId);
+        _audit_log("VISION_CLOSED", "session", sessionId);
+        _timeline_push("close", { sessionId });
+        return true;
+    },
+
+    /**
+     * @param {string} [sessionId] — if omitted, returns overall Vision status.
+     * @returns {object} frozen status snapshot
+     */
+    getStatus(sessionId) {
+        if (sessionId !== undefined) {
+            _requireString(sessionId, "sessionId");
+            const openEntry = _openHandles.get(sessionId);
+            const session = _sessions.get(sessionId);
+            return Object.freeze({
+                sessionId,
+                open: !!openEntry,
+                mode: openEntry ? openEntry.mode : null,
+                sessionState: session ? session.state : null,
+            });
+        }
+        return Object.freeze({
+            openSessions: _openHandles.size,
+            totalSessions: _sessions.size,
+            registeredProviders: Object.freeze(Array.from(_providers.keys())),
+        });
+    },
+
+    /**
+     * @returns {object} frozen capability snapshot. Reflects only what the
+     * registered "camera" provider actually reports — never fabricated.
+     */
+    getCapabilities() {
+        const provider = _providers.get("camera");
+        let cameraCapabilities = null;
+        if (provider && typeof provider.getCapabilities === "function") {
+            try {
+                cameraCapabilities = provider.getCapabilities();
+            } catch (_err) { cameraCapabilities = null; }
+        }
+        return Object.freeze({
+            modes: Object.freeze(["photo", "video", "qr", "document"]),
+            cameraProviderRegistered: !!provider,
+            camera: cameraCapabilities,
+        });
+    },
+
+    /**
+     * Register a named provider (e.g. "camera") that open()/close()/
+     * getCapabilities() will delegate to. Provider must expose an
+     * open(config) method at minimum.
+     * @param {string} name
+     * @param {{open: Function, close?: Function, getCapabilities?: Function}} adapter
+     * @returns {boolean}
+     */
+    registerProvider(name, adapter) {
+        _requireString(name, "name");
+        if (!adapter || typeof adapter !== "object" || typeof adapter.open !== "function") {
+            throw new Error("[CozyVision] registerProvider(): adapter must be an object exposing at least open().");
+        }
+        _providers.set(name, adapter);
+        try {
+            this.registerAdapter({ name, type: name, adapterId: `provider:${name}` });
+        } catch (_err) { /* adapter bookkeeping only — non-fatal if already registered */ }
+        _audit_log("PROVIDER_REGISTERED", "provider", name);
+        _timeline_push("providerRegistered", { name });
+        return true;
+    },
+
+    /**
+     * @param {string} name
+     * @returns {boolean}
+     */
+    unregisterProvider(name) {
+        _requireString(name, "name");
+        if (!_providers.has(name)) {
+            throw new Error(`[CozyVision] unregisterProvider(): no provider registered as "${name}".`);
+        }
+        _providers.delete(name);
+        try { this.removeAdapter(`provider:${name}`); } catch (_err) { /* already gone, non-fatal */ }
+        _audit_log("PROVIDER_UNREGISTERED", "provider", name);
+        _timeline_push("providerUnregistered", { name });
+        return true;
+    },
+
+    // ── § 5.34  VERSION ───────────────────────────────────────────────────────
 
     /** @returns {string} */
     getVersion() { return VISION_VERSION; },
@@ -1849,3 +2004,57 @@ if (typeof window !== "undefined") {
         window.CozyOS.Vision = _deepFreeze(_kernel);
     }
       }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// § 7. KERNEL & SERVICE REGISTRY INTEGRATION (Milestone 139)
+// ─────────────────────────────────────────────────────────────────────────────
+// Reuses the exact defensive registration convention already proven in
+// core/modules/vault/cozy-vault-engine.js (Bootstrap) and
+// core/modules/identity/identity-storage.js (ServiceRegistry). Both blocks
+// are non-fatal by design: Vision remains fully usable standalone (via
+// window.CozyOS.Vision) whether or not Kernel/ServiceRegistry are present
+// on the page. No new registration system is invented here.
+//
+// DISCLOSED GAP: as of this milestone, dashboard.html does not load
+// core/bootstrap.js at all, so window.CozyOS.Kernel.Bootstrap will not
+// exist in the current production page and this block will be a no-op
+// there — exactly as it already is for Vault/Identity/etc. This is
+// pre-existing platform technical debt, not something introduced or
+// fixed by this milestone.
+
+if (typeof window !== "undefined") {
+    let _visionKernelRegistrationAttempted = false;
+    async function _registerVisionWithKernel() {
+        if (_visionKernelRegistrationAttempted) return;
+        const bootstrap = window.CozyOS?.Kernel?.Bootstrap;
+        if (!bootstrap) return;
+        _visionKernelRegistrationAttempted = true;
+        try {
+            await bootstrap.registerService({
+                name: "Vision",
+                version: VISION_VERSION,
+                apiVersion: "1.0.0",
+                mandatory: false,
+                dependencies: [],
+            });
+            bootstrap.initializeService("Vision");
+            await bootstrap.verifyService("Vision", async () => window.CozyOS.Vision.getVersion() === VISION_VERSION);
+            bootstrap.startService("Vision");
+        } catch (_err) { /* non-fatal — Vision remains fully functional standalone even if Kernel registration fails */ }
+    }
+    _registerVisionWithKernel();
+    if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+        document.addEventListener("cozyos:kernel-bridge-ready", _registerVisionWithKernel, { once: true });
+    }
+
+    if (window.CozyOS.ServiceRegistry && typeof window.CozyOS.ServiceRegistry.registerCoordinator === "function") {
+        try {
+            window.CozyOS.ServiceRegistry.registerCoordinator({
+                name: "Vision",
+                category: "Platform",
+                icon: "camera.svg",
+                description: "Real vision coordination kernel — sessions, requests/tasks, image/video/document registries, adapter registry, and the Milestone 139 public facade (open/close/getStatus/getCapabilities/registerProvider/unregisterProvider). Performs no computation itself; delegates entirely to registered providers (e.g. the Camera provider backed by core/engines/camera/camera-manager.js, the LOCKED canonical Camera Engine per Milestone 138). No OCR/QR/AI logic implemented yet.",
+            });
+        } catch (_err) { /* non-fatal */ }
+    }
+}
