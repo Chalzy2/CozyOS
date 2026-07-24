@@ -697,16 +697,6 @@
     <script src="core/modules/ocr/cozy-ocr.js"></script>
     <script src="core/modules/ocr/document-router.js"></script>
 
-    <!-- Vision (core/modules/vision/) — Milestone 139: gives CozyVision its
-         first production runtime presence. cozy-vision.js self-registers
-         window.CozyOS.Vision; vision-camera-adapter.js must load after it
-         and registers the "camera" provider (delegating to the LOCKED
-         canonical Camera Engine, core/engines/camera/camera-manager.js,
-         loaded lazily via dynamic import()). No camera/QR/OCR/AI logic
-         implemented — facade + delegation only. -->
-    <script src="core/modules/vision/cozy-vision.js"></script>
-    <script src="core/modules/vision/vision-camera-adapter.js"></script>
-
     <!-- AIMode (core/modules/aimode/cozy-ai-mode.js) — registers
          window.CozyOS.AIMode, exact match for cozy-developer.js's
          #aimode(). The last of DeveloperHub's 8 optional integrations. -->
@@ -775,6 +765,14 @@
     <script src="core/modules/shopos/shopos.js"></script>
     <script src="core/plugins/pharmacyOS.js"></script>
     <script src="core/dashboard.js"></script>
+
+    <!-- Milestone 141: Engine Integration Bridge. type="module" is standard
+         HTML and coexists with the classic <script> tags above it — no other
+         script tag on this page needs to change. Loads Camera/Audio/
+         Playback/Scene/Media ES-module engines and exposes them under
+         window.CozyOS.*Engine, best-effort per engine (fail closed; a
+         missing/broken engine does not block the rest of the dashboard). -->
+    <script type="module" src="core/bridge/engine-bridge-bootstrap.js"></script>
 
     <!-- 3. BOOTSTRAP: mount the Workspace Shell once it and its scripts have
          loaded. Bounded retry (same convention already used elsewhere in
