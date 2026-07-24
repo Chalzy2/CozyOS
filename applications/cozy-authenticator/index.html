@@ -1,1 +1,215 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CozyAuthenticator | CozyOS Enterprise</title>
+    <!-- Tailwind CSS CDN — kept per approved design. Local-asset replacement is a
+         pre-Production-Certification step, not yet done (see changelog-136.md). -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        if (window.tailwind) {
+            tailwind.config = {
+                darkMode: 'class',
+                theme: {
+                    extend: {
+                        colors: {
+                            cozy: {
+                                emerald: '#1B5E20',
+                                emeraldLight: '#2E7D32',
+                                gold: '#F9A825',
+                                goldLight: '#FBC02D',
+                                dark: '#101418',
+                                surface: '#161D22',
+                                card: '#1C262C',
+                                border: '#28353E',
+                                text: '#212121',
+                                success: '#00A86B',
+                                error: '#D32F2F',
+                                warning: '#F9A825'
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            console.warn('[CozyAuthenticator] https://cdn.tailwindcss.com did not load in this environment — Tailwind styling will be unavailable, but the app will continue to run.');
+        }
+    </script>
+    <!-- Lucide Icons — kept per approved design; same CDN note as above. -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #101418; }
+        ::-webkit-scrollbar-thumb { background: #28353E; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb-hover { background: #1B5E20; }
 
+        .glass-panel {
+            background: rgba(28, 38, 44, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(249, 168, 37, 0.15);
+        }
+
+        .glass-card {
+            background: rgba(22, 29, 34, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(27, 94, 32, 0.25);
+        }
+
+        @keyframes softBreath {
+            0%, 100% { transform: scale(1); opacity: 0.95; }
+            50% { transform: scale(1.01); opacity: 1; box-shadow: 0 0 25px rgba(27, 94, 32, 0.3); }
+        }
+        .animate-soft-breath { animation: softBreath 4s ease-in-out infinite; }
+
+        /* Countdown is driven live per-account by JS (stroke-dashoffset set directly),
+           not by a fixed-duration CSS animation — real 30s (or account.period) timing. */
+        .countdown-ring { transition: stroke-dashoffset 1s linear; }
+
+        .light .glass-panel { background: rgba(255,255,255,0.85); border-color: rgba(27,94,32,0.15); }
+        .light .glass-card { background: rgba(255,255,255,0.7); border-color: rgba(27,94,32,0.2); }
+    </style>
+</head>
+<body class="bg-cozy-dark text-slate-100 font-sans antialiased min-h-screen flex flex-col justify-between selection:bg-cozy-emerald selection:text-white">
+
+    <!-- Top App Navigation / Header Bar -->
+    <header class="h-16 border-b border-cozy-border bg-cozy-surface/90 sticky top-0 z-30 flex items-center justify-between px-4 sm:px-8">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl overflow-hidden border border-cozy-gold/40 shadow-md shadow-cozy-emerald/30 bg-black flex items-center justify-center">
+                <img src="797850.png" alt="CozyOS Logo" class="w-full h-full object-cover">
+            </div>
+            <div>
+                <div class="flex items-center space-x-2">
+                    <span class="font-extrabold text-white tracking-wider text-sm sm:text-base">CozyAuthenticator</span>
+                    <span class="text-[9px] font-bold px-2 py-0.5 rounded bg-cozy-gold/20 text-cozy-gold border border-cozy-gold/30">ENTERPRISE</span>
+                </div>
+                <p class="text-[10px] text-slate-400">Built for Africa. Ready for the World.</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <!-- Real session identity — never hardcoded. Shows "No active session" honestly if AuthCoordinator.isAuthenticated() is false. -->
+            <div class="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-cozy-card border border-cozy-border text-xs text-slate-300">
+                <i data-lucide="user-check" class="w-3.5 h-3.5 text-cozy-success" id="ca-session-icon"></i>
+                <span id="ca-session-label">Checking session…</span>
+            </div>
+            <button class="p-2 rounded-xl bg-cozy-card hover:bg-cozy-border text-slate-300 hover:text-white transition border border-cozy-border" title="Security Center">
+                <i data-lucide="shield-check" class="w-5 h-5 text-cozy-success"></i>
+            </button>
+            <button class="p-2 rounded-xl bg-cozy-card hover:bg-cozy-border text-slate-300 hover:text-white transition border border-cozy-border" title="Settings">
+                <i data-lucide="settings" class="w-5 h-5"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Container -->
+    <main class="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+        <!-- Search and Action Bar -->
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="relative w-full sm:w-96">
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                <input type="text" id="ca-search-input" placeholder="Search accounts, issuers, or tags..."
+                    class="w-full bg-cozy-surface border border-cozy-border rounded-xl pl-9 pr-4 py-2 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cozy-gold transition shadow-inner">
+            </div>
+            <div class="flex items-center space-x-3 w-full sm:w-auto justify-end">
+                <!-- Scan QR: explicit UI placeholder only — no camera, no decode, no account creation. Separate future milestone. -->
+                <button id="ca-scan-qr-btn" class="px-4 py-2 rounded-xl bg-cozy-emerald hover:bg-cozy-emeraldLight text-white font-semibold text-xs transition flex items-center space-x-2 shadow-lg shadow-cozy-emerald/30 border border-cozy-gold/30">
+                    <i data-lucide="scan" class="w-4 h-4 text-cozy-gold"></i>
+                    <span>Scan QR</span>
+                </button>
+                <button id="ca-manual-setup-btn" class="px-4 py-2 rounded-xl bg-cozy-card hover:bg-cozy-border text-cozy-gold font-semibold text-xs transition flex items-center space-x-2 border border-cozy-gold/40">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>Manual Setup</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Authenticator Dashboard: Account Cards Grid (populated live — no hardcoded demo accounts) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="ca-account-grid">
+            <div class="glass-card p-6 rounded-2xl text-center text-sm text-slate-400 md:col-span-2" id="ca-empty-state">
+                No accounts enrolled yet. Use <strong class="text-cozy-gold">Manual Setup</strong> to add one — QR enrollment isn't available this milestone.
+            </div>
+        </div>
+
+        <!-- Security & Architecture Status Footer Card -->
+        <div class="glass-panel p-5 rounded-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-cozy-border pb-3">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="cpu" class="w-4 h-4 text-cozy-gold"></i>
+                    <span class="text-xs font-bold text-white uppercase tracking-wider">CozyOS Engine Integration Status</span>
+                </div>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded border" id="ca-overall-status-badge">CHECKING…</span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div class="p-3 rounded-xl bg-cozy-dark/60 border border-cozy-border space-y-1">
+                    <span class="text-slate-400 block text-[10px]">Identity Engine</span>
+                    <span class="font-bold text-white flex items-center" id="ca-status-identity"><span class="w-2 h-2 rounded-full bg-slate-500 mr-1.5"></span> Checking…</span>
+                </div>
+                <div class="p-3 rounded-xl bg-cozy-dark/60 border border-cozy-border space-y-1">
+                    <span class="text-slate-400 block text-[10px]">Auth Coordinator</span>
+                    <span class="font-bold text-white flex items-center" id="ca-status-authcoord"><span class="w-2 h-2 rounded-full bg-slate-500 mr-1.5"></span> Checking…</span>
+                </div>
+                <div class="p-3 rounded-xl bg-cozy-dark/60 border border-cozy-border space-y-1">
+                    <span class="text-slate-400 block text-[10px]">Authorization</span>
+                    <span class="font-bold text-white flex items-center" id="ca-status-authz"><span class="w-2 h-2 rounded-full bg-slate-500 mr-1.5"></span> Checking…</span>
+                </div>
+                <div class="p-3 rounded-xl bg-cozy-dark/60 border border-cozy-border space-y-1">
+                    <span class="text-slate-400 block text-[10px]">Factor Registry</span>
+                    <span class="font-bold text-white flex items-center" id="ca-status-factors"><span class="w-2 h-2 rounded-full bg-slate-500 mr-1.5"></span> Checking…</span>
+                </div>
+            </div>
+            <!-- Real per-factor breakdown — replaces the fabricated "Biometric Ready" badge.
+                 Never shows "Ready"/"Active" for a factor whose provider is isReal:false. -->
+            <div class="pt-2 border-t border-cozy-border/60">
+                <div class="text-[10px] text-slate-400 uppercase tracking-wider mb-2">Factor Detail (live from AuthFactorRegistry)</div>
+                <div class="flex flex-wrap gap-2" id="ca-factor-detail-list"><!-- populated live --></div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Manual Enrollment Modal -->
+    <div class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-40" id="ca-enroll-backdrop" hidden>
+        <div class="glass-panel w-full max-w-sm rounded-2xl p-6 space-y-3">
+            <h2 class="text-sm font-bold text-white">Add Account (Manual Entry)</h2>
+            <div>
+                <label class="text-[10px] text-slate-400 block mb-1">Issuer</label>
+                <input id="ca-issuer-input" type="text" placeholder="e.g. CozyOS" class="w-full bg-cozy-surface border border-cozy-border rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cozy-gold">
+            </div>
+            <div>
+                <label class="text-[10px] text-slate-400 block mb-1">Account Name</label>
+                <input id="ca-accountname-input" type="text" placeholder="e.g. jane@cozyos.dev" class="w-full bg-cozy-surface border border-cozy-border rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cozy-gold">
+            </div>
+            <p class="text-[10px] text-cozy-error" id="ca-enroll-error" hidden></p>
+            <div class="flex justify-end gap-2 pt-2">
+                <button id="ca-enroll-cancel-btn" class="px-3 py-1.5 rounded-lg bg-cozy-card border border-cozy-border text-slate-300 text-xs">Cancel</button>
+                <button id="ca-enroll-confirm-btn" class="px-3 py-1.5 rounded-lg bg-cozy-emerald text-white text-xs font-semibold">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast (used for "Coming Soon" and other non-blocking notices) -->
+    <div id="ca-toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-cozy-card border border-cozy-gold/40 text-white text-xs px-4 py-2 rounded-xl shadow-xl z-50" hidden></div>
+
+    <!-- Footer -->
+    <footer class="py-4 px-6 border-t border-cozy-border bg-cozy-surface text-center text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div class="flex items-center space-x-2">
+            <span class="font-bold text-white">CozyAuthenticator v4.2.0</span>
+            <span>&copy; 2026 CozyOS Enterprise. Built for Africa. Ready for the World.</span>
+        </div>
+        <div class="flex items-center space-x-4">
+            <a href="#" class="hover:text-cozy-gold transition">Security Center</a>
+            <a href="#" class="hover:text-cozy-gold transition">Backup & Restore</a>
+            <a href="#" class="hover:text-cozy-gold transition">Documentation</a>
+        </div>
+    </footer>
+
+    <!-- Core dependencies — real engines this UI connects to. -->
+    <script src="../../core/security/auth-factor-registry.js"></script>
+    <script src="../../core/security/otp-provider.js"></script>
+    <script src="authenticator.js"></script>
+</body>
+</html>
