@@ -697,6 +697,16 @@
     <script src="core/modules/ocr/cozy-ocr.js"></script>
     <script src="core/modules/ocr/document-router.js"></script>
 
+    <!-- Vision (core/modules/vision/) — Milestone 139: gives CozyVision its
+         first production runtime presence. cozy-vision.js self-registers
+         window.CozyOS.Vision; vision-camera-adapter.js must load after it
+         and registers the "camera" provider (delegating to the LOCKED
+         canonical Camera Engine, core/engines/camera/camera-manager.js,
+         loaded lazily via dynamic import()). No camera/QR/OCR/AI logic
+         implemented — facade + delegation only. -->
+    <script src="core/modules/vision/cozy-vision.js"></script>
+    <script src="core/modules/vision/vision-camera-adapter.js"></script>
+
     <!-- AIMode (core/modules/aimode/cozy-ai-mode.js) — registers
          window.CozyOS.AIMode, exact match for cozy-developer.js's
          #aimode(). The last of DeveloperHub's 8 optional integrations. -->
