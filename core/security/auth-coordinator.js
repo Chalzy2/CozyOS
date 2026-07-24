@@ -1,13 +1,25 @@
 /**
- * CozyOS Authentication Coordinator
+ * CozyOS Authorization Coordinator
  * File Reference: core/security/auth-coordinator.js
+ * Global: window.CozyOS.AuthorizationCoordinator
  * Layer: Core / Platform Foundation — Shared Platform Service
  * Version: 1.0.0-ENTERPRISE
  *
+ * ═══════════════════════════════════════════════════════════════════════
+ * OWNERSHIP NOTE (Milestone 132a Ownership Report)
+ * ═══════════════════════════════════════════════════════════════════════
+ *   This file is DISTINCT from core/modules/identity/auth-coordinator.js
+ *   (window.CozyOS.AuthCoordinator), which owns login orchestration and
+ *   session establishment. This file owns authorization, policy
+ *   evaluation, and step-up access decisions for already-authenticated
+ *   sessions. It registers under a different global —
+ *   window.CozyOS.AuthorizationCoordinator — and must never be
+ *   registered as window.CozyOS.AuthCoordinator again.
+ *
  * RESPONSIBILITY
- *   The one, real entry point callers (CozyBuilder, Developer Hub,
- *   Certification Center, etc.) should use instead of talking to
- *   `CozyOS.Auth`, `AuthPolicyEngine`, and `AuthFactorRegistry`
+ *   The one, real entry point callers (Developer Hub, and any future
+ *   caller needing step-up authorization) should use instead of talking
+ *   to `CozyOS.Auth`, `AuthPolicyEngine`, and `AuthFactorRegistry`
  *   separately. This file performs no authentication or policy logic
  *   itself — it orchestrates the three real coordinators that already
  *   exist, combining their real results, publishing real events, and
@@ -48,7 +60,7 @@
         "policy-evaluated", "factor-verified", "factor-failed", "session-created", "session-ended", "audit-report"
     ]);
 
-    class CozyAuthCoordinator {
+    class CozyAuthorizationCoordinator {
         #auditLog = [];
 
         getVersion() { return AUTH_COORDINATOR_VERSION; }
@@ -64,12 +76,12 @@
 
         #emitReal(eventName, detail = {}) {
             if (!REAL_EVENT_NAMES.includes(eventName)) {
-                console.warn(`[CozyOS.AuthCoordinator] Unknown event "${eventName}" — not emitted.`);
+                console.warn(`[CozyOS.AuthorizationCoordinator] Unknown event "${eventName}" — not emitted.`);
                 return;
             }
             this.#logAudit(eventName, detail);
             if (window.CozyOS.PlatformEventBus && typeof window.CozyOS.PlatformEventBus.emit === "function") {
-                try { window.CozyOS.PlatformEventBus.emit(`authcoordinator:${eventName}`, detail); } catch (_err) { /* non-fatal */ }
+                try { window.CozyOS.PlatformEventBus.emit(`authorizationcoordinator:${eventName}`, detail); } catch (_err) { /* non-fatal */ }
             }
         }
 
@@ -261,9 +273,9 @@
             if (!outputCenter) return { success: false, reason: "OutputCenter is not loaded." };
             this.#emitReal("audit-report", { entryCount: this.#auditLog.length });
             return outputCenter.publish({
-                name: `auth-coordinator-report-${Date.now()}.json`, category: "Reports",
+                name: `authorization-coordinator-report-${Date.now()}.json`, category: "Reports",
                 content: JSON.stringify({ generatedAt: new Date().toISOString(), auditLog: this.getAuditLog() }, null, 2), mimeType: "application/json",
-                sourceApplication: "CozyOS.Auth", sourceEngine: "AuthCoordinator", sourceOperation: "Publish Authentication Audit Report"
+                sourceApplication: "CozyOS.Auth", sourceEngine: "AuthorizationCoordinator", sourceOperation: "Publish Authorization Audit Report"
             });
         }
 
@@ -278,19 +290,19 @@
         }
     }
 
-    if (window.CozyOS.AuthCoordinator && typeof window.CozyOS.AuthCoordinator.getVersion === "function") {
-        const existingVersion = window.CozyOS.AuthCoordinator.getVersion();
-        if (existingVersion !== AUTH_COORDINATOR_VERSION) throw new Error(`[CozyOS] VERSION_CONFLICT: AuthCoordinator existing v${existingVersion} conflicts with load target v${AUTH_COORDINATOR_VERSION}.`);
+    if (window.CozyOS.AuthorizationCoordinator && typeof window.CozyOS.AuthorizationCoordinator.getVersion === "function") {
+        const existingVersion = window.CozyOS.AuthorizationCoordinator.getVersion();
+        if (existingVersion !== AUTH_COORDINATOR_VERSION) throw new Error(`[CozyOS] VERSION_CONFLICT: AuthorizationCoordinator existing v${existingVersion} conflicts with load target v${AUTH_COORDINATOR_VERSION}.`);
         return;
     }
 
-    window.CozyOS.AuthCoordinator = new CozyAuthCoordinator();
+    window.CozyOS.AuthorizationCoordinator = new CozyAuthorizationCoordinator();
 
     if (window.CozyOS.ServiceRegistry && typeof window.CozyOS.ServiceRegistry.registerCoordinator === "function") {
         try {
             window.CozyOS.ServiceRegistry.registerCoordinator({
-                name: "AuthCoordinator", category: "Platform", icon: "key.svg",
-                description: "Real, single facade over CozyOS.Auth, AuthPolicyEngine, and AuthFactorRegistry. Callers ask authenticate(operationName, context) instead of talking to the three underlying coordinators directly. Performs no authentication or policy logic itself — orchestrates real results, publishes real events, records real audit history."
+                name: "AuthorizationCoordinator", category: "Platform", icon: "key.svg",
+                description: "Real, single facade over CozyOS.Auth, AuthPolicyEngine, and AuthFactorRegistry. Callers ask authenticate(operationName, context) instead of talking to the three underlying coordinators directly. Performs no authentication or policy logic itself — orchestrates real results, publishes real events, records real audit history. Distinct from window.CozyOS.AuthCoordinator, which owns login orchestration."
             });
         } catch (_err) { /* non-fatal */ }
     }
