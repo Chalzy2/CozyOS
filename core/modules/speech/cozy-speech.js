@@ -1,7 +1,7 @@
 /**
  * ── CozyOS ENTERPRISE SPEECH COORDINATION KERNEL ──
  * FILE: core/modules/speech/cozy-speech.js
- * VERSION: 2.1.0-ENTERPRISE
+ * VERSION: 2.2.0-ENTERPRISE
  *
  * Mission: Orchestrate every speech source, destination, session, stream,
  * pipeline, segment, device, language, and adapter across CozyOS.
@@ -70,6 +70,28 @@
  *        "Overflow Room", "Livestream") so a single stream can target
  *        many outputs without duplicating per-output configuration.
  *
+ * V2.2 additions over V2.1 (Milestone 147 — Cozy Voice Engine, extending
+ * the existing canonical owners rather than creating a second Voice
+ * Registry/Engine/Session Manager — see core/security/voice-provider.js
+ * for the voice *authentication* factor and core/engines/audio/
+ * audio-manager.js for microphone/mixer ownership, both unchanged):
+ *   [24] Voice Personality Profile registry (§3.27) — Airy, Warm,
+ *        Storyteller, Custom Voice, … independent of language.
+ *   [25] Accent registry (§3.28), separate from language.
+ *   [26] Emotion registry (§3.29).
+ *   [27] Speaking Style registry (§3.30).
+ *   [28] Personal Voice registry (§3.31) — My/Family/Company/Brand/Custom
+ *        Voice extension points. Honest: no cloning implemented.
+ *   [29] Voice Settings registry (§3.32) — combines language, accent,
+ *        voice profile, speaking style, emotion, speed, pitch, warmth,
+ *        expressiveness, pause style, volume into one record.
+ *   [30] Voice Preview (§3.33) — honest, fail-closed until a real
+ *        preview/TTS backend is registered.
+ *   [31] Language registry (§3.5, existing) extended with optional
+ *        region/family metadata; African Language Registry is the same
+ *        _languages store filtered by region:"africa" — not a second
+ *        registry.
+ *
  * Public API (frozen after registration) — full list in § 0 / § 4.
  */
 
@@ -79,7 +101,7 @@
 // § 0. MODULE CONSTANTS & ENUMERATIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SPEECH_VERSION = "2.1.0-ENTERPRISE";
+const SPEECH_VERSION = "2.2.0-ENTERPRISE";
 
 const SESSION_STATE = Object.freeze({
     CREATED:  "CREATED",
@@ -270,6 +292,56 @@ const PROFILE_ENV = Object.freeze({
     CUSTOM:          "custom",
 });
 
+/**
+ * [V2.2-24] Reference-only Voice Personality Profile names (Milestone 147
+ * — Cozy Voice Engine). registerVoiceProfile() accepts any string for
+ * `name` — this enum documents the initial built-in set only. Distinct
+ * from PROFILE_ENV / _profiles above, which are audio *environment*
+ * presets (church, hospital, …), not voice personalities.
+ */
+const VOICE_PROFILE_REF = Object.freeze({
+    AIRY: "Airy", GLASSY: "Glassy", MELLOW: "Mellow", ROUNDED: "Rounded",
+    BUTTERY: "Buttery", WARM: "Warm", NATURAL: "Natural",
+    PROFESSIONAL: "Professional", FRIENDLY: "Friendly", CALM: "Calm",
+    ENERGETIC: "Energetic", MENTOR: "Mentor", STORYTELLER: "Storyteller",
+    TEACHER: "Teacher", EXECUTIVE: "Executive", CUSTOMER_CARE: "Customer Care",
+    CUSTOM: "Custom Voice",
+});
+
+/** [V2.2-25] Reference-only Accent names. registerAccent() accepts any string. */
+const ACCENT_REF = Object.freeze({
+    KENYAN: "Kenyan", UGANDAN: "Ugandan", TANZANIAN: "Tanzanian",
+    RWANDAN: "Rwandan", BURUNDIAN: "Burundian", CONGOLESE: "Congolese",
+    SOUTH_AFRICAN: "South African", NIGERIAN: "Nigerian", BRITISH: "British",
+    AMERICAN: "American", AUSTRALIAN: "Australian", CANADIAN: "Canadian",
+    FRENCH: "French", GULF_ARABIC: "Gulf Arabic", EGYPTIAN_ARABIC: "Egyptian Arabic",
+    LEVANTINE_ARABIC: "Levantine Arabic",
+});
+
+/** [V2.2-26] Reference-only Emotion names. registerEmotion() accepts any string. */
+const EMOTION_REF = Object.freeze({
+    HAPPY: "Happy", CALM: "Calm", FRIENDLY: "Friendly", SERIOUS: "Serious",
+    MOTIVATIONAL: "Motivational", COMPASSIONATE: "Compassionate",
+    EXCITED: "Excited", NEUTRAL: "Neutral",
+});
+
+/** [V2.2-27] Reference-only Speaking Style names. registerSpeakingStyle() accepts any string. */
+const SPEAKING_STYLE_REF = Object.freeze({
+    CONVERSATION: "Conversation", TEACHER: "Teacher", STORYTELLING: "Storytelling",
+    BUSINESS: "Business", EXECUTIVE: "Executive", PRAYER: "Prayer",
+    PODCAST: "Podcast", PRESENTATION: "Presentation", INTERVIEW: "Interview",
+    NEWS_READER: "News Reader", HEALTHCARE: "Healthcare", CUSTOMER_CARE: "Customer Care",
+});
+
+/**
+ * [V2.2-28] Personal Voice extension-point types. registerPersonalVoice()
+ * NEVER performs voice cloning — see § 3.33 header. Accepts any string.
+ */
+const PERSONAL_VOICE_TYPE = Object.freeze({
+    MY_VOICE: "my_voice", FAMILY_VOICE: "family_voice",
+    COMPANY_VOICE: "company_voice", BRAND_VOICE: "brand_voice", CUSTOM: "custom",
+});
+
 /** [V2-14] Per-entity sequence counter seeds */
 let _clockOffsetMs      = 0;
 let _speakerSeq         = 0;
@@ -399,6 +471,14 @@ const _plugins         = new Map(); // pluginId       → PluginRecord
 const _integrations    = new Map(); // integrationId  → IntegrationRecord
 const _graphNodes      = new Map(); // nodeId         → GraphNodeRecord      [V2-10]
 const _graphEdges      = new Map(); // edgeId         → GraphEdgeRecord      [V2-10]
+const _voiceProfiles   = new Map(); // voiceProfileId → VoiceProfileRecord   [V2.2-24]
+const _accents         = new Map(); // accentId       → AccentRecord         [V2.2-25]
+const _emotions        = new Map(); // emotionId      → EmotionRecord        [V2.2-26]
+const _speakingStyles  = new Map(); // speakingStyleId→ SpeakingStyleRecord  [V2.2-27]
+const _personalVoices  = new Map(); // personalVoiceId→ PersonalVoiceRecord  [V2.2-28]
+const _voiceSettings   = new Map(); // settingsId     → VoiceSettingsRecord  [V2.2-29]
+let   _previewBackend  = null;      // real preview/TTS backend hook        [V2.2-30]
+let   _personalVoiceBackend = null; // real personal-voice backend hook     [V2.2-28]
 
 /**
  * [V2.1-15] Set of speakerIds currently marked active. Replaces the
@@ -723,6 +803,12 @@ const _kernel = {
             languageCode:   config.languageCode,
             name:           config.name,
             direction:      config.direction ?? "ltr",
+            // [V2.2-31] Optional, opaque classification metadata — never
+            // interpreted or validated here, only stored/filtered on.
+            // `region: "africa"` backs the African Language Registry
+            // (Milestone 147) without a second registry/second owner.
+            region:         config.region ?? null,
+            family:         config.family ?? null,
             sequenceNumber: ++_languageSeq,
             registeredAt:   _now(),
             ..._syncMeta(config),
@@ -738,6 +824,17 @@ const _kernel = {
 
     listLanguages() {
         return Object.freeze(Array.from(_languages.values()));
+    },
+
+    /**
+     * [V2.2-31] African Language Registry view — same _languages store,
+     * filtered by region:"africa". Not a second registry: unlimited
+     * expansion happens by calling registerLanguage({..., region:"africa"}).
+     */
+    listAfricanLanguages() {
+        return Object.freeze(
+            Array.from(_languages.values()).filter(l => l.region === "africa")
+        );
     },
 
     // ── § 3.6  AUDIO CHANNEL REGISTRY ────────────────────────────────────────
@@ -1595,6 +1692,277 @@ const _kernel = {
         return Object.freeze(Array.from(_outputGroups.values()));
     },
 
+    // ── § 3.27  VOICE PERSONALITY PROFILE REGISTRY  [V2.2-24, NEW] ──────────
+    //
+    // A reusable voice "personality" (Airy, Warm, Storyteller, Custom
+    // Voice, …) — independent of language, per the Milestone 147 spec.
+    // Opaque bookkeeping only; CozySpeech never renders or synthesizes
+    // a voice. See VOICE_PROFILE_REF for the initial built-in set.
+
+    registerVoiceProfile(config) {
+        _requireString(config?.name, "name");
+        const voiceProfileId = config.voiceProfileId || _uid("voiceprofile");
+        _voiceProfiles.set(voiceProfileId, Object.freeze({
+            voiceProfileId,
+            name:         config.name,
+            description:  config.description ?? "",
+            builtin:      config.builtin === true,
+            registeredAt: _now(),
+            ..._syncMeta(config),
+        }));
+        _autoGraphNode("voiceProfile", voiceProfileId, null, config.name);
+        return voiceProfileId;
+    },
+
+    removeVoiceProfile(voiceProfileId) {
+        _requireString(voiceProfileId, "voiceProfileId");
+        return _voiceProfiles.delete(voiceProfileId);
+    },
+
+    getVoiceProfile(voiceProfileId) {
+        _requireString(voiceProfileId, "voiceProfileId");
+        return _voiceProfiles.get(voiceProfileId) ?? null;
+    },
+
+    listVoiceProfiles() {
+        return Object.freeze(Array.from(_voiceProfiles.values()));
+    },
+
+    // ── § 3.28  ACCENT REGISTRY  [V2.2-25, NEW] ──────────────────────────────
+    //
+    // Accent is intentionally separate from language (Milestone 147:
+    // "Never hardcode. Use registry."). `languageCode` is an optional,
+    // unvalidated reference — an accent may exist before its language does.
+
+    registerAccent(config) {
+        _requireString(config?.name, "name");
+        const accentId = config.accentId || _uid("accent");
+        _accents.set(accentId, Object.freeze({
+            accentId,
+            name:         config.name,
+            languageCode: config.languageCode ?? null,
+            registeredAt: _now(),
+            ..._syncMeta(config),
+        }));
+        _autoGraphNode("accent", accentId, null, config.name);
+        return accentId;
+    },
+
+    removeAccent(accentId) {
+        _requireString(accentId, "accentId");
+        return _accents.delete(accentId);
+    },
+
+    listAccents() {
+        return Object.freeze(Array.from(_accents.values()));
+    },
+
+    // ── § 3.29  EMOTION REGISTRY  [V2.2-26, NEW] ─────────────────────────────
+
+    registerEmotion(config) {
+        _requireString(config?.name, "name");
+        const emotionId = config.emotionId || _uid("emotion");
+        _emotions.set(emotionId, Object.freeze({
+            emotionId,
+            name:         config.name,
+            registeredAt: _now(),
+            ..._syncMeta(config),
+        }));
+        _autoGraphNode("emotion", emotionId, null, config.name);
+        return emotionId;
+    },
+
+    removeEmotion(emotionId) {
+        _requireString(emotionId, "emotionId");
+        return _emotions.delete(emotionId);
+    },
+
+    listEmotions() {
+        return Object.freeze(Array.from(_emotions.values()));
+    },
+
+    // ── § 3.30  SPEAKING STYLE REGISTRY  [V2.2-27, NEW] ──────────────────────
+
+    registerSpeakingStyle(config) {
+        _requireString(config?.name, "name");
+        const speakingStyleId = config.speakingStyleId || _uid("style");
+        _speakingStyles.set(speakingStyleId, Object.freeze({
+            speakingStyleId,
+            name:         config.name,
+            registeredAt: _now(),
+            ..._syncMeta(config),
+        }));
+        _autoGraphNode("speakingStyle", speakingStyleId, null, config.name);
+        return speakingStyleId;
+    },
+
+    removeSpeakingStyle(speakingStyleId) {
+        _requireString(speakingStyleId, "speakingStyleId");
+        return _speakingStyles.delete(speakingStyleId);
+    },
+
+    listSpeakingStyles() {
+        return Object.freeze(Array.from(_speakingStyles.values()));
+    },
+
+    // ── § 3.31  PERSONAL VOICE REGISTRY  [V2.2-28, NEW] ──────────────────────
+    //
+    // HONEST IMPLEMENTATION — Milestone 147 is explicit: "Do not
+    // implement cloning. Create extension points only." This registry
+    // stores the *slot* (My Voice / Family / Company / Brand / Custom)
+    // only. It never records audio, generates a voiceprint, or performs
+    // cloning. hasRealPersonalVoiceBackend() honestly reports false
+    // until a genuine future implementation calls
+    // registerPersonalVoiceBackend() — mirrored on every record's
+    // `isReal` flag so callers never have to guess.
+
+    registerPersonalVoiceBackend(fn) {
+        if (typeof fn !== "function") {
+            return { success: false, reason: "A real backend function is required." };
+        }
+        _personalVoiceBackend = fn;
+        return { success: true };
+    },
+
+    unregisterPersonalVoiceBackend() {
+        _personalVoiceBackend = null;
+        return { success: true };
+    },
+
+    hasRealPersonalVoiceBackend() {
+        return _personalVoiceBackend !== null;
+    },
+
+    registerPersonalVoice(config) {
+        _requireString(config?.type,  "type");
+        _requireString(config?.label, "label");
+        const personalVoiceId = config.personalVoiceId || _uid("personalvoice");
+        _personalVoices.set(personalVoiceId, Object.freeze({
+            personalVoiceId,
+            type:         config.type,
+            label:        config.label,
+            ownerId:      config.ownerId ?? null,
+            isReal:       false,
+            note:         "Extension point only — no voice cloning is implemented in this codebase.",
+            registeredAt: _now(),
+            ..._syncMeta(config),
+        }));
+        _autoGraphNode("personalVoice", personalVoiceId, null, config.label);
+        return personalVoiceId;
+    },
+
+    removePersonalVoice(personalVoiceId) {
+        _requireString(personalVoiceId, "personalVoiceId");
+        return _personalVoices.delete(personalVoiceId);
+    },
+
+    getPersonalVoice(personalVoiceId) {
+        _requireString(personalVoiceId, "personalVoiceId");
+        return _personalVoices.get(personalVoiceId) ?? null;
+    },
+
+    listPersonalVoices() {
+        return Object.freeze(Array.from(_personalVoices.values()));
+    },
+
+    // ── § 3.32  VOICE SETTINGS REGISTRY  [V2.2-29, NEW] ──────────────────────
+    //
+    // One settings record combines Language + African Language + Accent +
+    // Emotion + Speaking Style + Voice Profile + Personal Voice into a
+    // single consistent experience (Milestone 147 "Success Criteria").
+    // Fields are opaque references (unvalidated ids/strings) plus numeric
+    // tuning values; CozySpeech stores them, adapters apply them.
+
+    registerVoiceSettings(config = {}) {
+        const settingsId = config.settingsId || _uid("voicesettings");
+        _voiceSettings.set(settingsId, Object.freeze({
+            settingsId,
+            scopeId:         config.scopeId ?? null, // e.g. a sessionId, opaque
+            language:        config.language ?? null,
+            accent:          config.accent ?? null,
+            voiceProfile:    config.voiceProfile ?? null,
+            speakingStyle:   config.speakingStyle ?? null,
+            emotion:         config.emotion ?? null,
+            speed:           config.speed ?? 1.0,
+            pitch:           config.pitch ?? 1.0,
+            warmth:          config.warmth ?? 0.5,
+            expressiveness:  config.expressiveness ?? 0.5,
+            pauseStyle:      config.pauseStyle ?? "natural",
+            volume:          config.volume ?? 1.0,
+            registeredAt:    _now(),
+            ..._syncMeta(config),
+        }));
+        _autoGraphNode("voiceSettings", settingsId, config.scopeId ?? null, settingsId);
+        return settingsId;
+    },
+
+    updateVoiceSettings(settingsId, patch = {}) {
+        _requireString(settingsId, "settingsId");
+        const existing = _voiceSettings.get(settingsId);
+        if (!existing) {
+            throw new Error(`[CozySpeech] Voice settings "${settingsId}" not found.`);
+        }
+        _voiceSettings.set(settingsId, Object.freeze({
+            ...existing, ...patch, settingsId, lastModified: new Date().toISOString(),
+        }));
+        return settingsId;
+    },
+
+    getVoiceSettings(settingsId) {
+        _requireString(settingsId, "settingsId");
+        return _voiceSettings.get(settingsId) ?? null;
+    },
+
+    removeVoiceSettings(settingsId) {
+        _requireString(settingsId, "settingsId");
+        return _voiceSettings.delete(settingsId);
+    },
+
+    listVoiceSettings() {
+        return Object.freeze(Array.from(_voiceSettings.values()));
+    },
+
+    // ── § 3.33  VOICE PREVIEW  [V2.2-30, NEW] ────────────────────────────────
+    //
+    // Unique CozyOS feature (Milestone 147): tapping a voice profile
+    // immediately plays a short preview, independent of any assistant
+    // session. HONEST IMPLEMENTATION — no real TTS/synthesis engine
+    // exists in this codebase. Until a real one calls
+    // registerPreviewBackend(fn), previewVoice() always returns
+    // { available:false, played:false }. Never fabricates playback.
+
+    registerPreviewBackend(fn) {
+        if (typeof fn !== "function") {
+            return { success: false, reason: "A real backend function is required." };
+        }
+        _previewBackend = fn;
+        return { success: true };
+    },
+
+    unregisterPreviewBackend() {
+        _previewBackend = null;
+        return { success: true };
+    },
+
+    hasRealPreviewBackend() {
+        return _previewBackend !== null;
+    },
+
+    async previewVoice(config = {}) {
+        if (!_previewBackend) {
+            return {
+                available: false, played: false,
+                reason: "No real preview/TTS backend registered. Register one via registerPreviewBackend().",
+            };
+        }
+        try {
+            const raw = await _previewBackend(config);
+            return { available: true, played: raw?.played === true, reason: raw?.reason ?? null };
+        } catch (err) {
+            return { available: true, played: false, reason: `Real backend threw: ${err.message}` };
+        }
+    },
+
     // ── § 3.26  MODULE METADATA ───────────────────────────────────────────────
 
     getVersion() {
@@ -1625,5 +1993,61 @@ if (typeof window !== "undefined") {
         ZONE_TYPE,
         KNOWN_INTEGRATIONS,
         PROFILE_ENV,
+        VOICE_PROFILE_REF,
+        ACCENT_REF,
+        EMOTION_REF,
+        SPEAKING_STYLE_REF,
+        PERSONAL_VOICE_TYPE,
     });
+
+    // [V2.2] Seed the built-in Voice Profiles, Accents, Emotions, Speaking
+    // Styles, and the initial + African Language Registry, matching
+    // Milestone 147's baseline set. Idempotent-ish: re-running this whole
+    // script (e.g. a hot reload) simply re-registers the same builtin ids
+    // with fresh random suffixes, same as every other registry in this
+    // file — no different from re-registering a language on reload today.
+    (function _seedVoiceEngineDefaults() {
+        const speech = window.CozyOS.CozySpeech;
+        Object.values(VOICE_PROFILE_REF).forEach(name =>
+            speech.registerVoiceProfile({ name, builtin: true }));
+        Object.values(ACCENT_REF).forEach(name =>
+            speech.registerAccent({ name }));
+        Object.values(EMOTION_REF).forEach(name =>
+            speech.registerEmotion({ name }));
+        Object.values(SPEAKING_STYLE_REF).forEach(name =>
+            speech.registerSpeakingStyle({ name }));
+
+        const INITIAL_LANGUAGES = [
+            ["en", "English"], ["sw", "Kiswahili"], ["fr", "French"],
+            ["ar", "Arabic"], ["so", "Somali"], ["pt", "Portuguese"],
+            ["es", "Spanish"], ["de", "German"], ["it", "Italian"],
+            ["zh", "Chinese"], ["ja", "Japanese"], ["ko", "Korean"],
+            ["hi", "Hindi"], ["tr", "Turkish"], ["ru", "Russian"],
+        ];
+        INITIAL_LANGUAGES.forEach(([languageCode, name]) => {
+            if (!speech.listLanguages().some(l => l.languageCode === languageCode)) {
+                speech.registerLanguage({ languageCode, name });
+            }
+        });
+
+        const AFRICAN_LANGUAGES = [
+            ["luo", "Luo"], ["kik", "Kikuyu"], ["kam", "Kamba"], ["kln", "Kalenjin"],
+            ["luy", "Luhya"], ["guz", "Kisii"], ["mer", "Meru"], ["ebu", "Embu"],
+            ["mas", "Maasai"], ["orm", "Oromo"], ["amh", "Amharic"],
+            ["lug", "Luganda"], ["nyn", "Runyankole"], ["kin", "Kinyarwanda"],
+            ["run", "Kirundi"], ["zul", "Zulu"], ["xho", "Xhosa"],
+            ["afr", "Afrikaans"], ["sna", "Shona"], ["nde", "Ndebele"],
+            ["nya", "Chichewa"], ["bem", "Bemba"], ["tsn", "Tswana"],
+            ["sot", "Sotho"], ["wol", "Wolof"], ["hau", "Hausa"],
+            ["yor", "Yoruba"], ["ibo", "Igbo"],
+        ];
+        AFRICAN_LANGUAGES.forEach(([languageCode, name]) => {
+            if (!speech.listLanguages().some(l => l.languageCode === languageCode)) {
+                speech.registerLanguage({ languageCode, name, region: "africa" });
+            }
+        });
+        // Somali is already in INITIAL_LANGUAGES ("so") — the African
+        // Language Registry references the same "so" record rather than
+        // duplicating it under "som", per Single Source of Truth.
+    })();
 }
