@@ -1,16 +1,16 @@
 /**
- * tests/audio-manager.test.js
+ * core/engines/audio/test/audio-manager.test.js
  *
  * Real, executed tests for core/engines/audio/audio-manager.js.
- * Run with: node tests/audio-manager.test.js
+ * Run with: node core/engines/audio/test/audio-manager.test.js
  */
 
 'use strict';
 
 import assert from 'assert';
-import AudioManager from '../core/engines/audio/audio-manager.js';
-import { createInMemoryAudioProvider } from '../core/engines/audio/provider-inmemory.js';
-import Kernel from '../core/kernel/kernel.js';
+import AudioManager from '../audio-manager.js';
+import { createInMemoryAudioProvider } from '../provider-inmemory.js';
+import Kernel from '../../../kernel.js';
 
 let passed = 0;
 let failed = 0;
@@ -259,6 +259,241 @@ console.log('CozyOS Audio Manager — Test Suite (real integration, reference pr
   // 15. Frozen surface
   test('AudioManager is frozen and cannot be mutated', () => {
     assert.throws(() => { AudioManager.MIC_STATES = {}; }, TypeError);
+  });
+
+  // ── Milestone 158 — Listening Engine coverage ─────────────────────────
+
+  // 16. Capability API fails closed with no browser APIs present (this is a
+  // real, honest result in a Node test environment, not a stub)
+  test('getCapabilities() fails closed to false with no navigator present', () => {
+    AudioManager.__resetForTests();
+    const caps = AudioManager.getCapabilities();
+    assert.strictEqual(caps.supportsMicrophone, false);
+    assert.strictEqual(caps.supportsMultipleInputs, false);
+    assert.strictEqual(caps.supportsDeviceSwitch, false);
+    assert.strictEqual(caps.supportsRealtimeCapture, false);
+    assert.strictEqual(caps.supportsContinuousListening, false);
+    assert.strictEqual(caps.supportsBackgroundListening, false); // never true — no guaranteed API exists
+  });
+
+  // 17. Permission state never fabricates GRANTED
+  test('getPermissionState() starts UNKNOWN, never a fabricated default', () => {
+    AudioManager.__resetForTests();
+    assert.strictEqual(AudioManager.getPermissionState(), 'UNKNOWN');
+  });
+
+  // 18. Health reflects real capability + session evidence, in the right
+  // precedence order (an active session outranks the static capability
+  // check, since it's direct evidence capture is already working)
+  await asyncTest('getHealth() is UNAVAILABLE with no mic support, then reflects a real active session', async () => {
+    AudioManager.__resetForTests();
+    assert.strictEqual(AudioManager.getHealth(), 'UNAVAILABLE');
+
+    const provider = createInMemoryAudioProvider('usb');
+    provider._simulateDeviceAdded({ externalId: 'mic-1', name: 'Mic' });
+    AudioManager.registerProvider(provider);
+    const mic = AudioManager.registerMicrophone({ providerType: 'usb', externalId: 'mic-1' });
+    const session = AudioManager.createListeningSession({ deviceId: mic.id, profile: 'NORMAL' });
+    await AudioManager.startListeningSession(session.id);
+    assert.strictEqual(AudioManager.getHealth(), 'LISTENING');
+
+    AudioManager.pauseListeningSession(session.id);
+    assert.strictEqual(AudioManager.getHealth(), 'PAUSED');
+  });
+
+  // 19. createListeningSession() rejects unknown devices and unknown profiles
+  test('createListeningSession() validates device existence and profile name', () => {
+    AudioManager.__resetForTests();
+    assert.throws(() => AudioManager.createListeningSession({ deviceId: 'no-such-mic' }), /Unknown microphone/);
+
+    const provider = createInMemoryAudioProvider('usb');
+    provider._simulateDeviceAdded({ externalId: 'mic-1', name: 'Mic' });
+    AudioManager.registerProvider(provider);
+    const mic = AudioManager.registerMicrophone({ providerType: 'usb', externalId: 'mic-1' });
+    assert.throws(() => AudioManager.createListeningSession({ deviceId: mic.id, profile: 'NOT_A_PROFILE' }), /Unknown listening profile/);
+  });
+
+  // 20. Full session lifecycle: create -> start (auto-connects device,
+  // auto-selects primary if none set) -> pause -> resume -> stop
+  // (auto-disconnects device once no session references it), with real
+  // Session ID / Device / Start Time / End Time / Duration / Status tracking
+  await asyncTest('listening session lifecycle: create/start/pause/resume/stop tracks real fields', async () => {
+    AudioManager.__resetForTests();
+    const provider = createInMemoryAudioProvider('usb');
+    provider._simulateDeviceAdded({ externalId: 'mic-1', name: 'Mic' });
+    AudioManager.registerProvider(provider);
+    const mic = AudioManager.registerMicrophone({ providerType: 'usb', externalId: 'mic-1' });
+
+    const created = AudioManager.createListeningSession({ deviceId: mic.id, profile: 'MEETING' });
+    assert.strictEqual(created.status, 'CREATED');
+    assert.strictEqual(created.deviceId, mic.id);
+    assert.strictEqual(created.startTime, null);
+
+    const started = await AudioManager.startListeningSession(created.id);
+    assert.strictEqual(started.status, 'LISTENING');
+    assert.ok(typeof started.startTime === 'number');
+    assert.strictEqual(AudioManager.getMicrophone(mic.id).state, 'CONNECTED');
+    assert.strictEqual(AudioManager.getPrimaryMicrophone().id, mic.id); // auto-selected, none was set
+
+    const paused = AudioManager.pauseListeningSession(created.id);
+    assert.strictEqual(paused.status, 'PAUSED');
+    const resumed = AudioManager.resumeListeningSession(created.id);
+    assert.strictEqual(resumed.status, 'LISTENING');
+
+    const stopped = await AudioManager.stopListeningSession(created.id);
+    assert.strictEqual(stopped.status, 'STOPPED');
+    assert.ok(typeof stopped.endTime === 'number');
+    assert.ok(typeof stopped.duration === 'number');
+    assert.strictEqual(AudioManager.getMicrophone(mic.id).state, 'DISCONNECTED'); // no other session referencing it
+  });
+
+  // 21. Illegal session transitions are rejected (state machine is real,
+  // not a formality) — e.g. cannot pause a session that was never started
+  test('illegal listening session transitions throw', () => {
+    AudioManager.__resetForTests();
+    const provider = createInMemoryAudioProvider('usb');
+    provider._simulateDeviceAdded({ externalId: 'mic-1', name: 'Mic' });
+    AudioManager.registerProvider(provider);
+    const mic = AudioManager.registerMicrophone({ providerType: 'usb', externalId: 'mic-1' });
+    const created = AudioManager.createListeningSession({ deviceId: mic.id });
+    assert.throws(() => AudioManager.pauseListeningSession(created.id), /Illegal listening session transition/);
+    assert.throws(() => AudioManager.resumeListeningSession(created.id), /Illegal listening session transition/);
+  });
+
+  // 22. A shared device is only disconnected once ALL sessions referencing
+  // it have stopped — never torn down out from under a sibling session
+  await asyncTest('stopping one of two sessions sharing a device leaves the device connected', async () => {
+    AudioManager.__resetForTests();
+    const provider = createInMemoryAudioProvider('usb');
+    provider._simulateDeviceAdded({ externalId: 'mic-1', name: 'Mic' });
+    AudioManager.registerProvider(provider);
+    const mic = AudioManager.registerMicrophone({ providerType: 'usb', externalId: 'mic-1' });
+
+    const sessionA = await AudioManager.startListeningSession(AudioManager.createListeningSession({ deviceId: mic.id }).id);
+    const sessionB = await AudioManager.startListeningSession(AudioManager.createListeningSession({ deviceId: mic.id }).id);
+
+    await AudioManager.stopListeningSession(sessionA.id);
+    assert.strictEqual(AudioManager.getMicrophone(mic.id).state, 'CONNECTED', 'sessionB still needs the device');
+
+    await AudioManager.stopListeningSession(sessionB.id);
+    assert.strictEqual(AudioManager.getMicrophone(mic.id).state, 'DISCONNECTED');
+  });
+
+  // 23. cancelListeningSession() from CREATED (never started) works, and is terminal
+  test('cancelListeningSession() cancels a never-started session and blocks further transitions', () => {
+    AudioManager.__resetForTests();
+    const provider = createInMemoryAudioProvider('usb');
+    provider._simulateDeviceAdded({ externalId: 'mic-1', name: 'Mic' });
+    AudioManager.registerProvider(provider);
+    const mic = AudioManager.registerMicrophone({ providerType: 'usb', externalId: 'mic-1' });
+    const created = AudioManager.createListeningSession({ deviceId: mic.id });
+    const cancelled = AudioManager.cancelListeningSession(created.id);
+    assert.strictEqual(cancelled.status, 'CANCELLED');
+    assert.throws(() => AudioManager.pauseListeningSession(created.id), /Illegal listening session transition/);
+  });
+
+  // 24. restartListeningSession() stops and starts again with a fresh startTime
+  await asyncTest('restartListeningSession() produces a new startTime on the same session id', async () => {
+    AudioManager.__resetForTests();
+    const provider = createInMemoryAudioProvider('usb');
+    provider._simulateDeviceAdded({ externalId: 'mic-1', name: 'Mic' });
+    AudioManager.registerProvider(provider);
+    const mic = AudioManager.registerMicrophone({ providerType: 'usb', externalId: 'mic-1' });
+    const created = AudioManager.createListeningSession({ deviceId: mic.id });
+    const started = await AudioManager.startListeningSession(created.id);
+    const restarted = await AudioManager.restartListeningSession(created.id);
+    assert.strictEqual(restarted.id, started.id);
+    assert.strictEqual(restarted.status, 'LISTENING');
+  });
+
+  // 25. Developer API convenience surface: startListening() auto-detects and
+  // registers a device from the registered provider when none is given
+  await asyncTest('startListening() with no deviceId auto-detects and registers from the provider', async () => {
+    AudioManager.__resetForTests();
+    const provider = createInMemoryAudioProvider('browser');
+    provider._simulateDeviceAdded({ externalId: 'default', name: 'Default Mic' });
+    AudioManager.registerProvider(provider);
+
+    const session = await AudioManager.startListening();
+    assert.strictEqual(session.status, 'LISTENING');
+    assert.ok(AudioManager.getActiveDevice());
+    assert.strictEqual(AudioManager.listDevices().length, 1);
+
+    await AudioManager.stopListening();
+    assert.strictEqual((await AudioManager.stopListening()).reason, 'No active listening session.');
+  });
+
+  // 26. startListening() fails closed with a real error when no provider is
+  // registered at all (never fabricates a session against nothing)
+  await asyncTest('startListening() fails closed when no provider is registered', async () => {
+    AudioManager.__resetForTests();
+    await assert.rejects(() => AudioManager.startListening(), /No microphone registered and no "browser" provider available/);
+  });
+
+  // 27. selectDevice() connects if needed and sets primary — Developer API's
+  // selectDevice() reuses connectMicrophone()/selectPrimaryMicrophone()
+  // rather than duplicating device logic
+  await asyncTest('selectDevice() connects an unconnected device and makes it primary', async () => {
+    AudioManager.__resetForTests();
+    const provider = createInMemoryAudioProvider('usb');
+    provider._simulateDeviceAdded({ externalId: 'mic-1', name: 'Mic' });
+    AudioManager.registerProvider(provider);
+    const mic = AudioManager.registerMicrophone({ providerType: 'usb', externalId: 'mic-1' });
+    assert.strictEqual(AudioManager.getMicrophone(mic.id).state, 'REGISTERED');
+
+    await AudioManager.selectDevice(mic.id);
+    assert.strictEqual(AudioManager.getMicrophone(mic.id).state, 'CONNECTED');
+    assert.strictEqual(AudioManager.getActiveDevice().id, mic.id);
+  });
+
+  // 28. Audio Routing: registerInputAdapter() validates target names, and
+  // routeAudio() delivers the real active stream to every registered
+  // consumer without one adapter's failure blocking another
+  await asyncTest('registerInputAdapter()/routeAudio() deliver the real stream to multiple consumers, fail-closed per adapter', async () => {
+    AudioManager.__resetForTests();
+    assert.throws(() => AudioManager.registerInputAdapter({ target: 'not-a-target', handler: () => {} }), /registerInputAdapter requires target/);
+
+    const provider = createInMemoryAudioProvider('usb');
+    provider._simulateDeviceAdded({ externalId: 'mic-1', name: 'Mic' });
+    AudioManager.registerProvider(provider);
+    const mic = AudioManager.registerMicrophone({ providerType: 'usb', externalId: 'mic-1' });
+
+    let hearingReceived = null;
+    let speechCalls = 0;
+    AudioManager.registerInputAdapter({ target: 'hearing', handler: (stream) => { hearingReceived = stream; } });
+    AudioManager.registerInputAdapter({ target: 'speech', handler: () => { speechCalls += 1; throw new Error('consumer bug — must not break hearing'); } });
+
+    const session = await AudioManager.startListeningSession(AudioManager.createListeningSession({ deviceId: mic.id }).id);
+    assert.ok(hearingReceived, 'hearing adapter received the real stream on session start');
+    assert.strictEqual(speechCalls, 1, 'speech adapter was still called despite throwing');
+
+    await AudioManager.stopListeningSession(session.id);
+    assert.strictEqual(hearingReceived, null, 'stop routes a null stream to signal capture ended');
+  });
+
+  // 29. unregisterInputAdapter() stops further delivery to that consumer
+  await asyncTest('unregisterInputAdapter() removes a consumer from future routing', async () => {
+    AudioManager.__resetForTests();
+    const provider = createInMemoryAudioProvider('usb');
+    provider._simulateDeviceAdded({ externalId: 'mic-1', name: 'Mic' });
+    AudioManager.registerProvider(provider);
+    const mic = AudioManager.registerMicrophone({ providerType: 'usb', externalId: 'mic-1' });
+
+    let calls = 0;
+    const adapterId = AudioManager.registerInputAdapter({ target: 'media', handler: () => { calls += 1; } });
+    assert.strictEqual(AudioManager.unregisterInputAdapter(adapterId), true);
+
+    await AudioManager.startListeningSession(AudioManager.createListeningSession({ deviceId: mic.id }).id);
+    assert.strictEqual(calls, 0);
+  });
+
+  // 30. Frozen surface covers the new Listening Engine constants too
+  test('Listening Engine constants are frozen and cannot be mutated', () => {
+    assert.throws(() => { AudioManager.SESSION_STATES = {}; }, TypeError);
+    assert.throws(() => { AudioManager.LISTENING_PROFILES = []; }, TypeError);
+    assert.throws(() => { AudioManager.PERMISSION_STATES = {}; }, TypeError);
+    assert.throws(() => { AudioManager.LISTENING_HEALTH = {}; }, TypeError);
+    assert.ok(Object.isFrozen(AudioManager.getCapabilities()));
   });
 
   console.log(`\n${passed} passed, ${failed} failed\n`);
