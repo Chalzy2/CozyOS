@@ -15,6 +15,13 @@
  *   [FIX-8] _recordConfirmedIntent — normalised learning_memory write path
  *   [FIX-9] event listener cleanup — unbind on exit to prevent hot-reload leak
  *   [FIX-10] capability delegation — query storage gateway contract directly for layer separation [671984.jpg]
+ *   [FIX-11] initializeSubEngine — real implementation added. core/ai/cozy-ai-integration.js,
+ *            core/ai/cozy-ai-language.js and core/ai/cozy-ai-memory.js all call
+ *            window.CozyOS.AI.initializeSubEngine(key, instance) at load time, but no
+ *            definition existed on this class — every one of those files would have
+ *            thrown at parse time before this fix. Milestone 151 (Cozy AI Engine
+ *            Platform) surfaced this via Dependency/Runtime Review; fixed here rather
+ *            than worked around, since it is a contract this file already implicitly made.
  */
 
 "use strict";
@@ -34,6 +41,12 @@ class CozyAIEngine {
 
         // [FIX-7] Resolved on first executeRoutingPhase call; held for page-exit flush.
         this._storageGateway   = null;
+
+        // [FIX-11] Sub-engine attachment registry. initializeSubEngine() is the real
+        // contract other AI files already assume exists (language, memory, integration,
+        // platform, ...). Attaching by key on `this` keeps the existing access pattern
+        // (window.CozyOS.AI.language, window.CozyOS.AI.platform, etc.) working unchanged.
+        this._subEngines = new Map();
 
         // [FIX-9] Bind the handler explicitly to an instance variable for clean unregistration.
         this._flushOnExit = () => {
@@ -247,6 +260,37 @@ class CozyAIEngine {
                 console.log(`[TELEMETRY] [Local Backup Data]:`, JSON.stringify(telemetryPayload));
             }
         }
+    }
+
+    /**
+     * [FIX-11] Attach a sub-engine under this coordinator. Real implementation of a
+     * contract multiple files already called before it existed (see FIX-11 note above).
+     * Stores the instance both on `this[key]` (existing access pattern, e.g.
+     * window.CozyOS.AI.language) and in an internal map for introspection. Does not
+     * validate the instance's shape — callers such as cozy-ai-integration.js's own
+     * registerEngine() perform lifecycle-method checks; this is intentionally the
+     * thin, structural attach point only.
+     */
+    initializeSubEngine(key, instance) {
+        if (typeof key !== "string" || !key.trim()) {
+            throw new TypeError("[CozyAIEngine] initializeSubEngine(): key must be a non-empty string.");
+        }
+        if (!instance || typeof instance !== "object") {
+            throw new TypeError("[CozyAIEngine] initializeSubEngine(): instance must be an object.");
+        }
+        this[key] = instance;
+        this._subEngines.set(key, instance);
+        return true;
+    }
+
+    /** [FIX-11] Read-only introspection of currently attached sub-engine keys. */
+    getSubEngines() {
+        return Array.from(this._subEngines.keys());
+    }
+
+    /** Version accessor used by sub-engine manifests / diagnostics tooling. */
+    getVersion() {
+        return "1.4.1";
     }
 
     // ── PRIVATE METHODS ──────────────────────────────────────────────────────
