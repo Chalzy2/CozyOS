@@ -62,6 +62,12 @@
         #lastError = null;
 
         getVersion() { return VERSION; }
+
+        // ── RL-014 Platform Inspection Contract (Milestone 173, additive only) ──
+        getId() { return "CozyReasoning"; }
+        getName() { return "CozyReasoning"; }
+        /** @returns {string[]} real optional integrations checked via _dep() at call time. */
+        getDependencies() { return ["CozyInterpretation", "CozyThinking"]; }
         getReasoningTypes() { return REASONING_TYPES.slice(); }
         getContradictionKinds() { return CONTRADICTION_KINDS.slice(); }
 
@@ -331,4 +337,4 @@
             });
         } catch (_err) { /* non-fatal */ }
     }
-})();
+})();                                                                                                                           

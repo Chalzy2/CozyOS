@@ -151,6 +151,14 @@
 
         getHealth() { return { ...this._health }; }
 
+        // ── RL-014 Platform Inspection Contract (Milestone 173, additive only) ──
+        /** @returns {string} stable identifier — matches getManifest().name and the registerEngine("platform", ...) call. */
+        getId() { return "platform"; }
+        /** @returns {string} human-readable name — matches the ServiceRegistry catalog entry. */
+        getName() { return "Cozy AI Engine Platform"; }
+        /** @returns {string[]} delegates to the existing getManifest() contract rather than duplicating dependency logic. */
+        getDependencies() { return this.getManifest().dependencies; }
+
         _setHealth(state, error) {
             if (!HEALTH_STATES.includes(state)) return;
             this._health = { state, lastError: error ? String(error.message || error).slice(0, 256) : null, updatedAt: new Date().toISOString() };

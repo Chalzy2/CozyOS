@@ -69,6 +69,12 @@
         #lastError = null;
 
         getVersion() { return VERSION; }
+
+        // ── RL-014 Platform Inspection Contract (Milestone 173, additive only) ──
+        getId() { return "CozyConversation"; }
+        getName() { return "CozyConversation"; }
+        /** @returns {string[]} real optional integrations this engine checks for via _dep() at call time (see file header's "Confirmed real integrations"). */
+        getDependencies() { return ["CozyHearing", "SpeechRecognitionAdapter", "LanguageEngine", "CozyTranslate", "CozyMemory", "MemoryLifecycle", "PolicyDecisionEngine"]; }
         getConversationTypes() { return CONVERSATION_TYPES.slice(); }
         getTopicDomains() { return TOPIC_DOMAINS.slice(); }
 

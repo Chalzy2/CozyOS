@@ -98,6 +98,14 @@
 
         getVersion() { return VERSION; }
 
+        // ── RL-014 Platform Inspection Contract (Milestone 173, additive only) ──
+        /** @returns {string} stable identifier — matches the window.CozyOS registration key and ServiceRegistry entry. */
+        getId() { return "CozyHearing"; }
+        /** @returns {string} human-readable name. */
+        getName() { return "CozyHearing"; }
+        /** @returns {string[]} real runtime dependencies (window.CozyOS.AudioEngine, used by #ensureRegisteredWithAudioEngine()). */
+        getDependencies() { return ["AudioEngine"]; }
+
         /** Registers as an AudioEngine input adapter exactly once (Milestone 158). Never fabricates a stream — only relays what AudioEngine actually routes. */
         #ensureRegisteredWithAudioEngine() {
             const engine = window.CozyOS.AudioEngine;

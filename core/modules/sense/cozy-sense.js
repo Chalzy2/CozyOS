@@ -64,6 +64,12 @@
         #lastError = null;
 
         getVersion() { return VERSION; }
+
+        // ── RL-014 Platform Inspection Contract (Milestone 173, additive only) ──
+        getId() { return "CozySense"; }
+        getName() { return "CozySense"; }
+        /** @returns {string[]} no cross-engine runtime dependencies found in this file — genuinely standalone. */
+        getDependencies() { return []; }
         getSensorTypes() { return SENSOR_TYPES.slice(); }
         getObservationTypes() { return OBSERVATION_TYPES.slice(); }
 

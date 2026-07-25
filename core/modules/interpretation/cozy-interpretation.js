@@ -67,6 +67,12 @@
         #lastError = null;
 
         getVersion() { return VERSION; }
+
+        // ── RL-014 Platform Inspection Contract (Milestone 173, additive only) ──
+        getId() { return "CozyInterpretation"; }
+        getName() { return "CozyInterpretation"; }
+        /** @returns {string[]} real optional integrations checked via _dep() at call time. */
+        getDependencies() { return ["CozyConversation", "CozyMemory"]; }
         getInputSources() { return INPUT_SOURCES.slice(); }
         getCategories() { return CATEGORIES.slice(); }
         getTypes() { return TYPES.slice(); }

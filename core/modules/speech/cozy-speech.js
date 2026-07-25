@@ -1968,6 +1968,37 @@ const _kernel = {
     getVersion() {
         return SPEECH_VERSION;
     },
+
+    // ── RL-014 Platform Inspection Contract (Milestone 173, additive only) ──
+    /** @returns {string} stable identifier — matches the window.CozyOS.CozySpeech registration key. */
+    getId() { return "CozySpeech"; },
+    /** @returns {string} human-readable name. */
+    getName() { return "CozySpeech"; },
+    /** @returns {string[]} no cross-engine window.CozyOS.* references found in this file — genuinely standalone. */
+    getDependencies() { return []; },
+
+    // ── Gate 1 verified gaps: getHealth() and getCapabilities() did not
+    //    previously exist. Both are derived from real registries/state
+    //    (adapter registry, hasRealPreviewBackend(), session/language
+    //    counts) — never a fabricated status or feature list. ──
+    /** @returns {object} frozen health snapshot */
+    getHealth() {
+        return Object.freeze({
+            state: _sessions.size > 0 ? "active" : "ready",
+            previewBackendRegistered: this.hasRealPreviewBackend(),
+            openSessions: _sessions.size,
+            registeredAdapters: _adapters.size,
+        });
+    },
+    /** @returns {object} frozen capability snapshot, reflecting only what is actually registered. */
+    getCapabilities() {
+        return Object.freeze({
+            adapters: Object.freeze(Array.from(_adapters.values()).map(a => Object.freeze({ adapterId: a.adapterId, name: a.name, type: a.type }))),
+            previewBackendRegistered: this.hasRealPreviewBackend(),
+            registeredLanguages: _languages.size,
+            registeredDevices: _devices.size,
+        });
+    },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

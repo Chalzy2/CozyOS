@@ -1975,6 +1975,28 @@ const _kernel = {
 
     /** @returns {string} */
     getVersion() { return VISION_VERSION; },
+
+    // ── RL-014 Platform Inspection Contract (Milestone 173, additive only) ──
+    /** @returns {string} stable identifier — matches the bootstrap.registerService()/ServiceRegistry "Vision" name and the window.CozyOS.Vision registration key. */
+    getId() { return "Vision"; },
+    /** @returns {string} human-readable name. */
+    getName() { return "Vision"; },
+    /** @returns {string[]} matches the dependencies:[] already declared in this file's own Kernel/ServiceRegistry registration blocks. */
+    getDependencies() { return []; },
+
+    // ── Gate 1 verified gap: getHealth() did not previously exist. Derived
+    //    only from real internal state (provider registration, open session
+    //    count) — never a fabricated status. getCapabilities()/getStatus()
+    //    above are untouched. ──
+    /** @returns {object} frozen health snapshot */
+    getHealth() {
+        const provider = _providers.get("camera");
+        return Object.freeze({
+            state: provider ? "ready" : "unavailable",
+            registeredProviders: Object.freeze(Array.from(_providers.keys())),
+            openSessions: _openHandles.size,
+        });
+    },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

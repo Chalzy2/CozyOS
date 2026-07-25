@@ -7,6 +7,12 @@
     <link rel="stylesheet" href="core/ui/cozy-tokens.css">
     <link rel="stylesheet" href="core/ui/cozy-components.css">
     <link rel="stylesheet" href="core/modules/developer/developer-hub.css">
+    <!-- Milestone 132a: CozyAuthenticator, now a real dashboard.html module
+         (was a standalone page at applications/Cozy-Authenticator/index.html).
+         Consumes the already-loaded IdentityEngine/AuthCoordinator/
+         AuthorizationCoordinator/AuthFactorRegistry/OtpProvider below —
+         loads none of them itself. See MIGRATION_LOG.md. -->
+    <link rel="stylesheet" href="core/modules/Cozy-Authenticator/authenticator.css">
     <style>
         /* REWORKED (visual redesign per reference design): light content
          * area with a dark navy sidebar and a proper header bar, replacing
@@ -385,7 +391,7 @@
          (core/ui/cozy-base-linker.js, modules/quarry/*) but never
          implemented until now. Listens to IdentityEngine/
          AdminRecoveryPolicy session events; loaded after both. -->
-    <script src="core/modules/identity/cozy-auth.js"></script>
+    <script src="core/security/cozy-auth.js"></script>
     <!-- Milestone 120: real session snapshot service. Loaded before
          AuthCoordinator so establishFromIdentity()/establishFromExternalAuth()
          are available the first time AuthCoordinator needs them. -->
@@ -395,6 +401,56 @@
          AdminRecoveryPolicy — does not duplicate or replace any of them.
          Loaded last in this chain since it depends on all four. -->
     <script src="core/modules/identity/auth-coordinator.js"></script>
+    <!-- Milestone 130: Administrator Recovery Wizard dependency chain.
+         Real, dependency-ordered load: factor-provider-base before any
+         provider that composes it; auth-factor-registry and
+         auth-policy-engine before every real provider that registers
+         itself into them; recovery managers and WebAuthn provider next;
+         cozy-login-gate.js (this page's bootstrap script at the bottom
+         already calls window.CozyOS.LoginGate.mountIfNeeded() but had
+         no script tag anywhere on this page until now — a real,
+         separate, pre-existing gap, disclosed in this milestone's
+         changelog, not expanded on further here); AdminRecoveryWizard
+         loaded last since it composes all of the above. -->
+    <!-- ============================================================
+         Milestone 131a — Shell Ownership Review DECISION:
+         core/cozy-shell.html is now the one canonical production entry
+         point and the one real Login Gate. This page (dashboard.html)
+         is LEGACY and should not receive new feature work.
+
+         The Login Gate bootstrap below is INTENTIONALLY left wired
+         here, unretired, for one real reason: PharmacyOS,
+         CozyPaymentProviderEngine, WorkspaceShell, and Developer Hub
+         are only reachable through this page today — cozy-shell.html
+         does not yet load them. Removing this gate now would either
+         (a) leave those four reachable with no login at all, or
+         (b) make them unreachable altogether. Both are worse than the
+         current, real, working, gated state. A follow-up milestone
+         should port those four into cozy-shell.html; once that's
+         verified, this entire bootstrap script and its LoginGate/
+         AdminRecoveryWizard/core-security script tags below should be
+         deleted from this page for real, leaving cozy-shell.html as
+         the only Login Gate, per the "one Login Gate only" rule.
+         See changelog.md / migration-log-addendum.md for the full
+         Ownership Report.
+         ============================================================ -->
+    <script src="core/security/factor-provider-base.js"></script>
+    <script src="core/security/auth-factor-registry.js"></script>
+    <script src="core/security/otp-provider.js"></script>
+    <script src="core/security/auth-policy-engine.js"></script>
+    <script src="core/security/recovery-phrase-manager.js"></script>
+    <script src="core/security/recovery-question-manager.js"></script>
+    <script src="core/security/trusted-device-manager.js"></script>
+    <script src="core/security/recovery-key-manager.js"></script>
+    <script src="core/security/emergency-recovery-code-manager.js"></script>
+    <script src="core/security/webauthn-provider.js"></script>
+    <!-- Milestone 132a: window.CozyOS.AuthorizationCoordinator — authorization/
+         policy/step-up decisions. Distinct global from window.CozyOS.AuthCoordinator
+         (core/modules/identity/auth-coordinator.js, login orchestration only).
+         See changelog.md for the Ownership Report. -->
+    <script src="core/security/auth-coordinator.js"></script>
+    <script src="core/shell/cozy-login-gate.js"></script>
+    <script src="core/shell/cozy-admin-recovery-wizard.js"></script>
     <!-- Real bug fix: cozy-context-engine.js was migrated to
          PlatformEventBus in an early milestone but never received a
          script tag on this specific page. -->
@@ -642,26 +698,48 @@
     <script src="core/modules/automation/cozy-automation.js"></script>
     <script src="core/modules/analytics/cozy-analytics.js"></script>
     <script src="core/modules/speech/cozy-speech.js"></script>
+    <!-- Milestone 172 reconciliation: Speech domain owned by Branch B (Platform
+         Expansion) — these are the two adapter scripts Branch B's own
+         dashboard.html actually wires in; the other 12 files in
+         core/modules/speech/adapters/ are real but not yet loaded in either
+         branch's shell (reconciliation carries the file, not new wiring). -->
+    <script src="core/modules/speech/adapters/speech-translation-adapter.js"></script>
+    <script src="core/modules/speech/adapters/speech-translation-provider.js"></script>
     <script src="core/modules/translate/cozy-translate.js"></script>
 
-    <!-- Milestone 150: Speech Translation Provider — adapter into the
-         existing CozyTranslate coordinator (registerTranslator), not a
-         new engine. Loaded after CozyTranslate/CozySpeech/PlatformEventBus
-         so init() below finds real coordinators, never fabricated ones. -->
-    <script src="core/modules/speech/adapters/speech-translation-provider.js"></script>
-    <script src="core/modules/speech/adapters/speech-translation-adapter.js"></script>
-    <script>
-        (function () {
-            var tries = 0;
-            (function waitAndInit() {
-                if (window.CozyOS && window.CozyOS.CozyTranslate && window.CozyOS.SpeechTranslationAdapter) {
-                    window.CozyOS.SpeechTranslationAdapter.init();
-                } else if (tries++ < 75) {
-                    setTimeout(waitAndInit, 200);
-                }
-            })();
-        })();
-    </script>
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Milestone 173 / Gate 4 — Platform Integration runtime wiring.
+         Order follows repository-verified getDependencies() from Gate 2/3,
+         not an assumed sequence. core/ai.js is not one of the 11 RL-014
+         engines, but is a real, required prerequisite for AI Platform's
+         attach logic. Workflow Runtime is placed before core/ai.js because
+         its one reference to window.CozyOS.AI.platform is a lazy,
+         call-time-only check inside an action handler (call_ai) that already
+         degrades gracefully if unavailable — not a load-order dependency.
+         Integration Layer loads last: it only discovers, never registers.
+
+         CORRECTED FINDING (Browser Runtime Verification): CozyHearing.
+         getDependencies() declares "AudioEngine", but no file anywhere in
+         this repository assigns window.CozyOS.AudioEngine — the only
+         candidate, core/engines/audio/audio-manager.js, is an ES module
+         (export default) consumed exclusively via `import` by Scene
+         Manager, and is a different engine (mixer/mic bus control) than
+         whatever Hearing's dependency name refers to. Wiring it in here
+         would be a fabricated registration, not a real fix, so it is
+         intentionally NOT loaded. Hearing will honestly report AudioEngine
+         as unavailable until a real one is built — see Step 5 below. -->
+    <script src="core/modules/hearing/cozy-hearing.js"></script>
+    <script src="core/modules/vision/cozy-vision.js"></script>
+    <script src="core/modules/sense/cozy-sense.js"></script>
+    <script src="core/modules/conversation/cozy-conversation.js"></script>
+    <script src="core/modules/interpretation/cozy-interpretation.js"></script>
+    <script src="core/modules/thinking/cozy-thinking.js"></script>
+    <script src="core/modules/reasoning/cozy-reasoning.js"></script>
+    <script src="core/modules/intelligence/cozy-intelligence.js"></script>
+    <script src="core/modules/automation/cozy-workflow-runtime.js"></script>
+    <script src="core/ai.js"></script>
+    <script src="core/ai/cozy-ai-platform.js"></script>
+    <script src="core/modules/integration/cozy-integration-layer.js"></script>
 
     <script src="core/modules/company/cozy-company.js"></script>
 
@@ -672,31 +750,6 @@
          window.CozyOS.AIMode, exact match for cozy-developer.js's
          #aimode(). The last of DeveloperHub's 8 optional integrations. -->
     <script src="core/modules/aimode/cozy-ai-mode.js"></script>
-
-    <!-- Milestone 170 — Platform Integration Phase 2, Stage 1: Repository-
-         Verified Engine Registration. Every file below was individually
-         confirmed to exist and to be currently unloaded before adding it
-         here — see migration-report.md. Camera, Policy, and Language are
-         deliberately NOT loaded (verified duplicate ownership, unresolved)
-         and Conversation/Interpretation/Thinking/Reasoning/Intelligence/
-         Sense are deliberately NOT loaded (confirmed absent from this
-         repository) — both report honestly via Integration.
-         getRegistrationStatus() without needing a script tag. -->
-    <!-- AI Platform: core/ai.js registers window.CozyOS.AI (the parent
-         coordinator); cozy-ai-platform.js attaches to it as .platform.
-         Loaded after AIMode/SessionService/ContextEngine, all three of
-         which this depends on and are already loaded earlier on this page. -->
-    <script src="core/ai.js"></script>
-    <script src="core/ai/cozy-ai-platform.js"></script>
-    <script src="core/modules/automation/cozy-workflow-runtime.js"></script>
-    <script src="core/modules/hearing/cozy-hearing.js"></script>
-    <script src="core/modules/vision/cozy-vision.js"></script>
-
-    <!-- Platform Integration Layer itself — loaded last of this group so
-         every engine it discovers above is already registered by the time
-         it initializes. Its own discovery is live/lazy either way, so this
-         ordering is a courtesy, not a hard requirement. -->
-    <script src="core/modules/integration/cozy-integration-layer.js"></script>
 
     <!-- BugFixer (core/modules/bugfixer/cozy-bugfixer.js) — 1071 lines, real
          and complete, found in the full repository export. Registers as
@@ -712,14 +765,10 @@
     <!-- 1. PLATFORM SHELL + DEVELOPER HUB -->
     <script src="core/shell/cozy-workspace.js" defer></script>
     <script src="core/modules/developer/developer-hub.js" defer></script>
-
-    <!-- Milestone 122 dependency fix: cozy-login-gate.js defines
-         window.CozyOS.LoginGate, which bootWorkspace() below already
-         calls — but this file never had a <script> tag, so the gate
-         never mounted and the workspace fell through unauthenticated.
-         Loaded plain (non-deferred, matches identity/auth-coordinator
-         above) so it's registered before bootWorkspace() runs. -->
-    <script src="core/shell/cozy-login-gate.js"></script>
+    <!-- Milestone 132a: registers window.CozyOS.Modules["authenticator"].
+         Must load after IdentityEngine/AuthCoordinator/AuthorizationCoordinator/
+         AuthFactorRegistry/OtpProvider, all already loaded above. -->
+    <script src="core/modules/Cozy-Authenticator/authenticator.js" defer></script>
 
     <!-- 2. PLUGGABLE CORE ARCHITECTURE REGISTRIES (preserved, unchanged paths) -->
     <script src="core/pluginManager.js"></script>
@@ -769,6 +818,14 @@
     <script src="core/modules/shopos/shopos.js"></script>
     <script src="core/plugins/pharmacyOS.js"></script>
     <script src="core/dashboard.js"></script>
+
+    <!-- Milestone 141: Engine Integration Bridge. type="module" is standard
+         HTML and coexists with the classic <script> tags above it — no other
+         script tag on this page needs to change. Loads Camera/Audio/
+         Playback/Scene/Media ES-module engines and exposes them under
+         window.CozyOS.*Engine, best-effort per engine (fail closed; a
+         missing/broken engine does not block the rest of the dashboard). -->
+    <script type="module" src="core/bridge/engine-bridge-bootstrap.js"></script>
 
     <!-- 3. BOOTSTRAP: mount the Workspace Shell once it and its scripts have
          loaded. Bounded retry (same convention already used elsewhere in

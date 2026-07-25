@@ -49,7 +49,7 @@
 (function () {
     "use strict";
     window.CozyOS = window.CozyOS || {};
-    const INTEGRATION_VERSION = "1.1.0-ENTERPRISE"; // Milestone 170: Stage 1 engine registration + getRegistrationStatus()
+    const INTEGRATION_VERSION = "1.0.0-ENTERPRISE";
     const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
     function sanitizeObject(input) { if (!input || typeof input !== "object") return {}; const clean = {}; for (const key of Object.keys(input)) { if (!FORBIDDEN_KEYS.has(key)) clean[key] = input[key]; } return clean; }
 
@@ -63,45 +63,31 @@
         Vault: [],
         PaymentProvider: ["Vault", "Company"],
         DocumentEngine: ["Vault"],
-        DocumentStorageProvider: ["Vault"],
-
-        // ── Platform Integration — Phase 2, Stage 1 (Milestone 170) ──────
-        // Repository-Verified Engine Registration. Keys match the exact
-        // window.CozyOS.<key> global each engine registers under — see
-        // migration-report.md for the file-by-file verification.
-        CozyMemory: [],
-        OCR: [],
-        AI: [],                    // core/ai.js — cozy-ai-platform.js attaches to AI.platform
-        CozySpeech: [],
-        WorkflowEngine: [],
-        CozyHearing: [],
-        Vision: [],
-
-        // Known duplicate-ownership conflicts — deliberately NOT loaded
-        // this milestone. Listed here only so discoverEngines()/
-        // getRegistrationStatus() can report "Conflict" honestly instead
-        // of silently omitting them.
-        Camera: [],
-        PolicyEngine: [],
-        LanguageEngine: [],
-
-        // Confirmed not present in this repository as of Milestone 170's
-        // repository review. Listed so the platform reports "Unavailable"
-        // rather than pretending these don't exist as a concept.
-        Conversation: [],
-        Interpretation: [],
-        Thinking: [],
-        Reasoning: [],
-        Intelligence: [],
-        Sense: []
+        DocumentStorageProvider: ["Vault"]
     });
 
-    // Registration Status metadata (Milestone 170, non-breaking addition).
-    // Distinguishes "known duplicate-owner, deliberately excluded" from
-    // plain "not present in this repository" — both report as unavailable
-    // via #getEngine(), but they mean different things to a developer.
-    const KNOWN_CONFLICT_ENGINES = Object.freeze(new Set(["Camera", "PolicyEngine", "LanguageEngine"]));
-    const REGISTRATION_STATUS_VALUES = Object.freeze(["Registered", "Loaded", "Healthy", "Dormant", "Conflict", "Unavailable"]);
+    // ── Milestone 173 / Gate 3 — Platform Engine Registry ──────────────────
+    // Deliberately NOT a dependency graph: holds only each engine's live
+    // window.CozyOS accessor path (dot-notation for the one nested case,
+    // AI Platform, which attaches as window.CozyOS.AI.platform via
+    // initializeSubEngine() rather than a flat window.CozyOS.<key>).
+    // No dependency arrays, no capability lists, no health states are
+    // stored here — those are read live from each engine's own
+    // getDependencies()/getCapabilities()/getHealth() at call time, per
+    // RL-014. This registry only tells the layer where to look.
+    const PLATFORM_ENGINES = Object.freeze({
+        CozyHearing:       "CozyHearing",
+        CozyConversation:  "CozyConversation",
+        CozyInterpretation:"CozyInterpretation",
+        CozyThinking:      "CozyThinking",
+        CozyReasoning:     "CozyReasoning",
+        CozyIntelligence:  "CozyIntelligence",
+        CozySense:         "CozySense",
+        AIPlatform:        "AI.platform",
+        WorkflowEngine:    "WorkflowEngine",
+        Vision:            "Vision",
+        CozySpeech:        "CozySpeech"
+    });
 
     class CozyIntegrationLayer {
         #auditLog = [];
@@ -123,6 +109,14 @@
         /** #getEngine(name) — the one place engine references are looked up, always fresh, never cached (an engine could connect/disconnect between calls). */
         #getEngine(name) { return window.CozyOS?.[name] ?? null; }
 
+        /** #resolvePath(path) — walks a dot-notation accessor path off window.CozyOS, live, never cached. Needed only for AI Platform's nested window.CozyOS.AI.platform attachment; every other platform engine is a single flat segment. */
+        #resolvePath(path) {
+            if (typeof path !== "string" || !path) return null;
+            return path.split(".").reduce((obj, seg) => (obj && FORBIDDEN_KEYS.has(seg) ? null : obj?.[seg]) ?? null, window.CozyOS);
+        }
+        /** #getPlatformEngine(name) — looks up a Gate-2-certified platform engine via PLATFORM_ENGINES' accessor path. Returns null honestly if not registered/loaded. */
+        #getPlatformEngine(name) { const path = PLATFORM_ENGINES[name]; return path ? this.#resolvePath(path) : null; }
+
         /**
          * discoverEngines()
          *   Real, live discovery — checks window.CozyOS.<Engine> presence
@@ -137,52 +131,23 @@
                 const engine = this.#getEngine(name);
                 result[name] = { available: !!engine, version: engine && typeof engine.getVersion === "function" ? engine.getVersion() : null };
             }
-            return { ...result };
-        }
-        isEngineAvailable(name) { return !!this.#getEngine(name); }
-        getEngineVersion(name) { const e = this.#getEngine(name); return e && typeof e.getVersion === "function" ? e.getVersion() : null; }
-
-        /**
-         * getRegistrationStatus() — Milestone 170, non-breaking addition.
-         *   Real, per-engine status from exactly one of:
-         *     Healthy     — engine present; either it has no getHealth()
-         *                   (nothing to report, presence itself is the
-         *                   signal) or getHealth() reports no problem.
-         *     <engine's own reported state> — if getHealth() returns a
-         *                   string/status matching one of the six values,
-         *                   that real value is used instead of "Healthy".
-         *     Conflict    — engine NOT present, and it is a known
-         *                   duplicate-ownership case (KNOWN_CONFLICT_ENGINES)
-         *                   deliberately excluded, not merely missing.
-         *     Unavailable — engine NOT present and not a known conflict —
-         *                   confirmed absent from this repository, or not
-         *                   yet loaded, reported honestly either way.
-         *   Never fabricates a healthy/loaded state for an engine that
-         *   is not actually connected right now.
-         */
-        getRegistrationStatus() {
-            const result = Object.create(null);
-            for (const name of Object.keys(DEPENDENCY_GRAPH)) {
-                if (FORBIDDEN_KEYS.has(name)) continue;
-                const engine = this.#getEngine(name);
-                const registered = true; // present in DEPENDENCY_GRAPH by definition of this loop
-                const loaded = !!engine;
-                let status;
-                if (!loaded) {
-                    status = KNOWN_CONFLICT_ENGINES.has(name) ? "Conflict" : "Unavailable";
-                } else if (typeof engine.getHealth === "function") {
-                    let reported = null;
-                    try { const h = engine.getHealth(); reported = (h && (h.status || h.state)) || null; } catch (_err) { reported = null; }
-                    const normalized = REGISTRATION_STATUS_VALUES.find(v => typeof reported === "string" && v.toLowerCase() === reported.toLowerCase());
-                    status = normalized || "Healthy";
-                } else {
-                    status = "Healthy";
-                }
-                result[name] = { registered, loaded, status };
+            // ── Gate 3: the 11 RL-014 platform engines, discovered the same
+            //    live way, reporting id/name/version straight from each
+            //    engine's own methods — never fabricated. ──
+            for (const name of Object.keys(PLATFORM_ENGINES)) {
+                const engine = this.#getPlatformEngine(name);
+                result[name] = {
+                    available: !!engine,
+                    id: engine && typeof engine.getId === "function" ? engine.getId() : null,
+                    name: engine && typeof engine.getName === "function" ? engine.getName() : null,
+                    version: engine && typeof engine.getVersion === "function" ? engine.getVersion() : null
+                };
             }
             return { ...result };
         }
-        getRegistrationStatusValues() { return [...REGISTRATION_STATUS_VALUES]; }
+        /** isEngineAvailable(name) — checks flat business-engine registrations first (unchanged legacy path), then falls back to the platform-engine registry (needed for AI Platform's nested window.CozyOS.AI.platform accessor). Behavior for every existing business/commerce name is identical to before. */
+        isEngineAvailable(name) { return !!(this.#getEngine(name) || this.#getPlatformEngine(name)); }
+        getEngineVersion(name) { const e = this.#getEngine(name) || this.#getPlatformEngine(name); return e && typeof e.getVersion === "function" ? e.getVersion() : null; }
 
         /**
          * getCapabilityMap()
@@ -200,6 +165,18 @@
                 const ownership = typeof engine.getCanonicalOwnership === "function" ? engine.getCanonicalOwnership() : null;
                 map[name] = { available: true, version: typeof engine.getVersion === "function" ? engine.getVersion() : null, ownership };
             }
+            // ── Gate 3: platform engines expose their own real getCapabilities()
+            //    (RL-014) — read it directly rather than duplicating a capability
+            //    list here. Honestly reports {available:false} if unloaded. ──
+            for (const name of Object.keys(PLATFORM_ENGINES)) {
+                const engine = this.#getPlatformEngine(name);
+                if (!engine) { map[name] = { available: false }; continue; }
+                map[name] = {
+                    available: true,
+                    version: typeof engine.getVersion === "function" ? engine.getVersion() : null,
+                    capabilities: typeof engine.getCapabilities === "function" ? engine.getCapabilities() : null
+                };
+            }
             return { ...map };
         }
 
@@ -212,10 +189,25 @@
         validateDependencies(engineName) {
             this.#diagnostics.validations++;
             const deps = DEPENDENCY_GRAPH[engineName];
-            if (deps === undefined) return { available: false, reason: `Unknown engine "${engineName}".` };
-            const missing = deps.filter(dep => !this.isEngineAvailable(dep));
-            if (missing.length > 0) this.#diagnostics.validationFailures++;
-            return { available: true, satisfied: missing.length === 0, missingDependencies: missing };
+            if (deps !== undefined) {
+                // ── Legacy business/commerce path — byte-for-byte unchanged. ──
+                const missing = deps.filter(dep => !this.isEngineAvailable(dep));
+                if (missing.length > 0) this.#diagnostics.validationFailures++;
+                return { available: true, satisfied: missing.length === 0, missingDependencies: missing };
+            }
+            // ── Gate 3: platform engines are not duplicated into a second
+            //    hard-coded graph. This engine's own getDependencies() (RL-014)
+            //    is the single source of truth — read live, every call. ──
+            if (Object.prototype.hasOwnProperty.call(PLATFORM_ENGINES, engineName)) {
+                const engine = this.#getPlatformEngine(engineName);
+                if (!engine) return { available: false, reason: `Engine "${engineName}" is not connected/unregistered.` };
+                if (typeof engine.getDependencies !== "function") return { available: true, satisfied: null, reason: `Engine "${engineName}" does not expose getDependencies().`, missingDependencies: [] };
+                const platformDeps = engine.getDependencies();
+                const missing = platformDeps.filter(dep => !this.isEngineAvailable(dep));
+                if (missing.length > 0) this.#diagnostics.validationFailures++;
+                return { available: true, satisfied: missing.length === 0, missingDependencies: missing };
+            }
+            return { available: false, reason: `Unknown engine "${engineName}".` };
         }
 
         /**
@@ -287,9 +279,22 @@
                 const v = this.validateDependencies(name);
                 if (v.available && !v.satisfied) dependencyIssues[name] = v.missingDependencies;
             }
+            // ── Gate 3: same dependency-issue check extended to the 11
+            //    platform engines, via the same validateDependencies() call
+            //    (which now reads their own getDependencies()). ──
+            const engineHealth = Object.create(null);
+            for (const name of Object.keys(PLATFORM_ENGINES)) {
+                if (!discovery[name].available) continue;
+                const v = this.validateDependencies(name);
+                if (v.available && v.satisfied === false) dependencyIssues[name] = v.missingDependencies;
+                const engine = this.#getPlatformEngine(name);
+                // Read each engine's own getHealth() (RL-014) — never a fabricated status. Honest {reason} if the method isn't exposed.
+                engineHealth[name] = typeof engine?.getHealth === "function" ? engine.getHealth() : { reason: `Engine "${name}" does not expose getHealth().` };
+            }
             return {
                 available: true, connected, disconnected,
                 dependencyIssues: { ...dependencyIssues },
+                engineHealth: { ...engineHealth },
                 healthy: disconnected.length === 0 && Object.keys(dependencyIssues).length === 0
             };
         }

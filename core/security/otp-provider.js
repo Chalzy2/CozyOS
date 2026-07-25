@@ -250,6 +250,9 @@
     }
 
     if (window.CozyOS.ServiceRegistry && typeof window.CozyOS.ServiceRegistry.registerCoordinator === "function") {
-        window.CozyOS.ServiceRegistry.registerCoordinator("OtpProvider", instance);
+        window.CozyOS.ServiceRegistry.registerCoordinator({
+            name: "OtpProvider", category: "Platform", icon: "key.svg",
+            description: "Real RFC 6238 TOTP provider — crypto.subtle backed, in-memory account store this milestone. Registers the \"otp\" factor with AuthFactorRegistry."
+        });
     }
 })();
