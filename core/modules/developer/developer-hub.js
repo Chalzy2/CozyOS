@@ -266,6 +266,7 @@
         #lastRefactorResult = null;
         #lastRefactorFinalJs = null;
         #researchSubTab = "dashboard";
+        #voiceStudioTab = "profiles"; // Voice Studio (Milestone 148) active sub-panel
         #selectedResearchEntryId = null;
         #memorySubTab = "dashboard";
         #memoryExplorerNamespace = null;
@@ -802,6 +803,7 @@
         #sections() {
             return [
                 ["dashboard", "Dashboard"], ["builder", "Builder"], ["understanding", "Understanding Engine"], ["ocr", "OCR"],
+                ["voiceStudio", "Voice Studio"],
                 ["quickCert", "Quick Certification"], ["fullCert", "Full Certification"], ["bugfixer", "BugFixer"],
                 ["workspace", "Workspace"], ["moduleExplorer", "Module Explorer"], ["applicationExplorer", "Application Explorer"],
                 ["serviceRegistry", "Service Registry"], ["releaseCenter", "Release Center"], ["goldenVault", "Golden Vault"],
@@ -875,6 +877,7 @@
                 case "builder": return this.#renderBuilder();
                 case "understanding": return this.#renderUnderstanding();
                 case "ocr": return this.#renderOcr();
+                case "voiceStudio": return this.#renderVoiceStudio();
                 case "aimode": return this.#renderAiMode();
                 case "quickCert": return this.#renderQuickCert();
                 case "fullCert": return this.#renderFullCert();
@@ -2542,6 +2545,279 @@ ${result.recertifyResult ? `## Re-certification After Repair\n**Verdict:** ${res
         }
 
         /**
+         * ── VOICE STUDIO (Milestone 148) ──────────────────────────────────
+         *   UI-only milestone. Every panel below reads/writes the real,
+         *   canonical registries already shipped in
+         *   core/modules/speech/cozy-speech.js (Milestone 147) — no second
+         *   Voice Registry, Engine, or Session Manager. Preview Backend and
+         *   Personal Voice panels stay honest: hasRealPreviewBackend() /
+         *   hasRealPersonalVoiceBackend() are reported exactly as
+         *   CozySpeech returns them, never assumed true.
+         */
+        #renderVoiceStudio() {
+            const speech = window.CozyOS.CozySpeech;
+            if (!speech) return `<h1>Voice Studio</h1><div class="cz-not-connected">window.CozyOS.CozySpeech is not loaded.</div>`;
+
+            const tabs = [
+                ["profiles", "Voice Profiles"], ["languages", "Languages"], ["accents", "Accents"],
+                ["emotions", "Emotions"], ["styles", "Speaking Styles"], ["personalVoices", "Personal Voices"],
+                ["settings", "Voice Settings"], ["preview", "Preview Backend & Live Preview"],
+            ];
+            const tabNav = `<div class="cz-panel" style="display:flex;flex-wrap:wrap;gap:6px;">${tabs.map(([id, label]) =>
+                `<button class="cz-btn${this.#voiceStudioTab === id ? " cz-btn-primary" : ""}" data-action="hub-vs-tab" data-tab="${id}">${escapeHtml(label)}</button>`
+            ).join("")}</div>`;
+
+            let body;
+            switch (this.#voiceStudioTab) {
+                case "profiles":       body = this.#renderVoiceStudioProfiles(speech); break;
+                case "languages":      body = this.#renderVoiceStudioLanguages(speech); break;
+                case "accents":        body = this.#renderVoiceStudioAccents(speech); break;
+                case "emotions":       body = this.#renderVoiceStudioEmotions(speech); break;
+                case "styles":         body = this.#renderVoiceStudioStyles(speech); break;
+                case "personalVoices": body = this.#renderVoiceStudioPersonalVoices(speech); break;
+                case "settings":       body = this.#renderVoiceStudioSettings(speech); break;
+                case "preview":        body = this.#renderVoiceStudioPreview(speech); break;
+                default:               body = "";
+            }
+            return `<h1>Voice Studio</h1>
+                <p class="cz-subtitle">Manages the Cozy Voice Engine's canonical registries in core/modules/speech/cozy-speech.js. No voice recognition, cloning, or synthesis is performed anywhere here — every value is real, stored data.</p>
+                ${tabNav}${body}
+                <div class="cz-panel cz-dev-action-output-panel" id="cz-hub-output"></div>`;
+        }
+
+        #hubSetVoiceStudioTab(tab) {
+            this.#voiceStudioTab = tab;
+            this.#renderMain();
+        }
+
+        #vsListRows(items, fields) {
+            if (!items.length) return `<p class="cz-empty">None registered yet.</p>`;
+            return items.map(item =>
+                `<div class="cz-row">${fields.map(f => `<span>${escapeHtml(String(item[f] ?? ""))}</span>`).join("")}</div>`
+            ).join("");
+        }
+
+        #renderVoiceStudioProfiles(speech) {
+            const items = speech.listVoiceProfiles();
+            return `<div class="cz-panel">
+                <h3>Voice Profile Manager</h3>
+                <div class="cz-field"><label>Name</label><input class="cz-input" id="cz-vs-profile-name" placeholder="e.g. Airy, Storyteller, Custom Voice" /></div>
+                <div class="cz-field"><label>Description (optional)</label><input class="cz-input" id="cz-vs-profile-desc" placeholder="" /></div>
+                <button class="cz-btn cz-btn-primary" data-action="hub-vs-register-profile">Register Voice Profile</button>
+                <div class="cz-panel" style="margin-top:10px;">
+                    <div class="cz-row"><b>Name</b><b>Builtin</b><b>Description</b></div>
+                    ${this.#vsListRows(items, ["name", "builtin", "description"])}
+                </div>
+            </div>`;
+        }
+
+        #renderVoiceStudioLanguages(speech) {
+            const all = speech.listLanguages();
+            const african = speech.listAfricanLanguages();
+            return `<div class="cz-panel">
+                <h3>Language Manager</h3>
+                <div class="cz-field"><label>Language Code</label><input class="cz-input" id="cz-vs-lang-code" placeholder="e.g. luo, sw, en" /></div>
+                <div class="cz-field"><label>Name</label><input class="cz-input" id="cz-vs-lang-name" placeholder="e.g. Luo" /></div>
+                <div class="cz-field"><label>Region (optional)</label><input class="cz-input" id="cz-vs-lang-region" placeholder="africa" /></div>
+                <button class="cz-btn cz-btn-primary" data-action="hub-vs-register-language">Register Language</button>
+                <p class="cz-subtitle" style="margin-top:10px;">${all.length} total, ${african.length} in the African Language Registry.</p>
+                <div class="cz-panel">
+                    <div class="cz-row"><b>Code</b><b>Name</b><b>Region</b></div>
+                    ${this.#vsListRows(all, ["languageCode", "name", "region"])}
+                </div>
+            </div>`;
+        }
+
+        #renderVoiceStudioAccents(speech) {
+            const items = speech.listAccents();
+            return `<div class="cz-panel">
+                <h3>Accent Manager</h3>
+                <div class="cz-field"><label>Name</label><input class="cz-input" id="cz-vs-accent-name" placeholder="e.g. Kenyan, British" /></div>
+                <div class="cz-field"><label>Language Code (optional)</label><input class="cz-input" id="cz-vs-accent-lang" placeholder="e.g. en" /></div>
+                <button class="cz-btn cz-btn-primary" data-action="hub-vs-register-accent">Register Accent</button>
+                <div class="cz-panel" style="margin-top:10px;">
+                    <div class="cz-row"><b>Name</b><b>Language Code</b></div>
+                    ${this.#vsListRows(items, ["name", "languageCode"])}
+                </div>
+            </div>`;
+        }
+
+        #renderVoiceStudioEmotions(speech) {
+            const items = speech.listEmotions();
+            return `<div class="cz-panel">
+                <h3>Emotion Manager</h3>
+                <div class="cz-field"><label>Name</label><input class="cz-input" id="cz-vs-emotion-name" placeholder="e.g. Compassionate" /></div>
+                <button class="cz-btn cz-btn-primary" data-action="hub-vs-register-emotion">Register Emotion</button>
+                <div class="cz-panel" style="margin-top:10px;">
+                    <div class="cz-row"><b>Name</b></div>
+                    ${this.#vsListRows(items, ["name"])}
+                </div>
+            </div>`;
+        }
+
+        #renderVoiceStudioStyles(speech) {
+            const items = speech.listSpeakingStyles();
+            return `<div class="cz-panel">
+                <h3>Speaking Style Manager</h3>
+                <div class="cz-field"><label>Name</label><input class="cz-input" id="cz-vs-style-name" placeholder="e.g. News Reader" /></div>
+                <button class="cz-btn cz-btn-primary" data-action="hub-vs-register-style">Register Speaking Style</button>
+                <div class="cz-panel" style="margin-top:10px;">
+                    <div class="cz-row"><b>Name</b></div>
+                    ${this.#vsListRows(items, ["name"])}
+                </div>
+            </div>`;
+        }
+
+        #renderVoiceStudioPersonalVoices(speech) {
+            const items = speech.listPersonalVoices();
+            const hasBackend = speech.hasRealPersonalVoiceBackend();
+            return `<div class="cz-panel">
+                <div class="cz-row"><span class="cz-badge ${hasBackend ? "cz-badge-ready" : "cz-badge-neutral"}">${hasBackend ? "Real backend registered" : "No real backend"}</span><span>Extension point only — no voice cloning is implemented in this codebase.</span></div>
+            </div>
+            <div class="cz-panel">
+                <h3>Personal Voice Manager</h3>
+                <div class="cz-field"><label>Type</label>
+                    <select class="cz-input" id="cz-vs-pv-type">
+                        <option value="my_voice">My Voice</option><option value="family_voice">Family Voice</option>
+                        <option value="company_voice">Company Voice</option><option value="brand_voice">Brand Voice</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                </div>
+                <div class="cz-field"><label>Label</label><input class="cz-input" id="cz-vs-pv-label" placeholder="e.g. Pastor John's Voice" /></div>
+                <button class="cz-btn cz-btn-primary" data-action="hub-vs-register-personal-voice">Register Personal Voice Slot</button>
+                <div class="cz-panel" style="margin-top:10px;">
+                    <div class="cz-row"><b>Type</b><b>Label</b><b>Real</b></div>
+                    ${this.#vsListRows(items, ["type", "label", "isReal"])}
+                </div>
+            </div>`;
+        }
+
+        #renderVoiceStudioSettings(speech) {
+            const items = speech.listVoiceSettings();
+            const profileOpts = speech.listVoiceProfiles().map(p => `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join("");
+            const accentOpts = speech.listAccents().map(a => `<option value="${escapeHtml(a.name)}">${escapeHtml(a.name)}</option>`).join("");
+            const emotionOpts = speech.listEmotions().map(e => `<option value="${escapeHtml(e.name)}">${escapeHtml(e.name)}</option>`).join("");
+            const styleOpts = speech.listSpeakingStyles().map(s => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join("");
+            const langOpts = speech.listLanguages().map(l => `<option value="${escapeHtml(l.languageCode)}">${escapeHtml(l.name)}</option>`).join("");
+            return `<div class="cz-panel">
+                <h3>Voice Settings Panel</h3>
+                <div class="cz-field"><label>Language</label><select class="cz-input" id="cz-vs-set-lang"><option value="">—</option>${langOpts}</select></div>
+                <div class="cz-field"><label>Accent</label><select class="cz-input" id="cz-vs-set-accent"><option value="">—</option>${accentOpts}</select></div>
+                <div class="cz-field"><label>Voice Profile</label><select class="cz-input" id="cz-vs-set-profile"><option value="">—</option>${profileOpts}</select></div>
+                <div class="cz-field"><label>Speaking Style</label><select class="cz-input" id="cz-vs-set-style"><option value="">—</option>${styleOpts}</select></div>
+                <div class="cz-field"><label>Emotion</label><select class="cz-input" id="cz-vs-set-emotion"><option value="">—</option>${emotionOpts}</select></div>
+                <div class="cz-field"><label>Speed</label><input class="cz-input" type="number" step="0.1" id="cz-vs-set-speed" value="1.0" /></div>
+                <div class="cz-field"><label>Pitch</label><input class="cz-input" type="number" step="0.1" id="cz-vs-set-pitch" value="1.0" /></div>
+                <div class="cz-field"><label>Warmth</label><input class="cz-input" type="number" step="0.1" id="cz-vs-set-warmth" value="0.5" /></div>
+                <div class="cz-field"><label>Expressiveness</label><input class="cz-input" type="number" step="0.1" id="cz-vs-set-expr" value="0.5" /></div>
+                <div class="cz-field"><label>Volume</label><input class="cz-input" type="number" step="0.1" id="cz-vs-set-volume" value="1.0" /></div>
+                <button class="cz-btn cz-btn-primary" data-action="hub-vs-register-settings">Save Voice Settings</button>
+                <div class="cz-panel" style="margin-top:10px;">
+                    <div class="cz-row"><b>Lang</b><b>Accent</b><b>Profile</b><b>Style</b><b>Emotion</b><b>Speed</b><b>Pitch</b></div>
+                    ${this.#vsListRows(items, ["language", "accent", "voiceProfile", "speakingStyle", "emotion", "speed", "pitch"])}
+                </div>
+            </div>`;
+        }
+
+        #renderVoiceStudioPreview(speech) {
+            const hasBackend = speech.hasRealPreviewBackend();
+            const profileOpts = speech.listVoiceProfiles().map(p => `<option value="${escapeHtml(p.voiceProfileId)}">${escapeHtml(p.name)}</option>`).join("");
+            return `<div class="cz-panel">
+                <h3>Preview Backend</h3>
+                <div class="cz-row"><span class="cz-badge ${hasBackend ? "cz-badge-ready" : "cz-badge-neutral"}">${hasBackend ? "Real backend registered" : "No real preview/TTS backend"}</span><span>previewVoice() honestly reports { available:false, played:false } until a real backend calls registerPreviewBackend() from platform code — this panel cannot fabricate one.</span></div>
+            </div>
+            <div class="cz-panel">
+                <h3>Live Preview Controls</h3>
+                <div class="cz-field"><label>Voice Profile</label><select class="cz-input" id="cz-vs-preview-profile"><option value="">—</option>${profileOpts}</select></div>
+                <div class="cz-field"><label>Preview Text</label><input class="cz-input" id="cz-vs-preview-text" placeholder="Hello, I'm Cozy AI. This is how I sound." /></div>
+                <button class="cz-btn cz-btn-primary" data-action="hub-vs-preview">Play Preview</button>
+            </div>`;
+        }
+
+        #vsVal(id) { return document.getElementById(id)?.value?.trim() ?? ""; }
+
+        #hubVsRegisterProfile() {
+            const name = this.#vsVal("cz-vs-profile-name");
+            if (!name) { this.#devOutput('<p class="cz-muted">Name is required.</p>'); return; }
+            window.CozyOS.CozySpeech.registerVoiceProfile({ name, description: this.#vsVal("cz-vs-profile-desc") });
+            this.#devOutput(`<p>Voice Profile "${escapeHtml(name)}" registered.</p>`);
+            this.#renderMain();
+        }
+
+        #hubVsRegisterLanguage() {
+            const languageCode = this.#vsVal("cz-vs-lang-code");
+            const name = this.#vsVal("cz-vs-lang-name");
+            if (!languageCode || !name) { this.#devOutput('<p class="cz-muted">Language code and name are required.</p>'); return; }
+            window.CozyOS.CozySpeech.registerLanguage({ languageCode, name, region: this.#vsVal("cz-vs-lang-region") || null });
+            this.#devOutput(`<p>Language "${escapeHtml(name)}" (${escapeHtml(languageCode)}) registered.</p>`);
+            this.#renderMain();
+        }
+
+        #hubVsRegisterAccent() {
+            const name = this.#vsVal("cz-vs-accent-name");
+            if (!name) { this.#devOutput('<p class="cz-muted">Name is required.</p>'); return; }
+            window.CozyOS.CozySpeech.registerAccent({ name, languageCode: this.#vsVal("cz-vs-accent-lang") || null });
+            this.#devOutput(`<p>Accent "${escapeHtml(name)}" registered.</p>`);
+            this.#renderMain();
+        }
+
+        #hubVsRegisterEmotion() {
+            const name = this.#vsVal("cz-vs-emotion-name");
+            if (!name) { this.#devOutput('<p class="cz-muted">Name is required.</p>'); return; }
+            window.CozyOS.CozySpeech.registerEmotion({ name });
+            this.#devOutput(`<p>Emotion "${escapeHtml(name)}" registered.</p>`);
+            this.#renderMain();
+        }
+
+        #hubVsRegisterStyle() {
+            const name = this.#vsVal("cz-vs-style-name");
+            if (!name) { this.#devOutput('<p class="cz-muted">Name is required.</p>'); return; }
+            window.CozyOS.CozySpeech.registerSpeakingStyle({ name });
+            this.#devOutput(`<p>Speaking Style "${escapeHtml(name)}" registered.</p>`);
+            this.#renderMain();
+        }
+
+        #hubVsRegisterPersonalVoice() {
+            const type = document.getElementById("cz-vs-pv-type")?.value || "custom";
+            const label = this.#vsVal("cz-vs-pv-label");
+            if (!label) { this.#devOutput('<p class="cz-muted">Label is required.</p>'); return; }
+            window.CozyOS.CozySpeech.registerPersonalVoice({ type, label });
+            this.#devOutput(`<p>Personal Voice slot "${escapeHtml(label)}" registered. Extension point only — no cloning performed.</p>`);
+            this.#renderMain();
+        }
+
+        #hubVsRegisterSettings() {
+            const num = (id, fallback) => { const v = parseFloat(this.#vsVal(id)); return Number.isFinite(v) ? v : fallback; };
+            window.CozyOS.CozySpeech.registerVoiceSettings({
+                language:       document.getElementById("cz-vs-set-lang")?.value || null,
+                accent:         document.getElementById("cz-vs-set-accent")?.value || null,
+                voiceProfile:   document.getElementById("cz-vs-set-profile")?.value || null,
+                speakingStyle:  document.getElementById("cz-vs-set-style")?.value || null,
+                emotion:        document.getElementById("cz-vs-set-emotion")?.value || null,
+                speed:          num("cz-vs-set-speed", 1.0),
+                pitch:          num("cz-vs-set-pitch", 1.0),
+                warmth:         num("cz-vs-set-warmth", 0.5),
+                expressiveness: num("cz-vs-set-expr", 0.5),
+                volume:         num("cz-vs-set-volume", 1.0),
+            });
+            this.#devOutput(`<p>Voice Settings saved.</p>`);
+            this.#renderMain();
+        }
+
+        async #hubVsPreview() {
+            const voiceProfileId = document.getElementById("cz-vs-preview-profile")?.value || null;
+            const text = this.#vsVal("cz-vs-preview-text") || "Hello, I'm Cozy AI. This is how I sound.";
+            const result = await window.CozyOS.CozySpeech.previewVoice({ voiceProfileId, text });
+            if (result.played) {
+                this.#devOutput(`<p>Preview played via the registered backend.</p>`);
+            } else {
+                this.#devOutput(`<p class="cz-muted">${escapeHtml(result.reason || "Preview unavailable.")}</p>`);
+            }
+        }
+
+
+
+        /**
          * #renderAiMode()
          *   AI Mode — Enterprise Intelligence Center.
          *   HONEST SCOPE: window.CozyOS.AIMode.requestAssistance(task,
@@ -4180,6 +4456,15 @@ ${result.recertifyResult ? `## Re-certification After Repair\n**Verdict:** ${res
                 case "hub-approve-pattern": { try { window.CozyOS.UnderstandingEngine.approveCandidatePattern(actionEl.getAttribute("data-id")); this.#renderMain(); } catch (err) { this.#devOutput(`<p class="cz-muted">${escapeHtml(err.message)}</p>`); } return; }
                 case "hub-reject-pattern": { try { window.CozyOS.UnderstandingEngine.rejectCandidatePattern(actionEl.getAttribute("data-id"), "Rejected from Knowledge Review Queue."); this.#renderMain(); } catch (err) { this.#devOutput(`<p class="cz-muted">${escapeHtml(err.message)}</p>`); } return; }
                 case "hub-search": this.#hubSearch(document.getElementById("cz-hub-search-input")?.value.trim()); return;
+                case "hub-vs-tab": this.#hubSetVoiceStudioTab(actionEl.getAttribute("data-tab")); return;
+                case "hub-vs-register-profile": this.#hubVsRegisterProfile(); return;
+                case "hub-vs-register-language": this.#hubVsRegisterLanguage(); return;
+                case "hub-vs-register-accent": this.#hubVsRegisterAccent(); return;
+                case "hub-vs-register-emotion": this.#hubVsRegisterEmotion(); return;
+                case "hub-vs-register-style": this.#hubVsRegisterStyle(); return;
+                case "hub-vs-register-personal-voice": this.#hubVsRegisterPersonalVoice(); return;
+                case "hub-vs-register-settings": this.#hubVsRegisterSettings(); return;
+                case "hub-vs-preview": this.#hubVsPreview(); return;
                 default:
                     if (action.startsWith("hub-")) { this.#moduleAction(action, moduleId); return; }
             }
