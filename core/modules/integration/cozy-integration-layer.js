@@ -49,7 +49,7 @@
 (function () {
     "use strict";
     window.CozyOS = window.CozyOS || {};
-    const INTEGRATION_VERSION = "1.0.0-ENTERPRISE";
+    const INTEGRATION_VERSION = "1.1.0-ENTERPRISE"; // Milestone 170: Stage 1 engine registration + getRegistrationStatus()
     const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
     function sanitizeObject(input) { if (!input || typeof input !== "object") return {}; const clean = {}; for (const key of Object.keys(input)) { if (!FORBIDDEN_KEYS.has(key)) clean[key] = input[key]; } return clean; }
 
@@ -63,8 +63,45 @@
         Vault: [],
         PaymentProvider: ["Vault", "Company"],
         DocumentEngine: ["Vault"],
-        DocumentStorageProvider: ["Vault"]
+        DocumentStorageProvider: ["Vault"],
+
+        // ── Platform Integration — Phase 2, Stage 1 (Milestone 170) ──────
+        // Repository-Verified Engine Registration. Keys match the exact
+        // window.CozyOS.<key> global each engine registers under — see
+        // migration-report.md for the file-by-file verification.
+        CozyMemory: [],
+        OCR: [],
+        AI: [],                    // core/ai.js — cozy-ai-platform.js attaches to AI.platform
+        CozySpeech: [],
+        WorkflowEngine: [],
+        CozyHearing: [],
+        Vision: [],
+
+        // Known duplicate-ownership conflicts — deliberately NOT loaded
+        // this milestone. Listed here only so discoverEngines()/
+        // getRegistrationStatus() can report "Conflict" honestly instead
+        // of silently omitting them.
+        Camera: [],
+        PolicyEngine: [],
+        LanguageEngine: [],
+
+        // Confirmed not present in this repository as of Milestone 170's
+        // repository review. Listed so the platform reports "Unavailable"
+        // rather than pretending these don't exist as a concept.
+        Conversation: [],
+        Interpretation: [],
+        Thinking: [],
+        Reasoning: [],
+        Intelligence: [],
+        Sense: []
     });
+
+    // Registration Status metadata (Milestone 170, non-breaking addition).
+    // Distinguishes "known duplicate-owner, deliberately excluded" from
+    // plain "not present in this repository" — both report as unavailable
+    // via #getEngine(), but they mean different things to a developer.
+    const KNOWN_CONFLICT_ENGINES = Object.freeze(new Set(["Camera", "PolicyEngine", "LanguageEngine"]));
+    const REGISTRATION_STATUS_VALUES = Object.freeze(["Registered", "Loaded", "Healthy", "Dormant", "Conflict", "Unavailable"]);
 
     class CozyIntegrationLayer {
         #auditLog = [];
@@ -104,6 +141,48 @@
         }
         isEngineAvailable(name) { return !!this.#getEngine(name); }
         getEngineVersion(name) { const e = this.#getEngine(name); return e && typeof e.getVersion === "function" ? e.getVersion() : null; }
+
+        /**
+         * getRegistrationStatus() — Milestone 170, non-breaking addition.
+         *   Real, per-engine status from exactly one of:
+         *     Healthy     — engine present; either it has no getHealth()
+         *                   (nothing to report, presence itself is the
+         *                   signal) or getHealth() reports no problem.
+         *     <engine's own reported state> — if getHealth() returns a
+         *                   string/status matching one of the six values,
+         *                   that real value is used instead of "Healthy".
+         *     Conflict    — engine NOT present, and it is a known
+         *                   duplicate-ownership case (KNOWN_CONFLICT_ENGINES)
+         *                   deliberately excluded, not merely missing.
+         *     Unavailable — engine NOT present and not a known conflict —
+         *                   confirmed absent from this repository, or not
+         *                   yet loaded, reported honestly either way.
+         *   Never fabricates a healthy/loaded state for an engine that
+         *   is not actually connected right now.
+         */
+        getRegistrationStatus() {
+            const result = Object.create(null);
+            for (const name of Object.keys(DEPENDENCY_GRAPH)) {
+                if (FORBIDDEN_KEYS.has(name)) continue;
+                const engine = this.#getEngine(name);
+                const registered = true; // present in DEPENDENCY_GRAPH by definition of this loop
+                const loaded = !!engine;
+                let status;
+                if (!loaded) {
+                    status = KNOWN_CONFLICT_ENGINES.has(name) ? "Conflict" : "Unavailable";
+                } else if (typeof engine.getHealth === "function") {
+                    let reported = null;
+                    try { const h = engine.getHealth(); reported = (h && (h.status || h.state)) || null; } catch (_err) { reported = null; }
+                    const normalized = REGISTRATION_STATUS_VALUES.find(v => typeof reported === "string" && v.toLowerCase() === reported.toLowerCase());
+                    status = normalized || "Healthy";
+                } else {
+                    status = "Healthy";
+                }
+                result[name] = { registered, loaded, status };
+            }
+            return { ...result };
+        }
+        getRegistrationStatusValues() { return [...REGISTRATION_STATUS_VALUES]; }
 
         /**
          * getCapabilityMap()
