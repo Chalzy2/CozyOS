@@ -51,9 +51,39 @@ async function boot(target) {
     if (!result.success) {
       // eslint-disable-next-line no-console
       console.warn(`[EngineBridge] "${reg.name}" unavailable: ${result.reason}`);
+    } else if (reg.name === 'audio') {
+      await wireBrowserAudioProvider(target);
+      // Real, existing event bus only (Rule 2 — no new event system).
+      // Classic <script> consumers (VoiceCaptureAdapter, CozyHearing) load
+      // synchronously and cannot assume window.CozyOS.AudioEngine already
+      // exists by the time their own top-level code runs, since this
+      // bootstrap loads engines via async dynamic import. This event is
+      // the real, honest signal they wait for instead of guessing.
+      if (target.CozyOS.PlatformEventBus && typeof target.CozyOS.PlatformEventBus.emit === 'function') {
+        try { target.CozyOS.PlatformEventBus.emit('engine-bridge:audio-ready', {}); } catch (_err) { /* non-fatal */ }
+      }
     }
   }
   return results;
+}
+
+/**
+ * Milestone 158 — registers the platform's one real getUserMedia provider
+ * with the newly-loaded canonical Listening Engine (AudioEngine). Fails
+ * closed and non-fatally: if the provider module can't load, or is already
+ * registered (e.g. a second boot() call), the dashboard continues without
+ * real microphone capture rather than crashing (Rule 6 / existing
+ * fail-closed convention in this file).
+ */
+async function wireBrowserAudioProvider(target) {
+  try {
+    const mod = await import('../engines/audio/provider-browser.js');
+    const createBrowserAudioProvider = mod.default;
+    target.CozyOS.AudioEngine.registerProvider(createBrowserAudioProvider());
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(`[EngineBridge] Real browser audio provider unavailable: ${err.message}`);
+  }
 }
 
 if (typeof window !== 'undefined') {
