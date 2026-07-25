@@ -673,6 +673,31 @@
          #aimode(). The last of DeveloperHub's 8 optional integrations. -->
     <script src="core/modules/aimode/cozy-ai-mode.js"></script>
 
+    <!-- Milestone 170 — Platform Integration Phase 2, Stage 1: Repository-
+         Verified Engine Registration. Every file below was individually
+         confirmed to exist and to be currently unloaded before adding it
+         here — see migration-report.md. Camera, Policy, and Language are
+         deliberately NOT loaded (verified duplicate ownership, unresolved)
+         and Conversation/Interpretation/Thinking/Reasoning/Intelligence/
+         Sense are deliberately NOT loaded (confirmed absent from this
+         repository) — both report honestly via Integration.
+         getRegistrationStatus() without needing a script tag. -->
+    <!-- AI Platform: core/ai.js registers window.CozyOS.AI (the parent
+         coordinator); cozy-ai-platform.js attaches to it as .platform.
+         Loaded after AIMode/SessionService/ContextEngine, all three of
+         which this depends on and are already loaded earlier on this page. -->
+    <script src="core/ai.js"></script>
+    <script src="core/ai/cozy-ai-platform.js"></script>
+    <script src="core/modules/automation/cozy-workflow-runtime.js"></script>
+    <script src="core/modules/hearing/cozy-hearing.js"></script>
+    <script src="core/modules/vision/cozy-vision.js"></script>
+
+    <!-- Platform Integration Layer itself — loaded last of this group so
+         every engine it discovers above is already registered by the time
+         it initializes. Its own discovery is live/lazy either way, so this
+         ordering is a courtesy, not a hard requirement. -->
+    <script src="core/modules/integration/cozy-integration-layer.js"></script>
+
     <!-- BugFixer (core/modules/bugfixer/cozy-bugfixer.js) — 1071 lines, real
          and complete, found in the full repository export. Registers as
          window.CozyOS.BugFixer, verified to match exactly what
