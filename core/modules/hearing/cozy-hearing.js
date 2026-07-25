@@ -1,246 +1,254 @@
 /**
  * CozyOS Hearing Engine
  * File Reference: core/modules/hearing/cozy-hearing.js
- * Milestone: 157 — Cozy Hearing Engine
+ * Layer: Core / Platform Foundation — Kernel-adjacent Engine
  * Version: 1.0.0-ENTERPRISE
- * Layer: Core / Platform Service — Sound Understanding
+ * Milestone: 158 (prerequisite) — Cozy Hearing Engine
  *
  * OWNERSHIP
- *   No existing hearing/sound-engine owner found in the repository
- *   (searched core/modules/hearing/, hearing-engine.js, cozy-hearing.js,
- *   audio-analysis.js, sound-engine.js, and a broad grep for
- *   sound-classification/SoundEvent/HearingEngine). This file is the new
- *   canonical owner.
- *   Distinct from CozySpeech (language) and VoiceProvider/CozyOS auth
- *   (identity) — this engine understands SOUND, not speech content or
- *   who is speaking. Reuses VoiceCaptureAdapter (core/modules/speech/
- *   adapters/voice-capture-adapter.js) for raw microphone acquisition
- *   when present, so a second microphone owner is never created; falls
- *   back to its own getUserMedia call only if that adapter isn't loaded.
+ *   The one, canonical owner of sound classification in CozyOS:
+ *   window.CozyOS.CozyHearing. Owns the classifier registry, dispatch
+ *   (classifySound/analyseSound), capability aggregation, and health
+ *   aggregation. No other file may create a second classifier registry
+ *   — Milestone 158's providers register here, through
+ *   registerClassifier(), and nowhere else.
+ * Does NOT own
+ *   Any actual classification model or backend (TensorFlow, ONNX,
+ *   MediaPipe, cloud, etc.) — those are providers, built in Milestone
+ *   158 proper, against the real extension point below. Does not own
+ *   microphone capture (a real, separate, not-yet-built Listening
+ *   Engine sits between the microphone and this file per the
+ *   architecture diagram — this file accepts already-captured audio
+ *   data, it does not open a microphone itself).
  *
- * WHAT IS REAL
- *   Volume, energy (RMS), peak, dominant-frequency estimate, silence
- *   detection, and noise-level estimate are all real, computed from a
- *   live Web Audio AnalyserNode (time + frequency domain data). These
- *   never require an external model.
- *
- * WHAT IS NOT FABRICATED — Classification
- *   Recognizing WHICH category a sound belongs to (gunshot, dog bark,
- *   glass break, etc.) requires a real trained audio classification
- *   model. None exists in this offline, no-network environment.
- *   classifySound() fails closed (isReal:false) unless a real classifier
- *   has been registered via registerClassifier(descriptor, classifierFn)
- *   — the same extension-point pattern used by FaceProvider/VoiceProvider
- *   (registerBackend). The classifier function is kept in a private Map,
- *   never exposed through the public metadata registry, and its
- *   confidence value is always whatever the real backend reports — never
- *   invented by this file.
+ * REAL, NOT FAKE
+ *   With zero providers registered, every classification call fails
+ *   closed: isReal:false, confidence:null, category:"Unknown", and a
+ *   stated reason — never a fabricated category or score. Capability
+ *   and health are aggregated ONLY from what registered providers
+ *   themselves declare — this engine invents no capability a provider
+ *   didn't state.
  */
 (function () {
     "use strict";
     window.CozyOS = window.CozyOS || {};
-    const VERSION = "1.0.0-ENTERPRISE";
-    if (window.CozyOS.CozyHearing) return;
+    const HEARING_VERSION = "1.0.0-ENTERPRISE";
 
-    const SOUND_CATEGORIES = Object.freeze([
-        "human-speech", "music", "applause", "door-knock", "glass-break", "gunshot", "baby-cry",
-        "dog-bark", "cat-meow", "vehicle", "engine", "horn", "alarm", "siren", "rain", "wind",
-        "thunder", "ocean", "fire", "machine", "keyboard", "silence", "unknown"
+    // Canonical classification categories (Milestone 158 spec). Providers
+    // declare which of these they support; this list is the one source
+    // of truth for valid category names — not re-declared per provider.
+    const CATEGORIES = Object.freeze([
+        "Speech", "Music", "Applause", "Door Knock", "Door Bell", "Glass Break",
+        "Baby Cry", "Dog Bark", "Cat Meow", "Gunshot", "Explosion", "Alarm",
+        "Fire Alarm", "Smoke Alarm", "Siren", "Vehicle", "Motorcycle", "Truck",
+        "Train", "Aircraft", "Footsteps", "Keyboard", "Mouse Click", "Rain",
+        "Thunder", "Wind", "Ocean", "River", "Machine", "Factory",
+        "Construction", "Crowd", "Silence", "Unknown"
     ]);
-    const PROFILES = Object.freeze(["indoor", "outdoor", "office", "home", "factory", "vehicle", "classroom", "security", "meeting", "studio"]);
-    const HEALTH = Object.freeze({ READY: "ready", LISTENING: "listening", DISABLED: "disabled", UNAVAILABLE: "unavailable", ERROR: "error" });
+
+    const CAPABILITY_FLAGS = [
+        "supportsRealtimeClassification", "supportsOfflineClassification", "supportsStreaming",
+        "supportsBatchClassification", "supportsMultiLabel", "supportsConfidenceScores"
+    ];
+
+    const HEALTH_STATES = Object.freeze(["Ready", "Loading", "Unavailable", "Offline", "Error", "Busy"]);
 
     class CozyHearingEngine {
-        #audioCtx = null;
-        #analyser = null;
-        #stream = null;
-        #listening = false;
-        #sessions = new Map(); // sessionId -> {state, profile, startedAt, stoppedAt}
-        #classifiers = new Map(); // id -> { descriptor (public), fn (private) }
+        #classifiers = new Map(); // id -> { descriptor, provider }
         #history = [];
-        #enabled = true;
-        #lastError = null;
 
-        getVersion() { return VERSION; }
-        getSoundCategories() { return SOUND_CATEGORIES.slice(); }
-        getProfiles() { return PROFILES.slice(); }
+        getVersion() { return HEARING_VERSION; }
+        listCategories() { return [...CATEGORIES]; }
 
-        #log(event, detail) {
-            this.#history.push({ event, at: new Date().toISOString(), detail: detail || null });
-            if (this.#history.length > 300) this.#history.shift();
+        #deepClone(v) {
+            if (typeof structuredClone === "function") { try { return structuredClone(v); } catch (_e) { /* fall through */ } }
+            try { return JSON.parse(JSON.stringify(v)); } catch (_e2) { return v; }
+        }
+        #logHistory(event, detail) {
+            this.#history.push({ event, at: new Date(Date.now()).toISOString(), detail: this.#deepClone(detail) });
+            if (this.#history.length > 200) this.#history.shift();
+        }
+        #emit(eventName, detail) {
+            this.#logHistory(eventName, detail);
             if (window.CozyOS.PlatformEventBus && typeof window.CozyOS.PlatformEventBus.emit === "function") {
-                try { window.CozyOS.PlatformEventBus.emit(`hearing:${event}`, detail); } catch (_err) { /* non-fatal */ }
+                try { window.CozyOS.PlatformEventBus.emit(`hearing:${eventName}`, detail); } catch (_err) { /* non-fatal */ }
             }
         }
-        getHistory() { return this.#history.slice(); }
+        getHistory() { return this.#deepClone(this.#history); }
 
-        // ── Capabilities (real, honest) ────────────────────────────────────
-        getCapabilities() {
-            const audioSupported = (typeof navigator !== "undefined" && !!navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === "function") &&
-                (typeof window !== "undefined" && (!!window.AudioContext || !!window.webkitAudioContext));
-            const anyClassifier = this.#classifiers.size > 0;
-            const anyMultiSound = Array.from(this.#classifiers.values()).some((c) => c.descriptor.supportsMultiSound === true);
-            const anyOffline = Array.from(this.#classifiers.values()).some((c) => c.descriptor.offline === true);
-            return Object.freeze({
-                supportsRealtimeListening: audioSupported,
-                supportsClassification: anyClassifier,
-                supportsNoiseDetection: audioSupported,
-                supportsSilenceDetection: audioSupported,
-                supportsMultiSound: anyMultiSound,
-                supportsOfflineAnalysis: audioSupported && (this.#classifiers.size === 0 || anyOffline),
-                honestLimitation: anyClassifier ? undefined : "No real classifier registered — classifySound() fails closed."
-            });
+        /**
+         * registerClassifier(descriptor, provider)
+         *   THE real extension point Milestone 158's providers register
+         *   through. descriptor: { id, name, type (Browser/TensorFlow/
+         *   ONNX/MediaPipe/Cloud/LocalModel/Enterprise/Custom),
+         *   categories (subset of listCategories()), capabilities
+         *   (subset of the 6 real flags — undeclared ones are false,
+         *   never assumed true), priority (number, higher = preferred
+         *   default), metadata }. provider: an object implementing at
+         *   least classify(audioData, options); supportsCategory(),
+         *   listCategories(), getCapabilities(), getHealth(), load(),
+         *   unload(), reset() are all optional and checked for presence
+         *   before use — a provider's own declarations are never
+         *   duplicated or second-guessed here.
+         */
+        registerClassifier(descriptor, provider) {
+            if (!descriptor || !descriptor.id) return { success: false, reason: "descriptor.id is required." };
+            if (!provider || typeof provider.classify !== "function") return { success: false, reason: "provider.classify(audioData, options) is required." };
+            if (this.#classifiers.has(descriptor.id)) return { success: false, reason: `A classifier with id "${descriptor.id}" is already registered — extend it, do not re-register.` };
+            const clean = {
+                id: descriptor.id, name: descriptor.name || descriptor.id, type: descriptor.type || "Custom",
+                categories: Array.isArray(descriptor.categories) ? descriptor.categories.filter(c => CATEGORIES.includes(c)) : [],
+                capabilities: descriptor.capabilities && typeof descriptor.capabilities === "object" ? descriptor.capabilities : {},
+                priority: typeof descriptor.priority === "number" ? descriptor.priority : 0,
+                metadata: descriptor.metadata || {}
+            };
+            this.#classifiers.set(descriptor.id, { descriptor: clean, provider });
+            this.#emit("classifier-registered", { id: descriptor.id, type: clean.type });
+            return { success: true };
         }
 
-        // ── Listening lifecycle ────────────────────────────────────────────
-        async startListening(constraints) {
-            if (this.#listening) return { success: false, reason: "Already listening. Call stopListening() first." };
+        removeClassifier(id) {
+            const existed = this.#classifiers.delete(id);
+            if (existed) this.#emit("classifier-removed", { id });
+            return { success: existed };
+        }
+
+        listClassifiers() {
+            return [...this.#classifiers.values()].map(c => this.#deepClone(c.descriptor));
+        }
+
+        #selectClassifier(providerId) {
+            if (providerId) return this.#classifiers.get(providerId) || null;
+            if (this.#classifiers.size === 0) return null;
+            return [...this.#classifiers.values()].sort((a, b) => b.descriptor.priority - a.descriptor.priority)[0];
+        }
+
+        /**
+         * classifySound(audioData, options)
+         *   Real dispatch to ONE selected registered provider (highest
+         *   priority, or options.providerId). Fails closed — isReal:
+         *   false, confidence:null, category:"Unknown" — if none are
+         *   registered, the requested providerId doesn't exist, or the
+         *   provider itself throws. Never fabricates a result.
+         */
+        async classifySound(audioData, options = {}) {
+            const timestamp = new Date(Date.now()).toISOString();
+            const entry = this.#selectClassifier(options.providerId);
+            if (!entry) {
+                this.#emit("classify-failed-closed", { reason: "no-provider" });
+                return { category: "Unknown", confidence: null, duration: 0, timestamp, provider: null, metadata: {}, isReal: false, reason: options.providerId ? `No classifier registered with id "${options.providerId}".` : "No classifier providers are registered." };
+            }
+            const startedAt = Date.now();
             try {
-                let stream;
-                const capture = window.CozyOS.VoiceCaptureAdapter;
-                if (capture && typeof capture.startCapture === "function") {
-                    const result = await capture.startCapture(constraints);
-                    if (!result.success) return result;
-                    stream = result.stream;
-                } else {
-                    if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== "function") {
-                        return { success: false, isReal: false, reason: "No microphone API available in this environment." };
-                    }
-                    stream = await navigator.mediaDevices.getUserMedia(constraints || { audio: true, video: false });
+                const raw = await entry.provider.classify(audioData, options);
+                const duration = Date.now() - startedAt;
+                if (!raw || typeof raw.category !== "string") {
+                    this.#emit("classify-failed-closed", { reason: "malformed-provider-result", providerId: entry.descriptor.id });
+                    return { category: "Unknown", confidence: null, duration, timestamp, provider: entry.descriptor.id, metadata: {}, isReal: false, reason: "Provider returned a malformed result." };
                 }
-                const AC = window.AudioContext || window.webkitAudioContext;
-                if (!AC) { stream.getTracks().forEach((t) => t.stop()); return { success: false, reason: "Web Audio API not available." }; }
-                this.#stream = stream;
-                this.#audioCtx = new AC();
-                const source = this.#audioCtx.createMediaStreamSource(stream);
-                this.#analyser = this.#audioCtx.createAnalyser();
-                this.#analyser.fftSize = 2048;
-                source.connect(this.#analyser);
-                this.#listening = true;
-                this.#log("listening-started", {});
-                return { success: true };
+                this.#emit("classified", { providerId: entry.descriptor.id, category: raw.category });
+                return {
+                    category: raw.category, confidence: typeof raw.confidence === "number" ? raw.confidence : null,
+                    duration, timestamp, provider: entry.descriptor.id, metadata: raw.metadata || {}, isReal: raw.isReal === true
+                };
             } catch (err) {
-                this.#lastError = err && err.message ? err.message : String(err);
-                this.#log("listening-failed", { reason: this.#lastError });
-                return { success: false, reason: `Real getUserMedia/AudioContext rejection: ${this.#lastError}` };
+                this.#emit("classify-error", { providerId: entry.descriptor.id, message: err.message });
+                return { category: "Unknown", confidence: null, duration: Date.now() - startedAt, timestamp, provider: entry.descriptor.id, metadata: {}, isReal: false, reason: `Provider threw: ${err.message}` };
             }
         }
 
-        stopListening() {
-            if (!this.#listening) return { success: true, reason: "Not listening." };
-            try { if (this.#stream) this.#stream.getTracks().forEach((t) => t.stop()); if (this.#audioCtx) this.#audioCtx.close(); }
-            finally { this.#stream = null; this.#audioCtx = null; this.#analyser = null; this.#listening = false; }
-            this.#log("listening-stopped", {});
-            return { success: true };
-        }
-
-        isListening() { return this.#listening; }
-
-        // ── Real DSP analysis ──────────────────────────────────────────────
-        /** analyseSound() — real, instantaneous metrics from the live analyser. No confidence field: these are direct measurements, not inferences. */
-        analyseSound() {
-            if (!this.#analyser) return { success: false, reason: "Not listening. Call startListening() first." };
-            const timeData = new Uint8Array(this.#analyser.fftSize);
-            const freqData = new Uint8Array(this.#analyser.frequencyBinCount);
-            this.#analyser.getByteTimeDomainData(timeData);
-            this.#analyser.getByteFrequencyData(freqData);
-
-            let sumSquares = 0, peak = 0;
-            for (let i = 0; i < timeData.length; i++) {
-                const normalized = (timeData[i] - 128) / 128;
-                sumSquares += normalized * normalized;
-                peak = Math.max(peak, Math.abs(normalized));
+        /**
+         * analyseSound(audioData, options)
+         *   Real dispatch to EVERY registered provider (or
+         *   options.providerIds, a real subset filter) — a genuinely
+         *   different, richer operation than classifySound's single-
+         *   provider dispatch, useful for multi-provider comparison.
+         *   Returns one real (or real-fail-closed) result per provider;
+         *   an empty providers array if none are registered.
+         */
+        async analyseSound(audioData, options = {}) {
+            const timestamp = new Date(Date.now()).toISOString();
+            const targets = Array.isArray(options.providerIds) && options.providerIds.length
+                ? options.providerIds.map(id => this.#classifiers.get(id)).filter(Boolean)
+                : [...this.#classifiers.values()];
+            if (targets.length === 0) {
+                this.#emit("analyse-failed-closed", { reason: "no-provider" });
+                return { timestamp, results: [], isReal: false, reason: "No classifier providers are registered." };
             }
-            const rms = Math.sqrt(sumSquares / timeData.length);
-
-            let maxBin = 0, maxVal = 0;
-            for (let i = 0; i < freqData.length; i++) { if (freqData[i] > maxVal) { maxVal = freqData[i]; maxBin = i; } }
-            const nyquist = this.#audioCtx.sampleRate / 2;
-            const dominantFrequencyHz = (maxBin / freqData.length) * nyquist;
-
-            const silent = rms < 0.02;
-            return {
-                success: true,
-                volume: rms,
-                energy: rms,
-                peak,
-                dominantFrequencyHz,
-                noiseLevel: rms > 0.15 ? "high" : rms > 0.05 ? "moderate" : "low",
-                silence: silent,
-                capturedAt: new Date().toISOString()
-            };
+            const results = await Promise.all(targets.map(async (entry) => {
+                const startedAt = Date.now();
+                try {
+                    const raw = await entry.provider.classify(audioData, options);
+                    const duration = Date.now() - startedAt;
+                    if (!raw || typeof raw.category !== "string") return { category: "Unknown", confidence: null, duration, provider: entry.descriptor.id, metadata: {}, isReal: false, reason: "Provider returned a malformed result." };
+                    return { category: raw.category, confidence: typeof raw.confidence === "number" ? raw.confidence : null, duration, provider: entry.descriptor.id, metadata: raw.metadata || {}, isReal: raw.isReal === true };
+                } catch (err) {
+                    return { category: "Unknown", confidence: null, duration: Date.now() - startedAt, provider: entry.descriptor.id, metadata: {}, isReal: false, reason: `Provider threw: ${err.message}` };
+                }
+            }));
+            this.#emit("analysed", { providerCount: results.length });
+            return { timestamp, results, isReal: results.some(r => r.isReal) };
         }
 
-        /** detectSound() — one-shot alias of analyseSound(), for single-capture use. */
-        detectSound() { const r = this.analyseSound(); this.#log("detect", r.success ? { silence: r.silence } : { failed: true }); return r; }
-
-        // ── Classification (extension point — never fabricated) ───────────
-        registerClassifier(descriptor = {}, classifierFn) {
-            if (!descriptor.id || !descriptor.name) return { success: false, reason: "descriptor.id and descriptor.name are required." };
-            if (typeof classifierFn !== "function") return { success: false, reason: "classifierFn must be a real function — no default/fake classifier is provided." };
-            const categories = Array.isArray(descriptor.categories) ? descriptor.categories.filter((c) => SOUND_CATEGORIES.includes(c)) : [];
-            this.#classifiers.set(descriptor.id, {
-                descriptor: Object.freeze({ id: descriptor.id, name: descriptor.name, categories, offline: !!descriptor.offline, supportsMultiSound: !!descriptor.supportsMultiSound }),
-                fn: classifierFn
-            });
-            this.#log("classifier-registered", { id: descriptor.id });
-            return { success: true };
-        }
-
-        listClassifiers() { return Array.from(this.#classifiers.values()).map((c) => c.descriptor); }
-
-        /** classifySound(audioSample?) — real invocation of a registered backend, or honest fail-closed. */
-        classifySound(audioSample) {
-            if (this.#classifiers.size === 0) {
-                return { success: false, isReal: false, category: "unknown", confidence: null, reason: "No real classifier registered. Not fabricated — fails closed." };
+        /**
+         * getCapabilities(providerId?)
+         *   Real aggregation — OR of each registered provider's own
+         *   declared descriptor.capabilities (or their live
+         *   getCapabilities() if the provider implements it, which
+         *   takes precedence as the more current source). No providers
+         *   registered ⇒ every flag is honestly false.
+         */
+        getCapabilities(providerId = null) {
+            const entries = providerId ? [this.#classifiers.get(providerId)].filter(Boolean) : [...this.#classifiers.values()];
+            const result = {};
+            for (const flag of CAPABILITY_FLAGS) result[flag] = false;
+            for (const entry of entries) {
+                const live = typeof entry.provider.getCapabilities === "function" ? (entry.provider.getCapabilities() || {}) : entry.descriptor.capabilities;
+                for (const flag of CAPABILITY_FLAGS) if (live[flag] === true) result[flag] = true;
             }
-            const [{ fn, descriptor }] = this.#classifiers.values();
-            try {
-                const result = fn(audioSample || this.analyseSound());
-                this.#log("classified", { classifierId: descriptor.id, category: result && result.category });
-                return { success: true, isReal: true, classifierId: descriptor.id, ...result };
-            } catch (err) {
-                this.#lastError = err && err.message ? err.message : String(err);
-                return { success: false, isReal: false, reason: `Classifier threw: ${this.#lastError}` };
-            }
+            return result;
         }
 
-        // ── Sessions ────────────────────────────────────────────────────────
-        createSession({ profile = null } = {}) {
-            if (profile && !PROFILES.includes(profile)) return { success: false, reason: `Unknown profile "${profile}".` };
-            const sessionId = `hearing_${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
-            this.#sessions.set(sessionId, { state: "created", profile, startedAt: null, stoppedAt: null });
-            return { success: true, sessionId };
+        /**
+         * getHealth(providerId?)
+         *   Real — "Unavailable" with zero providers (honest, not
+         *   "Ready"). Otherwise defers to each provider's own
+         *   getHealth() if implemented; a provider without one is
+         *   reported "Ready" only because it registered successfully
+         *   and declared nothing else — never upgraded beyond what's
+         *   known.
+         */
+        async getHealth(providerId = null) {
+            if (this.#classifiers.size === 0) return { state: "Unavailable", reason: "No classifier providers are registered.", providers: [] };
+            const entries = providerId ? [this.#classifiers.get(providerId)].filter(Boolean) : [...this.#classifiers.values()];
+            if (entries.length === 0) return { state: "Unavailable", reason: `No classifier registered with id "${providerId}".`, providers: [] };
+            const providerHealth = await Promise.all(entries.map(async (entry) => {
+                if (typeof entry.provider.getHealth === "function") {
+                    try {
+                        const h = await entry.provider.getHealth();
+                        const state = HEALTH_STATES.includes(h && h.state) ? h.state : "Error";
+                        return { id: entry.descriptor.id, state, reason: (h && h.reason) || null };
+                    } catch (err) { return { id: entry.descriptor.id, state: "Error", reason: err.message }; }
+                }
+                return { id: entry.descriptor.id, state: "Ready", reason: null };
+            }));
+            const overall = providerHealth.some(p => p.state === "Ready") ? "Ready"
+                : providerHealth.some(p => p.state === "Busy") ? "Busy"
+                : providerHealth.some(p => p.state === "Loading") ? "Loading"
+                : providerHealth.every(p => p.state === "Offline") ? "Offline"
+                : "Error";
+            return { state: overall, reason: null, providers: providerHealth };
         }
-        startSession(sessionId) { return this.#transition(sessionId, "created", "active", "startedAt"); }
-        stopSession(sessionId) { return this.#transition(sessionId, "active", "stopped", "stoppedAt"); }
-        #transition(sessionId, from, to, stamp) {
-            const s = this.#sessions.get(sessionId);
-            if (!s) return { success: false, reason: `Session "${sessionId}" not found.` };
-            if (s.state !== from) return { success: false, reason: `Session is "${s.state}", expected "${from}".` };
-            this.#sessions.set(sessionId, { ...s, state: to, [stamp]: new Date().toISOString() });
-            return { success: true };
-        }
-        getSession(sessionId) { return this.#sessions.get(sessionId) || null; }
 
-        // ── Health ──────────────────────────────────────────────────────────
-        getHealth() {
-            if (this.#lastError) return { health: HEALTH.ERROR, reason: this.#lastError };
-            if (!this.#enabled) return { health: HEALTH.DISABLED };
-            if (this.#listening) return { health: HEALTH.LISTENING };
-            const audioSupported = this.getCapabilities().supportsRealtimeListening;
-            return { health: audioSupported ? HEALTH.READY : HEALTH.UNAVAILABLE };
+        getDiagnosticsReport() {
+            return this.#deepClone({ moduleVersion: HEARING_VERSION, registeredClassifiers: this.#classifiers.size, categoryCount: CATEGORIES.length, historyEntries: this.#history.length });
         }
-        disable() { this.stopListening(); this.#enabled = false; }
-        enable() { this.#enabled = true; }
+    }
 
-        getIntegrationManifest() {
-            return {
-                owns: ["hearing/sound-event registry", "real DSP sound analysis", "sessions", "classifier extension point"],
-                doesNotOwn: ["speech recognition (CozySpeech)", "voice authentication (voice-provider.js)", "audio playback/recording (Media Engine)", "translation", "AI"],
-                honestLimitation: "classifySound() returns isReal:false until a real classifier backend is registered via registerClassifier(). Analysis metrics (volume/energy/peak/frequency/silence) are real DSP, always available when listening."
-            };
-        }
+    if (window.CozyOS.CozyHearing && typeof window.CozyOS.CozyHearing.getVersion === "function") {
+        const existingVersion = window.CozyOS.CozyHearing.getVersion();
+        if (existingVersion !== HEARING_VERSION) throw new Error(`[CozyOS] VERSION_CONFLICT: CozyHearing existing v${existingVersion} conflicts with load target v${HEARING_VERSION}.`);
+        return;
     }
 
     window.CozyOS.CozyHearing = new CozyHearingEngine();
@@ -249,7 +257,7 @@
         try {
             window.CozyOS.ServiceRegistry.registerCoordinator({
                 name: "CozyHearing", category: "Platform", icon: "ear.svg",
-                description: "Canonical Hearing Engine. Real DSP sound analysis (volume/energy/peak/frequency/silence). Classification fails closed until a real classifier is registered — never fabricated."
+                description: "Canonical Sound Classification owner. Real classifier registry + dispatch (classifySound/analyseSound), real capability/health aggregation from registered providers only. Zero providers registered ⇒ fails closed (isReal:false, confidence:null) — never fabricates a category or score. Providers register via registerClassifier(descriptor, provider); built in Milestone 158 proper."
             });
         } catch (_err) { /* non-fatal */ }
     }
