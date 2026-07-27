@@ -2,7 +2,7 @@
  * CozyOS Enterprise Framework — CozyOCR
  * File Reference: core/modules/ocr/cozy-ocr.js
  * Layer: Core / Code Generation — Optical Character Recognition
- * Version: 1.0.0-ENTERPRISE
+ * Version: 1.1.0-ENTERPRISE
  *
  * RESPONSIBILITY
  *   Extracts real text from images and scanned/image-based PDF pages.
@@ -30,13 +30,23 @@
  *                          slot; falls back honestly if this reports
  *                          unavailable.
  *   ServiceRegistry      — registerCoordinator(), with retry.
+ *   OCR driver plugins   — registerPlugin(id, instance, priority). A
+ *                          registered driver (e.g. tesseract-plugin.js)
+ *                          owns its own worker lifecycle, preprocessing,
+ *                          and retries; extractText() calls its process()
+ *                          method instead of window.Tesseract directly
+ *                          once one is registered. See "PROVIDER PLUGINS"
+ *                          below. Its process() contract returns only
+ *                          {rawText, confidence} — no bounding boxes — so
+ *                          extractTables()/extractForm() need the direct
+ *                          window.Tesseract path, not a registered plugin.
  */
 
 (function () {
     "use strict";
 
     window.CozyOS = window.CozyOS || {};
-    const OCR_VERSION = "1.0.0-ENTERPRISE";
+    const OCR_VERSION = "1.1.0-ENTERPRISE";
     const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
     class CozyOSOcrCoordinator {
@@ -46,6 +56,7 @@
         #onceWrapped = new Map();
         #workerCache = null;
         #receiptAnalyzers = new Map();
+        #ocrPlugins = new Map(); // pluginId -> { priority, instance }
 
         #diagnostics = {
             extractionsAttempted: 0, extractionsSucceeded: 0, extractionsFailed: 0,
@@ -132,21 +143,136 @@
         }
 
         // =====================================================================
+        // ─── PROVIDER PLUGINS (real extension seam, not a duplicate owner) ────
+        // =====================================================================
+
+        /**
+         * registerPlugin(pluginId, pluginInstance, priority)
+         *   Real extension point for OCR drivers (e.g. tesseract-plugin.js)
+         *   that want to own worker lifecycle, preprocessing, retries, and
+         *   language management themselves rather than this coordinator
+         *   talking to window.Tesseract directly. Mirrors the
+         *   registerReceiptAnalyzer() pattern already used below.
+         *   pluginInstance must expose process(file) → {rawText, confidence}.
+         *   Highest-priority registered plugin is used by extractText();
+         *   ties are broken by registration order (first registered wins).
+         *   Never fabricates a plugin — throws on a malformed one.
+         */
+        registerPlugin(pluginId, pluginInstance, priority = 50) {
+            if (typeof pluginId !== "string" || !pluginId.trim()) throw new TypeError("[CozyOCR] registerPlugin(): pluginId must be a non-empty string.");
+            if (!pluginInstance || typeof pluginInstance.process !== "function") throw new TypeError("[CozyOCR] registerPlugin(): pluginInstance must expose a process(file) method.");
+            this.#ocrPlugins.set(pluginId, { priority: Number(priority) || 50, instance: pluginInstance });
+            this.#logAudit("PLUGIN_REGISTERED", `${pluginId} (priority ${priority})`);
+            this.emit("ocr:plugin_registered", { pluginId, priority });
+            return true;
+        }
+
+        unregisterPlugin(pluginId) {
+            const removed = this.#ocrPlugins.delete(pluginId);
+            if (removed) this.#logAudit("PLUGIN_UNREGISTERED", pluginId);
+            return removed;
+        }
+
+        listPlugins() {
+            return Array.from(this.#ocrPlugins.entries())
+                .map(([id, v]) => ({ pluginId: id, priority: v.priority, version: v.instance.version || null }))
+                .sort((a, b) => b.priority - a.priority);
+        }
+
+        /**
+         * registerProvider / getProvider — aliases over registerPlugin() /
+         * the active-plugin lookup, using the vendor-neutral naming future
+         * engines (EasyOCR, PaddleOCR, Cloud Vision, etc.) should call.
+         * registerPlugin() itself is kept as-is and NOT renamed: it's the
+         * exact method name the already-built, already-wired
+         * tesseract-plugin.js calls at load time, and renaming it there
+         * would be a cosmetic risk for zero real gain. New providers should
+         * prefer registerProvider(); existing callers of registerPlugin()
+         * keep working unchanged.
+         */
+        registerProvider(providerId, providerInstance, priority = 50) {
+            return this.registerPlugin(providerId, providerInstance, priority);
+        }
+
+        unregisterProvider(providerId) { return this.unregisterPlugin(providerId); }
+
+        /** Metadata for the currently-active provider, or null if none registered. */
+        getProvider() {
+            const active = this.#getActivePlugin();
+            if (!active) return null;
+            return this.#deepClone({ providerId: active.id, priority: active.priority, version: active.instance.version || null });
+        }
+
+        /**
+         * languages()
+         *   Real delegate to the active provider's own language registry —
+         *   this coordinator has no language list of its own to fabricate.
+         *   Returns null (not a guessed default) if no provider is
+         *   registered, or if the registered provider doesn't expose one.
+         */
+        languages() {
+            const plugin = this.#getActivePlugin();
+            if (!plugin) return null;
+            if (typeof plugin.instance.getSupportedLanguages === "function") {
+                try {
+                    return {
+                        supported: plugin.instance.getSupportedLanguages(),
+                        active: typeof plugin.instance.getLanguage === "function" ? plugin.instance.getLanguage() : null
+                    };
+                } catch (_err) { return null; }
+            }
+            return null;
+        }
+
+        /** Highest-priority registered plugin, or null if none registered. */
+        #getActivePlugin() {
+            if (this.#ocrPlugins.size === 0) return null;
+            let best = null, bestId = null;
+            for (const [id, entry] of this.#ocrPlugins.entries()) {
+                if (!best || entry.priority > best.priority) { best = entry; bestId = id; }
+            }
+            return { id: bestId, priority: best.priority, instance: best.instance };
+        }
+
+        // =====================================================================
         // ─── PROVIDER STATUS ──────────────────────────────────────────────────
         // =====================================================================
 
-        isAvailable() { return typeof window.Tesseract !== "undefined"; }
+        /**
+         * A registered plugin's worker is built lazily (on first process()
+         * call), so a freshly-registered plugin can't yet prove it works.
+         * If the plugin exposes getHealthStatus().isWorkerActive and it's
+         * true, that's a real, verified signal. Otherwise this falls back
+         * to checking whether the underlying library global the plugin
+         * drives (window.Tesseract) is present — never assumes success.
+         */
+        isAvailable() {
+            const plugin = this.#getActivePlugin();
+            if (plugin && typeof plugin.instance.getHealthStatus === "function") {
+                try {
+                    const health = plugin.instance.getHealthStatus();
+                    if (health && health.isWorkerActive === true) return true;
+                } catch (_err) { /* fall through to generic check */ }
+            }
+            return typeof window.Tesseract !== "undefined";
+        }
 
         getProviderStatus() {
+            const plugin = this.#getActivePlugin();
             return this.#deepClone({
                 available: this.isAvailable(),
-                engine: this.isAvailable() ? "Tesseract.js" : null,
+                engine: plugin ? `${plugin.id} (registered plugin, priority ${plugin.priority})` : (this.isAvailable() ? "Tesseract.js" : null),
                 mode: "offline",
-                note: this.isAvailable()
-                    ? "Tesseract.js loaded — real OCR runs entirely client-side, no network calls."
-                    : "No OCR provider loaded — add the Tesseract.js script tag to enable this (see certification.html for the same optional-script pattern used by pdf.js/jsPDF)."
+                note: plugin
+                    ? `Registered OCR plugin '${plugin.id}' active — real OCR runs entirely client-side, no network calls. Its worker builds lazily on first use.`
+                    : this.isAvailable()
+                        ? "Tesseract.js loaded — real OCR runs entirely client-side, no network calls."
+                        : "No OCR provider loaded — register a driver via registerPlugin(), or add the Tesseract.js script tag directly (see certification.html for the same optional-script pattern used by pdf.js/jsPDF)."
             });
         }
+
+        /** status() — alias of getProviderStatus(), vendor-neutral naming for the provider contract. */
+        status() { return this.getProviderStatus(); }
 
         // =====================================================================
         // ─── TEXT EXTRACTION ──────────────────────────────────────────────────
@@ -161,8 +287,43 @@
          *   recognition itself fails — never fabricated text either way.
          */
         async extractText(imageSource, { lang = "eng" } = {}) {
+            const plugin = this.#getActivePlugin();
+
+            // ─ Path 1: a registered driver (e.g. tesseract-plugin.js) owns
+            //   worker lifecycle/preprocessing/retries itself. Its process()
+            //   contract returns ONLY {rawText, confidence} — no word/line
+            //   bounding boxes (that's outside its declared scope) — so
+            //   words/lines come back empty through this path. extractTables()/
+            //   extractForm() need real bboxes and will report unavailable
+            //   when only a plugin (no direct window.Tesseract) is present.
+            if (plugin) {
+                this.#diagnostics.extractionsAttempted++;
+                try {
+                    if (typeof plugin.instance.getLanguage === "function" && typeof plugin.instance.setLanguage === "function" && plugin.instance.getLanguage() !== lang) {
+                        try { await plugin.instance.setLanguage(lang); } catch (_err) { /* keep the plugin's current active language if the target is rejected (e.g. unregistered code) */ }
+                    }
+                    const result = await plugin.instance.process(imageSource);
+                    this.#diagnostics.extractionsSucceeded++;
+                    this.#logTimeline(`Extracted ${(result.rawText || "").length} character(s) of text via plugin '${plugin.id}'.`);
+                    this.emit("ocr:extracted", { textLength: (result.rawText || "").length, confidence: result.confidence });
+                    return {
+                        available: true,
+                        text: result.rawText || "",
+                        confidence: typeof result.confidence === "number" ? result.confidence : null,
+                        words: [],
+                        lines: []
+                    };
+                } catch (err) {
+                    this.#diagnostics.extractionsFailed++;
+                    this.#logAudit("EXTRACTION_FAILED", err.message);
+                    return { available: false, reason: `OCR extraction failed: ${err.message}` };
+                }
+            }
+
+            // ─ Path 2: no plugin registered — direct window.Tesseract call,
+            //   unchanged from the original implementation.
             if (!this.isAvailable()) {
-                return { available: false, reason: "No OCR provider loaded (Tesseract.js not found on window)." };
+                return { available: false, reason: "No OCR provider loaded (no registered plugin, and Tesseract.js not found on window)." };
             }
             this.#diagnostics.extractionsAttempted++;
             try {

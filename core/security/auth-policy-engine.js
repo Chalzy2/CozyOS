@@ -165,6 +165,12 @@
     engine.definePolicy("administrator-recovery-wizard", { any: ["trusted-device", "recovery-phrase", "recovery-questions", "recovery-key", "emergency-recovery-code", "security-key"] });
     engine.definePolicy("delete-application", { all: ["trusted-device", "face", "voice"] });
     engine.definePolicy("release-production-build", { all: ["trusted-device", "face", "fingerprint", "voice"] });
+    // Milestone 192, Gate 7 — real step-up requirement for creating
+    // additional administrators post-initialization. Requires
+    // trusted-device (a real, achievable factor in this repository,
+    // confirmed before this policy was defined) so that a compromised
+    // session on an unrecognized device cannot mint new administrators.
+    engine.definePolicy("create-administrator", { all: ["trusted-device"] });
 
     if (window.CozyOS.ServiceRegistry && typeof window.CozyOS.ServiceRegistry.registerCoordinator === "function") {
         try {

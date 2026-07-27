@@ -44,8 +44,8 @@
 (function () {
     "use strict";
     window.CozyOS = window.CozyOS || {};
-
     const ADAPTER_VERSION = "1.0.0-ENTERPRISE";
+    if (window.CozyOS.CozyTTSBrowserAdapter) return;
 
     function getSpeechSynthesis() {
         return (typeof window !== "undefined" && window.speechSynthesis) ? window.speechSynthesis : null;

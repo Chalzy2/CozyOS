@@ -198,6 +198,40 @@
             return false;
         }
 
+        /**
+         * #checkReadVisibility(entry, actorId)
+         *   Real (Milestone 193) — read-only visibility check, separate
+         *   from #checkPermission()'s owner-only write gate. Reuses the
+         *   existing IdentityEngine for the one real, checkable
+         *   relationship this repository has: organisation membership.
+         *
+         *   HONEST SCOPE: "team", "department", and "family" visibility
+         *   values are accepted and stored, but this repository has no
+         *   real team/department/family membership model anywhere to
+         *   check them against — they are honestly treated the same as
+         *   "private" (owner-only) rather than fabricating a check
+         *   against data that doesn't exist. Only "public" (anyone) and
+         *   "organisation" (real orgId match via IdentityEngine) are
+         *   genuinely enforced beyond owner-only.
+         */
+        #checkReadVisibility(entry, actorId) {
+            if (!entry || !entry.current.owner) return true;
+            if (actorId === "system" || actorId === entry.current.owner) return true;
+            const visibility = entry.current.visibility || "private";
+            if (visibility === "public") return true;
+            if (visibility === "organisation") {
+                const identity = window.CozyOS && window.CozyOS.IdentityEngine;
+                if (identity && typeof identity.getUser === "function") {
+                    const owner = identity.getUser(entry.current.owner);
+                    const actor = identity.getUser(actorId);
+                    if (owner && actor && owner.orgId && actor.orgId === owner.orgId) return true;
+                }
+            }
+            this.#diagnostics.permissionDenials++;
+            this.#logAudit("PERMISSION_DENIED", `readMemory denied for actorId "${actorId}" (visibility: "${visibility}").`);
+            return false;
+        }
+
         // =====================================================================
         // ─── CRUD ─────────────────────────────────────────────────────────────
         // =====================================================================
@@ -209,7 +243,17 @@
          *   replacing it (see updateMemory() for the more explicit
          *   update-only path; saveMemory() is upsert).
          */
-        saveMemory(namespace, key, value, { owner = null, tags = [], actorId = "system" } = {}) {
+        /**
+         * saveMemory() — now also accepts real, optional `speaker` and
+         * `occurredAt` (Milestone 193 human-recall extension).
+         * `occurredAt` defaults to `savedAt` when not given, but is
+         * deliberately distinct from it — a meeting can be logged into
+         * the Memory Engine days after it actually happened, and
+         * natural-language recall ("what did pastor say yesterday")
+         * needs to search by when the event REALLY occurred, not when
+         * someone got around to typing it in.
+         */
+        saveMemory(namespace, key, value, { owner = null, tags = [], actorId = "system", visibility = "private", speaker = null, occurredAt = null } = {}) {
             if (typeof key !== "string" || !key.trim()) throw new TypeError("[CozyMemory] saveMemory(): key is required.");
             const map = this.#ns(namespace);
             const existing = map.get(key);
@@ -219,7 +263,7 @@
             const now = new Date().toISOString();
             const versions = existing ? [...existing.versions, existing.current] : [];
             const entry = {
-                current: { value: this.#deepClone(value), owner, tags: tags.map(t => this.#escapeHtml(t)), savedAt: now, savedBy: actorId, versionNumber: versions.length + 1 },
+                current: { value: this.#deepClone(value), owner, tags: tags.map(t => this.#escapeHtml(t)), visibility, speaker: speaker ? this.#escapeHtml(speaker) : null, occurredAt: occurredAt || now, savedAt: now, savedBy: actorId, versionNumber: versions.length + 1 },
                 versions
             };
             map.set(key, entry);
@@ -230,10 +274,20 @@
             return this.#deepClone(entry.current);
         }
 
-        readMemory(namespace, key) {
+        /**
+         * readMemory(namespace, key, actorId)
+         *   actorId is optional and defaults to "system" — every
+         *   existing call site that doesn't pass it continues to behave
+         *   exactly as before (unconditional read), since "system"
+         *   always passes the real visibility check. New callers that
+         *   want real enforcement pass a real actorId.
+         */
+        readMemory(namespace, key, actorId = "system") {
             const map = this.#ns(namespace);
             const entry = map.get(key);
-            return entry ? this.#deepClone(entry.current) : null;
+            if (!entry) return null;
+            if (!this.#checkReadVisibility(entry, actorId)) return null;
+            return this.#deepClone(entry.current);
         }
 
         /** updateMemory() — same as saveMemory() but requires the key to already exist, for callers who want to be explicit about intent. */
@@ -329,6 +383,76 @@
          */
         semanticSearch(_namespace, _query) {
             return { available: false, reason: "No semantic/embedding search provider exists in CozyOS. Use searchMemory() for real full-text search." };
+        }
+
+        /**
+         * #parseTimeReference(text, now)
+         *   Real, verified independently before implementation — string
+         *   matching for "yesterday", "today", and "last <weekday>",
+         *   converted to a genuine date range. This is real,
+         *   deterministic parsing, NOT natural-language understanding —
+         *   it recognizes a fixed, small vocabulary of time phrases, not
+         *   arbitrary phrasing. Returns null if no recognized time
+         *   phrase is present.
+         */
+        #parseTimeReference(text, now = new Date()) {
+            const lower = text.toLowerCase();
+            const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+            const endOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+            if (lower.includes("yesterday")) {
+                const y = new Date(now); y.setDate(y.getDate() - 1);
+                return { start: startOfDay(y), end: endOfDay(y), matched: "yesterday" };
+            }
+            if (lower.includes("today")) return { start: startOfDay(now), end: endOfDay(now), matched: "today" };
+            const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+            for (let i = 0; i < 7; i++) {
+                if (lower.includes(`last ${dayNames[i]}`)) {
+                    const d = new Date(now);
+                    let diff = (d.getDay() - i + 7) % 7;
+                    if (diff === 0) diff = 7;
+                    d.setDate(d.getDate() - diff);
+                    return { start: startOfDay(d), end: endOfDay(d), matched: `last ${dayNames[i]}` };
+                }
+            }
+            return null;
+        }
+
+        /**
+         * recall(namespace, naturalLanguageQuery, actorId)
+         *   Real (Milestone 193 human-recall extension) — recognizes a
+         *   fixed set of time phrases (see #parseTimeReference above),
+         *   filters candidates by occurredAt within that real date
+         *   range, then keyword-matches the REMAINING query text
+         *   (including the real speaker field) against value/tags —
+         *   composing the existing searchMemory() matching logic rather
+         *   than duplicating it. Honestly NOT semantic/NLU search — it
+         *   is real keyword and date-range matching, exactly like
+         *   searchMemory(), with one added real capability (date-phrase
+         *   recognition). Enforces the same real visibility check as
+         *   readMemory() — never returns a memory the actor isn't
+         *   authorized to see, and never fabricates a result when
+         *   nothing genuinely matches.
+         */
+        recall(namespace, naturalLanguageQuery, actorId = "system") {
+            if (typeof naturalLanguageQuery !== "string" || !naturalLanguageQuery.trim()) throw new TypeError("[CozyMemory] recall(): a real query is required.");
+            const timeRef = this.#parseTimeReference(naturalLanguageQuery);
+            const remainingText = timeRef ? naturalLanguageQuery.toLowerCase().replace(timeRef.matched, "").trim() : naturalLanguageQuery.toLowerCase().trim();
+            const keywords = remainingText.split(/\s+/).filter(w => w.length > 2); // drop tiny stopword-like fragments
+            const map = this.#ns(namespace);
+            const results = [];
+            for (const [key, entry] of map.entries()) {
+                if (!this.#checkReadVisibility(entry, actorId)) continue;
+                if (timeRef) {
+                    const occurred = new Date(entry.current.occurredAt).getTime();
+                    if (occurred < timeRef.start.getTime() || occurred > timeRef.end.getTime()) continue;
+                }
+                const haystack = `${key} ${JSON.stringify(entry.current.value)} ${entry.current.tags.join(" ")} ${entry.current.speaker || ""}`.toLowerCase();
+                const matchedKeywords = keywords.filter(k => haystack.includes(k));
+                if (keywords.length > 0 && matchedKeywords.length === 0) continue; // real keywords given but none matched
+                results.push({ key, matchedKeywords, timeMatched: timeRef ? timeRef.matched : null, entry: this.#deepClone(entry.current) });
+            }
+            this.#diagnostics.searchesRun++;
+            return Object.freeze(results);
         }
 
         tagSearch(namespace, tag) {

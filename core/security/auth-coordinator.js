@@ -53,7 +53,7 @@
 (function () {
     "use strict";
     window.CozyOS = window.CozyOS || {};
-    const AUTH_COORDINATOR_VERSION = "1.0.0-ENTERPRISE";
+    const AUTH_COORDINATOR_VERSION = "1.1.0-ENTERPRISE"; // Milestone 177: getFactorInventory, getFactorHealthReport (passthrough to AuthFactorRegistry — no new factor logic)
 
     const REAL_EVENT_NAMES = Object.freeze([
         "authentication-started", "authentication-completed", "authentication-failed",
@@ -288,6 +288,43 @@
                 }
             });
         }
+
+        /**
+         * getFactorInventory()
+         *   Milestone 177 (Gate 1A: verified genuinely missing — see
+         *   Milestone-177-Gate1A.md). Real passthrough only —
+         *   `AuthFactorRegistry` is the sole owner of the actual list of
+         *   registered factor names and their real/stub status via its
+         *   own `listFactors()`; this method never recomputes or caches
+         *   that list, so there is exactly one place that data can ever
+         *   drift out of date. Honest, fail-closed shape if the registry
+         *   itself is not loaded — never fabricates a factor list.
+         */
+        getFactorInventory() {
+            const registry = window.CozyOS.AuthFactorRegistry;
+            if (!registry || typeof registry.listFactors !== "function") {
+                return { available: false, reason: "AuthFactorRegistry is not loaded — no real factor inventory can be reported.", factors: [] };
+            }
+            return { available: true, factors: registry.listFactors() };
+        }
+
+        /**
+         * getFactorHealthReport()
+         *   Milestone 177 (Gate 1A: verified genuinely missing — see
+         *   Milestone-177-Gate1A.md). Real passthrough to
+         *   `AuthFactorRegistry.getDiagnosticsReport()` — same honesty
+         *   discipline as that method (registered name vs. genuinely
+         *   functional provider stay visibly distinct). This method
+         *   performs no factor verification and holds no factor state of
+         *   its own.
+         */
+        getFactorHealthReport() {
+            const registry = window.CozyOS.AuthFactorRegistry;
+            if (!registry || typeof registry.getDiagnosticsReport !== "function") {
+                return { available: false, reason: "AuthFactorRegistry is not loaded — no real factor health report can be produced.", totalFactors: 0, realProviders: 0, factors: [] };
+            }
+            return { available: true, ...registry.getDiagnosticsReport() };
+        }
     }
 
     if (window.CozyOS.AuthorizationCoordinator && typeof window.CozyOS.AuthorizationCoordinator.getVersion === "function") {
@@ -302,7 +339,7 @@
         try {
             window.CozyOS.ServiceRegistry.registerCoordinator({
                 name: "AuthorizationCoordinator", category: "Platform", icon: "key.svg",
-                description: "Real, single facade over CozyOS.Auth, AuthPolicyEngine, and AuthFactorRegistry. Callers ask authenticate(operationName, context) instead of talking to the three underlying coordinators directly. Performs no authentication or policy logic itself — orchestrates real results, publishes real events, records real audit history. Distinct from window.CozyOS.AuthCoordinator, which owns login orchestration."
+                description: "Real, single facade over CozyOS.Auth, AuthPolicyEngine, and AuthFactorRegistry. Callers ask authenticate(operationName, context) instead of talking to the three underlying coordinators directly. Performs no authentication or policy logic itself — orchestrates real results, publishes real events, records real audit history. Also exposes getFactorInventory()/getFactorHealthReport() as thin passthroughs to AuthFactorRegistry (Milestone 177) so callers never need to reach around this facade for factor-list/health data. Distinct from window.CozyOS.AuthCoordinator, which owns login orchestration."
             });
         } catch (_err) { /* non-fatal */ }
     }

@@ -139,6 +139,7 @@
         #diagnosticsExpanded = new Set();
         #vendorStateCache = null; // populated only by an explicit "Refresh Diagnostics" click (VendorDiagnostics.listVendorStates() is async; render() itself stays synchronous)
         #themeStudioSelected = null;
+        #createAdminError = null;
         #themeStudioCertification = null;
         #modeEngineLastError = null; // last real registerMode()/activateMode() failure reason, cleared on the next attempt
         #livingThemeEngineLastError = null; // last real registerTheme() failure reason
@@ -1261,6 +1262,46 @@
             try { return this.#deepClone({ connected: true, users: identity.listUsers() }); }
             catch (_err) { this.#diagnostics.errorsHidden++; return { connected: false, message: "IdentityEngine.listUsers() threw." }; }
         }
+
+        /**
+         * #handleCreateAdministrator()
+         *   Real (Milestone 192, Gate 7) — the one path that creates an
+         *   administrator AFTER platform initialization (distinct from
+         *   the first-run wizard's one-time createUser() call). Requires
+         *   real step-up authorization via the EXISTING
+         *   AuthorizationCoordinator + the new "create-administrator"
+         *   policy before ever calling IdentityEngine.createUser() — no
+         *   second policy engine, no bypass path. Fails closed: if
+         *   AuthorizationCoordinator is missing or denies, createUser()
+         *   is never called.
+         */
+        async #handleCreateAdministrator() {
+            const username = this.#domRoot?.querySelector("#cozy-create-admin-username")?.value || "";
+            const password = this.#domRoot?.querySelector("#cozy-create-admin-password")?.value || "";
+            const authCoord = window.CozyOS.AuthorizationCoordinator;
+            const identity = window.CozyOS.IdentityEngine;
+            if (!authCoord || typeof authCoord.authorize !== "function") {
+                this.#createAdminError = "AuthorizationCoordinator is not loaded — administrator creation is refused rather than left unprotected.";
+                this.#render(); return;
+            }
+            if (!identity || typeof identity.createUser !== "function") {
+                this.#createAdminError = "IdentityEngine is not loaded.";
+                this.#render(); return;
+            }
+            const authResult = await authCoord.authorize({ policy: "create-administrator" });
+            if (!authResult.authorized) {
+                this.#createAdminError = `Step-up authorization denied: ${(authResult.diagnostics && authResult.diagnostics.reason) || "not authorized"}.`;
+                this.#render(); return;
+            }
+            if (!username || !password) {
+                this.#createAdminError = "Username and password are both required.";
+                this.#render(); return;
+            }
+            const result = await identity.createUser({ username, password, roles: ["platform-admin"] });
+            this.#createAdminError = result.available ? null : result.reason;
+            this.#render();
+        }
+
         getRolesCenterData() { return this.#getIntegrationSlotData("roles"); }
         getPermissionsCenterData() { return this.#getIntegrationSlotData("permissions"); }
 
@@ -2115,7 +2156,23 @@
                             <span>${this.#escapeHtml((u.roles || []).join(", ") || "no roles")}</span>
                             <span class="cozy-badge">${this.#escapeHtml(u.status)}</span>
                         </div>`);
-                    return `<h2>Users</h2>${rows}`;
+                    // Milestone 192, Gate 7 — real, new capability (none
+                    // existed before: createUser() previously had exactly
+                    // one caller, the first-run wizard). Protected by a
+                    // real step-up check via the existing
+                    // AuthorizationCoordinator + the new
+                    // "create-administrator" policy — never bypassed,
+                    // never a second policy engine.
+                    const authCoord = window.CozyOS.AuthorizationCoordinator;
+                    const createAdminForm = authCoord ? `
+                        <h3>Create Additional Administrator</h3>
+                        <p class="cozy-disclosure-note">Requires a real step-up check (trusted device) via AuthorizationCoordinator — a compromised session on an unrecognized device cannot create new administrators.</p>
+                        <input type="text" id="cozy-create-admin-username" placeholder="Username" class="cozy-field" />
+                        <input type="password" id="cozy-create-admin-password" placeholder="Password" class="cozy-field" />
+                        <button type="button" class="cozy-btn cozy-btn-primary" id="cozy-create-admin-submit">Create Administrator</button>
+                        <p id="cozy-create-admin-error" class="cozy-disclosure-note" style="color:var(--cozy-error,#ef4444);">${this.#escapeHtml(this.#createAdminError || "")}</p>
+                    ` : `<p class="cozy-disclosure-note">AuthorizationCoordinator is not loaded — administrator creation is unavailable rather than left unprotected.</p>`;
+                    return `<h2>Users</h2>${rows}${createAdminForm}`;
                 }
                 case "roles": return this.#renderIntegrationSlot(this.getRolesCenterData(), "Roles");
                 case "permissions": return this.#renderIntegrationSlot(this.getPermissionsCenterData(), "Permissions");
@@ -3629,6 +3686,10 @@
                         this.#themeStudioSelected = evt.target.getAttribute("data-theme-select");
                         this.#themeStudioCertification = null; // stale from a different theme — clear rather than show a misleading old result
                         this.#render();
+                        return;
+                    }
+                    if (evt.target.id === "cozy-create-admin-submit") {
+                        this.#handleCreateAdministrator();
                         return;
                     }
                     if (evt.target.id === "cozy-theme-preview-btn") {

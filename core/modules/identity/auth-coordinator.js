@@ -317,22 +317,35 @@
     window.CozyOS.AuthCoordinator = new CozyOSAuthCoordinator();
 
     /* ------------------------------------------------------------------ *
-     * COMPATIBILITY ALIASES ONLY — no new storage, no new coordinators.
-     * Per explicit instruction: "add them as wrappers only." Bound once
-     * the real engines exist so the alias always points at the one real
-     * instance; retried in case this file loads before either engine.
+     * MILESTONE 176A — COMPATIBILITY-ALIAS BLOCK REMOVED
+     * ------------------------------------------------------------------ *
+     * A prior "bind once the real engines exist" fallback used to live
+     * here, aliasing window.CozyOS.SessionManager -> window.CozyOS.Session
+     * and window.CozyOS.TrustedDeviceManager -> window.CozyOS.AdminRecoveryPolicy
+     * whenever the real SessionManager/TrustedDeviceManager weren't yet
+     * registered at the moment this file executed.
+     *
+     * Gate 1 of Milestone 176 traced a real, confirmed conflict this
+     * caused: core/security/session-manager.js was never loaded by
+     * dashboard.html at all, and core/security/trusted-device-manager.js
+     * loads after this file — so the fallback always won first, aliasing
+     * both globals to the wrong real objects (window.CozyOS.Session, a
+     * different file with a different API; and AdminRecoveryPolicy, an
+     * explicitly self-declared stub). trusted-device-manager.js's own
+     * version guard then read the stub's getVersion() ("0.0.1-STUB") and
+     * threw VERSION_CONFLICT on load, so the real CozyTrustedDeviceManager
+     * was never constructed. window.CozyOS.SessionManager stayed aliased
+     * to CozyOS.Session permanently, since nothing else was checking or
+     * correcting it once bound.
+     *
+     * Both dependencies now have real, canonical, loaded implementations
+     * on this page (core/security/session-manager.js — added this
+     * milestone — and core/security/trusted-device-manager.js, already
+     * present). A same-page guessing fallback for either is therefore
+     * obsolete, and removing it — rather than reordering scripts around
+     * it — closes the conflict permanently regardless of any future
+     * script-order change on this page.
      * ------------------------------------------------------------------ */
-    (function bindCompatAliases() {
-        function attempt() {
-            let bound = false;
-            if (!window.CozyOS.SessionManager && window.CozyOS.Session) { window.CozyOS.SessionManager = window.CozyOS.Session; bound = true; }
-            if (!window.CozyOS.TrustedDeviceManager && window.CozyOS.AdminRecoveryPolicy) { window.CozyOS.TrustedDeviceManager = window.CozyOS.AdminRecoveryPolicy; bound = true; }
-            return !!(window.CozyOS.SessionManager && window.CozyOS.TrustedDeviceManager);
-        }
-        if (attempt()) return;
-        let attempts = 0;
-        const interval = setInterval(() => { attempts++; if (attempt() || attempts >= 200) clearInterval(interval); }, 250);
-    })();
 
     // Auto-restore on load — honest best-effort: if engines aren't ready
     // yet, retries briefly, then gives up silently (isAuthenticated()

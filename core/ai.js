@@ -22,6 +22,15 @@
  *            thrown at parse time before this fix. Milestone 151 (Cozy AI Engine
  *            Platform) surfaced this via Dependency/Runtime Review; fixed here rather
  *            than worked around, since it is a contract this file already implicitly made.
+ *   [FIX-12] Developer-identity delegation (Milestone 180A) — a small, additive
+ *            pattern match on normalizedQuery, run BEFORE the industry-context gate
+ *            (these are meta questions about CozyOS/CozyAI itself, not tenant/industry
+ *            plugin queries). On a match, delegates entirely to the single canonical
+ *            owner, window.CozyOS.DeveloperIdentity (core/identity/, Milestone 180) via
+ *            its query()/answer*() contract. No developer/project data is duplicated or
+ *            reconstructed here — if DeveloperIdentity is not registered (e.g. a script
+ *            tag was removed), this fails closed and falls through to the existing
+ *            industry-routing path unchanged. See Milestone-180A-Continuation.md.
  */
 
 "use strict";
@@ -61,6 +70,52 @@ class CozyAIEngine {
     }
 
     /**
+     * [FIX-12 / Milestone 180A] Matches a free-text query against the
+     * canonical developer/project-identity topics owned by
+     * window.CozyOS.DeveloperIdentity (core/identity/, Milestone 180).
+     * Returns the matching topic key for DeveloperIdentity.query(), or
+     * null if the query isn't about developer/project identity at all.
+     * Pure string matching — no data, no inference, no fabrication.
+     * @returns {string|null}
+     */
+    _matchDeveloperIdentityTopic(normalizedQuery) {
+        const q = String(normalizedQuery || "").toLowerCase();
+        if (/who\s+(created|developed|built|made|founded)\s+(you|cozyai|cozyos)/.test(q) ||
+            /who\s+is\s+(chalz\s+cozy|charles\s+cozy|charles\s+owuor)/.test(q) ||
+            /(your|cozyos'?s?|cozyai'?s?)\s+(creator|founder|developer)\b/.test(q)) {
+            return "who-created-you";
+        }
+        if (/why\s+(were\s+you|was\s+cozyos|was\s+cozyai)\s+(built|created|made)/.test(q) ||
+            /why\s+(does\s+)?cozyos\s+exist/.test(q)) {
+            return "why-created";
+        }
+        if (/why\s+africa/.test(q) || /african\s+knowledge\s+initiative/.test(q)) {
+            return "why-africa-focus";
+        }
+        return null;
+    }
+
+    /**
+     * [FIX-12 / Milestone 180A] Delegates a developer-identity question to
+     * the single canonical owner. Never stores or duplicates the answer —
+     * callers (this engine's own routing phase, or any other consumer such
+     * as a future Voice Engine wiring) should call this directly rather
+     * than caching a copy. Fails closed (returns null) if
+     * window.CozyOS.DeveloperIdentity did not register.
+     * @returns {{responseText: string, pipelineState: string}|null}
+     */
+    answerDeveloperIdentityQuery(topic) {
+        const identity = window.CozyOS?.DeveloperIdentity;
+        if (!identity || typeof identity.query !== "function") return null;
+        const result = identity.query(topic);
+        return {
+            responseText: result.answer,
+            pipelineState: result.known ? "completed" : "unknown_topic",
+            source: "DeveloperIdentity"
+        };
+    }
+
+    /**
      * Main intent routing execution phase handler.
      */
     async executeRoutingPhase(session, normalizedQuery) {
@@ -95,6 +150,25 @@ class CozyAIEngine {
             : "UNKNOWN";
 
         try {
+            // [FIX-12 / Milestone 180A] Developer/project-identity questions are
+            // meta questions about CozyOS/CozyAI itself, not tenant/industry plugin
+            // queries — resolve them before the industry-context gate below, via
+            // the single canonical owner. Additive only: if the query doesn't
+            // match, or DeveloperIdentity isn't registered, falls straight through
+            // to the unchanged industry-routing path.
+            if (typeof normalizedQuery === "string" && normalizedQuery.trim()) {
+                const identityTopic = this._matchDeveloperIdentityTopic(normalizedQuery.trim());
+                if (identityTopic) {
+                    const identityAnswer = this.answerDeveloperIdentityQuery(identityTopic);
+                    if (identityAnswer) {
+                        inferredIntent  = "developer_identity_query";
+                        confidenceScore = 1.0;
+                        executionStatus = "developer_identity_delegated";
+                        return identityAnswer;
+                    }
+                }
+            }
+
             if (!activeIndustry) {
                 executionStatus = "missing_industry_context";
                 return {
