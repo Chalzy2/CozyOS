@@ -1,0 +1,93 @@
+/**
+ * CozyOS — Shared Launch Sequence Styling (Stages 1-6)
+ * File Reference: core/shell/launch-sequence.css
+ * Milestone: 364.3 — Startup/Login Sequencing Correction
+ *
+ * Extracted verbatim from dashboard.html's own <style> block (same
+ * milestones as core/shell/launch-sequence.js) so both dashboard.html
+ * and index.html render the identical, single approved launch screen —
+ * never two different or duplicated versions of it.
+ */
+        html, body { background: #011c15 !important; margin: 0; }
+        #cozy-launch-screen {
+            position: fixed; inset: 0; z-index: 999999;
+            background: #011c15;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-family: system-ui, sans-serif; color: #F9A825;
+            transition: opacity 0.6s ease;
+        }
+        /* Milestone M252 — logo + slogan reveal delayed to the 1.5s
+           mark (Stage 1's minimum stated duration: 1.5-3s of pure
+           green before the logo appears), not the earlier 1.0s used
+           before this spec revision. */
+        #cozy-launch-logo {
+            width: min(320px, 70vw); height: auto;
+            filter: drop-shadow(var(--living-glow, 0 0 30px rgba(249,168,37,0.25)));
+            opacity: 0; transform: scale(0.85);
+            transition: opacity 1.2s ease, transform 1.2s ease;
+        }
+        /* Living Logo Lighting (Phase 2, section 7): brightness breathes
+           every 5s exactly, per spec - real fix from the prior 4s. */
+        #cozy-launch-logo.cozy-reveal { opacity: 1; transform: scale(1); animation: cozyLaunchBreathe calc(5s / var(--living-speed, 1)) ease-in-out infinite; animation-delay: 1.2s; }
+        /* M351: "Logo animates to top center and scales down." Kept as a
+           separate class (added after the wordmark/tagline finish typing)
+           rather than folded into .cozy-reveal, so the existing verified
+           breathing-glow reveal above is completely unchanged. */
+        #cozy-launch-logo.cozy-launch-shrink {
+            position: fixed; top: 18px; left: 50%;
+            width: 56px; height: auto; animation: none;
+            transform: translateX(-50%) scale(1);
+            transition: top 0.9s cubic-bezier(0.16,1,0.3,1), width 0.9s cubic-bezier(0.16,1,0.3,1), transform 0.9s cubic-bezier(0.16,1,0.3,1);
+        }
+        /* M351: admin-selectable wordmark reveal styles (typing uses the
+           real per-letter typeSplitColorText() above in JS; these four
+           are pure-CSS variants for when the administrator selects
+           fade/rise/fall/draw instead). */
+        #cozy-launch-title.cozy-launch-anim-fade { opacity: 0; transition: opacity 1s ease; }
+        #cozy-launch-title.cozy-launch-anim-fade.cozy-launch-anim-play { opacity: 1; }
+        #cozy-launch-title.cozy-launch-anim-rise { opacity: 0; transform: translateY(24px); transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.16,1,0.3,1); }
+        #cozy-launch-title.cozy-launch-anim-rise.cozy-launch-anim-play { opacity: 1; transform: translateY(0); }
+        #cozy-launch-title.cozy-launch-anim-fall { opacity: 0; transform: translateY(-24px); transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.16,1,0.3,1); }
+        #cozy-launch-title.cozy-launch-anim-fall.cozy-launch-anim-play { opacity: 1; transform: translateY(0); }
+        #cozy-launch-title.cozy-launch-anim-draw { opacity: 0; letter-spacing: 6px; filter: blur(3px); transition: opacity 1s ease, letter-spacing 1s ease, filter 1s ease; }
+        #cozy-launch-title.cozy-launch-anim-draw.cozy-launch-anim-play { opacity: 1; letter-spacing: 0.08em; filter: blur(0); }
+        @keyframes cozyLaunchBreathe { 0%, 100% { transform: scale(1); filter: brightness(1); } 50% { transform: scale(1.015); filter: brightness(1.12); } }
+        #cozy-launch-title {
+            font-family: Georgia, 'Times New Roman', serif; font-weight: 700;
+            font-size: 52px; letter-spacing: 0.06em; margin: 24px 0 0 0;
+            min-height: 1.2em;
+        }
+        /* M364.3: responsive sizing per the approved spec (mobile
+           48-72px, tablet 56-64px, desktop 64-72px) - font-family/weight
+           and the existing typing engine/cursor/split-color classes
+           below are all unchanged, only size and spacing increased. */
+        @media (min-width: 600px) {
+            #cozy-launch-title { font-size: 60px; }
+        }
+        @media (min-width: 1024px) {
+            #cozy-launch-title { font-size: 68px; }
+        }
+        #cozy-launch-title .cozy-title-cozy { color: #2E7D32; }
+        #cozy-launch-title .cozy-title-os { color: #F9A825; }
+        #cozy-launch-screen p { font-size: 14px; color: #81C784; margin: 16px 0 0 0; letter-spacing: 0.03em; min-height: 1.2em; }
+        #cozy-launch-screen.cozy-launch-hidden { opacity: 0; pointer-events: none; }
+        /* M355: approved Stage 6 (6.00-6.30s) - motto letters settle like
+           polished metal, not a bounce. Pure CSS, applied once by JS after
+           typeSplitColorText()'s own real completion callback fires. */
+        @keyframes cozyMottoSettle {
+            0%   { transform: translateY(-3px); filter: brightness(1.35); }
+            100% { transform: translateY(0); filter: brightness(1); }
+        }
+        #cozy-launch-slogan.cozy-motto-settle { animation: cozyMottoSettle 0.3s cubic-bezier(0.16,1,0.3,1); }
+        .cozy-typing-cursor {
+            display: inline-block; width: 2px; margin-left: 2px;
+            animation: cozyLaunchCursorBlink 0.9s step-end infinite;
+        }
+        @keyframes cozyLaunchCursorBlink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+        @keyframes cozyLetterPulse { 0% { filter: brightness(1.4); } 100% { filter: brightness(1); } }
+        .cozy-letter-pulse { animation: cozyLetterPulse 0.2s ease-out; }
+        @media (prefers-reduced-motion: reduce) {
+            #cozy-launch-logo.cozy-reveal { animation: none; }
+            .cozy-typing-cursor { animation: none; }
+            .cozy-letter-pulse { animation: none; }
+        }

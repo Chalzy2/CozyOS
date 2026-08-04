@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CozyOS Enterprise</title>
+<link rel="stylesheet" href="core/shell/cozy-animations.css">
+<link rel="stylesheet" href="core/shell/launch-sequence.css">
+<!--
+  M364.3 — Startup/Login Sequencing Correction.
+
+  Previously this file showed its own, much simpler startup screen
+  (static logo/wordmark/tagline, no typing/voice/motto animation) and,
+  after M364.2's routing fix, redirected to login.html almost
+  immediately once the (fast, in-memory) auth check resolved — the
+  approved 8-10s Stage 1-6 sequence was never actually shown to public
+  visitors at all, only to Chalzydashboard.html/dashboard.html.
+
+  Fixed: this file now renders the exact same #cozy-launch-screen
+  markup dashboard.html uses, and runs the identical, single, shared
+  core/shell/launch-sequence.js (extracted verbatim from dashboard.html,
+  not rewritten or duplicated) — the real logo reveal, COZYOS typing,
+  welcome voice, and motto fall-bounce, all unchanged. Routing to
+  login.html (or the signed-in placeholder) now waits for the real
+  "cozy:launch-sequence-complete" event that file emits at the true end
+  of Stage 6 — never before it, per explicit instruction. A bounded
+  fallback (matching the approved timeline's real total duration) covers
+  the case where the event is somehow never emitted, so a visitor can
+  never be stranded.
+-->
+<style>
+  html, body { margin: 0; padding: 0; }
+  #cozy-startup-error { color: #ff8a80; font-size: 13px; max-width: 420px; text-align: center; white-space: pre-wrap; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 1000000; display: none; }
+</style>
+</head>
+<body>
+
+<div id="cozy-launch-screen">
+    <img id="cozy-launch-logo" src="assets/branding/cozyoslogo-emblem.png" alt="CozyOS">
+    <h1 id="cozy-launch-title"></h1>
+    <p id="cozy-launch-slogan"></p>
+</div>
+<div id="cozy-startup-error"></div>
+
+<!-- Same real dependency set the shared launch sequence composes on
+     dashboard.html — none new, none duplicated. -->
+<script src="core/ui/cozy-theme.js"></script>
+<script src="core/ui/cozy-background.js"></script>
+<script src="core/ui/live-animation-engine.js"></script>
+<script src="core/living/cozy-living-sounds.js"></script>
+<script src="core/living/cozy-living-audio.js"></script>
+<script src="core/shell/platform-event-bus.js"></script>
+<script src="core/modules/speech/cozy-speech.js"></script>
+<script src="core/modules/speech/adapters/cozy-tts-browser-adapter.js"></script>
+<script src="core/modules/speech/providers/charles-voice-provider.js"></script>
+<script src="core/modules/speech/voice-manager.js"></script>
+<script src="core/modules/speech/adapters/speech-recognition-adapter.js"></script>
+<script src="core/modules/identity/identity-engine.js"></script>
+<script src="core/modules/identity/auth-coordinator.js"></script>
+<script src="core/living/cozy-living-ai.js"></script>
+<script src="core/ui/living-message-engine.js"></script>
+<script src="core/platform/application-visibility.js"></script>
+<script src="core/shell/cozy-workspace.js"></script>
+<link rel="stylesheet" href="core/living/cozy-living.css">
+<!-- M365.0: real dependencies for the composed User Dashboard - none
+     new; the same real engines already proven across M364.1-M364.9. -->
+<script src="core/shell/user-dashboard.js"></script>
+<script src="core/living/cozy-living-assistant.js"></script>
+<script src="core/shell/startup-orchestrator.js"></script>
+<script src="core/shell/launch-sequence.js"></script>
+<script>
+  // M364.3: routing (login.html redirect, or the signed-in placeholder)
+  // is gated entirely behind the real "cozy:launch-sequence-complete"
+  // event — this script does nothing until that fires (or the bounded
+  // fallback below elapses). The real auth check (M364.2, unchanged in
+  // substance) still runs in parallel so it's ready the moment the
+  // sequence finishes, but its RESULT is never acted on early.
+  (function () {
+    const errorEl = document.getElementById("cozy-startup-error");
+
+    function mountUserDashboard(userId) {
+      const screen = document.getElementById("cozy-launch-screen");
+      if (!screen) return;
+      screen.classList.add("cozy-launch-hidden");
+      setTimeout(() => {
+        // M365.0: the honest "not built yet" placeholder is replaced by
+        // the real, composed User Dashboard (core/shell/user-dashboard.js).
+        // Same real fade-out of the launch screen as before; only what
+        // replaces it has changed.
+        screen.innerHTML = "";
+        screen.classList.remove("cozy-launch-hidden");
+        const dashboard = window.CozyOS && window.CozyOS.UserDashboard;
+        if (dashboard && typeof dashboard.render === "function") {
+          dashboard.render(screen, userId);
+        } else {
+          // Honest fallback if the real module somehow failed to load -
+          // never fabricate a working dashboard in its place.
+          screen.innerHTML = `<p style="color:#9fd6ae;text-align:center;margin-top:60px;">Signed in${userId ? " as " + String(userId).replace(/</g, "&lt;") : ""}. The dashboard failed to load - please refresh.</p>`;
+        }
+      }, 600);
+    }
+
+    async function resolveAuthState() {
+      const auth = window.CozyOS && window.CozyOS.AuthCoordinator;
+      if (!auth) return { authenticated: false };
+      if (typeof auth.restoreSession === "function") {
+        try { await auth.restoreSession(); } catch (_err) { /* honest no-op */ }
+      }
+      const authenticated = typeof auth.isAuthenticated === "function" && auth.isAuthenticated();
+      if (!authenticated) return { authenticated: false };
+      const identityResult = typeof auth.getCurrentIdentity === "function" ? auth.getCurrentIdentity() : null;
+      return { authenticated: true, userId: identityResult && identityResult.userId };
+    }
+
+    function proceedPastSequence(authState) {
+      // Per the explicit routing requirement (M364.2, unchanged): the
+      // public entry never auto-mounts the Administrator Workspace,
+      // authenticated or not, admin or not. M365.0: authenticated
+      // visitors now see the real, composed User Dashboard instead of
+      // the earlier honest placeholder; unauthenticated visitors still
+      // go to the real login.html.
+      if (authState && authState.authenticated) {
+        mountUserDashboard(authState.userId);
+      } else {
+        window.location.href = "login.html";
+      }
+    }
+
+    // Real auth check runs in parallel with the visible sequence -
+    // never blocks or shortens it, just has its result ready in time.
+    const authStatePromise = resolveAuthState().catch(() => ({ authenticated: false }));
+
+    const bus = window.CozyOS && window.CozyOS.PlatformEventBus;
+    let proceeded = false;
+    function proceedOnce() {
+      if (proceeded) return;
+      proceeded = true;
+      authStatePromise.then(proceedPastSequence);
+    }
+
+    if (bus && typeof bus.once === "function") {
+      bus.once("cozy:launch-sequence-complete", proceedOnce);
+      // Honest, bounded fallback matching the approved timeline's real
+      // total duration (500ms Stage1 + 2500ms Stage2 + ~1000ms typing/
+      // hold + voice + ~1000ms motto + settle, generously rounded up so
+      // real voice-playback variance never cuts the sequence short) -
+      // never blocks forever if the event is somehow never emitted.
+      setTimeout(proceedOnce, 10000);
+    } else {
+      // PlatformEventBus or the shared sequence genuinely failed to
+      // load - honest fallback so a visitor is never stuck on a green
+      // screen forever, while still never skipping straight past a
+      // sequence that never started.
+      errorEl.style.display = "block";
+      errorEl.textContent = "Startup sequence could not fully load — continuing to sign-in.";
+      setTimeout(proceedOnce, 1500);
+    }
+  })();
+</script>
+</body>
+</html>
