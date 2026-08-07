@@ -388,8 +388,35 @@
             return true;
         }
 
-        /** getCurrentIdentity() — pure delegation, never a second pointer. CozyOS.Auth remains the one source of truth for "who is current." */
+        /**
+         * getCurrentIdentity() — RP-019 real-phone fix: previously
+         * delegated ONLY to CozyOS.Auth.getCurrentAdministrator() (an
+         * admin-only engine that is not even loaded on index.html/
+         * login.html, confirmed by repository-wide search), while
+         * isAuthenticated() below correctly checks the real, general-
+         * purpose CozySessionService first. That mismatch meant any
+         * genuinely signed-in non-admin user (isAuthenticated() true via
+         * session.isSignedIn()) still got userId === null from this
+         * method, since the session path was never consulted here -
+         * the verified, direct cause of the real-phone "No userId
+         * supplied — a per-user visibility list requires a real,
+         * authenticated user" dashboard message appearing for a visibly
+         * signed-in account. CozySessionService's real session.current()
+         * (already loaded, already public, already carries .uid) is now
+         * checked first and mapped to the same {userId, ...} shape every
+         * existing caller of this method already expects. CozyOS.Auth
+         * is kept as the exact same admin fallback as before when no
+         * regular session is active - no caller-visible shape change, no
+         * behavior change for the admin path.
+         */
         getCurrentIdentity() {
+            const session = this.#session();
+            if (session && typeof session.current === "function") {
+                const current = session.current();
+                if (current && current.uid) {
+                    return { userId: current.uid, source: current.source, roles: current.roles ? [...current.roles] : [], sessionId: current.sessionId || null };
+                }
+            }
             const auth = this.#auth();
             // Milestone 200D: real, verified root cause of the silent
             // login failure — CozyOS.Auth's actual real method is
