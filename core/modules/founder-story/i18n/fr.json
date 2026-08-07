@@ -1,0 +1,29 @@
+{
+  "language": "fr",
+  "direction": "ltr",
+  "strings": {
+    "panel.title": "Coffre de l'Histoire du Fondateur",
+    "panel.subtitle": "Votre autobiographie privée, protégée et partagée selon vos choix.",
+    "panel.newStory": "Nouvelle Histoire",
+    "panel.noStories": "Aucune histoire pour l'instant. Commencez votre premier chapitre.",
+    "field.title": "Titre",
+    "field.subtitle": "Sous-titre",
+    "field.language": "Langue",
+    "field.category": "Catégorie",
+    "field.chapters": "Chapitres",
+    "status.draft": "Brouillon",
+    "status.archived": "Archivé",
+    "visibility.only-me": "🔒 Moi Seulement",
+    "visibility.selected": "👥 Personnes Sélectionnées",
+    "visibility.family": "👨‍👩‍👧 Famille",
+    "visibility.mentors": "🤝 Mentors",
+    "visibility.public": "🌍 Public",
+    "private.badge": "🔒 Contenu Privé du Fondateur",
+    "private.message": "Cette histoire est privée.",
+    "action.view": "Voir",
+    "action.edit": "Modifier",
+    "action.share": "Partager",
+    "action.addChapter": "Ajouter un Chapitre",
+    "action.requestPublish": "Demander la Publication (bientôt disponible)"
+  }
+}

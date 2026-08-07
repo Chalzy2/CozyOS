@@ -1,0 +1,39 @@
+/**
+ * CozyOS Enterprise Design System — Core Theme Registry & Ambient Rules
+ * File Reference: core/ui/cozy-theme.css
+ * * Applies dynamic gradient foundations and smooth element highlights.
+ */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--cozy-font-sans);
+    background: var(--cozy-bg-gradient);
+    color: var(--cozy-text);
+    overflow-x: hidden;
+    min-height: 100vh;
+    transition: background 0.8s cubic-bezier(0.16, 1, 0.3, 1), color 0.4s ease;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Dynamic glow elements that inherit active theme variables */
+.cozy-theme-accent-text {
+    color: var(--cozy-brand-primary);
+    text-shadow: 0 0 12px var(--cozy-brand-glow);
+    transition: var(--cozy-transition-smooth);
+}
+
+.cozy-theme-accent-border {
+    border-color: var(--cozy-brand-primary) !important;
+    transition: var(--cozy-transition-smooth);
+}
+
+.cozy-theme-accent-bg {
+    background-color: var(--cozy-brand-primary);
+    box-shadow: 0 4px 14px var(--cozy-brand-glow);
+    transition: var(--cozy-transition-smooth);
+}
+
+.cozy-muted-text {
+    color: var(--cozy-muted);
+    transition: var(--cozy-transition-smooth);
+}

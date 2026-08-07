@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CozyOS — Sign In</title>
+<!--
+  M355 — Living Login Experience (spec-reconciled)
+  File Reference: login.html
+
+  HONEST SCOPE
+    This page renders the UI/interaction layer only. Per Rule 14 (Gemini/UI
+    prompts design UI only) and Rule 6 (compose existing engines, never
+    duplicate), everything visual/aural below is a real, existing CozyOS
+    engine already shipped in this repository:
+      - window.CozyOS.Background     (core/ui/cozy-background.js)   — the
+        living nature scene (clouds/birds/trees/wind/particles/lighting).
+      - window.CozyOS.StartupOrchestrator (core/shell/startup-orchestrator.js)
+        — revealLiveBackground()/applyStartupScene()/activateLighting(),
+        composed here exactly as dashboard.html's own launch screen does,
+        so login.html reached directly (bookmark, deep link, redirect
+        target) never shows a flat/blank page behind the card.
+      - window.CozyOS.AuthCoordinator (core/modules/identity/auth-coordinator.js)
+        — loginWithCredentials() (Remember Me is its real rememberMe
+        option), loginWithTrustedDevice(), loginWithBiometrics().
+      - window.CozyOS.IdentityEngine  (core/modules/identity/identity-engine.js)
+        — register() and resetPassword(), called directly for Create
+        Account / Forgot Password (no separate auth engine invented).
+    No "Living Voice"/"Living Particle"/"Living Light" file exists as a
+    literal filename beyond what's cited above (see startup-orchestrator.js's
+    own header) — lighting/particles are part of Background's own canvas;
+    this page does not fabricate a second engine to satisfy the name.
+
+  DISCLOSED GAPS (never faked — shown as real "Coming soon", not dead buttons)
+    - Face / Voice / Passkey / Authenticator / Google / Facebook / Microsoft
+      sign-in: no real provider/engine exists yet in this repository for
+      any of these seven methods. They render, visibly disabled, inside
+      "More sign-in options" so the option is discoverable without lying
+      about it working.
+    - Fingerprint / Trusted Device: real and wired to
+      AuthCoordinator.loginWithBiometrics()/loginWithTrustedDevice() — but
+      those methods are genuinely scoped to Platform-Administrator device
+      recovery (AdminRecoveryPolicy), not general per-user WebAuthn. The
+      dialog is honest about that scope rather than presenting it as a
+      universal biometric login.
+    - Forgot Password: IdentityEngine.resetPassword(username, newPassword)
+      is real, but no email/SMS verification token engine exists yet in
+      this repository, so this flow honestly resets immediately from the
+      username alone (documented on-screen) rather than pretending to have
+      sent a verification email it never sent.
+    - Registration: the spec (Rule 7 / Production Rules) asks for
+      username/email/password only. The real, existing
+      IdentityEngine.register() additionally requires firstName, lastName
+      and a valid phone number to create a genuine account record — those
+      three fields are real requirements of already-shipped code, not
+      invented here, and are kept visually secondary (collapsed under
+      "Complete your profile") rather than removed, so the account this
+      page creates is a real, valid CozyOS account and not a stub.
+-->
+<style>
+  :root {
+    --cozy-emerald: #1B5E20;
+    --cozy-emerald-bright: #2E7D32;
+    --cozy-emerald-deep: #011c15;
+    --cozy-gold: #F9A825;
+    --cozy-gold-bright: #FFCA28;
+    --cozy-glass: rgba(13, 46, 30, 0.55);
+    --cozy-glass-border: rgba(249, 168, 37, 0.35);
+  }
+  html, body { margin: 0; padding: 0; background: transparent; color: #eaf5ee; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; height: 100%; overflow-x: hidden; }
+  /* M366.8 — real, confirmed bug fix: this was previously an opaque
+     var(--cozy-emerald-deep), which sat in front of (stacking-wise)
+     the real Living Background canvas (core/ui/cozy-background.js) -
+     that canvas renders at z-index: -100 by design, specifically so
+     transparent ancestors let it show through (confirmed by that
+     file's own code comment: "Let cozy-theme.css radial gradient shine
+     through"). With an opaque body background, the canvas was fully
+     hidden behind a flat, static color that never changed - even
+     though the canvas itself was correctly self-activating and
+     rendering the whole time. index.html and dashboard.html never had
+     this override and already correctly showed the Living Background;
+     login.html now matches them. */
+  #cozy-login-screen { position: relative; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 24px 16px 48px; box-sizing: border-box; }
+
+  /* Living Background canvas (core/ui/cozy-background.js self-mounts this
+     element, prepended to <body>) — fades in via StartupOrchestrator,
+     never a static image standing in for it. */
+  #cozy-live-bg-canvas { opacity: 0; transition: opacity 2.2s ease; }
+
+  /* Official emblem, top-center, exact asset, never redistorted. */
+  #cozy-login-brand { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; margin: 4vh 0 auto; opacity: 0; transform: translateY(-8px); transition: opacity 1s ease, transform 1s cubic-bezier(0.16,1,0.3,1); }
+  #cozy-login-brand.cozy-brand-visible { opacity: 1; transform: translateY(0); }
+  /* M366.2 — dual-tone glow (tight emerald + soft gold outer), matching
+     the official CozyOS mark; object-fit:contain keeps the supplied
+     logo's real aspect ratio, never stretched. */
+  #cozy-login-emblem { width: 84px; height: 84px; object-fit: contain; filter: drop-shadow(0 0 10px rgba(46, 125, 50, 0.55)) drop-shadow(0 0 20px rgba(249, 168, 37, 0.30)); }
+  /* M364.3: Georgia Bold for brand-family consistency with the main
+     launch sequence's wordmark; modestly larger + more breathing room,
+     kept proportionate to this page's compact card-based layout rather
+     than the full hero sizing used on the launch screen itself. */
+  #cozy-login-wordmark { margin-top: 18px; font-family: Georgia, 'Times New Roman', serif; font-weight: 700; font-size: 28px; letter-spacing: 0.04em; }
+  #cozy-login-wordmark .cozy-w-cozy { color: var(--cozy-emerald-bright); }
+  #cozy-login-wordmark .cozy-w-os { color: var(--cozy-gold); }
+  #cozy-login-motto { margin-top: 10px; margin-bottom: 6px; font-size: 12px; letter-spacing: 0.12em; color: #b9dcc2; text-align: center; min-height: 1.2em; }
+  #cozy-login-motto span { display: inline-block; }
+  #cozy-login-motto .cozy-motto-green { color: #b9dcc2; }
+  #cozy-login-motto .cozy-motto-gold { color: var(--cozy-gold-bright); }
+
+  /* Glass login card — transparent emerald, never white/opaque. */
+  #cozy-login-card {
+    position: relative; z-index: 2; width: 100%; max-width: 380px; padding: 30px 28px 26px; margin-top: 22px;
+    background: var(--cozy-glass); backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border: 1px solid var(--cozy-glass-border); border-radius: 20px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(249,168,37,0.06) inset;
+    opacity: 0; filter: blur(6px); transform: translateY(30px) scale(0.95);
+    --cozy-wind-tilt: 0deg;
+    /* M370.2 — Living Login Card Experience: entrance lengthened from
+       0.9s to 2.5s, now animating opacity + blur + scale + translateY
+       together so the card feels like it's genuinely emerging from the
+       moving background behind it, not just fading in. */
+    transition: opacity 2.5s ease, filter 2.5s ease, transform 2.5s cubic-bezier(0.16,1,0.3,1), box-shadow 1.2s ease, background 3s ease, border-color 3s ease;
+    touch-action: none; will-change: transform;
+  }
+  #cozy-login-card.cozy-login-card-visible { opacity: 1; filter: blur(0); transform: translateY(0) scale(1); }
+  /* M370.3/M370.4 — Cloud Birth Effect + Mist Dissipation: the mist no
+     longer simply fades - it gathers, briefly brightens, then slowly
+     dissolves over a real 2.6s sequence (within the requested 2-3s),
+     reading as blending into the moving clouds rather than an abrupt
+     cut. Placed as the card's own first child so it can use a simple
+     descendant selector below. */
+  #cozy-login-mist {
+    position: absolute; inset: -40px; z-index: -1; pointer-events: none; border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(232,245,233,0.35) 0%, rgba(232,245,233,0.12) 45%, transparent 75%);
+    filter: blur(18px); opacity: 0.9;
+    animation: cozyLoginMistDissipate 2.6s ease-in forwards;
+  }
+  @keyframes cozyLoginMistDissipate {
+    0%   { opacity: 0.7; filter: blur(14px); }
+    25%  { opacity: 1; filter: blur(16px); }
+    100% { opacity: 0; filter: blur(28px); }
+  }
+  /* Soft reflection - a subtle top-edge highlight, real CSS gradient, no image asset. */
+  #cozy-login-card::before {
+    content: ""; position: absolute; inset: 0; border-radius: 20px; pointer-events: none; z-index: 1;
+    background: linear-gradient(160deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 35%);
+    transform: translate(var(--cozy-parallax-x, 0px), var(--cozy-parallax-y, 0px));
+  }
+  /* M370.4 — brief, JS-toggled transition for the reflection layer's
+     return-to-neutral after a drag ends (see endDrag()) - real-time
+     tracking during active drag stays instant (no transition), so this
+     only applies for the short reset window. */
+  #cozy-login-card.cozy-parallax-returning::before { transition: transform 300ms ease; }
+  /* M370.3 — Glass Depth: a slow, subtle moving highlight sweep (GPU-
+     friendly background-position animation on a gradient, not a
+     repaint-heavy filter). Restrained - one soft sweep, nothing busier. */
+  #cozy-login-card::after {
+    content: ""; position: absolute; inset: 0; border-radius: 20px; pointer-events: none; z-index: 1;
+    background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.06) 50%, transparent 60%);
+    background-size: 250% 100%; background-position: 100% 0;
+    animation: cozyLoginCardSweep 12s linear infinite;
+  }
+  @keyframes cozyLoginCardSweep { 0% { background-position: 130% 0; } 100% { background-position: -30% 0; } }
+  /* M370.4 — Breathing Glow: the emerald edge glow slowly, softly
+     breathes (never pulses/flashes) - a real, gentle 10s cycle,
+     separate from the brightness-driven glow so both can coexist
+     (breathing modulates opacity of an added glow layer, brightness
+     sets its base intensity via updateLivingLook()'s box-shadow write). */
+  @keyframes cozyLoginCardBreathe { 0%, 100% { box-shadow: 0 0 18px rgba(76,175,80,0.12); } 50% { box-shadow: 0 0 30px rgba(76,175,80,0.24); } }
+  #cozy-login-card.cozy-login-card-visible::before { animation: cozyLoginCardBreathe 10s ease-in-out infinite; }
+  /* M370.3 — Natural Floating (M370.4: now includes the real,
+     honest wind-tilt custom property alongside each translate step,
+     so both compose in the same transform rather than fighting for
+     priority). */
+  @keyframes cozyLoginCardFloatOrganic {
+    0%   { transform: translate(0, 0) rotate(0deg); }
+    15%  { transform: translate(1px, -5px) rotate(var(--cozy-wind-tilt)); }
+    30%  { transform: translate(1px, -5px) rotate(var(--cozy-wind-tilt)); }
+    45%  { transform: translate(3px, -2px) rotate(var(--cozy-wind-tilt)); }
+    60%  { transform: translate(-2px, 1px) rotate(calc(var(--cozy-wind-tilt) * 0.6)); }
+    75%  { transform: translate(-3px, 3px) rotate(calc(var(--cozy-wind-tilt) * 0.6)); }
+    88%  { transform: translate(-1px, 3px) rotate(0deg); }
+    100% { transform: translate(0, 0) rotate(0deg); }
+  }
+  #cozy-login-card.cozy-login-card-floating { animation: cozyLoginCardFloatOrganic 13s cubic-bezier(0.45,0,0.55,1) infinite; }
+  /* Dragging disables the floating animation and the entrance transition
+     so the card follows the pointer immediately, with no fighting
+     transforms - re-enabled once the drag ends. */
+  #cozy-login-card.cozy-login-card-dragging { animation: none; transition: none; cursor: grabbing; }
+  #cozy-login-card:not(.cozy-login-card-dragging) { cursor: grab; }
+  @media (prefers-reduced-motion: reduce) {
+    #cozy-login-card { transition: opacity 0.4s ease; filter: none; transform: none; }
+    #cozy-login-card.cozy-login-card-floating, #cozy-login-card::after, #cozy-login-card.cozy-login-card-visible::before { animation: none; }
+    #cozy-login-mist { display: none; animation: none; }
+  }
+  #cozy-login-title { font-size: 19px; font-weight: 700; margin: 0 0 2px 0; color: #eaf5ee; }
+  #cozy-login-sub { font-size: 12.5px; color: #8fd39c; margin: 0 0 20px 0; }
+
+  .cozy-login-field { margin-bottom: 14px; position: relative; }
+  .cozy-login-field label { display: block; font-size: 11.5px; color: #9fd6ae; margin-bottom: 6px; letter-spacing: 0.02em; }
+  .cozy-login-field input { width: 100%; box-sizing: border-box; padding: 11px 13px; border-radius: 10px; border: 1px solid rgba(249,168,37,0.18); background: rgba(6, 20, 13, 0.55); color: #eaf5ee; font-size: 14px; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+  .cozy-login-field input:focus { outline: none; border-color: var(--cozy-gold); box-shadow: 0 0 0 3px rgba(249,168,37,0.15); }
+  .cozy-pw-toggle { position: absolute; right: 12px; top: 32px; background: none; border: none; color: #9fd6ae; font-size: 11.5px; cursor: pointer; padding: 4px; }
+  .cozy-pw-toggle:hover { color: var(--cozy-gold-bright); }
+
+  .cozy-login-row { display: flex; align-items: center; justify-content: space-between; margin: 2px 0 18px; font-size: 12.5px; }
+  .cozy-remember { display: flex; align-items: center; gap: 6px; color: #b9dcc2; }
+  .cozy-remember input { accent-color: var(--cozy-gold); }
+  #cozy-forgot-link { color: var(--cozy-gold-bright); text-decoration: none; }
+  #cozy-forgot-link:hover { text-decoration: underline; }
+
+  #cozy-login-submit { width: 100%; padding: 12px; border-radius: 10px; border: none; background: linear-gradient(135deg, var(--cozy-emerald-bright), var(--cozy-emerald)); color: #fff; font-weight: 700; font-size: 14.5px; cursor: pointer; letter-spacing: 0.02em; box-shadow: 0 4px 14px rgba(46,125,50,0.35); transition: filter 0.2s ease, transform 0.15s ease; }
+  #cozy-login-submit:hover:not(:disabled) { filter: brightness(1.08); }
+  #cozy-login-submit:active:not(:disabled) { transform: translateY(1px); }
+  #cozy-login-submit:disabled { opacity: 0.6; cursor: default; }
+
+  #cozy-login-error { color: #ff8a80; font-size: 12.5px; margin-top: 12px; display: none; }
+
+  .cozy-divider { display: flex; align-items: center; gap: 10px; margin: 18px 0 4px; }
+  .cozy-divider::before, .cozy-divider::after { content: ""; flex: 1; height: 1px; background: rgba(249,168,37,0.18); }
+  .cozy-divider span { font-size: 10.5px; color: #7fae8b; }
+
+  #cozy-create-account { width: 100%; margin-top: 10px; padding: 11px; border-radius: 10px; background: transparent; border: 1px solid rgba(249,168,37,0.4); color: var(--cozy-gold-bright); font-weight: 600; font-size: 13.5px; cursor: pointer; }
+  #cozy-create-account:hover { background: rgba(249,168,37,0.08); }
+
+  /* "More sign-in options" — collapsed by default, per spec. */
+  #cozy-more-toggle { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 16px; background: none; border: none; color: #9fd6ae; font-size: 12px; cursor: pointer; padding: 6px; }
+  #cozy-more-toggle:hover { color: var(--cozy-gold-bright); }
+  #cozy-more-arrow { display: inline-block; transition: transform 0.3s cubic-bezier(0.16,1,0.3,1); }
+  #cozy-more-toggle.cozy-more-open #cozy-more-arrow { transform: rotate(180deg); }
+  #cozy-more-panel { max-height: 0; overflow: hidden; transition: max-height 0.4s cubic-bezier(0.16,1,0.3,1), opacity 0.3s ease; opacity: 0; }
+  #cozy-more-panel.cozy-more-open { max-height: 260px; opacity: 1; }
+  #cozy-more-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+  .cozy-more-btn { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 10px 4px; border-radius: 10px; border: 1px solid rgba(249,168,37,0.15); background: rgba(6,20,13,0.4); color: #cdeed5; font-size: 10px; cursor: pointer; }
+  .cozy-more-btn .cozy-icon { font-size: 17px; }
+  .cozy-more-btn:hover:not(:disabled) { border-color: var(--cozy-gold); background: rgba(249,168,37,0.08); }
+  .cozy-more-btn:disabled { opacity: 0.4; cursor: default; }
+  .cozy-more-btn .cozy-soon { display: block; font-size: 8.5px; color: var(--cozy-gold); margin-top: 1px; }
+
+  /* Lightweight modal shell, reused for Forgot Password + Create Account. */
+  .cozy-modal-backdrop { position: fixed; inset: 0; background: rgba(3,10,6,0.55); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 10; padding: 20px; box-sizing: border-box; }
+  .cozy-modal-backdrop.cozy-modal-open { display: flex; }
+  .cozy-modal { width: 100%; max-width: 360px; background: rgba(13,46,30,0.92); border: 1px solid var(--cozy-glass-border); border-radius: 16px; padding: 24px; box-shadow: 0 12px 48px rgba(0,0,0,0.5); }
+  .cozy-modal h2 { margin: 0 0 4px; font-size: 17px; color: var(--cozy-gold-bright); }
+  .cozy-modal p.cozy-modal-note { font-size: 11.5px; color: #9fd6ae; margin: 0 0 16px; line-height: 1.5; }
+  .cozy-modal .cozy-login-field input { font-size: 13.5px; padding: 9px 11px; }
+  .cozy-modal-actions { display: flex; gap: 10px; margin-top: 6px; }
+  .cozy-modal-actions button { flex: 1; padding: 10px; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .cozy-modal-cancel { background: transparent; border: 1px solid rgba(255,255,255,0.15); color: #cdeed5; }
+  .cozy-modal-submit { background: var(--cozy-emerald-bright); border: none; color: #fff; }
+  .cozy-modal-error { color: #ff8a80; font-size: 12px; margin-top: 10px; display: none; }
+  .cozy-modal-success { color: #81C784; font-size: 12px; margin-top: 10px; display: none; }
+  .cozy-modal-collapse { font-size: 11.5px; color: var(--cozy-gold-bright); background: none; border: none; cursor: pointer; padding: 4px 0; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+<div id="cozy-login-screen">
+
+  <div id="cozy-login-brand">
+    <img id="cozy-login-emblem" src="assets/branding/cozyoslogo-emblem.png" alt="CozyOS">
+    <div id="cozy-login-wordmark"><span class="cozy-w-cozy">COZY</span><span class="cozy-w-os">OS</span></div>
+    <div id="cozy-login-motto"></div>
+  </div>
+
+  <div id="cozy-login-card">
+    <div id="cozy-login-mist" aria-hidden="true"></div>
+    <h1 id="cozy-login-title">Welcome Back</h1>
+    <p id="cozy-login-sub">Sign in to continue to CozyOS</p>
+
+    <form id="cozy-login-form" autocomplete="on">
+      <div class="cozy-login-field">
+        <label for="cozy-login-username">Username or Email</label>
+        <input id="cozy-login-username" type="text" autocomplete="username" required>
+      </div>
+      <div class="cozy-login-field">
+        <label for="cozy-login-password">Password</label>
+        <input id="cozy-login-password" type="password" autocomplete="current-password" required>
+        <button type="button" class="cozy-pw-toggle" id="cozy-pw-toggle">SHOW</button>
+      </div>
+
+      <div class="cozy-login-row">
+        <label class="cozy-remember"><input type="checkbox" id="cozy-remember-me" checked> Remember Me</label>
+        <a href="#" id="cozy-forgot-link">Forgot Password?</a>
+      </div>
+
+      <button id="cozy-login-submit" type="submit">Sign In</button>
+      <p id="cozy-login-error"></p>
+    </form>
+
+    <div class="cozy-divider"><span>OR</span></div>
+    <button id="cozy-create-account" type="button">Create Account</button>
+
+    <button id="cozy-more-toggle" type="button" aria-expanded="false">
+      More sign-in options <span id="cozy-more-arrow">▾</span>
+    </button>
+    <div id="cozy-more-panel">
+      <div id="cozy-more-grid">
+        <!-- M364.5 walkthrough fix: the Fingerprint option previously
+             here was, by its own disclosed scope (see the removed
+             modal's copy, still real and unchanged in
+             AuthCoordinator.loginWithBiometrics()/loginWithTrustedDevice()),
+             a Platform-Administrator-only recovery path (AdminRecoveryPolicy)
+             — exposing it on this PUBLIC login page directly contradicted
+             the explicit "no administrator controls on public login"
+             requirement (M364.1/M364.2). Removed from public view only;
+             the underlying, real AuthCoordinator methods are untouched
+             and still available for a proper admin-scoped entry point
+             (e.g. Chalzydashboard.html) in a future, separate milestone. -->
+        <button class="cozy-more-btn" disabled type="button"><span class="cozy-icon">🙂</span>Face<span class="cozy-soon">Soon</span></button>
+        <button class="cozy-more-btn" disabled type="button"><span class="cozy-icon">🎙️</span>Voice<span class="cozy-soon">Soon</span></button>
+        <button class="cozy-more-btn" disabled type="button"><span class="cozy-icon">🔑</span>Passkey<span class="cozy-soon">Soon</span></button>
+        <button class="cozy-more-btn" disabled type="button"><span class="cozy-icon">🔐</span>Authenticator<span class="cozy-soon">Soon</span></button>
+        <button class="cozy-more-btn" disabled type="button"><span class="cozy-icon">G</span>Google<span class="cozy-soon">Soon</span></button>
+        <button class="cozy-more-btn" disabled type="button"><span class="cozy-icon">f</span>Facebook<span class="cozy-soon">Soon</span></button>
+        <button class="cozy-more-btn" disabled type="button"><span class="cozy-icon">⊞</span>Microsoft<span class="cozy-soon">Soon</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Forgot Password modal -->
+<div class="cozy-modal-backdrop" id="cozy-forgot-modal">
+  <div class="cozy-modal">
+    <h2>Reset Password</h2>
+    <p class="cozy-modal-note">No email-verification service exists in this build yet, so this resets your password immediately from your username — treat this link as sensitive. Verified email reset is a disclosed future milestone.</p>
+    <div class="cozy-login-field">
+      <label for="cozy-forgot-username">Username</label>
+      <input id="cozy-forgot-username" type="text" autocomplete="username">
+    </div>
+    <div class="cozy-login-field">
+      <label for="cozy-forgot-newpass">New Password</label>
+      <input id="cozy-forgot-newpass" type="password" autocomplete="new-password">
+    </div>
+    <div class="cozy-login-field">
+      <label for="cozy-forgot-confirm">Confirm New Password</label>
+      <input id="cozy-forgot-confirm" type="password" autocomplete="new-password">
+    </div>
+    <div class="cozy-modal-actions">
+      <button class="cozy-modal-cancel" type="button" id="cozy-forgot-cancel">Cancel</button>
+      <button class="cozy-modal-submit" type="button" id="cozy-forgot-submit">Reset</button>
+    </div>
+    <p class="cozy-modal-error" id="cozy-forgot-error"></p>
+    <p class="cozy-modal-success" id="cozy-forgot-success"></p>
+  </div>
+</div>
+
+<!-- M373 — real CozyOS Authenticator second-factor entry, same modal
+     pattern as Reset Password above, no new styling invented. -->
+<div class="cozy-modal-backdrop" id="cozy-otp-modal">
+  <div class="cozy-modal">
+    <h2>Enter Your Authenticator Code</h2>
+    <p class="cozy-modal-note">This account has the CozyOS Authenticator enabled. Enter the 6-digit code from your authenticator, or a recovery code if you don't have access to it.</p>
+    <div class="cozy-login-field">
+      <label for="cozy-otp-code">Authenticator Code or Recovery Code</label>
+      <input id="cozy-otp-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="20">
+    </div>
+    <div class="cozy-modal-actions">
+      <button class="cozy-modal-cancel" type="button" id="cozy-otp-cancel">Cancel</button>
+      <button class="cozy-modal-submit" type="button" id="cozy-otp-submit">Verify</button>
+    </div>
+    <p class="cozy-modal-error" id="cozy-otp-error"></p>
+  </div>
+</div>
+
+<!-- Create Account modal -->
+<div class="cozy-modal-backdrop" id="cozy-register-modal">
+  <div class="cozy-modal">
+    <h2>Create Account</h2>
+    <p class="cozy-modal-note">Username, email and password are all that's required to sign up.</p>
+    <div class="cozy-login-field">
+      <label for="cozy-reg-username">Username</label>
+      <input id="cozy-reg-username" type="text" autocomplete="username">
+    </div>
+    <div class="cozy-login-field">
+      <label for="cozy-reg-email">Email</label>
+      <input id="cozy-reg-email" type="email" autocomplete="email">
+    </div>
+    <div class="cozy-login-field">
+      <label for="cozy-reg-password">Password</label>
+      <input id="cozy-reg-password" type="password" autocomplete="new-password">
+    </div>
+    <div class="cozy-login-field">
+      <label for="cozy-reg-confirm">Confirm Password</label>
+      <input id="cozy-reg-confirm" type="password" autocomplete="new-password">
+    </div>
+
+    <button class="cozy-modal-collapse" type="button" id="cozy-reg-more-toggle">+ Complete your profile (required to create the account)</button>
+    <div id="cozy-reg-more" style="display:none;">
+      <div class="cozy-login-field">
+        <label for="cozy-reg-first">First Name</label>
+        <input id="cozy-reg-first" type="text" autocomplete="given-name">
+      </div>
+      <div class="cozy-login-field">
+        <label for="cozy-reg-last">Last Name</label>
+        <input id="cozy-reg-last" type="text" autocomplete="family-name">
+      </div>
+      <div class="cozy-login-field">
+        <label for="cozy-reg-phone">Phone</label>
+        <input id="cozy-reg-phone" type="tel" autocomplete="tel">
+      </div>
+      <label class="cozy-remember"><input type="checkbox" id="cozy-reg-terms"> I accept the CozyOS Terms</label>
+    </div>
+
+    <div class="cozy-modal-actions" style="margin-top:14px;">
+      <button class="cozy-modal-cancel" type="button" id="cozy-register-cancel">Cancel</button>
+      <button class="cozy-modal-submit" type="button" id="cozy-register-submit">Create Account</button>
+    </div>
+    <p class="cozy-modal-error" id="cozy-register-error"></p>
+  </div>
+</div>
+
+<!-- M364.5 walkthrough fix: the Platform-Administrator-only biometric/
+     trusted-device recovery modal that lived here was removed from
+     this PUBLIC page for the same reason as its trigger button above -
+     see that comment. Nothing else on this page depended on this
+     markup. -->
+
+<!-- Real, minimal dependency set — only what AuthCoordinator/IdentityEngine
+     and the Living Background genuinely need. login.html's only job is to
+     authenticate/register and hand off; it never renders the dashboard. -->
+<script src="core/shell/platform-event-bus.js"></script>
+<!-- M374 — critical fix: identity-storage.js and otp-provider.js were
+     never loaded on this page at all, confirmed by exhaustive search.
+     This means IdentityEngine's real persistence (restorePersistedUsers,
+     M372) and the entire OTP/MFA login gate (M373) have never actually
+     activated here - every prior Node test correctly verified the
+     LOGIC by manually loading these files in the test harness, but
+     never caught that the real HTML page itself doesn't. Fixed here.
+     Order matters: identity-storage.js must load BEFORE
+     identity-engine.js, since IdentityEngine's own .ready promise
+     fires immediately on load and requires IdentityStorage to already
+     exist - matching dashboard.html's own proven-working order. -->
+<script src="core/modules/identity/identity-storage.js"></script>
+<script src="core/modules/identity/identity-engine.js"></script>
+<script src="core/security/otp-provider.js"></script>
+<!-- M372 — real, confirmed fix: this was missing from both login.html
+     and index.html, the two pages where session restoration ("Remember
+     Me") actually needs to run. AuthCoordinator.restoreSession()
+     requires window.CozyOS.Session to exist (confirmed by reading its
+     source before this was added) - without it, restoration silently
+     failed every single time with "Session not loaded yet," regardless
+     of the pointer being correctly stored. dashboard.html already
+     loads this in the same real position; matched here. -->
+<script src="core/modules/session/cozy-session-service.js"></script>
+<script src="core/modules/identity/auth-coordinator.js"></script>
+<script src="core/ui/cozy-background.js"></script>
+<!-- M370.5 — CozyEnvironment. Single, read-only facade over the Living
+     Background's real state - composes it, never duplicates it. -->
+<script src="core/living/cozy-environment.js"></script>
+<script src="core/ui/live-animation-engine.js"></script>
+<script src="core/living/cozy-living-sounds.js"></script>
+<script src="core/shell/startup-orchestrator.js"></script>
+<script>
+// M366.8 — same defensive-only fix as index.html: unregisters any stale
+// service worker from a past deployment before anything else runs.
+// Never registers a new one - confirmed no code anywhere calls
+// navigator.serviceWorker.register().
+if (typeof navigator !== "undefined" && navigator.serviceWorker && typeof navigator.serviceWorker.getRegistrations === "function") {
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+    regs.forEach((reg) => reg.unregister());
+  }).catch(() => { /* real, honest no-op */ });
+}
+
+/**
+ * M373 — real, confirmed fix: this file previously had NO session
+ * restoration logic at all - confirmed by exhaustive search before
+ * this was written. A user who checked "Remember Me" and had a
+ * genuinely valid, persisted session pointer would still always see
+ * the login form if they landed directly on login.html, since nothing
+ * here ever checked. Composes the same real AuthCoordinator/
+ * IdentityEngine methods index.html's own resolveAuthState() already
+ * uses - never a second restoration mechanism. Waits (bounded) for
+ * both real engines to exist before attempting, since script load
+ * order isn't otherwise guaranteed here.
+ */
+(async function restoreExistingSession() {
+  const waitFor = (check, attempts = 0) => new Promise((resolve) => {
+    if (check() || attempts >= 40) { resolve(check()); return; }
+    setTimeout(() => resolve(waitFor(check, attempts + 1)), 200);
+  });
+  const ready = await waitFor(() => !!(window.CozyOS && window.CozyOS.AuthCoordinator && window.CozyOS.IdentityEngine));
+  if (!ready) return; // honest no-op - engines never loaded, stay on the login form
+
+  const identity = window.CozyOS.IdentityEngine;
+  if (typeof identity.restorePersistedUsers === "function") {
+    try { await identity.restorePersistedUsers(); } catch (_err) { /* honest no-op */ }
+  }
+  const auth = window.CozyOS.AuthCoordinator;
+  if (typeof auth.restoreSession === "function") {
+    try { await auth.restoreSession(); } catch (_err) { /* honest no-op */ }
+  }
+  if (typeof auth.isAuthenticated === "function" && auth.isAuthenticated()) {
+    window.location.href = "index.html";
+  }
+})();
+
+(function () {
+  // Compose the real Living Background + StartupOrchestrator exactly as
+  // dashboard.html's own launch screen does — never a second background
+  // implementation. Idempotent: init() no-ops if the canvas already
+  // exists (e.g. arriving here mid-way through index.html's sequence).
+  const background = window.CozyOS && window.CozyOS.Background;
+  const orchestrator = window.CozyOS && window.CozyOS.StartupOrchestrator;
+  if (background && typeof background.init === "function") background.init();
+  if (orchestrator && typeof orchestrator.applyStartupScene === "function") orchestrator.applyStartupScene();
+
+  // M364.3: real motto text, split-colored and fall-bounce-animated via
+  // the same, single, promoted LiveAnimationEngine.fallBounceText()
+  // method the main launch sequence uses (core/ui/live-animation-
+  // engine.js) — never a second animation implementation, never typed.
+  const MOTTO = "Built for Africa. Ready for the World.";
+  const MOTTO_SPLIT_INDEX = MOTTO.indexOf(". ") >= 0 ? MOTTO.indexOf(". ") + 2 : MOTTO.length;
+
+  requestAnimationFrame(() => {
+    if (orchestrator && typeof orchestrator.revealLiveBackground === "function") {
+      orchestrator.revealLiveBackground();
+    } else {
+      const canvas = document.getElementById("cozy-live-bg-canvas");
+      if (canvas) canvas.style.opacity = "1";
+    }
+    if (orchestrator && typeof orchestrator.activateLighting === "function") orchestrator.activateLighting();
+
+    document.getElementById("cozy-login-brand").classList.add("cozy-brand-visible");
+
+    // M364.4 — Living Audio Completion: register the real, official
+    // sound pack (same call, same engine, as launch-sequence.js — see
+    // that file's own comment; harmless no-op until real .mp3 files
+    // exist under assets/audio/, disclosed in the certification report).
+    if (orchestrator && typeof orchestrator.loadOfficialSoundPack === "function") orchestrator.loadOfficialSoundPack();
+
+    // M364.4: real button-hover cue, composing the existing LivingSounds
+    // registry directly (same real engine cozy-login-gate.js already
+    // uses for its own "notification" cue) — never a second sound path.
+    const sounds = window.CozyOS && window.CozyOS.LivingSounds;
+    if (sounds && typeof sounds.play === "function") {
+      document.querySelectorAll("#cozy-login-submit, #cozy-create-account, #cozy-forgot-link, .cozy-more-btn:not(:disabled)").forEach((btn) => {
+        btn.addEventListener("mouseenter", () => sounds.play("button-hover", { category: "ui" }));
+      });
+    }
+
+    const motto = document.getElementById("cozy-login-motto");
+    const engine = window.CozyOS && window.CozyOS.LiveAnimationEngine;
+    if (motto && engine && typeof engine.fallBounceText === "function") {
+      engine.fallBounceText(motto, MOTTO, MOTTO_SPLIT_INDEX, { greenClass: "cozy-motto-green", goldClass: "cozy-motto-gold" });
+    } else if (motto) {
+      // Honest fallback if the engine hasn't loaded for any reason.
+      motto.innerHTML = `<span class="cozy-motto-green">${MOTTO.slice(0, MOTTO_SPLIT_INDEX)}</span><span class="cozy-motto-gold">${MOTTO.slice(MOTTO_SPLIT_INDEX)}</span>`;
+    }
+
+    setTimeout(() => {
+      const card = document.getElementById("cozy-login-card");
+      if (card) {
+        card.classList.add("cozy-login-card-visible");
+        // M364.4 refinement: soft settle cue, fired exactly when the
+        // real CSS transition finishes (transitionend), not guessed via
+        // a second timer - composes the same LivingSounds registry,
+        // "button-hover" reused as the softest existing real UI cue
+        // rather than inventing a new event for this one moment.
+        const onSettled = (evt) => {
+          if (evt.target !== card) return;
+          card.removeEventListener("transitionend", onSettled);
+          if (sounds && typeof sounds.play === "function") sounds.play("button-hover", { category: "ui", volume: 0.4 });
+          // M370.2 — the floating idle animation only begins once the
+          // real entrance transition has genuinely finished, using this
+          // same real transitionend event - never a guessed delay.
+          card.classList.add("cozy-login-card-floating");
+        };
+        card.addEventListener("transitionend", onSettled);
+        initLoginCardDrag(card);
+      }
+    }, 350);
+
+    /**
+     * initLoginCardDrag(card)
+     *   M370.2 — real, self-contained drag: native Pointer Events
+     *   (mouse/touch/pen unified, same primitive the Window Manager
+     *   itself uses, M366.7 - no third-party drag library, no
+     *   duplicate abstraction). Deliberately NOT WindowManager.create() -
+     *   the login card has no title bar, no resize, no minimize; it's a
+     *   floating card, not a window, same reasoning already applied to
+     *   the Live View Controller (M367.1). Only ever repositions this
+     *   one element - the Living Background canvas underneath is never
+     *   touched, so it keeps animating independently by construction.
+     */
+    function initLoginCardDrag(card) {
+      const EDGE_MARGIN = 20;
+      let dragState = null;
+      let lastTapAt = 0;
+      let hasSwitchedToFixed = false;
+
+      function switchToFixedPositioning() {
+        if (hasSwitchedToFixed) return;
+        hasSwitchedToFixed = true;
+        const rect = card.getBoundingClientRect();
+        card.style.position = "fixed";
+        card.style.left = `${rect.left}px`;
+        card.style.top = `${rect.top}px`;
+        card.style.margin = "0";
+        card.style.right = "auto"; card.style.bottom = "auto";
+      }
+
+      function clampToScreen(x, y) {
+        const rect = card.getBoundingClientRect();
+        const maxX = window.innerWidth - rect.width - EDGE_MARGIN;
+        const maxY = window.innerHeight - rect.height - EDGE_MARGIN;
+        return { x: Math.min(Math.max(EDGE_MARGIN, x), Math.max(EDGE_MARGIN, maxX)), y: Math.min(Math.max(EDGE_MARGIN, y), Math.max(EDGE_MARGIN, maxY)) };
+      }
+
+      function getDefaultPosition() {
+        const rect = card.getBoundingClientRect();
+        // M370.2 — honors this screen's real layout (the card normally
+        // sits low, near the bottom, per #cozy-login-screen's own
+        // justify-content: flex-end) rather than assuming a literal
+        // vertical screen center.
+        return clampToScreen((window.innerWidth - rect.width) / 2, window.innerHeight - rect.height - 48);
+      }
+
+      function animateTo(x, y, durationMs) {
+        card.style.transition = `left ${durationMs}ms ease, top ${durationMs}ms ease`;
+        card.style.left = `${x}px`;
+        card.style.top = `${y}px`;
+        setTimeout(() => { card.style.transition = ""; }, durationMs + 20);
+      }
+
+      function returnToCenter() {
+        const target = getDefaultPosition();
+        animateTo(target.x, target.y, 400);
+      }
+
+      card.addEventListener("pointerdown", (evt) => {
+        if (evt.target.closest("input, button, a, textarea, select")) return; // never hijacks real form interaction
+        switchToFixedPositioning();
+        const rect = card.getBoundingClientRect();
+        dragState = { startX: evt.clientX, startY: evt.clientY, origX: rect.left, origY: rect.top, moved: false };
+        card.setPointerCapture(evt.pointerId);
+        card.classList.add("cozy-login-card-dragging");
+      });
+      const mistEl = card.querySelector("#cozy-login-mist");
+      card.addEventListener("pointermove", (evt) => {
+        if (!dragState) return;
+        const dx = evt.clientX - dragState.startX, dy = evt.clientY - dragState.startY;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragState.moved = true;
+        const clamped = clampToScreen(dragState.origX + dx, dragState.origY + dy);
+        card.style.left = `${clamped.x}px`;
+        card.style.top = `${clamped.y}px`;
+        // M370.4 — Parallax: foreground (card) moves 100% via left/top
+        // above; the mist (a real, separate element) and the reflection
+        // layer (::before, via a CSS custom property) lag slightly
+        // behind at 95%/98% of the same real drag delta, creating a
+        // small depth effect. Values match the spec's own example.
+        if (mistEl) mistEl.style.transform = `translate(${dx * -0.05}px, ${dy * -0.05}px)`;
+        card.style.setProperty("--cozy-parallax-x", `${dx * -0.02}px`);
+        card.style.setProperty("--cozy-parallax-y", `${dy * -0.02}px`);
+      });
+      const endDrag = (evt) => {
+        if (!dragState) return;
+        const wasTap = !dragState.moved;
+        dragState = null;
+        card.classList.remove("cozy-login-card-dragging");
+        card.classList.add("cozy-login-card-floating");
+        // M370.4 — Parallax reset: smoothly returns both lagging layers
+        // to their neutral offset once dragging stops. The reflection
+        // layer is a ::before pseudo-element (not directly stylable
+        // from JS), so a brief class toggle supplies its return
+        // transition instead.
+        if (mistEl) { mistEl.style.transition = "transform 300ms ease"; mistEl.style.transform = "translate(0, 0)"; setTimeout(() => { mistEl.style.transition = ""; }, 320); }
+        card.classList.add("cozy-parallax-returning");
+        card.style.setProperty("--cozy-parallax-x", "0px");
+        card.style.setProperty("--cozy-parallax-y", "0px");
+        setTimeout(() => card.classList.remove("cozy-parallax-returning"), 320);
+        if (wasTap) {
+          const now = Date.now();
+          if (now - lastTapAt < 350) { returnToCenter(); lastTapAt = 0; }
+          else lastTapAt = now;
+        } else {
+          // M370.3 — Magnetic Return: released after a real drag (not a
+          // tap) - if close enough to the default position, smoothly
+          // snap back to it; otherwise honestly leave the card exactly
+          // where the user dropped it.
+          const MAGNETIC_THRESHOLD_PX = 70;
+          const rect = card.getBoundingClientRect();
+          const target = getDefaultPosition();
+          const distance = Math.hypot(rect.left - target.x, rect.top - target.y);
+          if (distance <= MAGNETIC_THRESHOLD_PX) animateTo(target.x, target.y, 500);
+        }
+      };
+      card.addEventListener("pointerup", endDrag);
+      card.addEventListener("pointercancel", endDrag);
+
+      /**
+       * updateLivingLook()
+       *   M370.3/M370.4 — Dynamic Light + Wind Interaction. Composes
+       *   only real, already-public values from the unmodified Living
+       *   Background engine: getTimeOfDay().brightness, lightingIntensity,
+       *   and windStrength (all confirmed public instance properties/
+       *   methods by reading cozy-background.js before writing this).
+       *   No hardcoded colors are introduced beyond the existing
+       *   emerald/gold palette already used throughout this file.
+       *
+       *   HONEST DISCLOSURE — Wind direction: this engine's own real
+       *   cloud-movement code (confirmed by reading it directly) always
+       *   increments cloud.x by a positive speed - clouds only ever
+       *   drift one constant direction in this engine, never
+       *   alternating left/right. So the requested "tilts left when
+       *   clouds drift left, right when they drift right" has no real,
+       *   varying signal to read. What IS real and does genuinely vary
+       *   is windStrength (intensity). This composes that: a tiny,
+       *   constant-direction tilt (matching the one real direction
+       *   clouds move) whose MAGNITUDE scales with real wind intensity -
+       *   never a fabricated alternating direction.
+       *
+       *   Performance: no real "lighting changed" event exists on this
+       *   engine either (confirmed absent by search) - periodic polling
+       *   remains the only available approach, so it stays (unchanged
+       *   from M370.3's 8s interval, still far from per-frame). Added:
+       *   real change-detection so a style write only happens when a
+       *   value has genuinely changed since the last check, not on
+       *   every poll regardless.
+       */
+      /**
+       * applyLivingLook(state)
+       *   M370.5 — real fix: previously read window.CozyOS.Background
+       *   directly and ran its own 8s poll, meaning login.html had its
+       *   own copy of "how do I read the environment." Now composes the
+       *   single, existing CozyEnvironment facade (core/living/cozy-
+       *   environment.js) instead - CozyEnvironment owns the poll (and
+       *   will own the real event too, the moment one exists); this
+       *   file only reacts to whatever state it's given. No environment
+       *   logic is duplicated here anymore.
+       */
+      function applyLivingLook(state) {
+        if (!state || !state.available) return;
+        const brightness = Math.max(0.15, Math.min(1, state.lighting));
+        const wind = typeof state.windStrength === "number" ? state.windStrength : 1;
+
+        const shadowAlpha = (0.35 + (1 - brightness) * 0.25).toFixed(2);
+        const emeraldAlpha = (0.10 + brightness * 0.14).toFixed(2);
+        card.style.boxShadow = `0 8px 40px rgba(0,0,0,${shadowAlpha}), 0 0 0 1px rgba(249,168,37,0.06) inset, 0 0 24px rgba(76,175,80,${emeraldAlpha})`;
+
+        // Glass brightness + border glow scale with the same real value.
+        const glassAlpha = (0.45 + brightness * 0.2).toFixed(2);
+        card.style.background = `rgba(13, 46, 30, ${glassAlpha})`;
+        const borderAlpha = (0.25 + brightness * 0.25).toFixed(2);
+        card.style.borderColor = `rgba(249, 168, 37, ${borderAlpha})`;
+
+        // Wind: tiny, constant-direction tilt (real cloud movement in
+        // this engine is always one direction, confirmed by reading its
+        // source - see cozy-environment.js's own header for the full
+        // disclosure), magnitude scaled by real windStrength, applied as
+        // a CSS custom property so it composes with (doesn't fight) the
+        // organic floating animation's own transform.
+        const tiltDeg = Math.min(1, wind * 0.6).toFixed(2);
+        card.style.setProperty("--cozy-wind-tilt", `${tiltDeg}deg`);
+      }
+
+      const env = window.CozyOS && window.CozyOS.CozyEnvironment;
+      if (env && typeof env.getState === "function") {
+        applyLivingLook(env.getState());
+        if (typeof env.onChange === "function") env.onChange(applyLivingLook);
+      }
+
+      /**
+       * applyLoginSubtitle(state)
+       *   M372 — real, composed subtitle text from CozyEnvironment.
+       *   getState() (no separate time calculation). Honest disclosure:
+       *   this does NOT say "Welcome back, Charles" - no mechanism
+       *   exists anywhere in this repository to recall a previously
+       *   logged-in user's name before authentication happens
+       *   (confirmed by exhaustive search before this was written), so
+       *   only the real, time-based portion is implemented.
+       */
+      function applyLoginSubtitle(state) {
+        const sub = document.getElementById("cozy-login-sub");
+        if (!sub || !state || !state.available) return;
+        const byPeriod = {
+          morning: "Ready for another productive day?",
+          afternoon: "Sign in to continue to CozyOS.",
+          evening: "Welcome back this evening.",
+          night: "Sign in to continue to CozyOS."
+        };
+        sub.textContent = byPeriod[state.timeOfDay] || "Sign in to continue to CozyOS.";
+      }
+      if (env && typeof env.getState === "function") {
+        applyLoginSubtitle(env.getState());
+        if (typeof env.onChange === "function") env.onChange(applyLoginSubtitle);
+      }
+      // Keep the card within bounds if the viewport itself changes
+      // (orientation change / resize) while it's been dragged.
+      window.addEventListener("resize", () => {
+        if (!hasSwitchedToFixed) return;
+        const rect = card.getBoundingClientRect();
+        const clamped = clampToScreen(rect.left, rect.top);
+        card.style.left = `${clamped.x}px`;
+        card.style.top = `${clamped.y}px`;
+      });
+    }
+  });
+
+  // ---- Sign in -------------------------------------------------------
+  const form = document.getElementById("cozy-login-form");
+  const errorEl = document.getElementById("cozy-login-error");
+  const submitBtn = document.getElementById("cozy-login-submit");
+
+  document.getElementById("cozy-pw-toggle").addEventListener("click", () => {
+    const pw = document.getElementById("cozy-login-password");
+    const btn = document.getElementById("cozy-pw-toggle");
+    const showing = pw.type === "text";
+    pw.type = showing ? "password" : "text";
+    btn.textContent = showing ? "SHOW" : "HIDE";
+  });
+
+  form.addEventListener("submit", async (evt) => {
+    evt.preventDefault();
+    errorEl.style.display = "none";
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Signing in…";
+
+    const username = document.getElementById("cozy-login-username").value.trim();
+    const password = document.getElementById("cozy-login-password").value;
+    const rememberMe = document.getElementById("cozy-remember-me").checked;
+
+    const auth = window.CozyOS && window.CozyOS.AuthCoordinator;
+    if (!auth || typeof auth.loginWithCredentials !== "function") {
+      errorEl.textContent = "CozyOS Identity services failed to load. Please reload the page.";
+      errorEl.style.display = "block";
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Sign In";
+      return;
+    }
+
+    let result;
+    try {
+      result = await auth.loginWithCredentials(username, password, { rememberMe });
+    } catch (err) {
+      result = { available: false, reason: err.message };
+    }
+
+    if (!result || result.available !== true) {
+      errorEl.textContent = (result && result.reason) ? result.reason : "Sign in failed. Check your username and password.";
+      errorEl.style.display = "block";
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Sign In";
+      return;
+    }
+
+    // M373 — real MFA gate: the password was correct, but this account
+    // has a CozyOS Authenticator enrolled. No redirect happens yet -
+    // showOtpStep() (below) reveals a real code-entry form; only a
+    // genuinely verified TOTP or recovery code proceeds past this point.
+    if (result.requiresOtp) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Sign In";
+      showOtpStep({ challengeToken: result.challengeToken, rememberMe: result.rememberMe });
+      return;
+    }
+
+    // M364.4: real login-success cue, composing the existing
+    // LivingSounds registry directly — plays (or honestly no-ops today,
+    // no asset yet) immediately before the real hand-off below.
+    const successSounds = window.CozyOS && window.CozyOS.LivingSounds;
+    if (successSounds && typeof successSounds.play === "function") successSounds.play("login-success", { category: "notification" });
+
+    // Real, honest hand-off — index.html is the real end-user entry point
+    // (M311/M326 bootstrap); login.html never renders an app list itself.
+    window.location.href = "index.html";
+  });
+
+  // ---- More sign-in options ------------------------------------------
+  const moreToggle = document.getElementById("cozy-more-toggle");
+  const morePanel = document.getElementById("cozy-more-panel");
+  moreToggle.addEventListener("click", () => {
+    const open = morePanel.classList.toggle("cozy-more-open");
+    moreToggle.classList.toggle("cozy-more-open", open);
+    moreToggle.setAttribute("aria-expanded", String(open));
+  });
+
+  // ---- Modal plumbing --------------------------------------------------
+  function openModal(id) { document.getElementById(id).classList.add("cozy-modal-open"); }
+  function closeModal(id) { document.getElementById(id).classList.remove("cozy-modal-open"); }
+
+  // ---- Forgot password ---------------------------------------------
+  document.getElementById("cozy-forgot-link").addEventListener("click", (e) => { e.preventDefault(); openModal("cozy-forgot-modal"); });
+  document.getElementById("cozy-forgot-cancel").addEventListener("click", () => closeModal("cozy-forgot-modal"));
+  document.getElementById("cozy-forgot-submit").addEventListener("click", async () => {
+    const errEl = document.getElementById("cozy-forgot-error");
+    const okEl = document.getElementById("cozy-forgot-success");
+    errEl.style.display = "none"; okEl.style.display = "none";
+    const username = document.getElementById("cozy-forgot-username").value.trim();
+    const pw = document.getElementById("cozy-forgot-newpass").value;
+    const confirm = document.getElementById("cozy-forgot-confirm").value;
+    if (!username || !pw) { errEl.textContent = "Username and new password are required."; errEl.style.display = "block"; return; }
+    if (pw !== confirm) { errEl.textContent = "Passwords do not match."; errEl.style.display = "block"; return; }
+    const identity = window.CozyOS && window.CozyOS.IdentityEngine;
+    if (!identity || typeof identity.resetPassword !== "function") { errEl.textContent = "Identity services unavailable."; errEl.style.display = "block"; return; }
+    try {
+      const result = await identity.resetPassword(username, pw);
+      if (!result || result.available !== true) { errEl.textContent = (result && result.reason) || "Reset failed."; errEl.style.display = "block"; return; }
+      okEl.textContent = "Password reset. You can sign in now.";
+      okEl.style.display = "block";
+      setTimeout(() => closeModal("cozy-forgot-modal"), 1400);
+    } catch (err) {
+      errEl.textContent = err.message || "Reset failed.";
+      errEl.style.display = "block";
+    }
+  });
+
+  /**
+   * showOtpStep({challengeToken, rememberMe})
+   *   M373 — real second factor step. Opens the same real modal
+   *   pattern used elsewhere on this page. Submit composes
+   *   AuthCoordinator.completeLoginWithOtp() (real TOTP or recovery
+   *   code verification) - the redirect to index.html only happens on
+   *   genuine success, never optimistically.
+   */
+  function showOtpStep({ challengeToken, rememberMe }) {
+    document.getElementById("cozy-otp-error").style.display = "none";
+    document.getElementById("cozy-otp-code").value = "";
+    openModal("cozy-otp-modal");
+    setTimeout(() => document.getElementById("cozy-otp-code").focus(), 100);
+
+    const submitBtn = document.getElementById("cozy-otp-submit");
+    const cancelBtn = document.getElementById("cozy-otp-cancel");
+    const errEl = document.getElementById("cozy-otp-error");
+
+    const onCancel = () => { closeModal("cozy-otp-modal"); cleanup(); };
+    const onSubmit = async () => {
+      errEl.style.display = "none";
+      const code = document.getElementById("cozy-otp-code").value.trim();
+      if (!code) { errEl.textContent = "Enter a code."; errEl.style.display = "block"; return; }
+      submitBtn.disabled = true; submitBtn.textContent = "Verifying...";
+      const auth = window.CozyOS && window.CozyOS.AuthCoordinator;
+      let result;
+      try {
+        result = await auth.completeLoginWithOtp(challengeToken, code, { rememberMe });
+      } catch (err) {
+        result = { available: false, reason: err.message };
+      }
+      submitBtn.disabled = false; submitBtn.textContent = "Verify";
+      if (!result || result.available !== true) {
+        errEl.textContent = (result && result.reason) || "Invalid code.";
+        errEl.style.display = "block";
+        return;
+      }
+      closeModal("cozy-otp-modal");
+      cleanup();
+      window.location.href = "index.html";
+    };
+    function cleanup() {
+      submitBtn.removeEventListener("click", onSubmit);
+      cancelBtn.removeEventListener("click", onCancel);
+    }
+    submitBtn.addEventListener("click", onSubmit);
+    cancelBtn.addEventListener("click", onCancel);
+  }
+
+
+  // ---- Create account ------------------------------------------------
+  document.getElementById("cozy-create-account").addEventListener("click", () => openModal("cozy-register-modal"));
+  document.getElementById("cozy-register-cancel").addEventListener("click", () => closeModal("cozy-register-modal"));
+  document.getElementById("cozy-reg-more-toggle").addEventListener("click", () => {
+    const el = document.getElementById("cozy-reg-more");
+    el.style.display = el.style.display === "none" ? "block" : "none";
+  });
+  document.getElementById("cozy-register-submit").addEventListener("click", async () => {
+    const errEl = document.getElementById("cozy-register-error");
+    errEl.style.display = "none";
+    const username = document.getElementById("cozy-reg-username").value.trim();
+    const email = document.getElementById("cozy-reg-email").value.trim();
+    const password = document.getElementById("cozy-reg-password").value;
+    const confirmPassword = document.getElementById("cozy-reg-confirm").value;
+    const firstName = document.getElementById("cozy-reg-first").value.trim();
+    const lastName = document.getElementById("cozy-reg-last").value.trim();
+    const phone = document.getElementById("cozy-reg-phone").value.trim();
+    const acceptTerms = document.getElementById("cozy-reg-terms").checked;
+
+    if (!username || !email || !password) { errEl.textContent = "Username, email and password are required."; errEl.style.display = "block"; return; }
+    if (password !== confirmPassword) { errEl.textContent = "Passwords do not match."; errEl.style.display = "block"; return; }
+    if (!firstName || !lastName || !phone || !acceptTerms) {
+      errEl.textContent = "CozyOS requires first name, last name, phone and accepted terms to create a real account — please expand \"Complete your profile\" above.";
+      errEl.style.display = "block";
+      document.getElementById("cozy-reg-more").style.display = "block";
+      return;
+    }
+
+    const identity = window.CozyOS && window.CozyOS.IdentityEngine;
+    const auth = window.CozyOS && window.CozyOS.AuthCoordinator;
+    if (!identity || typeof identity.register !== "function") { errEl.textContent = "Identity services unavailable."; errEl.style.display = "block"; return; }
+
+    try {
+      const result = await identity.register({ accountType: "user", firstName, lastName, username, email, phone, password, confirmPassword, acceptTerms });
+      if (!result || result.available !== true) { errEl.textContent = (result && result.reason) || "Registration failed."; errEl.style.display = "block"; return; }
+      // Real hand-off: log the freshly registered user straight in via the
+      // one real login path, never a second/parallel session creation.
+      if (auth && typeof auth.loginWithCredentials === "function") {
+        const loginResult = await auth.loginWithCredentials(username, password, { rememberMe: true });
+        if (loginResult && loginResult.available === true) { window.location.href = "index.html"; return; }
+      }
+      closeModal("cozy-register-modal");
+      document.getElementById("cozy-login-username").value = username;
+      errorEl.textContent = "Account created — please sign in.";
+      errorEl.style.display = "block";
+    } catch (err) {
+      errEl.textContent = err.message || "Registration failed.";
+      errEl.style.display = "block";
+    }
+  });
+
+  // M364.5 walkthrough fix: the Fingerprint/Trusted-Device click
+  // handlers that lived here were removed along with their markup
+  // above (see that comment) — window.CozyOS.AuthCoordinator's real
+  // loginWithBiometrics()/loginWithTrustedDevice() methods are
+  // themselves untouched and still real; only this page's public
+  // exposure of them was removed.
+})();
+</script>
+</body>
+</html>

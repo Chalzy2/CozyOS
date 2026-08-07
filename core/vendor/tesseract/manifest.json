@@ -1,0 +1,19 @@
+{
+  "vendor": "Tesseract.js",
+  "requiredLibraryVersion": "^6.0.0",
+  "installed": false,
+  "vendorSource": "pending-install",
+  "status": "missing vendor binaries",
+  "lastChecked": "2026-07-26T01:34:42.000Z",
+  "requiredFiles": [
+    { "file": "tesseract.min.js", "role": "Main OCR engine (API, OCR processing, worker management)", "present": false },
+    { "file": "worker.min.js", "role": "Background-thread OCR runner", "present": false },
+    { "file": "tesseract-core.wasm.js", "role": "WebAssembly OCR runtime", "present": false },
+    { "file": "eng.traineddata", "role": "English language pack", "present": false },
+    { "file": "swa.traineddata", "role": "Kiswahili language pack", "present": false },
+    { "file": "ara.traineddata", "role": "Arabic language pack", "present": false },
+    { "file": "fra.traineddata", "role": "French language pack", "present": false },
+    { "file": "som.traineddata", "role": "Somali language pack", "present": false }
+  ],
+  "note": "This manifest is read by CozyOS.OCR.getProviderStatus() consumers to check real vendor state before assuming OCR works — never claims installed:true without present binaries. See README.md and install.sh in this directory for how to install once network access is available. core/modules/ocr/plugins/tesseract-plugin.js already registers against CozyOS.OCR and will report itself honestly unavailable until these files exist and window.Tesseract loads."
+}
