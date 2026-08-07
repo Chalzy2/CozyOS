@@ -331,6 +331,26 @@
                 if (engine.applyAnimation) engine.applyAnimation(taglineEl, "fade-in");
                 taglineEl.style.opacity = "1";
             }
+            // Real fix: this previously never attempted the wordmark's own
+            // "typing" sound cue at all (confirmed by exhaustive search -
+            // no play("typing", ...) call existed anywhere in this
+            // function), so the wordmark reveal was always silent by
+            // omission, not by a failed/blocked playback. Now attempts the
+            // real cue exactly once for the reveal (showTyping() has no
+            // per-character hook to attach to, so this is not a
+            // per-letter click - see this file's header on scope). Failure
+            // (missing asset, autoplay policy, LivingSounds not loaded) is
+            // now logged honestly via console.warn instead of being
+            // silently swallowed, so a real cause is visible in devtools
+            // rather than looking like an unexplained bug.
+            const sounds = window.CozyOS.LivingSounds;
+            if (sounds && typeof sounds.play === "function") {
+                sounds.play("typing", { category: "ui" }).then((result) => {
+                    if (!result || !result.success) {
+                        console.warn("[CozyOS StartupOrchestrator] Wordmark typing sound did not play:", result && result.reason);
+                    }
+                });
+            }
             return { started: true };
         }
 
