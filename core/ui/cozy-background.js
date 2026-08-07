@@ -425,6 +425,16 @@
             const particleMul = cfg ? cfg.particleDensity : 1;
 
             // Clouds (Nature)
+            // RP-018 real-phone finding: cloud movement logic (below, in
+            // renderNatureScene()/renderStartupLivingScene()) was always
+            // correct - each cloud increments x by speed every frame and
+            // wraps at the edge. The reported "clouds not appearing as
+            // intended" was a render-visibility bug, not a motion bug:
+            // opacity was generated in the 0.02-0.06 range (2-6%),
+            // effectively invisible against the existing background tint
+            // on real devices. Raised to a genuinely visible-but-still-
+            // subtle 0.10-0.22 range. No change to position, radius,
+            // speed, or count - motion behavior is unmodified.
             this.clouds = [];
             for (let i = 0; i < 5; i++) {
                 this.clouds.push({
@@ -432,7 +442,7 @@
                     y: Math.random() * (height * 0.35),
                     radius: Math.random() * 50 + 40,
                     speed: (Math.random() * 0.15 + 0.05) * cloudSpeedMul,
-                    opacity: Math.random() * 0.04 + 0.02
+                    opacity: Math.random() * 0.12 + 0.10
                 });
             }
 
