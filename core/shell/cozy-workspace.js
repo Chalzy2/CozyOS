@@ -4453,7 +4453,22 @@
             // #render() does on every call) and persists across reloads.
             if (!this.#openNavSection || !VISIBLE_NAV_SECTIONS.some(s => s.label === this.#openNavSection)) {
                 const containing = VISIBLE_NAV_SECTIONS.find(s => s.items.some(([id]) => id === this.#activeCenter));
-                this.#openNavSection = (containing || VISIBLE_NAV_SECTIONS[0]).label;
+                // RP-017 real fix: this previously assumed
+                // (containing || VISIBLE_NAV_SECTIONS[0]) was always a real
+                // section object and read .label off it unconditionally.
+                // That's false whenever a role has zero granted <id>:view
+                // permissions (M365.2's own fail-closed model) -
+                // VISIBLE_NAV_SECTIONS is then a real, legitimate empty
+                // array, containing is undefined, VISIBLE_NAV_SECTIONS[0]
+                // is undefined, and .label threw on undefined - the exact
+                // "Cannot read properties of undefined (reading 'label')"
+                // crash. Two lines above already treats an empty
+                // VISIBLE_NAV_SECTIONS as a real, expected state (the
+                // fallback ? ... : "applications" guard) - this now
+                // matches that same, already-established invariant rather
+                // than fabricating a fake section.
+                const fallbackSection = containing || VISIBLE_NAV_SECTIONS[0] || null;
+                this.#openNavSection = fallbackSection ? fallbackSection.label : null;
             }
 
             const navHtml = VISIBLE_NAV_SECTIONS.map(section => {
