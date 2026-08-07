@@ -1486,7 +1486,17 @@
                     // nothing architecturally; it only makes a genuine
                     // failure visible instead of silent.
                     try {
-                        window.CozyOS.WorkspaceShell.mount(root);
+                        // Minimal fix: don't resolve the current user's role
+                        // before IdentityEngine has finished restoring users
+                        // (restorePersistedUsers() is async) — mounting early
+                        // makes a genuine admin resolve to role=null and hit
+                        // a false "Access Denied", most visible right after
+                        // signing into a freshly-created account.
+                        const identity = window.CozyOS.IdentityEngine;
+                        const identityReady = (identity && identity.ready && typeof identity.ready.then === "function")
+                            ? identity.ready
+                            : Promise.resolve();
+                        identityReady.catch(() => {}).then(() => window.CozyOS.WorkspaceShell.mount(root));
                         return true;
                     } catch (err) {
                         console.error("[CozyOS] WorkspaceShell.mount() threw:", err);
