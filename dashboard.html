@@ -21,6 +21,20 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="CozyOS Enterprise">
     <meta name="twitter:image" content="https://cozyos.org/assets/branding/cozyoslogo.png?v=1.13.1">
+    <script>
+    // RP-018 — defensive-only, same real snippet already present in
+    // index.html/login.html since M366.8. dashboard.html is this PWA's
+    // manifest start_url, so it's the *first* page a home-screen install
+    // ever loads - it needs this cleanup at least as much as the other
+    // two. Never registers a worker (still true repository-wide);
+    // only unregisters one that may already be installed from an
+    // earlier deployment. Runs before any engine script below loads.
+    if (typeof navigator !== "undefined" && navigator.serviceWorker && typeof navigator.serviceWorker.getRegistrations === "function") {
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        regs.forEach((reg) => reg.unregister());
+      }).catch(() => { /* real, honest no-op */ });
+    }
+    </script>
     <script type="application/ld+json">
     {
         "@context": "https://schema.org",

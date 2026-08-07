@@ -13,7 +13,26 @@
 // index.html and login.html added to the real, existing precache list -
 // they were the two most important navigation entry points and were
 // previously absent from it entirely.
-const CACHE_VERSION = 'cozyos-M366.8';
+//
+// RP-018 — real-phone investigation, this pass: CACHE_VERSION had been
+// frozen at 'cozyos-M366.8' through roughly 20 subsequent milestones
+// (M367-M388) without ever being bumped again. HONEST CORRECTION made
+// during the same pass, before treating that as the fix: confirmed by
+// repository-wide search that no code anywhere currently calls
+// navigator.serviceWorker.register() - this worker is not actually
+// being registered by index.html, login.html, or dashboard.html today,
+// so its cache-first-for-assets fetch strategy cannot be intercepting
+// live traffic under normal use. The real, load-bearing finding instead
+// was that manifest.json's start_url ("/dashboard.html") sends any
+// home-screen-installed PWA straight into dashboard.html, which (unlike
+// index.html/login.html) carried no defensive unregister-stale-worker
+// snippet - so a device with a genuinely pre-existing registration
+// (from before M366.8 introduced that cleanup) could keep it alive
+// indefinitely. That gap is now closed directly in dashboard.html; see
+// its header comment. This version bump is kept only as harmless
+// defense-in-depth for that same pre-existing-install case, not
+// presented as the primary fix.
+const CACHE_VERSION = 'cozyos-M388-RP018';
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `dynamic-${CACHE_VERSION}`;
 
