@@ -533,7 +533,9 @@ if (typeof navigator !== "undefined" && navigator.serviceWorker && typeof naviga
     const sounds = window.CozyOS && window.CozyOS.LivingSounds;
     if (sounds && typeof sounds.play === "function") {
       document.querySelectorAll("#cozy-login-submit, #cozy-create-account, #cozy-forgot-link, .cozy-more-btn:not(:disabled)").forEach((btn) => {
-        btn.addEventListener("mouseenter", () => sounds.play("button-hover", { category: "ui" }));
+        btn.addEventListener("mouseenter", () => sounds.play("button-hover", { category: "ui" }).then((result) => {
+          if (!result || !result.success) console.warn("[CozyOS Login] button-hover sound did not play:", result && result.reason);
+        }));
       });
     }
 
@@ -558,7 +560,11 @@ if (typeof navigator !== "undefined" && navigator.serviceWorker && typeof naviga
         const onSettled = (evt) => {
           if (evt.target !== card) return;
           card.removeEventListener("transitionend", onSettled);
-          if (sounds && typeof sounds.play === "function") sounds.play("button-hover", { category: "ui", volume: 0.4 });
+          if (sounds && typeof sounds.play === "function") {
+            sounds.play("button-hover", { category: "ui", volume: 0.4 }).then((result) => {
+              if (!result || !result.success) console.warn("[CozyOS Login] button-hover sound did not play:", result && result.reason);
+            });
+          }
           // M370.2 — the floating idle animation only begins once the
           // real entrance transition has genuinely finished, using this
           // same real transitionend event - never a guessed delay.
@@ -857,7 +863,11 @@ if (typeof navigator !== "undefined" && navigator.serviceWorker && typeof naviga
     // LivingSounds registry directly — plays (or honestly no-ops today,
     // no asset yet) immediately before the real hand-off below.
     const successSounds = window.CozyOS && window.CozyOS.LivingSounds;
-    if (successSounds && typeof successSounds.play === "function") successSounds.play("login-success", { category: "notification" });
+    if (successSounds && typeof successSounds.play === "function") {
+      successSounds.play("login-success", { category: "notification" }).then((result) => {
+        if (!result || !result.success) console.warn("[CozyOS Login] login-success sound did not play:", result && result.reason);
+      });
+    }
 
     // Real, honest hand-off — index.html is the real end-user entry point
     // (M311/M326 bootstrap); login.html never renders an app list itself.
