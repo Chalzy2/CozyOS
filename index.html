@@ -79,6 +79,15 @@
 <!-- RP-025-A: real on-device conversational provider — registers into
      LivingAI's existing "on-device" provider slot; never auto-activates. -->
 <script src="core/modules/intelligence/providers/on-device-conversational-provider.js"></script>
+<!-- RP-027: language + knowledge registries, read defensively (at call
+     time, not load time) by rule-based-conversational-provider.js
+     below. index.html does not load cozyai-identity.js/ProviderManager/
+     ServiceRegistry — the knowledge registry honestly degrades to
+     NOT_FOUND for founder/apps/providers facts on this page, exactly
+     as documented in its own header, never a throw. -->
+<script src="core/modules/intelligence/language/cozy-language-registry.js"></script>
+<script src="core/modules/intelligence/language/cozy-language-templates.js"></script>
+<script src="core/modules/intelligence/knowledge/cozy-knowledge-registry.js"></script>
 <script src="core/modules/intelligence/providers/rule-based-conversational-provider.js"></script>
 <script src="core/ui/living-message-engine.js"></script>
 <script src="core/platform/application-visibility.js"></script>
