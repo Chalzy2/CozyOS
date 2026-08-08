@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CozyOS — Sign In</title>
+<!-- M387.5-repair — real regression fix: login.html had no favicon link
+     tags, so every browser issued a default /favicon.ico request that
+     404'd (visible in DevTools console). dashboard.html already links
+     these two real, existing assets; reused verbatim, nothing new. -->
+<link rel="icon" href="assets/branding/favicon-32.png" sizes="32x32">
+<link rel="icon" href="assets/branding/favicon-16.png" sizes="16x16">
+<link rel="shortcut icon" href="assets/branding/favicon-32.png">
 <!--
   M355 — Living Login Experience (spec-reconciled)
   File Reference: login.html
