@@ -62,14 +62,19 @@
 (function () {
     "use strict";
     window.CozyOS = window.CozyOS || {};
-    const VERSION = "1.0.1"; // P-023: fixed reply path to result.result.intelligence.insights
+    const VERSION = "1.0.2"; // P-023: added the image-attach UI door into the existing CognitiveCoordinator.runFromImage()/OCR pipeline
     window.CozyOS.Modules = window.CozyOS.Modules || {};
     // P-023 (this pass): fixed #send()'s reply-formatting path - it was
     // reading result.result.insights, but CognitiveCoordinator.run()
     // nests the real intelligence output at result.result.intelligence.
     // insights, so every real answer was silently missed and every
     // message fell through to the fallback string. One-line path fix,
-    // no new engine, no hardcoded response.
+    // no new engine, no hardcoded response. Also added a real image-
+    // attach button (#wireImageInput()/#sendImage()) composing the
+    // existing, unmodified CognitiveCoordinator.runFromImage()/
+    // window.CozyOS.OCR - that pipeline already existed but had no UI
+    // able to reach it. Honestly disables itself if OCR reports no real
+    // backend loaded, never fakes availability.
     if (window.CozyOS.Modules["cozy-living-assistant"] && window.CozyOS.Modules["cozy-living-assistant"].version) return;
 
     const MAX_BIND_ATTEMPTS = 40;
@@ -116,6 +121,8 @@
                 <div id="cozy-living-assistant-messages" class="cozy-living-assistant-messages" role="log" aria-live="polite"></div>
                 <form id="cozy-living-assistant-form" class="cozy-living-assistant-form">
                     <button type="button" id="cozy-living-assistant-mic" aria-label="Voice input" title="Speak">🎙️</button>
+                    <button type="button" id="cozy-living-assistant-image" aria-label="Attach an image" title="Attach an image (OCR)">📷</button>
+                    <input type="file" id="cozy-living-assistant-image-input" accept="image/*" style="display:none;">
                     <input type="text" id="cozy-living-assistant-input" class="cozy-living-input" placeholder="Ask CozyOS..." autocomplete="off">
                     <button type="submit" id="cozy-living-assistant-send" aria-label="Send">➤</button>
                 </form>
@@ -125,6 +132,7 @@
             this.#wireButton();
             this.#wireForm();
             this.#wireVoiceInput();
+            this.#wireImageInput();
             this.#wireLivingAIState();
             this.#bindWorkspaceContext();
             this.#renderQuickActions();
@@ -385,6 +393,61 @@
             });
         }
 
+        /**
+         * #wireImageInput() — P-023: the real door into
+         * CognitiveCoordinator.runFromImage(), which already existed but
+         * had no UI able to reach it. Composes the existing, unmodified
+         * window.CozyOS.OCR for a real, live availability check -
+         * honestly disables the button rather than offering an attach
+         * flow that would fail. Never a second OCR/vision engine.
+         */
+        #wireImageInput() {
+            const imageBtn = this.#panel.querySelector("#cozy-living-assistant-image");
+            const imageInput = this.#panel.querySelector("#cozy-living-assistant-image-input");
+            const ocr = window.CozyOS && window.CozyOS.OCR;
+            if (!ocr || typeof ocr.isAvailable !== "function" || !ocr.isAvailable()) {
+                imageBtn.disabled = true;
+                imageBtn.title = "Image reading is not available - no real OCR backend (Tesseract.js) is loaded in this build.";
+                return;
+            }
+            imageBtn.addEventListener("click", () => imageInput.click());
+            imageInput.addEventListener("change", () => {
+                const file = imageInput.files && imageInput.files[0];
+                imageInput.value = ""; // real reset - allows re-selecting the same file next time
+                if (file) this.#sendImage(file);
+            });
+        }
+
+        /**
+         * #sendImage(file) — composes the existing, unmodified
+         * CognitiveCoordinator.runFromImage() (real OCR -> the same real
+         * pipeline text input already uses). Same honest reply-path
+         * discipline as #send(): reads the real intelligence.insights
+         * shape, never fabricates a reply when OCR or the pipeline
+         * genuinely has nothing.
+         */
+        async #sendImage(file) {
+            this.#addMessage("user", `📷 ${file && file.name ? file.name : "image"}`);
+            const coordinator = window.CozyOS && window.CozyOS.CognitiveCoordinator;
+            if (!coordinator || typeof coordinator.runFromImage !== "function") {
+                this.#addMessage("assistant", "The CozyOS vision pipeline is not available right now.");
+                return;
+            }
+            const conversationId = this.#getOrCreateConversationId();
+            const result = await coordinator.runFromImage(file, { conversationId });
+            let replyText;
+            if (!result || !result.success) {
+                replyText = (result && result.reason) || "I couldn't read that image right now.";
+            } else if (result.intelligence && result.intelligence.isReal
+                       && Array.isArray(result.intelligence.insights) && result.intelligence.insights.length) {
+                replyText = result.intelligence.insights.map(i => i.text).filter(Boolean).join(" ");
+            } else {
+                replyText = "I read the image but don't have a real answer for that yet.";
+            }
+            this.#addMessage("assistant", replyText);
+            this.#speak(replyText);
+        }
+
         /** #wireLivingAIState() — subscribes to LivingAI's own real, existing state machine (idle/thinking/speaking) to reflect it visually. No new state machine. */
         #wireLivingAIState() {
             const ai = window.CozyOS && window.CozyOS.LivingAI;
@@ -430,7 +493,7 @@
     window.CozyOS.LivingAssistant = instance;
     window.CozyOS.Modules["cozy-living-assistant"] = Object.freeze({
         version: VERSION,
-        description: "Living Floating Assistant — a COMPOSED LIVING COMPONENT (M364.7.1). Composes LivingAI (real state machine + think()), core/living/cozy-living.css (real button/panel/glass/glow/input/card classes), VoiceManager/CozySpeech (real TTS, same pattern as Founder Story's narration engine), SpeechRecognitionAdapter (real ASR), and WorkspaceShell's own existing event system (one new event name, 'center:changed', added at its real section-switch site — no new bus, no polling). Mounts once, outside #cozy-workspace-root, sibling to the Living Background canvas — never recreated on navigation, conversation state never lost. Only ever mounted from dashboard.html, after real authentication — never shown during startup/login."
+        description: "Living Floating Assistant — a COMPOSED LIVING COMPONENT (M364.7.1, P-023 fix). Composes LivingAI (real state machine + think()), core/living/cozy-living.css (real button/panel/glass/glow/input/card classes), VoiceManager/CozySpeech (real TTS, same pattern as Founder Story's narration engine), SpeechRecognitionAdapter (real ASR), CognitiveCoordinator.runFromImage()/window.CozyOS.OCR (real, Tesseract-backed OCR — a new image-attach button, honestly disabled when no real OCR backend is loaded), and WorkspaceShell's own existing event system (one new event name, 'center:changed', added at its real section-switch site — no new bus, no polling). P-023: fixed the reply-formatting path, which was reading result.result.insights instead of the real result.result.intelligence.insights, causing every message to silently fall through to the fallback string regardless of what the pipeline actually produced. Mounts once, outside #cozy-workspace-root, sibling to the Living Background canvas — never recreated on navigation, conversation state never lost. Only ever mounted from dashboard.html, after real authentication — never shown during startup/login."
     });
 
     // Auto-mount: this file is only ever loaded on an authenticated
