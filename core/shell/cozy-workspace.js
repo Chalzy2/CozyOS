@@ -4390,6 +4390,27 @@
             if (!this.#domRoot) return;
             this.#diagnostics.renderCycles++;
 
+            // RP-020 — real, confirmed fix: #currentUserRole/#currentUserId
+            // were previously resolved exactly once, in mount(), and never
+            // again. If that one resolution raced ahead of IdentityEngine
+            // (e.g. identity.ready technically resolved but the specific
+            // user record wasn't yet reflected, a second tab/flow signing
+            // in after this page's mount() already ran, or any other
+            // transient timing gap not covered by the M373/M387.5 mount()
+            // guard above), the shell had no way to self-correct — it
+            // stayed on the wrong role for the rest of the page's life,
+            // rendering a false Access Denied on every Admin-only section
+            // even after the real admin data became available. Re-resolving
+            // here, on every render, reuses the exact same two existing
+            // methods mount() already calls — no new permission mechanism,
+            // no new state, just removing the one-shot staleness. Cheap:
+            // both methods are synchronous lookups against already-loaded
+            // in-memory state, safe to repeat every render cycle.
+            const resolvedUserId = this.#resolveCurrentUserId();
+            if (resolvedUserId !== this.#currentUserId) this.#currentUserId = resolvedUserId;
+            const resolvedRole = this.#resolveCurrentUserRole(this.#currentUserId);
+            if (resolvedRole !== this.#currentUserRole) this.#currentUserRole = resolvedRole;
+
             const NAV_SECTIONS = [
                 { label: "Overview", items: [["dashboard", "Dashboard"], ["applications", "Application Center"], ["modules", "Module Manager"], ["founderStory", "Founder Story"]] },
                 { label: "Certification", items: [["certification", "Certification Center"], ["releases", "Release Center"], ["upgrades", "Upgrade Center"], ["dependencies", "Dependency Viewer"]] },
