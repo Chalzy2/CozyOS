@@ -62,8 +62,14 @@
 (function () {
     "use strict";
     window.CozyOS = window.CozyOS || {};
-    const VERSION = "1.0.0";
+    const VERSION = "1.0.1"; // P-023: fixed reply path to result.result.intelligence.insights
     window.CozyOS.Modules = window.CozyOS.Modules || {};
+    // P-023 (this pass): fixed #send()'s reply-formatting path - it was
+    // reading result.result.insights, but CognitiveCoordinator.run()
+    // nests the real intelligence output at result.result.intelligence.
+    // insights, so every real answer was silently missed and every
+    // message fell through to the fallback string. One-line path fix,
+    // no new engine, no hardcoded response.
     if (window.CozyOS.Modules["cozy-living-assistant"] && window.CozyOS.Modules["cozy-living-assistant"].version) return;
 
     const MAX_BIND_ATTEMPTS = 40;
@@ -322,15 +328,18 @@
             }
             const conversationId = this.#getOrCreateConversationId();
             const result = await ai.think(text, { context: this.#currentSection, conversationId });
-            // M366.8 — real bug fix: falling through to
-            // JSON.stringify(result.result) is exactly what was
-            // reported as "returns raw JSON instead of intelligent
-            // conversation." The living-composition-adapter provider
-            // (M366.3) genuinely has no .text/.summary field - its real
-            // output is { insights: [{type, text}], confidence, ... }.
-            // This now formats that real, existing shape into readable
-            // text instead of dumping the raw object - composes the
-            // actual data already being returned, fabricates nothing.
+            // P-023 real bug fix (verified by reading the actual return
+            // shapes before editing, not assumed): the "reasoning-pipeline"
+            // provider's result.result IS CognitiveCoordinator.run()'s
+            // full return object - {interpretation, thinking, reasoning,
+            // intelligence, recalledMemories, policyResult, diagnostics}.
+            // It has no top-level .text/.summary/.insights of its own.
+            // The living-composition-adapter provider's real insights
+            // ({type, text}) live one level deeper, at
+            // result.result.intelligence.insights - that mismatch, not a
+            // missing capability, is why every message fell through to
+            // the fallback. This now reads the real, existing path -
+            // fabricates nothing, adds no new provider or engine.
             let replyText;
             if (!result || !result.success) {
                 replyText = (result && result.reason) || "I couldn't process that right now.";
@@ -338,8 +347,9 @@
                 replyText = result.result.text;
             } else if (result.result && typeof result.result.summary === "string") {
                 replyText = result.result.summary;
-            } else if (result.result && Array.isArray(result.result.insights) && result.result.insights.length) {
-                replyText = result.result.insights.map(i => i.text).filter(Boolean).join(" ");
+            } else if (result.result && result.result.intelligence && result.result.intelligence.isReal
+                       && Array.isArray(result.result.intelligence.insights) && result.result.intelligence.insights.length) {
+                replyText = result.result.intelligence.insights.map(i => i.text).filter(Boolean).join(" ");
             } else {
                 replyText = "I don't have a real answer for that yet.";
             }
