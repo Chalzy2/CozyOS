@@ -58,19 +58,89 @@
  *   - Only ever appears after a real, successful login (mounted from
  *     dashboard.html only, never index.html/login.html) — never shown
  *     during the startup/login sequence, per explicit scope.
+ *
+ * RP-024 — HONEST CONVERSATIONAL-REPLY SELECTION (this pass)
+ *   P-023 fixed the *path* (reading result.result.intelligence.insights
+ *   instead of the wrong nesting) but that path led to
+ *   living-composition-adapter's evidence/diagnostic summary (see
+ *   core/modules/intelligence/cozy-intelligence-provider.js), which was
+ *   never meant to be a conversational answer - it honestly describes
+ *   the evidence CozyIntelligence.analyse() received (source count,
+ *   character totals, isReal flags for upstream stages), not a reply to
+ *   what the user said. CognitiveCoordinator.run() (confirmed by reading
+ *   its actual return shape before this change) has no genuine
+ *   conversational-answer field anywhere in its result - only
+ *   {interpretation, thinking, reasoning, intelligence, recalledMemories,
+ *   policyResult, diagnostics}. So this pass stops reading
+ *   intelligence.insights entirely and instead ONLY renders a reply when
+ *   a genuine conversational field (.text/.reply/.answer) is present on
+ *   the pipeline's result. No such field exists anywhere in this
+ *   codebase today (confirmed by search before writing this) - so this
+ *   change honestly falls back to NO_CONVERSATIONAL_ENGINE_FALLBACK
+ *   below for every message, rather than inventing a rule-based
+ *   conversational engine that doesn't exist. resolveConversationalReply()
+ *   is a pure, DOM-free function (module scope, outside the IIFE below)
+ *   specifically so it can be required and regression-tested directly in
+ *   Node without stubbing window/document - see
+ *   core/living/tests/cozy-living-assistant-reply.test.js.
  */
+
+/**
+ * resolveConversationalReply(container)
+ *   Pure - given the object that would hold a genuine conversational
+ *   answer (LivingAI.think()'s result.result, or
+ *   CognitiveCoordinator.runFromImage()'s result), returns the first
+ *   non-empty string found among .text / .reply / .answer - the only
+ *   fields this codebase treats as a real conversational answer.
+ *   Deliberately never reads .intelligence, .insights, .thinking,
+ *   .interpretation, .reasoning, .diagnostics, .isReal, or any other
+ *   pipeline-internal field: those are evidence/diagnostic data, not an
+ *   answer to the user (RP-024). Returns null - never a fabricated
+ *   string - when no genuine field is present; callers must render the
+ *   honest fallback in that case.
+ */
+function resolveConversationalReply(container) {
+    if (!container || typeof container !== "object") return null;
+    const candidates = [container.text, container.reply, container.answer];
+    for (const candidate of candidates) {
+        if (typeof candidate === "string" && candidate.trim().length > 0) return candidate;
+    }
+    return null;
+}
+
+/** The one honest, static fallback string used whenever no genuine conversational field is present. Never dynamic, never built from pipeline internals. */
+const NO_CONVERSATIONAL_ENGINE_FALLBACK = "I heard you, but CozyOS's real conversational response engine isn't connected or available yet - so I don't have a genuine answer to give you right now.";
+
+// Node-safe export for regression testing (RP-024). A classic <script>
+// in the browser never defines `module`, so this is a no-op there - the
+// rest of this file's browser behavior is completely unchanged. This
+// lets core/living/tests/cozy-living-assistant-reply.test.js require()
+// the real, unmodified function directly, instead of duplicating its
+// logic into the test (which would test a copy, not the real code).
+if (typeof module !== "undefined" && module.exports) {
+    module.exports = { resolveConversationalReply, NO_CONVERSATIONAL_ENGINE_FALLBACK };
+}
+
+// The rest of this file mounts a real, live UI component and touches
+// window/document throughout - it only ever runs in a browser. Guarding
+// it this way lets the pure function above be require()'d in Node (for
+// the regression test) without the DOM-mounting code below throwing on
+// a missing `window`/`document`. In every real browser load this
+// condition is always true, so behavior is unchanged there.
+if (typeof window !== "undefined" && typeof document !== "undefined") {
 (function () {
     "use strict";
     window.CozyOS = window.CozyOS || {};
-    const VERSION = "1.0.2"; // P-023: added the image-attach UI door into the existing CognitiveCoordinator.runFromImage()/OCR pipeline
+    const VERSION = "1.0.3"; // RP-024: stopped treating intelligence.insights (evidence/diagnostic summary) as a conversational answer
     window.CozyOS.Modules = window.CozyOS.Modules || {};
-    // P-023 (this pass): fixed #send()'s reply-formatting path - it was
+    // P-023 (prior pass): fixed #send()'s reply-formatting path - it was
     // reading result.result.insights, but CognitiveCoordinator.run()
     // nests the real intelligence output at result.result.intelligence.
-    // insights, so every real answer was silently missed and every
-    // message fell through to the fallback string. One-line path fix,
-    // no new engine, no hardcoded response. Also added a real image-
-    // attach button (#wireImageInput()/#sendImage()) composing the
+    // insights. That path fix was real, but what it led to
+    // (living-composition-adapter's evidence-summary text) was never a
+    // conversational answer - see the RP-024 note above this IIFE and
+    // resolveConversationalReply()'s doc comment. Also added a real
+    // image-attach button (#wireImageInput()/#sendImage()) composing the
     // existing, unmodified CognitiveCoordinator.runFromImage()/
     // window.CozyOS.OCR - that pipeline already existed but had no UI
     // able to reach it. Honestly disables itself if OCR reports no real
@@ -336,30 +406,21 @@
             }
             const conversationId = this.#getOrCreateConversationId();
             const result = await ai.think(text, { context: this.#currentSection, conversationId });
-            // P-023 real bug fix (verified by reading the actual return
-            // shapes before editing, not assumed): the "reasoning-pipeline"
-            // provider's result.result IS CognitiveCoordinator.run()'s
-            // full return object - {interpretation, thinking, reasoning,
-            // intelligence, recalledMemories, policyResult, diagnostics}.
-            // It has no top-level .text/.summary/.insights of its own.
-            // The living-composition-adapter provider's real insights
-            // ({type, text}) live one level deeper, at
-            // result.result.intelligence.insights - that mismatch, not a
-            // missing capability, is why every message fell through to
-            // the fallback. This now reads the real, existing path -
-            // fabricates nothing, adds no new provider or engine.
+            // RP-024: CognitiveCoordinator.run()'s full return object
+            // (interpretation/thinking/reasoning/intelligence/
+            // recalledMemories/policyResult/diagnostics) has no genuine
+            // conversational-answer field. result.result.intelligence.
+            // insights is living-composition-adapter's evidence/
+            // diagnostic summary, not an answer - see this file's RP-024
+            // header note. resolveConversationalReply() only ever reads
+            // .text/.reply/.answer; everything else honestly falls back,
+            // never exposing evidence counts, isReal flags, or other
+            // pipeline internals as if they were a reply.
             let replyText;
             if (!result || !result.success) {
                 replyText = (result && result.reason) || "I couldn't process that right now.";
-            } else if (result.result && typeof result.result.text === "string") {
-                replyText = result.result.text;
-            } else if (result.result && typeof result.result.summary === "string") {
-                replyText = result.result.summary;
-            } else if (result.result && result.result.intelligence && result.result.intelligence.isReal
-                       && Array.isArray(result.result.intelligence.insights) && result.result.intelligence.insights.length) {
-                replyText = result.result.intelligence.insights.map(i => i.text).filter(Boolean).join(" ");
             } else {
-                replyText = "I don't have a real answer for that yet.";
+                replyText = resolveConversationalReply(result.result) || NO_CONVERSATIONAL_ENGINE_FALLBACK;
             }
             this.#addMessage("assistant", replyText);
             this.#speak(replyText);
@@ -435,14 +496,15 @@
             }
             const conversationId = this.#getOrCreateConversationId();
             const result = await coordinator.runFromImage(file, { conversationId });
+            // RP-024: same honest selection as #send() - only a genuine
+            // .text/.reply/.answer field counts as an answer;
+            // result.intelligence.insights is an evidence/diagnostic
+            // summary, never rendered as if it were a reply.
             let replyText;
             if (!result || !result.success) {
                 replyText = (result && result.reason) || "I couldn't read that image right now.";
-            } else if (result.intelligence && result.intelligence.isReal
-                       && Array.isArray(result.intelligence.insights) && result.intelligence.insights.length) {
-                replyText = result.intelligence.insights.map(i => i.text).filter(Boolean).join(" ");
             } else {
-                replyText = "I read the image but don't have a real answer for that yet.";
+                replyText = resolveConversationalReply(result) || NO_CONVERSATIONAL_ENGINE_FALLBACK;
             }
             this.#addMessage("assistant", replyText);
             this.#speak(replyText);
@@ -493,7 +555,7 @@
     window.CozyOS.LivingAssistant = instance;
     window.CozyOS.Modules["cozy-living-assistant"] = Object.freeze({
         version: VERSION,
-        description: "Living Floating Assistant — a COMPOSED LIVING COMPONENT (M364.7.1, P-023 fix). Composes LivingAI (real state machine + think()), core/living/cozy-living.css (real button/panel/glass/glow/input/card classes), VoiceManager/CozySpeech (real TTS, same pattern as Founder Story's narration engine), SpeechRecognitionAdapter (real ASR), CognitiveCoordinator.runFromImage()/window.CozyOS.OCR (real, Tesseract-backed OCR — a new image-attach button, honestly disabled when no real OCR backend is loaded), and WorkspaceShell's own existing event system (one new event name, 'center:changed', added at its real section-switch site — no new bus, no polling). P-023: fixed the reply-formatting path, which was reading result.result.insights instead of the real result.result.intelligence.insights, causing every message to silently fall through to the fallback string regardless of what the pipeline actually produced. Mounts once, outside #cozy-workspace-root, sibling to the Living Background canvas — never recreated on navigation, conversation state never lost. Only ever mounted from dashboard.html, after real authentication — never shown during startup/login."
+        description: "Living Floating Assistant — a COMPOSED LIVING COMPONENT (M364.7.1, RP-024 fix). Composes LivingAI (real state machine + think()), core/living/cozy-living.css (real button/panel/glass/glow/input/card classes), VoiceManager/CozySpeech (real TTS, same pattern as Founder Story's narration engine), SpeechRecognitionAdapter (real ASR), CognitiveCoordinator.runFromImage()/window.CozyOS.OCR (real, Tesseract-backed OCR — a new image-attach button, honestly disabled when no real OCR backend is loaded), and WorkspaceShell's own existing event system (one new event name, 'center:changed', added at its real section-switch site — no new bus, no polling). P-023 fixed the reply-formatting *path*; RP-024 (this pass) fixed what that path led to — living-composition-adapter's evidence/diagnostic summary was being rendered as if it were a conversational answer. Replies are now only rendered from a genuine .text/.reply/.answer field (resolveConversationalReply()); with none present anywhere in this codebase today, every message honestly falls back to NO_CONVERSATIONAL_ENGINE_FALLBACK instead of exposing evidence counts, isReal flags, or other pipeline internals. Mounts once, outside #cozy-workspace-root, sibling to the Living Background canvas — never recreated on navigation, conversation state never lost. Only ever mounted from dashboard.html, after real authentication — never shown during startup/login."
     });
 
     // Auto-mount: this file is only ever loaded on an authenticated
@@ -505,3 +567,4 @@
         instance.mount();
     }
 })();
+} // end RP-024 browser-only guard (see note above the IIFE)
