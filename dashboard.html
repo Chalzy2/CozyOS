@@ -1253,6 +1253,11 @@
          CozyOS provider (existing and future) - does not replace any
          cognitive engine. Loaded early so consumers below can register. -->
     <script src="core/shell/provider-manager.js"></script>
+    <!-- RP-025-A: real on-device conversational provider — registers
+         into LivingAI's existing "on-device" provider slot and (since
+         ProviderManager is loaded on this page) into ProviderManager
+         for visibility/health. Never auto-activates. -->
+    <script src="core/modules/intelligence/providers/on-device-conversational-provider.js"></script>
     <script src="core/modules/ChurchOS/multi-branch-coordinator.js"></script>
     <!-- ChurchOS C003 — genuine new feature (real camera/mic capture).
          Loaded after WorshipModeCoordinator so its updated recording
