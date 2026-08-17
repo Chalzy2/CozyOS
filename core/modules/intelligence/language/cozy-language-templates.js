@@ -103,6 +103,39 @@
             ar: "يمكنني المساعدة في البحث، والإشعارات، والنشاط الأخير، والأسئلة الحوارية البسيطة حول CozyOS نفسه — من أنشأه، وما التطبيقات ومزوّدو الخدمة المتاحون، وكيف يعمل التسجيل والمصادقة، وماذا تعني حالات الحساب/المزوّد. فهمي قائم على القواعد، لذا سأخبرك دائمًا بصدق عندما يكون الأمر خارج ما أتعرف عليه حاليًا.",
             so: "Waan kaa caawin karaa raadinta, ogeysiisyada, dhaqdhaqaaqa dhawaan dhacay, iyo su'aalo fudud oo ku saabsan CozyOS lafteeda — cidda abuurtay, ka fiican maxay tahay app-yada iyo bixiyeyaasha (providers) ee la heli karo, sida diiwaangelinta iyo xaqiijinta u shaqeeyaan, iyo waxa ay ka dhigan tahay xaaladaha akoonka/bixiyaha. Fahamkaygu waxa uu ku salaysan yahay xeerar, sidaas darteed had iyo jeer si daacad ah ayaan kuu sheegi doonaa marka wax ka baxsan yahay waxa aan hadda aqoonsanahay."
         }),
+        // ── RP-036 navigation intents ─────────────────────────────
+        // en/sw fully authored (Kiswahili support is a hard
+        // requirement of RP-036). fr/ar/so deliberately have no entry
+        // here yet — getTemplate() already degrades honestly to the
+        // en string in that case (see getTemplate() below), exactly
+        // the same disclosed, partial-coverage pattern RP-027 used for
+        // its own extended languages, rather than a fabricated
+        // translation.
+        "nav-dashboard": Object.freeze({
+            en: "Opening the dashboard for you.",
+            sw: "Ninafungua dashibodi kwa ajili yako."
+        }),
+        "nav-notifications": Object.freeze({
+            en: "Opening notifications for you.",
+            sw: "Ninafungua arifa kwa ajili yako."
+        }),
+        "nav-recent": Object.freeze({
+            en: "Here's your recent activity.",
+            sw: "Hii ndiyo shughuli zako za hivi karibuni."
+        }),
+        "nav-search": Object.freeze({
+            en: "Opening search for you.",
+            sw: "Ninafungua utafutaji kwa ajili yako."
+        }),
+        "nav-aiproviders": Object.freeze({
+            en: "Opening AI Providers for you.",
+            sw: "Ninafungua sehemu ya AI Providers kwa ajili yako."
+        }),
+        "nav-diagnostics": Object.freeze({
+            en: "Opening the Diagnostics Center for you.",
+            sw: "Ninafungua Diagnostics Center kwa ajili yako."
+        }),
+
         "unsupported": Object.freeze({
             en: "I don't have a rule-based answer for that yet — right now my conversational understanding only covers greetings, help requests, thanks, and a set of disclosed questions about CozyOS itself. That's a real, disclosed limit, not an error.",
             sw: "Bado sina jibu la kanuni (rule-based) kwa hilo — kwa sasa uelewa wangu wa mazungumzo unahusisha tu salamu, maombi ya msaada, shukrani, na seti ya maswali yaliyowekwa wazi kuhusu CozyOS yenyewe. Hii ni kikomo halisi, kilichowekwa wazi, si hitilafu.",

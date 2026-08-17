@@ -131,7 +131,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
 (function () {
     "use strict";
     window.CozyOS = window.CozyOS || {};
-    const VERSION = "1.0.3"; // RP-024: stopped treating intelligence.insights (evidence/diagnostic summary) as a conversational answer
+    const VERSION = "1.0.4"; // RP-036: typed text that classifies as a known navigation intent (nav-dashboard/notifications/recent/search/aiproviders/diagnostics) now actually executes via the existing #runQuickAction(), not just described in text
     window.CozyOS.Modules = window.CozyOS.Modules || {};
     // P-023 (prior pass): fixed #send()'s reply-formatting path - it was
     // reading result.result.insights, but CognitiveCoordinator.run()
@@ -149,6 +149,31 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
 
     const MAX_BIND_ATTEMPTS = 40;
     const BIND_RETRY_MS = 250;
+
+    /**
+     * NAV_INTENT_ACTIONS — RP-036
+     *   Maps the rule-based-conversational-provider's own new
+     *   navigation intent ids (nav-dashboard/notifications/recent/
+     *   search/aiproviders/diagnostics — see that file's INTENT_RULES)
+     *   onto the exact same action strings #runQuickAction() already
+     *   handles for the quick-action buttons. This is the ONLY new
+     *   code here: it reuses #runQuickAction() unmodified rather than
+     *   duplicating its real [data-center] click / WorkspaceShell
+     *   search / getNotificationFeed logic a second time. Typed text
+     *   that classifies as one of these intents now actually performs
+     *   the action, in addition to the rule-based composer's own
+     *   confirmation text — previously, typed text could only ever
+     *   produce a reply, never an action; only the quick-action
+     *   buttons could act.
+     */
+    const NAV_INTENT_ACTIONS = Object.freeze({
+        "nav-dashboard": "goto-dashboard",
+        "nav-notifications": "notifications",
+        "nav-recent": "recent",
+        "nav-search": "search",
+        "nav-aiproviders": "goto-aiProviders",
+        "nav-diagnostics": "goto-diagnostics"
+    });
 
     class LivingAssistant {
         #messages = [];      // { role: "user"|"assistant", text, timestamp }
@@ -424,6 +449,14 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
             }
             this.#addMessage("assistant", replyText);
             this.#speak(replyText);
+
+            // RP-036 — if the classified intent is a real, known
+            // navigation action, actually perform it (via the existing,
+            // unmodified #runQuickAction()) rather than only describing
+            // it. A missing/unrecognized intent is a no-op here, same
+            // as before this change.
+            const navAction = result && result.success && result.result && NAV_INTENT_ACTIONS[result.result.intent];
+            if (navAction) this.#runQuickAction(navAction);
         }
 
         /** #speak() — composes the real VoiceManager, exactly as Founder Story's narration engine already does (M361 Stage 3). Never a second TTS path. */
