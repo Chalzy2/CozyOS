@@ -153,17 +153,76 @@
         };
     }
 
+    /**
+     * safeCallAsync(fn)
+     *   Same fail-closed discipline as safeCall(), for the async
+     *   FounderStory.getPublicStory() read path below. A throwing or
+     *   rejecting dependency is treated as absent, never surfaced as
+     *   fact.
+     */
+    async function safeCallAsync(fn) {
+        try {
+            return await fn();
+        } catch (_err) {
+            return null;
+        }
+    }
+
+    /**
+     * getProjectKnowledgeFact(topicTag)
+     *   CozyAI Project Knowledge & Public Story Integration milestone.
+     *   The single, shared implementation behind all five new project-
+     *   knowledge fact-getters below — composes
+     *   window.CozyOS.FounderStory.getPublicStory(topicTag) only (the
+     *   one narrow, viewerId-free, public+published-only read path
+     *   added to that engine this milestone). Never reads the private
+     *   Founder Story Vault directly, never accepts or forwards a
+     *   viewerId, never upgrades an absent/private/draft result into a
+     *   positive claim.
+     *
+     *   Evidence mapping:
+     *     - FounderStory not loaded, or getPublicStory() throws/returns
+     *       something that isn't a real {title, body} object → NOT_FOUND
+     *       (same "missing dependency degrades to NOT_FOUND" convention
+     *       getFounderFact() above already established — this is not a
+     *       "CozyOS doesn't implement this" case, the capability exists,
+     *       there is simply no published content yet).
+     *     - A real public+published chapter body → VERIFIED.
+     */
+    async function getProjectKnowledgeFact(topicTag) {
+        const founderStory = window.CozyOS && window.CozyOS.FounderStory;
+        if (!founderStory || typeof founderStory.getPublicStory !== "function") {
+            return { evidence: "NOT_FOUND", answer: null, source: null };
+        }
+        const result = await safeCallAsync(() => founderStory.getPublicStory(topicTag));
+        if (result && typeof result.body === "string" && result.body.length > 0) {
+            return { evidence: "VERIFIED", answer: result.body, source: "window.CozyOS.FounderStory" };
+        }
+        return { evidence: "NOT_FOUND", answer: null, source: null };
+    }
+
+    function getProjectOriginFact() { return getProjectKnowledgeFact("project-origin"); }
+    function getPublicStoryFact() { return getProjectKnowledgeFact("public-story"); }
+    function getVisionFact() { return getProjectKnowledgeFact("vision"); }
+    function getMissionFact() { return getProjectKnowledgeFact("mission"); }
+    function getProjectHistoryFact() { return getProjectKnowledgeFact("project-history"); }
+
     window.CozyOS.CozyKnowledge = Object.freeze({
         getVersion() { return VERSION; },
         getFounderFact,
         listApplicationsFact,
         listProvidersFact,
         activeProviderFact,
-        accountStateVocabulary
+        accountStateVocabulary,
+        getProjectOriginFact,
+        getPublicStoryFact,
+        getVisionFact,
+        getMissionFact,
+        getProjectHistoryFact
     });
 
     window.CozyOS.Modules["cozy-knowledge-registry"] = Object.freeze({
         version: VERSION,
-        description: "RP-027 — Knowledge/fact evidence gatherer. Reads DeveloperIdentity, ServiceRegistry, ProviderManager, and LivingAI's already-existing public APIs at call time only (never at load time, so load order is not load-bearing) and returns an explicit evidence state (VERIFIED / PARTIALLY_VERIFIED / NOT_FOUND / NOT_A_CAPABILITY) alongside every fact, per RP-027's Fact Safety Rule. A missing or throwing dependency always degrades to an honest NOT_FOUND — never a fabricated answer. Consumed by rule-based-conversational-provider.js; does not itself compose or translate any user-facing text (that is cozy-language-templates.js's job)."
+        description: "RP-027 — Knowledge/fact evidence gatherer. Reads DeveloperIdentity, ServiceRegistry, ProviderManager, LivingAI, and (CozyAI Project Knowledge & Public Story Integration milestone) FounderStory.getPublicStory()'s already-existing public APIs at call time only (never at load time, so load order is not load-bearing) and returns an explicit evidence state (VERIFIED / PARTIALLY_VERIFIED / NOT_FOUND / NOT_A_CAPABILITY) alongside every fact, per RP-027's Fact Safety Rule. A missing or throwing dependency always degrades to an honest NOT_FOUND — never a fabricated answer. The five project-knowledge fact-getters (origin/public-story/vision/mission/history) never read the private Founder Story Vault directly and never accept a viewerId — they compose FounderStory's own narrow public+published-only read path exclusively. Consumed by rule-based-conversational-provider.js; does not itself compose or translate any user-facing text (that is cozy-language-templates.js's job)."
     });
 })();

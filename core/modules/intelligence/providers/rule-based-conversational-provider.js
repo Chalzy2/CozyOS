@@ -159,10 +159,23 @@
         //    Enterprise intent rather than the shorter "what-is-cozyos"
         //    pattern it textually contains. ─────────────────────────
         { id: "what-is-cozyos-enterprise", pattern: /\bcozyos\s+enterprise\b/i },
+
+        // ── CozyAI Project Knowledge & Public Story Integration —
+        //    placed AHEAD of "founder" (the bare \bfounder\b pattern
+        //    would otherwise swallow "why did the founder create
+        //    CozyOS" — more specific patterns must be checked first,
+        //    per this file's own established ordering discipline) and
+        //    ahead of what-is-cozyos for the same reason. ───────────
+        { id: "project-origin", pattern: /\bwhy\s+was\s+cozyos\s+started\b|\bwhy\s+did\s+(?:the\s+)?founder\s+create\s+cozyos\b|\borigin\s+of\s+cozyos\b/i },
+        { id: "public-story", pattern: /\bpublic\s+story\b|\bcozyos\s+story\b|\bstory\s+of\s+cozyos\b/i },
+        { id: "cozyos-vision", pattern: /\bvision\s+of\s+cozyos\b|\bcozyos'?s?\s+vision\b|\bwhat\s+is\s+cozyos\s+trying\s+to\s+accomplish\b|\bwhat\s+is\s+the\s+vision\b/i },
+        { id: "cozyos-mission", pattern: /\bmission\s+of\s+cozyos\b|\bcozyos'?s?\s+mission\b|\bwhat\s+is\s+the\s+mission\b/i },
+        { id: "project-history", pattern: /\bproject\s+history\b|\bhistory\s+of\s+cozyos\b|\bwhat\s+is\s+the\s+history\b/i },
+
         { id: "founder", pattern: /\bwho\s+(?:created|made|built|founded)\s+(?:you|cozyos)\b|\bfounder\b|\bwho\s+owns\s+cozyos\b|\bowner\s+of\s+cozyos\b/i },
         { id: "what-is-cozyos", pattern: /\bwhat\s+is\s+cozyos\b/i },
         { id: "list-apps", pattern: /\b(?:what|which)\s+apps?\b|\bshow\s+me\s+the\s+apps\b|\bapplications?\s+(?:are\s+)?(?:available|installed)\b|\bwant\s+to\s+see\s+the\s+apps\b|\bfind\s+an?\s+app\b/i },
-        { id: "how-to-register", pattern: /\bhow\s+(?:do\s+i|to)\s+register\b|\bregistration\s+requirements?\b|\bhow\s+do\s+i\s+activate\s+an?\s+account\b/i },
+        { id: "how-to-register", pattern: /\bhow\s+(?:do\s+i|to|can\s+i)\s+register\b|\bregistration\s+requirements?\b|\bhow\s+do\s+i\s+activate\s+an?\s+account\b|\bhow\s+(?:do\s+i|can\s+i)\s+create\s+an?\s+account\b/i },
         { id: "phone-verification", pattern: /\bphone\s+verification\b|\bverify\s+my\s+phone\b|\bwhy\s+(?:is\s+)?my\s+phone\s+not\s+verified\b|\bwhy\s+did\s+my\s+verification\s+fail\b/i },
         { id: "how-authentication-works", pattern: /\bhow\s+(?:does\s+)?authentication\s+works?\b|\bwhat\s+happens\s+during\s+authentication\b|\bwhy\s+is\s+authentication\s+failing\b/i },
         { id: "account-status", pattern: /\baccount\s+not\s+active\b|\bwhy\s+is\s+my\s+account\b|\baccount\s+status\b|\baccount\s+(?:disabled|pending|inactive)\b/i },
@@ -257,7 +270,17 @@
         // intents — response text must never be empty, per RP-027 §13.
         "founder:not_found": "I'm the CozyOS Assistant. I was built as part of CozyOS, but I don't currently have a verified record of the individual who created me.",
         "list-apps:unavailable": "I can help you find the CozyOS apps, but the application registry isn't available right now.",
-        "list-providers:unavailable": "I can explain what providers are, but I can't see the live Provider Manager status from here right now."
+        "list-providers:unavailable": "I can explain what providers are, but I can't see the live Provider Manager status from here right now.",
+        // CozyAI Project Knowledge & Public Story Integration —
+        // same "not_found" fallback convention, so a partial-load page
+        // (cozy-knowledge-registry.js without cozy-language-
+        // templates.js) still never returns a blank/undefined reply
+        // for these five evidence-backed intents.
+        "project-origin:not_found": "The public origin story of CozyOS hasn't been published yet, so I don't have an authoritative answer to why it was started.",
+        "public-story:not_found": "CozyOS doesn't have a published public story yet, so I can't share one right now.",
+        "vision:not_found": "CozyOS's vision statement hasn't been published yet, so I don't have an authoritative answer for what it's trying to accomplish.",
+        "mission:not_found": "CozyOS's mission statement hasn't been published yet, so I don't have an authoritative answer for that.",
+        "project-history:not_found": "CozyOS's project history hasn't been published yet, so I don't have an authoritative account of it."
     });
 
     function template(key, lang) {
@@ -269,18 +292,28 @@
         return RP026_ENGLISH_FALLBACK[key] || null;
     }
 
+    /** safeCallAsync(fn) — same fail-closed discipline as safeCall(), for the async CozyAI Project Knowledge fact-getters below. */
+    async function safeCallAsync(fn) {
+        try { return await fn(); } catch (_err) { return null; }
+    }
+
     /**
      * composeReply(intent, lang)
      *   Real template selection — the ONLY place conversational text is
      *   generated. Never reads pipeline internals. Fixed-text intents
      *   resolve directly to a per-language string (template()); the
-     *   evidence-backed intents (founder/list-apps/list-providers) call
-     *   CozyKnowledge (RP-027) for live evidence first and select the
-     *   ":verified" or the honest ":not_found"/":unavailable" template
-     *   variant accordingly — per the Fact Safety Rule (RP-027 §3),
-     *   absence of evidence is NEVER converted into a positive claim.
+     *   evidence-backed intents (founder/list-apps/list-providers, plus
+     *   the CozyAI Project Knowledge intents below) call CozyKnowledge
+     *   (RP-027) for live evidence first and select the ":verified" or
+     *   the honest ":not_found"/":unavailable" template variant
+     *   accordingly — per the Fact Safety Rule (RP-027 §3), absence of
+     *   evidence is NEVER converted into a positive claim. async
+     *   because the five project-knowledge fact-getters compose
+     *   FounderStory.getPublicStory(), which is genuinely async
+     *   (real Vault decryption) — this file's only caller (think())
+     *   is already async and awaits this.
      */
-    function composeReply(intent, lang) {
+    async function composeReply(intent, lang) {
         const knowledge = window.CozyOS && window.CozyOS.CozyKnowledge;
 
         switch (intent) {
@@ -291,6 +324,46 @@
                     if (typeof frame === "function") return frame(fact.answer);
                 }
                 return template("founder:not_found", lang);
+            }
+            case "project-origin": {
+                const fact = knowledge && typeof knowledge.getProjectOriginFact === "function" ? await safeCallAsync(() => knowledge.getProjectOriginFact()) : null;
+                if (fact && fact.evidence === "VERIFIED") {
+                    const frame = template("project-origin:verified", lang);
+                    if (typeof frame === "function") return frame(fact.answer);
+                }
+                return template("project-origin:not_found", lang);
+            }
+            case "public-story": {
+                const fact = knowledge && typeof knowledge.getPublicStoryFact === "function" ? await safeCallAsync(() => knowledge.getPublicStoryFact()) : null;
+                if (fact && fact.evidence === "VERIFIED") {
+                    const frame = template("public-story:verified", lang);
+                    if (typeof frame === "function") return frame(fact.answer);
+                }
+                return template("public-story:not_found", lang);
+            }
+            case "cozyos-vision": {
+                const fact = knowledge && typeof knowledge.getVisionFact === "function" ? await safeCallAsync(() => knowledge.getVisionFact()) : null;
+                if (fact && fact.evidence === "VERIFIED") {
+                    const frame = template("vision:verified", lang);
+                    if (typeof frame === "function") return frame(fact.answer);
+                }
+                return template("vision:not_found", lang);
+            }
+            case "cozyos-mission": {
+                const fact = knowledge && typeof knowledge.getMissionFact === "function" ? await safeCallAsync(() => knowledge.getMissionFact()) : null;
+                if (fact && fact.evidence === "VERIFIED") {
+                    const frame = template("mission:verified", lang);
+                    if (typeof frame === "function") return frame(fact.answer);
+                }
+                return template("mission:not_found", lang);
+            }
+            case "project-history": {
+                const fact = knowledge && typeof knowledge.getProjectHistoryFact === "function" ? await safeCallAsync(() => knowledge.getProjectHistoryFact()) : null;
+                if (fact && fact.evidence === "VERIFIED") {
+                    const frame = template("project-history:verified", lang);
+                    if (typeof frame === "function") return frame(fact.answer);
+                }
+                return template("project-history:not_found", lang);
             }
             case "list-apps": {
                 const fact = knowledge && typeof knowledge.listApplicationsFact === "function" ? safeCall(() => knowledge.listApplicationsFact()) : null;
@@ -368,7 +441,7 @@
             // fallback disclosure (RP-027 §12) rather than silently
             // substituting language.
             const resolvedLanguage = resolveLanguage(options);
-            let replyText = composeReply(intent, resolvedLanguage.code);
+            let replyText = await composeReply(intent, resolvedLanguage.code);
             if (resolvedLanguage.fallback) {
                 const templates = window.CozyOS && window.CozyOS.CozyLanguageTemplates;
                 const disclosureFn = templates && templates.FALLBACK_DISCLOSURE && templates.FALLBACK_DISCLOSURE[resolvedLanguage.code];

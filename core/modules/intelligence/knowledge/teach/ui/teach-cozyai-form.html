@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CozyOS \u2014 Teach CozyAI (Full Knowledge Form)</title>
+<link rel="stylesheet" href="../../../../ui/cozy-tokens.css">
+<link rel="stylesheet" href="../../../../ui/cozy-components.css">
+<link rel="stylesheet" href="../../ui/contribution-form.css">
+</head>
+<body>
+<h1 class="cozy-text-page-title" style="padding:16px 16px 0;">Teach CozyAI</h1>
+<p style="padding:0 16px;" class="contribution-hint">African teaches AI, and AI helps Africa improve their lives.</p>
+<div id="teach-cozyai-form-root"></div>
+
+<!-- RP-029-A -->
+<script src="../../cozy-knowledge-ingestion.js"></script>
+<!-- RP-029-B -->
+<script src="../../cozy-knowledge-community.js"></script>
+<!-- RP-029-C Phase 1 -->
+<script src="../../cozy-knowledge-review.js"></script>
+<!-- RP-027 language modules -->
+<script src="../../../language/cozy-language-templates.js"></script>
+<script src="../../../language/cozy-language-registry.js"></script>
+<!-- Cozy Offline Hotspot (existing, real engine) + Phase 2 bridge -->
+<script src="../../../../engines/collaboration/live-hotspot-engine.js"></script>
+<script src="../../ui/cozy-knowledge-safety-gate.js"></script>
+<script src="../../ui/cozy-knowledge-review-hotspot-bridge.js"></script>
+<!-- RP-029-C Phase 3 (real review-pipeline submission path) -->
+<script src="../../ui/cozy-knowledge-contribution-core.js"></script>
+<!-- RP-030 (real language-pack routing) -->
+<script src="../../../language-packs/cozy-language-pack-registry.js"></script>
+<!-- RP-031 Phase 2A -->
+<script src="../cozy-teach-cozyai-routing-core.js"></script>
+<script src="cozy-teach-cozyai-ui.js"></script>
+<script>
+  window.CozyOS.CozyTeachCozyAIUI.init(document.getElementById("teach-cozyai-form-root"), {});
+</script>
+</body>
+</html>

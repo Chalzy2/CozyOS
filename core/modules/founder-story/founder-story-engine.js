@@ -929,6 +929,54 @@
             this.#emit("export-requested", { storyId, requesterId, chapterId });
             return { storyId, chapterId, status: "queued-for-future-milestone", note: "Export pipeline (PDF/DOCX) is out of scope through M361 Stage 3 — no file is generated." };
         }
+
+        /**
+         * getPublicStory(topicTag) — CozyAI Project Knowledge & Public
+         * Story Integration milestone. The ONLY read path this milestone
+         * adds to FounderStory. Deliberately narrow:
+         *   - Takes NO viewerId. There is no authorization decision here
+         *     to make on a caller's behalf — this method itself defines
+         *     "public" by checking the raw story/chapter fields directly
+         *     (visibility === "public" AND status === "published"),
+         *     never delegating to canView()/canViewChapter() and never
+         *     accepting any identity that could be mistaken for a
+         *     privileged viewer.
+         *   - Matches on the story's existing `category` field as the
+         *     topic tag — no new schema, no new index, nothing added to
+         *     the story/chapter shape.
+         *   - Returns null (never PRIVATE_NOTICE, never a partial
+         *     object, never a thrown error swallowed into a fabricated
+         *     answer) whenever no story/chapter combination is BOTH
+         *     public AND published. only-me+published, public+draft,
+         *     deleted, and missing-Vault all fall through to this same
+         *     honest null — there is no fallback path that can ever
+         *     surface only-me or draft content through this method.
+         *   - Only public+published+public+published pairs are ever
+         *     decrypted and returned.
+         */
+        async getPublicStory(topicTag) {
+            if (!topicTag || typeof topicTag !== "string") return null;
+            const vault = window.CozyOS.Vault;
+            if (!vault || typeof vault.decrypt !== "function") return null;
+            for (const story of this.#stories.values()) {
+                if (story.deleted) continue;
+                if (story.visibility !== "public" || story.status !== "published") continue;
+                if (story.category !== topicTag) continue;
+                for (const chapterId of story.chapterOrder) {
+                    const chapter = this.#chapters.get(chapterId);
+                    if (!chapter || chapter.deleted) continue;
+                    const effectiveVisibility = chapter.visibility == null ? story.visibility : chapter.visibility;
+                    if (effectiveVisibility !== "public" || chapter.status !== "published") continue;
+                    try {
+                        const plain = JSON.parse(await vault.decrypt(story.keyId, chapter.envelope));
+                        this.#diagnostics.views++;
+                        this.#logAudit("VIEW", { storyId: story.storyId, chapterId, viewerId: null, action: "public-knowledge-read" });
+                        return { storyId: story.storyId, chapterId, topicTag, title: plain.title, body: plain.body };
+                    } catch (_err) { return null; } // decrypt failure — fail closed, never a partial/garbled answer
+                }
+            }
+            return null;
+        }
     }
 
 

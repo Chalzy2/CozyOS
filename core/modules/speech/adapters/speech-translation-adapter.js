@@ -98,7 +98,11 @@
     // OWN registry (never a second one). Both source and target sets are
     // seeded identically — CozyTranslate doesn't assume a language can
     // only be one or the other.
-    const SEED_LANGUAGES = ["sw", "luo", "ki", "kam", "kln", "luy", "mas", "so", "lg", "am", "yo", "ha", "zu", "en", "fr"];
+    const SEED_LANGUAGES = [
+        "sw", "luo", "ki", "kam", "kln", "luy", "mas",
+        "so", "lg", "am", "yo", "ha", "zu", "en", "fr",
+        "ar", "ru", "zh", "ln", "ig", "hi"
+    ];
 
     // sessionId -> { streamId, sourceLanguage, targetLanguage }
     const _streamBySession = new Map();

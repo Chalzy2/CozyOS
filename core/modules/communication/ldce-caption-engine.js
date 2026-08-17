@@ -133,20 +133,47 @@
 
             const roster = ldce ? ldce.listParticipants(sessionId, speakerUserId) : [];
             const targetLanguages = Array.from(new Set(roster.map((p) => p.language).filter((lang) => lang && lang !== sourceLanguage)));
-            for (const targetLanguage of targetLanguages) {
+            await Promise.all(targetLanguages.map(async (targetLanguage) => {
                 const txSessionId = await this.#getOrCreateTranslationSession(sourceLanguage, targetLanguage);
                 const adapter = window.CozyOS.SpeechTranslationAdapter;
-                if (!adapter) { this.#emit("caption-translated", { sessionId, speakerUserId, targetLanguage, isReal: false, reason: "SpeechTranslationAdapter is not available." }); continue; }
-                let result;
-                try { result = await adapter.translateText(txSessionId, payload.transcript, { sourceLanguage, targetLanguage }); }
-                catch (err) { result = { isReal: false, reason: err.message || "translateText threw." }; }
-                if (result.isReal) {
-                    if (session && conversation) conversation.addTranscriptSegment(session.conversationId, { speaker: speakerUserId, text: result.translatedText, languageCode: targetLanguage, source: "ldce-caption-translated" });
-                    this.#emit("caption-translated", { sessionId, speakerUserId, targetLanguage, isReal: true, text: result.translatedText });
-                } else {
-                    this.#emit("caption-translated", { sessionId, speakerUserId, targetLanguage, isReal: false, reason: result.reason });
+                if (!adapter) {
+                    this.#emit("caption-translated", { sessionId, speakerUserId, targetLanguage, isReal: false, reason: "SpeechTranslationAdapter is not available." });
+                    return;
                 }
-            }
+
+                let result;
+                try {
+                    result = await adapter.translateText(txSessionId, payload.transcript, { sourceLanguage, targetLanguage });
+                } catch (err) {
+                    result = { isReal: false, reason: err.message || "translateText threw." };
+                }
+
+                if (result.isReal) {
+                    if (session && conversation) {
+                        conversation.addTranscriptSegment(session.conversationId, {
+                            speaker: speakerUserId,
+                            text: result.translatedText,
+                            languageCode: targetLanguage,
+                            source: "ldce-caption-translated"
+                        });
+                    }
+                    this.#emit("caption-translated", {
+                        sessionId,
+                        speakerUserId,
+                        targetLanguage,
+                        isReal: true,
+                        text: result.translatedText
+                    });
+                } else {
+                    this.#emit("caption-translated", {
+                        sessionId,
+                        speakerUserId,
+                        targetLanguage,
+                        isReal: false,
+                        reason: result.reason
+                    });
+                }
+            }));
         }
 
         /** getCaptionAvailability() — honest Current Status / What's Needed Next (Governance Principle 12), never merged into one ambiguous flag. */

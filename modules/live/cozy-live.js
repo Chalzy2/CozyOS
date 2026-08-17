@@ -2280,9 +2280,14 @@ function createOurCozyLive(options) {
     } else if (activeSpeakerByRoom.has(roomId)) {
       speakerId = activeSpeakerByRoom.get(roomId);
     }
+    let stream = null;
     if (opts.streamId) {
-      getStreamOrThrow(sessionId, roomId, opts.streamId);
+      stream = getStreamOrThrow(sessionId, roomId, opts.streamId);
     }
+
+    const sourceLanguage = stream && stream.sourceLanguage
+      ? stream.sourceLanguage
+      : (session.primaryLanguage || 'swh_Latn');
 
     const speech = getSubsystemOrThrow('CozySpeech');
     const translate = getSubsystemOrThrow('CozyTranslate');
@@ -2322,7 +2327,7 @@ function createOurCozyLive(options) {
       }
     }
 
-    const transcript = speech.transcribe(sourceAudioRef, session.primaryLanguage);
+    const transcript = speech.transcribe(sourceAudioRef, sourceLanguage);
     assert(
       transcript && typeof transcript.text === 'string',
       ERROR_CODES.SUBSYSTEM_CONTRACT_VIOLATION,
@@ -2331,7 +2336,9 @@ function createOurCozyLive(options) {
 
     const channels = Array.from(getLanguageChannelsMap(roomId).values());
     const translations = channels.map((channel) => {
-      const translated = translate.translate(transcript.text, session.primaryLanguage, channel.languageCode);
+      const translated = sourceLanguage === channel.languageCode
+        ? { text: transcript.text }
+        : translate.translate(transcript.text, sourceLanguage, channel.languageCode);
       assert(
         translated && typeof translated.text === 'string',
         ERROR_CODES.SUBSYSTEM_CONTRACT_VIOLATION,
@@ -2362,7 +2369,7 @@ function createOurCozyLive(options) {
       sequenceNumber,
       speakerId,
       streamId: opts.streamId || null,
-      sourceLanguage: session.primaryLanguage,
+      sourceLanguage: sourceLanguage,
       detectedLanguage,
       terminologyHints,
       transcript: transcript.text,
@@ -2375,7 +2382,7 @@ function createOurCozyLive(options) {
       roomId,
       streamId: opts.streamId || null,
       speakerId,
-      sourceLanguage: session.primaryLanguage,
+      sourceLanguage: sourceLanguage,
       detectedLanguage,
       sequenceNumber,
       transcript: transcript.text,
@@ -2466,13 +2473,23 @@ function createOurCozyLive(options) {
    * @returns {Readonly<Object>}
    */
   function createStream(sessionId, roomId) {
-    getSessionOrThrow(sessionId);
+    const session = getSessionOrThrow(sessionId);
     getRoomOrThrow(sessionId, roomId);
     const id = generateId('stream');
-    const stream = { id, sessionId, roomId, status: STREAM_STATUSES.IDLE, createdAt: Date.now() };
+    const stream = {
+      id,
+      sessionId,
+      roomId,
+      sourceLanguage: 'swh_Latn',
+      status: STREAM_STATUSES.IDLE,
+      createdAt: Date.now()
+    };
     getStreamsMap(roomId).set(id, stream);
 
-    graphUpsertNode('stream', id, sessionId, { roomId });
+    graphUpsertNode('stream', id, sessionId, {
+      roomId,
+      sourceLanguage: stream.sourceLanguage
+    });
     graphAddEdgeInternal(roomId, id, 'has_stream');
 
     emit(EVENT_TYPES.STREAM_CREATED, { sessionId, roomId, stream: cloneData(stream) });
@@ -2497,8 +2514,21 @@ function createOurCozyLive(options) {
       `status must be one of: ${validStatuses.join(', ')}`
     );
     const previousStatus = stream.status;
+
+    // Lock the authoritative source language once the stream goes LIVE.
+    if (status === STREAM_STATUSES.LIVE && previousStatus !== STREAM_STATUSES.LIVE) {
+  assert(stream.sourceLanguage === 'swh_Latn', ERROR_CODES.INVALID_ARGUMENT, 'Stream sourceLanguage is locked to swh_Latn');
+    }
+
     stream.status = status;
-    emit(EVENT_TYPES.STREAM_STATUS_CHANGED, { sessionId, roomId, streamId, previousStatus, status });
+    emit(EVENT_TYPES.STREAM_STATUS_CHANGED, {
+      sessionId,
+      roomId,
+      streamId,
+      previousStatus,
+      status,
+      sourceLanguage: stream.sourceLanguage
+    });
     return toPublicSnapshot(stream);
   }
 

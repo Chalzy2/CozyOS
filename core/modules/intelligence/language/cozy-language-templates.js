@@ -221,6 +221,87 @@
             fr: "Je peux expliquer ce que sont les fournisseurs, mais je ne peux pas voir l'état en direct de Provider Manager depuis ici pour le moment.",
             ar: "يمكنني شرح ما هي المزوّدات، لكن لا يمكنني رؤية حالة Provider Manager المباشرة من هنا حاليًا.",
             so: "Waan sharixi karaa waxa bixiyeyaashu yihiin, laakiin hadda halkan kama arki karo xaalada toos ah ee Provider Manager."
+        }),
+
+        // ── CozyAI Project Knowledge & Public Story Integration ──
+        // Dynamic "verified" frames wrap the real published chapter
+        // body (whatever language it was authored in) with a fixed
+        // per-language lead-in, same pattern as founder:verified.
+        // "not_found" frames are fixed text — shown until the Founder
+        // explicitly publishes the corresponding chapter.
+        "project-origin:verified": Object.freeze({
+            en: (answer) => `Here's why CozyOS was started, from the published project story: ${answer}`,
+            sw: (answer) => `Hii ndiyo sababu CozyOS ilianzishwa, kutoka kwa hadithi ya mradi iliyochapishwa: ${answer}`,
+            fr: (answer) => `Voici pourquoi CozyOS a été créé, d'après l'histoire du projet publiée : ${answer}`,
+            ar: (answer) => `إليك سبب إنشاء CozyOS، من قصة المشروع المنشورة: ${answer}`,
+            so: (answer) => `Tani waa sababta CozyOS loo aasaasay, taas oo laga soo qaatay sheekada mashruuca ee la daabacay: ${answer}`
+        }),
+        "project-origin:not_found": Object.freeze({
+            en: "The public origin story of CozyOS hasn't been published yet, so I don't have an authoritative answer to why it was started.",
+            sw: "Hadithi ya asili ya CozyOS bado haijachapishwa hadharani, kwa hivyo sina jibu la kuthibitishwa kuhusu kwa nini ilianzishwa.",
+            fr: "L'histoire publique des origines de CozyOS n'a pas encore été publiée, je n'ai donc pas de réponse fiable sur les raisons de sa création.",
+            ar: "لم تُنشر بعد قصة نشأة CozyOS العامة، لذا ليس لدي إجابة موثوقة عن سبب إنشائه.",
+            so: "Sheekada guud ee asalka CozyOS weli lama daabicin, sidaas darteed ma haysto jawaab la xaqiijiyay oo ku saabsan sababta loo aasaasay."
+        }),
+
+        "public-story:verified": Object.freeze({
+            en: (answer) => `Here's the published public story of CozyOS: ${answer}`,
+            sw: (answer) => `Hii ndiyo hadithi ya umma ya CozyOS iliyochapishwa: ${answer}`,
+            fr: (answer) => `Voici l'histoire publique publiée de CozyOS : ${answer}`,
+            ar: (answer) => `إليك القصة العامة المنشورة لـ CozyOS: ${answer}`,
+            so: (answer) => `Tani waa sheekada dadweynaha ee CozyOS ee la daabacay: ${answer}`
+        }),
+        "public-story:not_found": Object.freeze({
+            en: "CozyOS doesn't have a published public story yet, so I can't share one right now.",
+            sw: "CozyOS bado haina hadithi ya umma iliyochapishwa, kwa hivyo siwezi kushiriki moja kwa sasa.",
+            fr: "CozyOS n'a pas encore d'histoire publique publiée, je ne peux donc pas en partager une pour le moment.",
+            ar: "ليس لدى CozyOS بعد قصة عامة منشورة، لذا لا يمكنني مشاركة واحدة الآن.",
+            so: "CozyOS weli ma laha sheeko dadweyne oo la daabacay, sidaas darteed hadda ma wadaagi karo mid."
+        }),
+
+        "vision:verified": Object.freeze({
+            en: (answer) => `Here's CozyOS's published vision: ${answer}`,
+            sw: (answer) => `Hii ndiyo dira ya CozyOS iliyochapishwa: ${answer}`,
+            fr: (answer) => `Voici la vision publiée de CozyOS : ${answer}`,
+            ar: (answer) => `إليك رؤية CozyOS المنشورة: ${answer}`,
+            so: (answer) => `Tani waa aragtida CozyOS ee la daabacay: ${answer}`
+        }),
+        "vision:not_found": Object.freeze({
+            en: "CozyOS's vision statement hasn't been published yet, so I don't have an authoritative answer for what it's trying to accomplish.",
+            sw: "Kauli ya dira ya CozyOS bado haijachapishwa, kwa hivyo sina jibu la kuthibitishwa kuhusu kile inachojaribu kutimiza.",
+            fr: "L'énoncé de vision de CozyOS n'a pas encore été publié, je n'ai donc pas de réponse fiable sur ce qu'il cherche à accomplir.",
+            ar: "لم يُنشر بعد بيان رؤية CozyOS، لذا ليس لدي إجابة موثوقة عمّا يسعى لتحقيقه.",
+            so: "Bayaanka aragtida CozyOS weli lama daabicin, sidaas darteed ma haysto jawaab la xaqiijiyay oo ku saabsan waxa uu isku dayayo inuu gaaro."
+        }),
+
+        "mission:verified": Object.freeze({
+            en: (answer) => `Here's CozyOS's published mission: ${answer}`,
+            sw: (answer) => `Hii ndiyo dhamira ya CozyOS iliyochapishwa: ${answer}`,
+            fr: (answer) => `Voici la mission publiée de CozyOS : ${answer}`,
+            ar: (answer) => `إليك مهمة CozyOS المنشورة: ${answer}`,
+            so: (answer) => `Tani waa hadafka CozyOS ee la daabacay: ${answer}`
+        }),
+        "mission:not_found": Object.freeze({
+            en: "CozyOS's mission statement hasn't been published yet, so I don't have an authoritative answer for that.",
+            sw: "Kauli ya dhamira ya CozyOS bado haijachapishwa, kwa hivyo sina jibu la kuthibitishwa kuhusu hilo.",
+            fr: "L'énoncé de mission de CozyOS n'a pas encore été publié, je n'ai donc pas de réponse fiable à ce sujet.",
+            ar: "لم يُنشر بعد بيان مهمة CozyOS، لذا ليس لدي إجابة موثوقة حول ذلك.",
+            so: "Bayaanka hadafka CozyOS weli lama daabicin, sidaas darteed ma haysto jawaab la xaqiijiyay oo ku saabsan taas."
+        }),
+
+        "project-history:verified": Object.freeze({
+            en: (answer) => `Here's the published history of CozyOS: ${answer}`,
+            sw: (answer) => `Hii ndiyo historia ya CozyOS iliyochapishwa: ${answer}`,
+            fr: (answer) => `Voici l'histoire publiée de CozyOS : ${answer}`,
+            ar: (answer) => `إليك تاريخ CozyOS المنشور: ${answer}`,
+            so: (answer) => `Tani waa taariikhda CozyOS ee la daabacay: ${answer}`
+        }),
+        "project-history:not_found": Object.freeze({
+            en: "CozyOS's project history hasn't been published yet, so I don't have an authoritative account of it.",
+            sw: "Historia ya mradi wa CozyOS bado haijachapishwa, kwa hivyo sina maelezo yaliyothibitishwa kuhusu hilo.",
+            fr: "L'historique du projet CozyOS n'a pas encore été publié, je n'en ai donc pas de récit fiable.",
+            ar: "لم يُنشر بعد تاريخ مشروع CozyOS، لذا ليس لدي سرد موثوق له.",
+            so: "Taariikhda mashruuca CozyOS weli lama daabicin, sidaas darteed ma haysto sheekayn la xaqiijiyay oo ku saabsan taas."
         })
     });
 

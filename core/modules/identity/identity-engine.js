@@ -61,6 +61,15 @@
         // never-exposed record key.
         #adminIdCounter = 0; #userIdCounter = 0;
         #applicationEnabled = new Map(); #featureToggles = new Map(); #licenses = new Map(); #licenseHistory = new Map();
+        // RP-035 Phase 5 addition — BUILT_IN core-application tier.
+        // Deliberately a SEPARATE set from #applicationAssignments:
+        // visibility (does every active user see this app at all,
+        // with no per-user assignment needed) stays a distinct concept
+        // from authorization (per-user assignment for everything
+        // else). A core app still honors the existing global
+        // isApplicationEnabled() kill switch — core status is never a
+        // way to bypass that.
+        #coreApplications = new Set();
         #departments = new Map(); #resourcePermissions = new Map();
         #auditLogs = []; #listeners = new Map(); #onceWrapped = new Map();
         #diagnostics = { usersCreated: 0, loginsSucceeded: 0, loginsFailed: 0, sessionsIssued: 0, permissionChecks: 0, errorsHidden: 0, eventsEmitted: 0, memoryBaseline: 3.0 };
@@ -911,6 +920,34 @@
         listApplicationStates() { return Array.from(this.#applicationEnabled.entries()).map(([appName, enabled]) => ({ appName, enabled })); }
 
         /**
+         * BUILT_IN CORE APPLICATION TIER (RP-035 Phase 5)
+         *   registerCoreApplication(appName) declares that an
+         *   application is visible to every active user without any
+         *   per-user assignApplication() call — a genuine visibility
+         *   tier, not a shortcut that silently assigns the app to
+         *   everyone (that would conflate visibility with
+         *   authorization, exactly what this tier exists to avoid).
+         *   A core app still respects the existing global
+         *   setApplicationEnabled() kill switch and still requires an
+         *   active account, same as every other path through
+         *   canAccessApplication().
+         */
+        registerCoreApplication(appName) {
+            if (typeof appName !== "string" || !/^[a-z0-9-]+$/i.test(appName)) throw new TypeError("[Identity] registerCoreApplication(): appName must be a simple alphanumeric/hyphen identifier.");
+            this.#coreApplications.add(appName.toLowerCase());
+            this.#logAudit("CORE_APPLICATION_REGISTERED", appName);
+            this.emit("identity:core_application_registered", { appName });
+            return true;
+        }
+        unregisterCoreApplication(appName) {
+            const removed = this.#coreApplications.delete(String(appName || "").toLowerCase());
+            if (removed) { this.#logAudit("CORE_APPLICATION_UNREGISTERED", appName); this.emit("identity:core_application_unregistered", { appName }); }
+            return removed;
+        }
+        isCoreApplication(appName) { return this.#coreApplications.has(String(appName || "").toLowerCase()); }
+        listCoreApplications() { return Array.from(this.#coreApplications); }
+
+        /**
          * setFeatureEnabled(appName, featureName, enabled)
          *   Real, per-application feature toggle (Receipts/Reports/QR/
          *   Barcode/Camera/OCR/etc.) — a generic key-value store, same
@@ -968,11 +1005,22 @@
          *   the Session Service: no method previously returned a user's
          *   basic profile (username/roles/status) to an external caller.
          *   Never exposes hash/salt — those never leave this engine.
+         *
+         *   RP-035 Phase B Checkpoint 2 addition: `country` and `orgId`
+         *   were always stored on the internal user record (`country`
+         *   at register()'s optional-field line; `orgId` since the
+         *   register() signature's own `orgId = null` parameter) but
+         *   were never exposed by this getter — a real gap, the same
+         *   kind Rule 24 already covers here, not a new field being
+         *   invented. `country` is only ever present when the user (or
+         *   an admin on their behalf) actually supplied it as consented,
+         *   optional profile data at registration — never derived from
+         *   IP, GPS, phone number, language, or any other inference.
          */
         getUser(userId) {
             const user = this.#users.get(userId);
             if (!user) return null;
-            return { userId: user.id, username: user.username, roles: [...(user.roles || [])], status: user.status || "active", companyId: user.companyId ?? null, branchId: user.branchId ?? null, departmentId: user.departmentId ?? null, teamId: user.teamId ?? null, languagePreference: user.languagePreference ?? null };
+            return { userId: user.id, username: user.username, roles: [...(user.roles || [])], status: user.status || "active", companyId: user.companyId ?? null, branchId: user.branchId ?? null, departmentId: user.departmentId ?? null, teamId: user.teamId ?? null, languagePreference: user.languagePreference ?? null, country: user.country ?? null, orgId: user.orgId ?? null };
         }
 
         /**
@@ -1088,7 +1136,13 @@
                 return { available: true, dashboardType: "developer", isPlatformAdmin: false, isDeveloper: true, developerApplications: DEVELOPER_APPLICATIONS };
             }
             const assigned = this.listAssignedApplications(userId).filter(app => this.isApplicationEnabled(app));
-            return { available: true, dashboardType: "user", isPlatformAdmin: false, isDeveloper: false, assignedApplications: assigned };
+            // RP-035 Phase 5: core (BUILT_IN) apps are kept as their
+            // own field — never merged into assignedApplications —
+            // so a caller can always tell whether an app appears
+            // because it's visible-to-everyone or because it was
+            // specifically assigned to this user.
+            const coreApps = this.listCoreApplications().filter(app => this.isApplicationEnabled(app));
+            return { available: true, dashboardType: "user", isPlatformAdmin: false, isDeveloper: false, assignedApplications: assigned, coreApplications: coreApps };
         }
 
         /**
@@ -1101,6 +1155,12 @@
          *   override, global application toggle, per-user assignment)
          *   into one boolean, so the shell's integration is a single
          *   call rather than reimplementing this logic itself.
+         *
+         *   RP-035 Phase 5: a BUILT_IN core application is accessible
+         *   to any active user once the global enable toggle allows
+         *   it — no per-user assignment required. This is a real,
+         *   explicit visibility tier, not every core app silently
+         *   auto-assigned to every user's assignment set.
          */
         canAccessApplication(userId, appName) {
             const user = this.#users.get(userId);
@@ -1109,6 +1169,7 @@
             if (this.isPlatformAdmin(userId)) return true; // admins can reach every real application, including developer-hub
             if (this.isDeveloper(userId)) return appName.toLowerCase() === "developer-hub";
             if (!this.isApplicationEnabled(appName)) return false;
+            if (this.isCoreApplication(appName)) return true;
             return this.listAssignedApplications(userId).includes(appName.toLowerCase());
         }
 

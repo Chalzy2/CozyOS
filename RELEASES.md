@@ -15,6 +15,1161 @@ message for that release.
 
 ---
 
+## RP-035 WOS2 Part 6 — Specification Checkpoint (not a code release)
+
+**Baseline:** `COS-RP035-WOS2-P5-CERTIFIED.zip`, SHA-256
+`ed0f2493697ef82e523cc904c36e8a5d43b92f68fba4547e1dfae5c0e3479782`.
+
+**Added:** no production code. One specification document,
+`docs/history/RP-035-WOS2-P6-Specification.md` (Rule 31), and one
+governance/checkpoint entry. Logged here for lineage continuity only —
+this entry intentionally breaks from the "Added: <code>" template
+above because there is no code to describe; recording it as if there
+were would misrepresent this checkpoint.
+
+**Physical checkpoint:** `COS-RP035-WOS2-P6-SPEC.zip`, SHA-256 (hashed
+twice, matched)
+`959b4186716e289073d8d0def87f870530f906629db5ebee47fc883ee777700b`,
+`unzip -t` clean.
+
+**Byte identity:** diffed against a fresh extraction of the
+P5-CERTIFIED baseline — exactly one file added, zero modified.
+
+---
+
+## RP-035 Section 16 — Live Broadcast & Living Live Surface
+
+**Baseline:** `CozyOS-main-RP-035-CozyAI-KnowledgeIntegration.zip`,
+SHA-256
+`e0081dfcfd92b93a973028415e1c05794a98d26a9f07d820af50e947dc26f9b3`
+(verified via Production-ZIP-first protocol; Rule 29 ownership scan
+performed before any code, reproducing a real WebRTC-in-sandbox
+limitation live before implementation began).
+
+**Added:** `core/shell/live/cozy-live-session.js` — orchestration-only
+Live Session coordinator composing `LiveVideoCapture`,
+`CozyCameraClarityEngine`, `CozyConnectivityTransport`,
+`IdentityEngine`, `ServiceRegistry`. Real state machine; sessionId
+invariant preserved across minimize/expand/fullscreen/drag/resize/
+rotate/navigate — only explicit Stop/X tears down real resources.
+Comments/live text are offline-first, never fabricate `SENT`.
+`core/shell/live/cozy-advertising-policy.js` — the single ad-policy
+decision point (ChurchOS always `ADS_DISABLED`, others default
+`ADS_ALLOWED`), fully separate from media transport. First dashboard
+UI + browser test for the live-session line (15/15,
+`BROWSER_TEST = PASS`, real drag/resize/rotate/navigation, stable
+across repeated runs).
+
+**Absolute honesty boundary held throughout:** true one-to-many
+broadcast (SFU/CDN, unlimited viewers, global viewer count) is
+permanently `CAPABILITY_UNAVAILABLE` — confirmed both by repository-
+wide search and by the repository's own prior, independent
+disclosures that this was deliberately out of scope. Real bounded
+peer-transport code exists and is composed, but is honestly marked
+`NOT_VERIFIED_IN_THIS_ENVIRONMENT` after a live reproduction of real
+WebRTC negotiation failures in this sandbox.
+
+**Tests:** 52/52 Node + 15/15 browser = 67 new; full regression 2146
+passed / 16 pre-existing-unrelated failed (unchanged pattern).
+
+**Byte identity:** diffed against the CozyAI Knowledge Integration
+zip — exactly one new directory (`core/shell/live/`, 5 files).
+Pristine RP-034 Phase 8 comparison still unavailable (not uploaded
+this session).
+
+**Rule 82:** not applicable to this domain; no promotion mutator
+exists regardless.
+
+---
+
+## CozyAI Project Knowledge & Public Story Integration
+
+**Baseline:** `CozyOS-main-RP-035-Section15-CameraClarity.zip`,
+SHA-256
+`6966aa537c0bf4a3b4f61d0902a1913712e68a3061cd8386b91a48fe514f6376`
+(verified via Production-ZIP-first protocol; separate milestone from
+RP-035, zero camera/media files touched).
+
+**Added:** one narrow `FounderStory.getPublicStory(topicTag)` read
+method (no viewerId, public+published only); five new
+`cozy-knowledge-registry.js` fact-getters sharing one implementation;
+five new intents in `rule-based-conversational-provider.js`
+(reordered to fix a real bug where the bare `founder` pattern was
+swallowing a more specific new phrase); one real "how can I register"
+regex fix surfaced by the required regression set; 10 new template
+keys × 5 languages.
+
+**Privacy:** only-me+published → never returned; public+draft → never
+returned; public+published → eligible. All three verified directly.
+No story published this milestone — every new intent honestly
+NOT_FOUND.
+
+**Multilingual:** verified across the real 5-AVAILABLE+6-NOT_READY
+language registry (a separate system from RP-030's 13-language media
+registry — disclosed, not conflated). One canonical fact source,
+localized per language, structurally verified (no per-language
+duplication in the fact layer).
+
+**Tests:** 48/48 new; full regression 2079 passed / 16 pre-existing-
+unrelated failed (unchanged pattern).
+
+**Byte identity:** diffed against RP-035 Section 15 zip — exactly 5
+explained changes, zero RP-035/camera files touched.
+
+---
+
+## RP-035 Section 15 — Camera Clarity / Computational Image Enhancement
+
+**Baseline:** `CozyOS-main-RP-035-Section14-LiveCameraCapture.zip`,
+SHA-256
+`0f282bae5b78cca8634cd85fab297c1221fa9729ad9a37d3443e133000bdd054`
+(verified via Production-ZIP-first protocol; a real one-time timing
+flake in Section 14's own browser test was diagnosed and hardened
+before implementation began — see LATEST.md).
+
+**Added:** `core/engines/video/ui/clarity/cozy-camera-clarity-
+engine.js` — a real, staged image-enhancement pipeline consuming
+Section 14's actual (not assumed) capture contract. Genuinely
+implemented and measurement-verified: TONE_MAPPING, BASIC_DENOISE,
+SHARPEN, LOCAL_CONTRAST. Every other requested capability
+(SUPER_RESOLUTION, AI_DENOISE, DEHAZE, MULTI_FRAME_FUSION, OCR, true
+HDR, NPU, etc.) honestly CAPABILITY_UNAVAILABLE. Quality Guard
+genuinely computes ACCEPT/REDUCE/REJECT from measured sharpness/
+clipping deltas. First dashboard UI + browser test for the clarity
+line (10/10, `BROWSER_TEST = PASS`, live-verified).
+
+**Tests:** 36/36 Node + 10/10 browser = 46 new; full regression 2031
+passed / 16 pre-existing-unrelated failed (unchanged pattern).
+
+**Byte identity:** diffed against RP-035 Section 14 zip — exactly the
+new `clarity/` directory (4 files) plus the one disclosed Section 14
+test-timing fix. Pristine RP-034 Phase 8 comparison still unavailable
+(not uploaded this session).
+
+**Rule 82:** not applicable to this domain; no promotion mutator
+exists regardless.
+
+**Video clarity processing:** explicitly out of scope this pass —
+Section 14's `stopRecording()` returns a real Blob, not a dataUrl;
+real per-frame video enhancement is a substantially larger
+implementation, documented as a gap, not fabricated.
+
+---
+
+## RP-035 Section 14 — Live Camera Capture Application
+
+**Baseline:** `CozyOS-main-RP-035-Section13-LiveConnectivity.zip`,
+SHA-256
+`fe599e95c461f85d0809917cf4a304a8840b911a9ad7f2a44617c0d4081f7ffa`
+(verified via Production-ZIP-first protocol before extraction).
+
+**Added:** `core/engines/video/ui/cozy-live-camera-capture-app.js` —
+real preview/photo/recording capture composing `LiveVideoCapture` +
+`CozyLivingConnectivity` only. Capture-only; capture/clarity boundary
+enforced at the source level (`clarityProcessed: false`, permanent
+`CAPABILITY_UNAVAILABLE` for every enhancement capability). First
+dashboard UI + mandatory browser test for the camera-capture line
+(13/13, `BROWSER_TEST = PASS`, using Chromium's real fake-camera-
+device flags, live-verified). `live-capture-engine.js`'s disclosed
+`CameraEngine`/`AudioManager` mismatch confirmed real and left
+unrepaired, per instruction.
+
+**Tests:** 37/37 Node + 13/13 browser = 50 new; full regression 1985
+passed / 16 pre-existing-unrelated failed (unchanged pattern,
+including `camera-manager.test.js` still crashing — confirmed
+pre-existing, not caused by this session).
+
+**Byte identity:** diffed against RP-035 Section 13 zip — exactly one
+new directory (`core/engines/video/ui/`, 4 files). Pristine RP-034
+Phase 8 comparison still unavailable (not uploaded this session).
+
+**Rule 82:** not applicable to this domain; no promotion mutator
+exists regardless.
+
+**Section 15 Camera Clarity Engine:** completely out of scope, not
+started.
+
+---
+
+## RP-035 Section 13 — Live/Connectivity Application
+
+**Baseline:** `CozyOS-main-RP-035-Phase5.zip`, SHA-256
+`0fd8fad385a77b03f40f7b4e08ec2b094a08d15100e46f7277e35a059d070fd1`
+(verified via Production-ZIP-first protocol before extraction).
+
+**Added:** `core/connectivity/ui/cozy-live-connectivity-app.js` —
+turns the previously ENGINE_ONLY RP-033 Gate 1/2 capability into a
+real `IMPLEMENTED_APPLICATION` (§29): capability overview, offline
+queue, local device discovery, connectivity session state machine,
+pairing composition. First dashboard UI + mandatory browser test for
+the connectivity line (8/8, `BROWSER_TEST = PASS`, live-verified).
+Registered via `ServiceRegistry` but explicitly NOT `BUILT_IN` —
+visibility stays an admin-assignment decision, distinct from
+Media Intelligence's core-app treatment.
+
+**Tests:** 32/32 Node + 8/8 browser = 40 new; full regression 1935
+passed / 16 pre-existing-unrelated failed (unchanged pattern).
+
+**Byte identity:** diffed against RP-035 Phase 5 zip — exactly one new
+directory (`core/connectivity/ui/`, 4 files). Pristine RP-034 Phase 8
+comparison still unavailable (not uploaded this session).
+
+**Rule 82:** not applicable to this domain; no promotion mutator
+exists regardless.
+
+---
+
+## RP-035 Phase 5 — Living Media Intelligence Discovery
+
+**Baseline:** `CozyOS-main-RP-035-Phase4.zip`, SHA-256
+`2435eda95d11499697f568b2a58025a9081875691d4736fbd3f6df1b1657732e`
+(verified via Production-ZIP-first protocol before extraction).
+
+**Added:** `core/modules/intelligence/media/cozy-media-intelligence.js`
+— testimony discovery, person-appearance search (confirmed/possible,
+never automated), timestamp navigation, evidence-aware search,
+offline-first availability, and a real disclosed-deterministic
+`answerMediaQuestion()` for CozyAI. First dashboard UI + mandatory
+browser test for the media-intelligence line (9/9, `BROWSER_TEST =
+PASS`, live-verified). New `BUILT_IN` core-application tier in
+`identity-engine.js` — visibility kept separate from per-user
+authorization.
+
+**Tests:** 50/50 Node + 9/9 browser = 59 new; full regression 1895
+passed / 16 pre-existing-unrelated failed (unchanged pattern).
+
+**Byte identity:** diffed against RP-035 Phase 4 zip — exactly the 1
+intentional identity-engine.js change + 2 new files + the new ui/
+directory. Pristine RP-034 Phase 8 comparison still unavailable (not
+uploaded this session).
+
+**Rule 82:** UNTOUCHED.
+
+---
+
+## RP-035 Phase 4 — Living Media Evidence & Intelligence Enrichment
+
+**Baseline:** `CozyOS-main-RP-035-Phase3.zip`, SHA-256
+`983adb2eeed734727d0d66d95e4367fa3d7ec1670cd63423a52014d2ed787030`.
+
+**Added:** `core/modules/intelligence/media/cozy-media-evidence.js` —
+13-type provider-neutral evidence layer (LANGUAGE/COUNTRY/REGION/
+COMMUNITY/DIALECT/PERSON_REFERENCE/EVENT/TOPIC/TIMESTAMP/SOURCE/
+MEDIA_METADATA/ANALYSIS_REFERENCE/PROVENANCE) composing Phase 2/3/
+RP-030/Phase-1-country/Phase 6/Phase 7 real APIs only. Deterministic
+reconciliation (CONSISTENT/MISSING_RESEARCH/CONFLICT/PRIVACY_BLOCKED/
+STALE_EVIDENCE/NOT_FOUND) and non-destructive repair candidates.
+
+**Fixed:** a real region/dialect/community evidence-forwarding gap in
+Phase 1's `cozy-media-analysis-link.js` — genuine upstream data loss,
+found via live reproduction, fixed without weakening any test.
+
+**Tests:** 108/108 new; full regression 1836 passed / 16 pre-existing-
+unrelated failed (unchanged pattern).
+
+**Byte identity:** diffed against RP-035 Phase 3 zip — exactly the 2
+new files plus the 1 bugfixed file. Pristine RP-034 Phase 8 comparison
+still unavailable (not uploaded this session).
+
+**Rule 82:** UNTOUCHED.
+
+---
+
+## RP-035 Phase 3 — Living Media Research Search & Intelligence Retrieval
+
+**Baseline:** `CozyOS-main-RP-035-Phase2.zip`, SHA-256
+`56c963be4798aff8cd1f0a213b5760c3fb6141807bda0eb366300dc38dff5375`.
+
+**Added:** `core/modules/intelligence/media/cozy-research-search.js` —
+structured-query builder + search/retrieval orchestration over Phase
+2's ResearchRecord layer, composing Phase 2/Phase-3-of-RP-034/RP-030/
+RP-035-Phase-1 real APIs only. 13 query modes. Deterministic ranking.
+Ambiguous language/community terms return UNRESOLVED. Person search
+never claims automated face detection.
+
+**Tests:** 46/46 new; full regression 1728 passed / 16 pre-existing-
+unrelated failed (unchanged pattern).
+
+**Byte identity:** diffed against RP-035 Phase 2 zip — only the two
+expected new files. Pristine RP-034 Phase 8 comparison still
+unavailable (not uploaded this session).
+
+**Rule 82:** UNTOUCHED.
+
+---
+
+## RP-035 Phase 2 — Living Media Research Intelligence
+
+**Baseline:** FINAL VERIFIED RP-035 Phase 1 package (13-default +
+optional-pack + country/flag correction).
+
+**Added:** `core/modules/intelligence/media/cozy-research-intelligence.js`
+— provider-neutral ResearchRecord layer (12 research types), composing
+Phase 1-7/RP-030 real APIs only. Person appearance stays
+CAPABILITY_UNAVAILABLE except admin-confirmed references. Confirmation
+never overwrites original evidence. Idempotent duplicate detection.
+Offline-sync composition via real `OPERATION_TYPES`.
+
+**Fixed:** a real `languageId`/`languageCode` field-name mismatch in
+Phase 1's `cozy-media-analysis-link.js` that silently prevented
+`record.language.detected` from ever being set.
+
+**Tests:** 94/94 new; full regression 1682 passed / 16 pre-existing-
+unrelated failed (unchanged pattern).
+
+**Byte identity:** diffed against the RP-035 Phase 1 zip — only the
+expected new/modified files. Pristine RP-034 Phase 8 comparison still
+unavailable (not uploaded this session).
+
+**Rule 82:** UNTOUCHED.
+
+---
+
+## RP-035 Phase 1 — Living Media Intelligence & Integration Completion
+
+**Baseline:** `CozyOS-main-RP-034-Phase8.zip` (RP-034 FINAL CERTIFIED),
+SHA-256 `d43b42d898721295cab7a08bc1518e2e8f6ce6a8bdf9e28f2c251a7cb5666e17`
+— verified via `unzip -t` (clean) and independent double SHA-256
+computation before any code was written.
+
+**Scope:** Closes RP-034-PHASE8-ANALYSIS-FIELD-GAP — the explicit,
+authoritative, provenance-preserving, privacy-aware, idempotent
+relationship between Phase 2's index record and Phase 4's analysis
+job, via one new additive coordinator. No RP-034 file modified.
+
+**Files added:**
+`core/modules/intelligence/media/cozy-media-analysis-link.js`,
+`core/modules/intelligence/media/tests/cozy-media-analysis-link.test.js`.
+
+**Tests:** 80/80 new, real, no mocks against the complete Phase 1-8 +
+RP-033 + RP-029/030/031 chain. Full 61-file pre-existing suite
+re-run: 1484 passing (unchanged baseline pattern) + 80 new = 1564
+passing, 16 pre-existing-unrelated failures (unchanged).
+
+**Byte identity:** confirmed against a fresh, independent extraction
+of the baseline ZIP — only the two files above differ.
+
+**RP-034-PHASE8-ANALYSIS-FIELD-GAP: CLOSED.**
+
+Package: `CozyOS-main-RP-035-Phase1.zip`. Real SHA-256 communicated
+once, externally, in this delivery's own message (Rule 60 — never
+embedded in the package itself).
+
+Confirms: RP-034 Phase 8's own disclosed finding
+(`RP-034-PHASE8-ANALYSIS-FIELD-GAP`) is now resolved, not merely
+re-stated.
+
+---
+
+## RP-034 Phase 8 — Final Integration, End-to-End Certification & Release (FINAL PHASE — RP-034 FINAL CERTIFIED)
+
+**Baseline:** `CozyOS-main-RP-034-Phase7.zip`, SHA-256
+`1df7698153324ae008abf105aa0816a0268ed634e20ffad653450ff1cf0e03b5`
+(matched exactly — both the previously delivered hash and the hash
+stated in this phase's own spec — computed twice independently).
+`unzip -t` clean. Phase 1-7, Gate 1/2, RP-029/030/031 all re-run and
+confirmed passing (60-file baseline).
+
+**Scope:** Phase 8 — the final phase of the RP-034 milestone. See
+`docs/builder/knowledge/repair-history-registry.md` RP-034 Phase 8
+entry for full detail. Adds a deliberately thin integration
+coordinator (`cozy-rp034-integration.js`) composing the real, complete
+Phase 1-7 + RP-033 chain — no new engine. `getIntegrationStatus()`/
+`getCapabilityMatrix()` report real, freshly-computed capability
+status across all 7 phases + RP-033, never upgraded. `runCertificationScenario()`
+executes the canonical 14-step end-to-end scenario with real API calls
+throughout, recording every real outcome — never fabricating SYNCED or
+any global-success state. `verifyProvenanceChain()`/
+`verifyIdentitySeparation()` complete the certification surface.
+
+**A genuine integration finding surfaced, not hidden:** Phase 2's
+`record.analysis` field is never updated by Phase 4's separate job
+store — a real, pre-existing gap between two already-delivered phases,
+honestly disclosed rather than papered over.
+
+**Two test-authoring bugs (not engine bugs) found and fixed** during
+this session's first test run — see HANDOFF.md for detail.
+
+**Regression:** all 60 pre-existing Node test files re-run,
+byte-for-byte identical outcome to the pre-Phase-8 baseline; the 1 new
+test file passes 86/86.
+
+**Repository SHA-256 (this release, computed after all governance
+files were finalized):**
+`d9bfa4e63a182cad3f12bf6ef68d903922d973aeeefbf64cea4bc57c0392d59a`
+(method: `find . -type f ! -path './_archive/*' ! -name 'RELEASES.md'
+-print0 | sort -z | xargs -0 sha256sum | sha256sum`).
+
+**Package:** `CozyOS-main-RP-034-Phase8.zip`. Package SHA-256 is
+communicated in the delivery message for this release, not embedded
+here (see note above on why).
+
+**Browser testing:** `BROWSER_TEST = NOT_APPLICABLE` (no UI
+introduced).
+
+**Final RP-034 certification:** Phase 1 ✅ through Phase 8 ✅ — **RP-034:
+FINAL CERTIFIED**, with all real, disclosed environment constraints
+(no YouTube API credentials, no live network, no real second physical
+device for WebRTC, no real encryption/cloud sync/Wi-Fi Direct/native
+hotspot/ASR/OCR/face recognition) honestly preserved throughout.
+
+**Next:** RP-034 is complete. Further work belongs to a new repair
+identifier.
+
+---
+
+## RP-034 Phase 7 — Offline Sync & Reconciliation Engine
+
+**Baseline:** `CozyOS-main-RP-034-Phase6.zip`, SHA-256
+`4089084775597d1b960a7c033460ac4ae022c63bd47728156b3898ecfb3c7c10`
+(matched exactly, computed twice independently). `unzip -t` clean.
+Phase 1-6, Gate 1/2, RP-029/030/031 all re-run and confirmed passing.
+
+**Scope:** Phase 7 of the RP-034 milestone (8 phases planned; NOT the
+full milestone — Phase 8 final integration remains). See
+`docs/builder/knowledge/repair-history-registry.md` RP-034 Phase 7
+entry for full detail. Adds a real sync operation model (10 types),
+real local-first behavior, real idempotency, real payload-hash
+verification, real versioning/conflict detection and deterministic
+resolution (sensitive fields always forcing manual review), real
+quarantine and African-language-routing preservation across sync, real
+RP-033 Gate 2 transport composition with privacy re-evaluated at
+transmission time, real multi-device independent status reporting
+(never a fabricated global state), and a real append-only audit trail.
+No SYNCED anywhere — VERIFIED (a real Gate 2 state) is the strongest
+outcome. Rule 82 fully untouched.
+
+**A real bug found and fixed before delivery:** `compareVersions()`
+short-circuited on numeric equality before checking base-divergence,
+misreporting the spec's own explicit same-version-conflict example as
+UNCHANGED. Fixed and locked in by a dedicated test.
+
+**Regression:** all 59 pre-existing Node test files re-run,
+byte-for-byte identical outcome to the pre-Phase-7 baseline (49 clean,
+2 with pre-existing unrelated internal failures
+`engine-bridge`/`audio-manager`, 8 pre-existing load failures
+unrelated to this scope); the 1 new test file passes 77/77 (spec
+minimum: 70+).
+
+**Repository SHA-256 (this release, computed after all governance
+files were finalized):**
+`370cbbaa4e21f655119569fc8d0ccf8ee50102ce53696b62fb16268a83b5d322`
+(method: `find . -type f ! -path './_archive/*' ! -name 'RELEASES.md'
+-print0 | sort -z | xargs -0 sha256sum | sha256sum`).
+
+**Package:** `CozyOS-main-RP-034-Phase7.zip`. Package SHA-256 is
+communicated in the delivery message for this release, not embedded
+here (see note above on why).
+
+**Browser testing:** `BROWSER_TEST = NOT_APPLICABLE` (no Phase 7 UI
+built).
+
+**Next:** RP-034 Phase 8 (final integration and acceptance).
+
+---
+
+## RP-034 Phase 6 — Privacy, Identity & Provenance
+
+**Baseline:** `CozyOS-main-RP-034-Phase5.zip`, SHA-256
+`0e6b2b772673e7683677eef0b593f9a225aea21afb14903db2391ab9fa508a90`
+(matched exactly, computed twice independently). `unzip -t` clean.
+Phase 1-5, Gate 1/2, and RP-029/030/031 all re-run and confirmed
+passing.
+
+**Scope:** Phase 6 of the RP-034 milestone (8 phases planned; NOT the
+full milestone). See
+`docs/builder/knowledge/repair-history-registry.md` RP-034 Phase 6
+entry for full detail. Adds seven separate identity types, six real
+privacy tiers with tier-based display filtering, real expiring/
+revocable purpose-scoped consent, real sequential knowledge lineage,
+real redaction, real export/transfer/research/publish/share controls,
+real privacy-aware RP-033 packet filtering (never fabricated SYNCED),
+a real receiving-device validation pipeline (never a direct trusted-
+pack insert), real domain-knowledge protection, a real append-only
+audit trail, and an honest right-to-withdraw (no real deletion
+mechanism exists — never claims "deleted everywhere"). Rule 82 fully
+untouched.
+
+**No bug found this session** — both the drafted implementation's
+smoke test and the full 108-test suite passed on first run.
+
+**Regression:** all 58 pre-existing Node test files re-run,
+byte-for-byte identical outcome to the pre-Phase-6 baseline (48 clean,
+2 with pre-existing unrelated internal failures
+`engine-bridge`/`audio-manager`, 8 pre-existing load failures
+unrelated to this scope); the 1 new test file passes 108/108 (spec
+minimum: 70+), including seven real, measured performance tests.
+
+**Repository SHA-256 (this release, computed after all governance
+files were finalized):**
+`c04e5b1bd6fd6d3c2c86ca57c0ea66bed9cd6b1ca23a2509e31de144f28422f5`
+(method: `find . -type f ! -path './_archive/*' ! -name 'RELEASES.md'
+-print0 | sort -z | xargs -0 sha256sum | sha256sum`).
+
+**Package:** `CozyOS-main-RP-034-Phase6.zip`. Package SHA-256 is
+communicated in the delivery message for this release, not embedded
+here (see note above on why).
+
+**Browser testing:** `BROWSER_TEST = NOT_APPLICABLE` (no Phase 6 UI
+built).
+
+**Next:** RP-034 Phase 7 (offline synchronization).
+
+---
+
+## RP-034 Phase 5 — African Language Intelligence & Automatic Pack Routing
+
+**Baseline:** `CozyOS-main-RP-034-Phase4.zip`, SHA-256
+`6c0e653c4aac6a638b03cca6b9fccabfbb5adf4a86aed1f7bcb6e0e4a2f7f1ff`
+(matched exactly, computed twice independently). `unzip -t` clean.
+Phase 1-4 (30/30, 55/55, 56/56, 63/63) re-run and confirmed passing.
+
+**Scope:** Phase 5 of the RP-034 milestone (8 phases planned; NOT the
+full milestone — do not claim RP-034 overall complete). See
+`docs/builder/knowledge/repair-history-registry.md` RP-034 Phase 5
+entry for full detail. Adds a real six-level language routing
+hierarchy (community+dialect -> community -> region -> country ->
+general pack -> honest fallback) over the real RP-030 registry; real
+evidence-hierarchy-derived confidence; real meaning isolation; a real
+ASR-readiness interface (honestly CAPABILITY_UNAVAILABLE, never fake
+transcription); real code-switching/multi-language support; real
+community learning (composing RP-031), media integration (composing
+RP-034 Phase 4), and hotspot transport (composing RP-033 Gate 2); a
+real language coverage registry and admin intelligence API. Rule 82
+untouched, fully authoritative.
+
+**A real bug found and fixed before delivery:** community-level
+routing matched even without real community evidence, due to a
+composite-key collapse when community was absent. Fixed and locked in
+by a dedicated test.
+
+**Regression:** all 57 pre-existing Node test files re-run,
+byte-for-byte identical outcome to the pre-Phase-5 baseline (47 clean,
+2 with pre-existing unrelated internal failures
+`engine-bridge`/`audio-manager`, 8 pre-existing load failures
+unrelated to this scope); the 1 new test file passes 63/63 (spec
+minimum: 60+), including five real, measured performance tests.
+
+**Repository SHA-256 (this release, computed after all governance
+files were finalized):**
+`403e47ce21c2a2319907847e23223058d3e7419f085ede42124c5db5e221528a`
+(method: `find . -type f ! -path './_archive/*' ! -name 'RELEASES.md'
+-print0 | sort -z | xargs -0 sha256sum | sha256sum`).
+
+**Package:** `CozyOS-main-RP-034-Phase5.zip`. Package SHA-256 is
+communicated in the delivery message for this release, not embedded
+here (see note above on why).
+
+**Browser testing:** `BROWSER_TEST = NOT_APPLICABLE` (no Phase 5 UI
+built).
+
+**Next:** RP-034 Phase 6 (privacy/identity expansion).
+
+---
+
+## RP-034 Phase 4 — Full Remote Media Intelligence Pipeline
+
+**Baseline:** `CozyOS-main-RP-034-Phase3.zip`, SHA-256
+`2c2bc721597fc9cbffe6a7e96deb1b184b919bb4c23730cb9acf81cd642ad8a9`
+(matched exactly, computed twice independently). `unzip -t` clean.
+Phase 1 (30/30), Phase 2 (55/55), Phase 3 (56/56) re-run and confirmed
+passing.
+
+**Scope:** Phase 4 of the RP-034 milestone (8 phases planned; NOT the
+full milestone). See
+`docs/builder/knowledge/repair-history-registry.md` RP-034 Phase 4
+entry for full detail. Adds a real, job-based pipeline coordinator (9
+job types, each with an honest real/CAPABILITY_UNAVAILABLE boundary),
+real four-level language routing (composing RP-030), real duplicate-
+fingerprint handling, real safety-gate integration (RP-029-C), real
+knowledge-domain separation (7 domains, always caller-asserted, never
+auto-verified), real hotspot transport (composing RP-033 Gate 2's
+real `sendPacket`/`receivePacket`, real state vocabulary — no
+fabricated SYNCED), and real admin/research visibility. No video
+download, no automatic topic/language detection, no fabricated
+analysis — Phases 5-8 explicitly deferred.
+
+**No bugs found this session** — all 63 new tests passed on the first
+run.
+
+**Regression:** all 56 pre-existing Node test files re-run,
+byte-for-byte identical outcome to the pre-Phase-4 baseline (46 clean,
+2 with pre-existing unrelated internal failures
+`engine-bridge`/`audio-manager`, 8 pre-existing load failures
+unrelated to this scope); the 1 new test file passes 63/63 (spec
+minimum: 50+).
+
+**Repository SHA-256 (this release, computed after all governance
+files were finalized):**
+`24147009585707bd48f145f60c41e9b1a5d780e401581fad428746ab4fc1fcf5`
+(method: `find . -type f ! -path './_archive/*' ! -name 'RELEASES.md'
+-print0 | sort -z | xargs -0 sha256sum | sha256sum`).
+
+**Package:** `CozyOS-main-RP-034-Phase4.zip`. Package SHA-256 is
+communicated in the delivery message for this release, not embedded
+here (see note above on why).
+
+**Browser testing:** `BROWSER_TEST = NOT_APPLICABLE` (no Phase 4 UI
+built).
+
+**Next:** RP-034 Phase 5 (expanded African-language intelligence/
+routing).
+
+---
+
+## RP-034 Phase 3 — Remote Media Search & Research Engine
+
+**Baseline:** `CozyOS-main-RP-034-Phase2.zip`, SHA-256
+`17bdd7be79f4fed575e77161197873fd6159183ab00e4d1d72f8e8ead61b6920`
+(matched exactly, computed twice independently). `unzip -t` clean.
+Phase 2 (55/55) re-run and confirmed passing.
+
+**Scope:** Phase 3 of the RP-034 milestone (8 phases planned; NOT the
+full milestone). See
+`docs/builder/knowledge/repair-history-registry.md` RP-034 Phase 3
+entry for full detail. Adds real, deterministic local search/ranking
+(no fabricated relevance scores), the full core query API, real
+language routing for queries (composing RP-030 read-only), real
+research tooling (aggregation, regional/language comparison, conflict
+detection, term frequency distinguishing source vs. user-usage data,
+research priority), real refresh delegation to Phase 1/2 (no second
+network implementation), and real quarantine visibility (composing
+RP-029-C read-only). No semantic search, no video download/frame/OCR/
+ASR/face capability — Phases 4-8 explicitly deferred.
+
+**A real bug found and fixed before delivery:** `quarantineLabel()`
+read the wrong field path on a quarantine entry (`entry.sourceRecordId`
+instead of the real `entry.fields.sourceRecordId`), silently mislabeling
+every quarantined result as RELEASED. Fixed and locked in by a
+dedicated test.
+
+**Regression:** all 55 pre-existing Node test files re-run,
+byte-for-byte identical outcome to the pre-Phase-3 baseline (45 clean,
+2 with pre-existing unrelated internal failures
+`engine-bridge`/`audio-manager`, 8 pre-existing load failures
+unrelated to this scope); the 1 new test file passes 56/56 (spec
+minimum: 40+).
+
+**Repository SHA-256 (this release, computed after all governance
+files were finalized):**
+`a032e779e019339d9a4a6c247d30d380531c03e8f53a415526b63fa94fe8942a`
+(method: `find . -type f ! -path './_archive/*' ! -name 'RELEASES.md'
+-print0 | sort -z | xargs -0 sha256sum | sha256sum`).
+
+**Package:** `CozyOS-main-RP-034-Phase3.zip`. Package SHA-256 is
+communicated in the delivery message for this release, not embedded
+here (see note above on why).
+
+**Browser testing:** `BROWSER_TEST = NOT_APPLICABLE` (no Phase 3 UI
+built).
+
+**Next:** RP-034 Phase 4 (full media analysis pipeline).
+
+---
+
+## RP-034 Phase 2 — Persistent Remote Media Intelligence Index
+
+**Baseline:** `CozyOS-main-RP-034-Phase1.zip`, SHA-256
+`8b56578f91be1a4448850a8f63638bed654c5d5a6e6e3334a58f5733130f9335`
+(matched exactly, computed twice independently). `unzip -t` clean.
+Phase 1 (30/30), RP-033 Gate 1 (34/34), Gate 2 (51/51) re-run and
+confirmed passing.
+
+**Scope:** Phase 2 of the RP-034 milestone (8 phases planned; NOT the
+full milestone). See
+`docs/builder/knowledge/repair-history-registry.md` RP-034 Phase 2
+entry for full detail. Adds real, in-memory persistent CRUD +
+versioning (via composed `CozyMemory`), real field-aware local search,
+real duplicate prevention, real per-field provenance, real language
+routing (composing RP-030 read-only), real privacy-secret rejection,
+an honestly `SYNC_CAPABILITY_UNAVAILABLE`-only sync contract, and real
+metadata refresh composing the real Phase 1 YouTube connector. No
+video download/frame/OCR/transcript/speech/face/scene capability
+exists — Phases 3-8 explicitly deferred.
+
+**A real bug found and fixed before delivery:** `listRecords()`
+misread `CozyMemory.listKeys()`'s real return shape, silently breaking
+`search()`. Fixed and re-verified before the test suite was written.
+
+**Regression:** all 54 pre-existing Node test files re-run. One
+transient, non-reproducible flake in RP-033 Gate 2's own test was
+investigated (standalone re-runs and a full second regression pass
+both clean, byte-identical to baseline) and recorded as pre-existing/
+unrelated, not caused by this session. The 1 new test file passes
+55/55 (spec minimum: 30+).
+
+**Repository SHA-256 (this release, computed after all governance
+files were finalized):**
+`970071a29ce20a21445eb4cf9cfe23050256c86d90494b694c144b753608be63`
+(method: `find . -type f ! -path './_archive/*' ! -name 'RELEASES.md'
+-print0 | sort -z | xargs -0 sha256sum | sha256sum`).
+
+**Package:** `CozyOS-main-RP-034-Phase2.zip`. Package SHA-256 is
+communicated in the delivery message for this release, not embedded
+here (see note above on why).
+
+**Browser testing:** `BROWSER_TEST = NOT_APPLICABLE` (no Phase 2 UI
+built).
+
+**Next:** RP-034 Phase 3 (advanced local search/research).
+
+---
+
+## RP-034 Phase 1 — CozyOS Remote Media Intelligence Connector (Connector Foundation — YouTube)
+
+**Baseline:** `CozyOS-main-RP-033-Gate2.zip`, SHA-256
+`fd03e226c10580830e689684d7a8f0fa6fb33d76349d38e32742cecb2d5189e2`.
+`unzip -t` clean. Gate 2's 51/51 and Gate 1's 34/34 re-run and passing
+before any RP-034 code was written.
+
+**Scope:** Phase 1 of the 8-phase RP-034 milestone (overall milestone
+remains IN PROGRESS — persistent index, CozyAI search, full transcript/
+OCR pipeline, African-language routing, privacy/identity, and RP-033
+offline-sync composition are Phases 2-8). New file `core/modules/
+intelligence/media/cozy-media-connector.js`: a generic, reusable
+`MediaConnectorRegistry` plus a real `YouTubeConnector` (authorization
+state, honest capability detection, real URL/duration parsing, real
+YouTube Data API v3 metadata retrieval). No existing file was modified.
+See `HANDOFF.md` and `LATEST.md` for the full session record.
+
+**Package:** `CozyOS-main-RP-034-Phase1.zip`. Package SHA-256:
+*(communicated once, externally, in the delivery message for this
+release).*
+
+**Tests:** 30/30 new Phase 1 tests, plus 202 regression tests across
+RP-033 Gate 1/Gate 2, RP-029 (knowledge ingestion/community/registry/
+review/safety-gate), RP-030/031 (language pack registry, acquisition
+pipeline), and the language registry — all passing.
+
+**Honest limitation:** a real call against the live YouTube Data API
+from this sandbox returned a real HTTP 403 (no general outbound network
+access in this environment) — reported honestly by the connector.
+
+**Deferred:** Remote Media Index (Phase 2), CozyAI search (Phase 3),
+full media intelligence pipeline (Phase 4), African-language regional
+routing (Phase 5), privacy/identity (Phase 6), RP-033 offline sync
+composition (Phase 7), remaining Phase 8 test categories.
+
+---
+
+## RP-033 Gate 2 — Cozy Living Connectivity (Real Pairing + Transport)
+
+**Baseline:** `CozyOS-main-RP-033-Gate1.zip`, SHA-256
+`84442d44644cc1020f56394fa9e1500ab4312a2dcb6bf1061bc158bba26139a8`.
+`unzip -t` clean. Gate 1's 34/34 tests re-run and passing before any
+Gate 2 code was written.
+
+**Scope:** Gate 2 of the RP-033 milestone (overall milestone remains IN
+PROGRESS — BLE GATT transport, full trust evaluation, and multi-hop
+relay remain later gates). New file `core/connectivity/
+cozy-connectivity-transport.js` composes the existing, unmodified
+`cozy-connect.js`, `cozy-living-connectivity.js`, `live-hotspot-
+engine.js`, and `cozy-share.js` to turn Gate 1's contracts into a real
+COZYPAIR invitation flow, real WebRTC host/join pairing, a real
+DataChannel send/receive adapter, the packet-integrity pipeline, and an
+offline store-and-forward queue. No existing file was modified. See
+`HANDOFF.md` and `LATEST.md` for the full session record.
+
+**Package:** `CozyOS-main-RP-033-Gate2.zip`. Package SHA-256:
+*(communicated once, externally, in the delivery message for this
+release).*
+
+**Tests:** 51/51 new Gate 2 tests + 34/34 Gate 1 regression, all
+passing (`core/connectivity/test/cozy-connectivity-transport.test.js`).
+Genuine Chromium/Playwright browser E2E attempted
+(`core/connectivity/test/browser-e2e-gate2.js`) — real
+`RTCPeerConnection`/host-candidate gathering confirmed working; full
+ICE-gathering-complete does not fire in this sandboxed container's
+no-outbound-network environment, so the negotiated-channel portion is
+honestly reported `BROWSER_TEST = ATTEMPTED, PARTIAL`, not a fabricated
+PASS.
+
+**Deferred:** BLE GATT data transport, full cryptographic trust
+evaluation, multi-hop relay/routing, crypto/payment settlement.
+
+---
+
+## RP-033 Gate 1 — Cozy Living Offline Connectivity (Connectivity Core + Capability Detection)
+
+**Baseline:** `CozyOS-main-RP-032-Living-Compressor.zip`, SHA-256
+`cf6fe2ca312feb080a3311d379bb9c7789ad4be1d26f3958097fcc750efe7bcc`
+(matched exactly, computed twice independently). `unzip -t` clean.
+
+**Scope:** Gate 1 of the RP-033 milestone (overall milestone remains
+IN PROGRESS — Gate 2+ carry real transport). New file `core/
+connectivity/cozy-living-connectivity.js` composes the existing,
+unmodified `core/connectivity/cozy-connect.js` and `core/engines/
+collaboration/live-hotspot-engine.js` for honest capability detection,
+and defines the offline-first connectivity state machine, the
+store-and-forward packet contract, and identity/session/invitation/
+replay-protection contracts. No new physical transport was created;
+no existing file was modified. See `HANDOFF.md` and `LATEST.md` for
+the full session record.
+
+**Package:** `CozyOS-main-RP-033-Gate1.zip`. Package SHA-256:
+*(communicated once, externally, in the delivery message for this
+release — see the note in this file's header on why a package cannot
+embed a correct hash of its own final bytes).*
+
+**Tests:** 34/34 passing (`core/connectivity/test/
+cozy-living-connectivity.test.js`).
+
+---
+
+## RP-032 — CozyOS Living Compressor
+
+**Baseline:** `CozyOS-main-RP-031-Phase2B-Increment5.zip`, SHA-256
+`3ea2018ba9276615b8424b830112f3f88a76128326e9b798e86f34f2148412d9`
+(matched exactly, computed twice independently). `unzip -t` clean.
+
+**Scope:** A new, independent milestone (not part of RP-031-B). Real,
+offline-first compression planning/orchestration engine. See
+`docs/builder/knowledge/repair-history-registry.md` RP-032 entry for
+full detail. Composes the existing real M333 text compressor
+(`window.CozyOS.LivingCompressor`) for every text-bearing file, real
+RP-030 language-pack records for preservation planning, the real
+RP-029-C safety gate for quarantine protection, and the real
+`LiveHotspotEngine` for local package transfer — no duplicate
+compressor, no second transport, no second safety system. PHOTO/
+VIDEO/AUDIO/ARCHIVE always honestly report `CAPABILITY_UNAVAILABLE`/
+`ESTIMATE_UNAVAILABLE` — no real binary/codec compression backend
+exists anywhere in this repository (confirmed by direct source read of
+two existing files). Enforces mandatory user approval for every
+destructive action, real verify/restore via round-trip decompression +
+checksum, and an African Language Preservation rule (LOW_USAGE ≠
+LOW_VALUE) preventing bare usage-based deletion of language-pack data.
+
+**A real bug found and fixed before delivery:** `planCompression()`
+did not check whether the real text-compressor backend was actually
+loaded, only file type + content presence. Fixed with an explicit
+presence check; caught by this session's own test suite.
+
+**Regression:** all 50 pre-existing Node test files re-run,
+byte-for-byte identical outcome to the pre-session baseline (40 clean,
+2 with pre-existing unrelated internal failures `engine-bridge`/
+`audio-manager`, 8 pre-existing load failures unrelated to this
+scope); the 1 new test file passes 49/49.
+
+**Repository SHA-256 (this release, computed after all governance
+files were finalized, including this pass's delivery-confirmation
+updates to `HANDOFF.md`, `repair-queue.md`, and
+`repair-history-registry.md`):**
+`ef3195ab6bad9014b58c6be5ebc4961b91fcd081e24bd6177a7a3356ab419097`
+(method: `find . -type f ! -path './_archive/*' ! -name 'RELEASES.md'
+-print0 | sort -z | xargs -0 sha256sum | sha256sum`; computed twice,
+independently, identical both times).
+
+**Package:** `CozyOS-main-RP-032-Living-Compressor.zip`. Delivered
+this pass. **Package SHA-256:** Generated after packaging — see
+delivery message for value (computed twice, independently, identical
+both passes). `unzip -t`: clean. 1095 entries, matching baseline file
+count. **STATUS: DELIVERED.**
+
+**Next:** a real client-side codec/compression library remains a
+genuine, disclosed gap. CozyMemory persistence wiring for the
+compression ledger is a disclosed, real next step.
+
+---
+
+## RP-031-B — Admin Language Dashboard + Usage/Research Analytics (Increment 5)
+
+**Baseline:** `CozyOS-main-RP-031-Phase2B-Increment4.zip`, SHA-256
+`bee3cf76fed9033295c16c06f4ab768750727411dc105247518608756ea066e0`
+(matched exactly, computed twice independently). `unzip -t` clean.
+Increment 1–4 files and tests confirmed present, re-run from a clean
+extraction (14/14, 28/28, 31/31, 23/23).
+
+**Scope:** Increment 5 of the RP-031-B milestone (~9 planned
+increments; NOT the full milestone). See
+`docs/builder/knowledge/repair-history-registry.md` RP-031-B entry for
+full detail. Adds the Admin Language Dashboard UI + production-safe
+authorization: a DOM-free `core` logic layer plus a real DOM renderer
+covering all 10 spec dashboard sections (Language Overview, Language
+Routing, Term Explorer, Research, Community Analytics, Domain
+Analytics, Quarantine, Hotspot, Rule 82, Most Used) plus Hearing Mode,
+composing Increments 1–4 and RP-031 Phase 1's real acquisition
+pipeline verbatim. Authorization reuses RP-029-C Phase 2's real
+`resolveRole()` — no second auth system; a requested `OWNER` tier
+honestly maps to the real backend's actual highest tier (`ADMIN`),
+since no `OWNER` role exists in this repository's real authorization
+code. Community confirmation is composed at `COMMUNITY`+ rank,
+deliberately not gated behind reviewer authorization, avoiding the
+disclosed Phase 2 bug this increment's own spec warned against
+repeating. Ambiguous-meaning search results are preserved and flagged
+`CONFLICTING_MEANING` rather than overwritten. Real HTML page + CSS
+(layout only, reuses existing tokens/components, no new external
+dependency) included.
+
+**Two real bugs found and fixed before delivery:** a module-lookup
+shape mismatch (`cozy-knowledge-review-dashboard-core.js` exposes its
+API at `window.CozyOS.CozyKnowledgeReviewDashboardCore` directly, not
+via `Modules[name].api`) caught by the Node test suite; a real mobile
+viewport overflow (375px) caught and fixed via a real Playwright test.
+
+**Regression:** all 48 pre-existing Node test files re-run,
+byte-for-byte identical outcome to the pre-Increment-5 baseline (38
+clean, 2 with pre-existing unrelated internal failures
+`engine-bridge`/`audio-manager`, 8 pre-existing load failures
+unrelated to this scope); the 2 new Increment 5 test files pass 22/22
+(Node) and 13/13 (real Playwright/Chromium, `BROWSER_TEST = PASS`).
+
+**Repository SHA-256 (this release, computed after all governance
+files were finalized):**
+`596bc92701aa7fb788872b99491b8c58874fe3e6cf26de1a03879a73ca1845e7`
+(method: `find . -type f ! -path './_archive/*' ! -name 'RELEASES.md'
+-print0 | sort -z | xargs -0 sha256sum | sha256sum`).
+
+**Package:** `CozyOS-main-RP-031-Phase2B-Increment5.zip`. Package
+SHA-256 is communicated in the delivery message for this release, not
+embedded here (see note above on why).
+
+**Next:** any remaining increments per the full RP-031-B plan, then
+final regression, governance, and ZIP packaging for the complete
+milestone.
+
+---
+
+## RP-031-B — Admin Language Dashboard + Usage/Research Analytics (Increment 4)
+
+**Baseline:** `CozyOS-main-RP-031-Phase2B-Increment3.zip`, SHA-256
+`2c0e280e02d658be76adb17cb72fd0b622e591544bdc1dfc3a58ba879b7c1f81`
+(matched exactly, computed twice independently). `unzip -t` clean.
+Increment 1/2/3 files and tests confirmed present, re-run from a clean
+extraction (14/14, 23/23, 28/28).
+
+**Scope:** Increment 4 of the RP-031-B milestone (~9 planned
+increments; NOT the full milestone). See
+`docs/builder/knowledge/repair-history-registry.md` RP-031-B entry for
+full detail. Adds Quarantine + Cozy Offline Hotspot Dashboard Views:
+quarantine overview (real current/under-review/high-risk/language/
+region/contribution-type breakdowns; historical released/rejected/
+escalated honestly `NOT_AVAILABLE_NO_HISTORICAL_AGGREGATE`); Rule 82
+visibility (reshapes the real gate only, no mutator, never
+`AVAILABLE`); hotspot dashboard (real transport status strings only;
+`SYNCING`/`SYNCED`/`CONFLICT` honestly `NOT_SUPPORTED_BY_TRANSPORT`
+since the real transport has no such states); language routing via
+the real Increment 1 router; per-language safety summary; community/
+domain views (verbatim Increment 3 reuse); authorization (thin wrapper
+over the real quarantine-admin layer); combined view model. Composes
+RP-030, RP-029-C (safety gate, quarantine-admin, review, hotspot
+bridge), and Increments 1–3 — none of those files modified.
+
+**Regression:** all 47 pre-existing Node test files re-run,
+byte-for-byte identical outcome to the pre-Increment-4 baseline (37
+clean, 2 with pre-existing unrelated internal failures
+`engine-bridge`/`audio-manager`, 8 pre-existing load failures
+unrelated to this scope); the 1 new Increment 4 test file passes
+31/31.
+
+**Repository SHA-256 (this release, computed after all governance
+files were finalized):**
+`564392ac6e5b0e43409e2754aebfb88dd8a76a065dd8fae34fa09d3992727c27`
+(method: `find . -type f ! -path './_archive/*' ! -name 'RELEASES.md'
+-print0 | sort -z | xargs -0 sha256sum | sha256sum`).
+
+**Package:** `CozyOS-main-RP-031-Phase2B-Increment4.zip`. Package
+SHA-256 is communicated in the delivery message for this release, not
+embedded here (see note above on why).
+
+**Next:** RP-031-B Increment 5 (browser UI shell + authorization),
+Increment 6 (browser tests), then final packaging of the complete
+RP-031-B milestone.
+
+---
+
+## RP-031-B — Admin Language Dashboard + Usage/Research Analytics (Increment 3)
+
+**Baseline:** `CozyOS-main-RP-031-Phase2B-Increment2.zip`, SHA-256
+`91032cca991771eccef49e7919fc740d465f5896a6d2eaf499f0806a221eb816`
+(matched exactly). `unzip -t` clean. Increment 1 + 2 files and tests
+confirmed present.
+
+**Scope:** Increment 3 of the RP-031-B milestone (~9 planned
+increments; NOT the full milestone). See
+`docs/builder/knowledge/repair-history-registry.md` RP-031-B entry for
+full detail. Adds Domain & Community Analytics: language activity
+(real word/phrase/confidence/confirmation/disagreement counts per
+region/dialect, reusing Increment 2's research priority verbatim),
+domain analytics (all 9 spec domains honestly
+`DOMAIN_NOT_TRACKED_BY_REGISTRY`), community contribution analytics
+(pseudonymous-only counts; historical released/post-quarantine-rejected
+totals honestly `NOT_AVAILABLE_NO_HISTORICAL_AGGREGATE`), quarantine
+integration (composes RP-029-C Phase 5's real authorization layer),
+regional knowledge map, most-used passthrough, research dashboard
+(aggregates Increment 2's own scoring), and cross-language gap
+detection (distinguishes language-not-supported from
+registered-no-data from a genuine per-term gap). Composes RP-030,
+RP-029-B, RP-029-C, and Increments 1–2 — none of those files modified.
+One real privacy leak in the existing RP-029-C Phase 5
+`listQuarantine()` (raw evidence/fields passthrough) was found by this
+increment's own test suite and redacted on this file's own composition
+boundary, without touching the locked Phase 5 file.
+
+**Regression:** all 46 pre-existing Node test files re-run,
+byte-for-byte identical outcome to the pre-Increment-3 baseline
+(36 clean, 2 with pre-existing unrelated internal failures
+`engine-bridge`/`audio-manager`, 8 pre-existing load failures
+unrelated to this scope); the 1 new Increment 3 test file passes
+28/28.
+
+**Repository SHA-256 (this release, computed after all governance
+files were finalized):**
+`10240e209b2d2f30ff02c4142d2c1c2a5fda5b1a0955083ac9e34c2b50e15e4b`
+(method: `find . -type f ! -path './_archive/*' ! -name 'RELEASES.md'
+-print0 | sort -z | xargs -0 sha256sum | sha256sum`).
+
+**Package:** `CozyOS-main-RP-031-Phase2B-Increment3.zip`. Package
+SHA-256 is communicated in the delivery message for this release, not
+embedded here (see note above on why).
+
+**Next:** RP-031-B Increment 4 (quarantine/hotspot dashboard views),
+Increment 5 (browser UI + authorization), Increment 6 (browser tests),
+then final packaging of the complete RP-031-B milestone.
+
+---
+
+## RP-031-B — Admin Language Dashboard + Usage/Research Analytics (Increment 2)
+
+**Baseline:** `CozyOS-main-RP-031-Phase2A.zip`, SHA-256
+`e17149425540cbdcc2a8cc7e6aa4b3aa640f9ab3117f42a0ca4d86c483b09566`
+(matched exactly). `unzip -t` clean.
+
+**Scope:** Increment 2 of the RP-031-B milestone (~9 planned
+increments; NOT the full milestone). See
+`docs/builder/knowledge/repair-history-registry.md` RP-031-B entry for
+full detail. Adds Term Explorer (`searchTerms`/`getTermDetail`, real
+match classification, honest not-tracked disclosures for domain and
+translation-text), language-aware routed search (reuses Increment 1's
+routing), quarantine visibility, and a Research Priority Engine
+(`LOW`/`MEDIUM`/`HIGH`/`URGENT_REVIEW`, computed only from real
+evidence, usage always `NOT_AVAILABLE_NO_TELEMETRY`). Increment 1
+(Language Overview, Pack Routing, Most-Used passthrough) shipped in
+the same package. Composes RP-030's registry and RP-029-C's safety
+gate — neither file modified.
+
+**Regression:** 659 passed, 0 failed, across all 30 Node test files
+that execute (28 baseline + 2 new). Same 4 pre-existing, unrelated
+broken files (`scene-manager`, `media-pipeline-manager`,
+`playback-engine`, `camera-manager`) unchanged before/after.
+
+**Package:** `CozyOS-main-RP-031-Phase2B-Increment2.zip`. Package
+SHA-256 is communicated in the delivery message for this release, not
+embedded here (see note above on why).
+
+**Next:** RP-031-B Increment 3 (domain separation + community
+analytics), then Increment 4 (quarantine/hotspot views), Increment 5
+(browser UI + authorization), Increment 6 (browser tests), then final
+packaging of the complete RP-031-B milestone.
+
+---
+
+## RP-031 Phase 2A — Teach CozyAI Full Knowledge Vocabulary + Language-Pack Routing
+
+**Baseline:** `CozyOS-main-RP-031-Phase1.zip`, SHA-256
+`ed8aae71e546cd325a0f10ba62ff313a00ba90e06494191ea7d983cbae14f4fe`
+(computed twice, independently, matching). `unzip -t` clean.
+
+**Scope:** First of six staged Phase 2 passes (2A of 2A–2F). See
+`docs/builder/knowledge/repair-history-registry.md` RP-031-PHASE2A
+entry for full detail. Added `core/modules/intelligence/knowledge/teach/`
+(routing core + DOM UI + HTML page + 27 real, executed tests: 21 core
++ 6 Playwright browser tests, all passing, `BROWSER_TEST = PASS`).
+Composes RP-029-C's real review pipeline and RP-030's real
+language-pack registry — neither file modified.
+
+**Regression:** Full pre-existing 42-file suite re-run before and
+after this pass — identical pass/fail pattern (11 pre-existing,
+unrelated failing files unchanged; all RP-029/RP-030/RP-031-Phase-1/
+RP-027 suites remained at 0 failures).
+
+**Package:** `CozyOS-main-RP-031-Phase2A.zip`. Package SHA-256 is
+communicated in the delivery message for this release, not embedded
+here (see note above on why).
+
+**Next:** RP-031 Phase 2B (admin language dashboard + usage/research
+analytics).
+
+---
+
+## RP-031 Phase 1 — Core Language Acquisition Foundation + Dholuo/Kenya Reference Architecture
+
+**Baseline:** `CozyOS-main-RP-030.zip`, SHA-256
+`e7e0cd9f3eacf07ab1762caa6eff60a39f16f446048d7d6cf6431aa87c102a91`
+(computed twice independently, matching; `unzip -t` clean before any
+code was written).
+
+**Added:** `core/modules/intelligence/language-packs/
+cozy-language-acquisition-pipeline.js` + its test file (30/30
+passing). Composes RP-030's `CozyLanguagePacks` (never rewritten) to
+add independent-contributor validation tiers, fast local retrieval,
+a privacy-first Hearing Mode capture/clarify workflow, honest
+capability-gated document/website/OCR/audio/video entry points, a
+Cozy Offline Hotspot transport wrapper, knowledge-domain separation,
+and reference geography (Dholuo/Kenya + contrastive regional
+examples) plus one real, cross-referenced Dholuo reference word
+(`LICENSE_UNKNOWN`, never promoted — Rule 82 unaffected). Full
+regression (pre-existing suites) unchanged; 30 new tests all passing.
+
+**Scope:** Phase 1 of RP-031 only — pipeline + data contracts. The
+"Teach CozyAI" contribution UI and visual Admin Dashboard are Phase 2,
+left with clean APIs to build against (`getAcquisitionDashboardSnapshot()`,
+`listPendingClarifications()`, `lookupExpression()`, etc.), not
+attempted this pass.
+
+**Package SHA-256:** communicated externally in the delivery message
+for this release, per Rule 60 (a package cannot correctly embed a
+hash of its own final bytes).
+
+---
+
+## RP-030 — CozyAI Language Pack Foundation
+
+**Baseline:** `CozyOS-main-RP-029-C-Phase5.zip`, SHA-256
+`8a56ded2986332eacc253cb27e74141bd36a3d6e4dee6b158c735a0d4d4c23fb`
+(matched exactly before any code was written).
+
+**Added:** `core/modules/intelligence/language-packs/
+cozy-language-pack-registry.js` + its test file (32/32 passing).
+Canonical `LanguagePack` architecture and 13 language-pack identities
+(all `REGISTERED`/`NOT_READY` — none `AVAILABLE`). Full regression
+(pre-existing suites) unchanged, byte-identical pass/fail counts
+before and after.
+
+**Package SHA-256:** communicated externally in the delivery message
+for this release, per Rule 60 (a package cannot correctly embed a
+hash of its own final bytes).
+
+---
+
+## RP-029-A — Document/Website/Community-Submission Knowledge Ingestion Pipeline
+
+**Repository SHA-256:** `cb6c77b195366e9cd991a8b265a7aed728c31669d1a017e1d43ee3e7ac510244`
+(computed over all repository files except `RELEASES.md`, 840 files, via
+`find . -type f -not -name "RELEASES.md" -print0 | sort -z | xargs -0
+sha256sum | sort | sha256sum`)
+
+**Package SHA-256:** Generated after packaging — see delivery message for
+this release.
+
+**What changed:** Added `core/modules/intelligence/knowledge/cozy-knowledge-
+ingestion.js` (new, additive) and its test file (26/26 passing) — a real
+text/document/website/community-submission knowledge ingestion pipeline.
+No existing source file was modified; `cozy-language-registry.js` and
+`cozy-language-templates.js` confirmed byte-identical to their prior
+state. No audio, speech, video, or lip-reading capability was added or
+claimed. Full detail: `docs/builder/knowledge/repair-history-registry.md`
+(RP-029-A entry), `HANDOFF.md`'s matching entry.
+
+**Known limitations carried forward, not this release's to fix:** the
+three pre-existing failure groups discovered incidentally during this
+release's full-suite regression re-run (`MD-025`/`MD-026`/`MD-027` in
+the Repair Queue) — `audio-manager.test.js` (15/15 failing),
+`engine-bridge.test.js` (1 failing), and six browser-DOM-dependent
+suites that crash under plain `node`. None were introduced by this
+release; none were investigated this pass.
+
+---
+
 ## M387.5 — Browser Verification & Integration (Partial)
 
 **Repository SHA-256:** `06ea0c37901706077b1b33c475aee73e6166cd59178be3f5dca34cf9fa34bbde`
@@ -2697,3 +3852,612 @@ confirmed via `present_files` in the same turn, not merely built).
 Ready for Next Account: **YES — M388 — Living Media Interpreter is
 COMPLETE. All 11 engines Closed. No Engine 12 exists. Begin the Living
 AI Learning milestone's own Phase 0 next.**
+
+---
+
+## RP-026 — Rule-Based Reply Composer (CozyOS Living Assistant)
+
+**Confirms RP-025-A package SHA-256:** see prior entry above (not independently reverified against a delivered package this pass — this session began from the uploaded `CozyOS-main-RP-025-A.zip` repository contents directly).
+
+**Repository SHA-256:** `e6fda8cc0ba74e48ab73073ea737f7783b4d6fd737d9a9ea29c1234b89ab0ea0`
+(computed over all repository files except `RELEASES.md` itself, via the canonical method: `find . -type f ! -path './_archive/*' ! -name 'RELEASES.md' -print0 | sort -z | xargs -0 sha256sum | sha256sum`)
+
+**Package SHA-256:** Generated after packaging — see delivery message for this release.
+
+**What changed:** New file `core/modules/intelligence/providers/rule-based-conversational-provider.js` (+ its test file) implements and activates a real, honestly-disclosed rule-based conversational Reply Composer for the CozyOS Living Assistant, fixing the `NO_CONVERSATIONAL_ENGINE_FALLBACK` symptom. One additive `<script>` tag each in `index.html`/`dashboard.html`. All locked files (`cognitive-coordinator.js`, `cozy-intelligence-provider.js`, `core/config.js`, `cozy-living-assistant.js`, `cozy-living-ai.js`, `on-device-conversational-provider.js`) confirmed byte-identical to the RP-025-A baseline. 14/14 new tests pass; RP-024 (10/10) and RP-025-A (8/8) regression suites both re-run clean. Full detail: `docs/builder/knowledge/repair-history-registry.md` (RP-026 entry), `HANDOFF.md`, `LATEST.md`.
+
+---
+
+## Rule 84 — Language Taxonomy & Single-Source Governance (documentation pass)
+
+**What changed:** New file `docs/builder/rules/29-language-taxonomy-
+and-single-source-governance-rule.md` (Rule 84), adopted at the
+owner's direction to codify eight structural requirements ahead of
+the next language implementation: (1) Target/Registered/Available as
+three permanent, independent states (never `TARGET → AVAILABLE`
+directly); (2) country/region mapping as many-to-many metadata, never
+country = language; (3) dialect/variant metadata on the parent
+language, not premature new registry entries; (4) `script`/
+`direction`/`locale` as first-class registry fields; (5) offline-
+resource state tracked independently of Rule 82's conversational
+`AVAILABLE`; (6) voice verified separately from text (text→speech,
+speech→text, conversational round-trip); (7) public-answer facts
+authored once and rendered per language, never re-authored per
+language; (8) a bounded CozyOS Public Story kept distinct from
+internal Builder/Governance information. Extends Rule 82
+(`27-language-availability-verification-rule.md`) and Rule 83
+(`28-universal-builder-and-public-knowledge-governance-rule.md`)
+without weakening either. `docs/builder/rules/00-INDEX.md` and
+`docs/builder/knowledge/repair-queue.md`'s "Not Yet Composed" section
+both updated with cross-references. `LATEST.md`/`HANDOFF.md` both
+carry the matching entry.
+
+**No application code changed.** `cozy-language-registry.js`,
+`cozy-language-templates.js`, and every file outside `docs/` are
+confirmed byte-identical to the RP-028 baseline this pass started
+from — this is a documentation-only policy adoption, per Rule 69 (a
+policy document is not itself an implementation).
+
+**Repository SHA-256 (this round, computed over all repository files
+except `RELEASES.md`, via the canonical method:
+`find . -type f ! -path './_archive/*' ! -name 'RELEASES.md' -print0 | sort -z | xargs -0 sha256sum | sha256sum`):**
+`908e3d3c53e3ace7d12c54bb423b358b9033fb96598898db852a4e419218af9c`
+
+**ZIP filename:** `CozyOS-main-Rule84-language-taxonomy.zip`
+**ZIP size / Package SHA-256:** see this session's Rule 67 Delivery
+block (never written into any repository file, per Rule 70).
+
+**Certification:** Repository Verified: YES (Rule 84 file, index
+entry, and repair-queue cross-reference all confirmed present;
+application code confirmed byte-identical to RP-028 baseline).
+Compose Verified: YES (owner-directed, single-path, no ambiguity).
+Implementation Verified: N/A (documentation-only pass — no
+implementation to verify against Rule 82's five conditions; none of
+the eight points claim a language moved state). Handoff Verified: YES
+(`LATEST.md`/`HANDOFF.md` both updated this pass). Artifact SHA-256
+Verified: YES (repository hash computed above; package hash in
+delivery block). Ready for Next Account: **YES — Rule 84 is adopted
+and cross-referenced. The schema work it requires (country mapping,
+variant metadata, script/direction/locale, offline-pack states, voice
+verification, public-knowledge single-source refactor) remains open,
+un-Composed work for a future session, per Rule 84's own "Recording"
+section.**
+
+---
+
+## RP-029-B — Community Contribution + Knowledge Validation
+
+**Append-only note:** this entry is appended at the true end of this
+file, per Rule 60. RP-029-A's own entry above (line 18) is placed out
+of chronological order — ahead of M387.5/M388/RP-026/Rule 84, all of
+which predate it — a pre-existing inconsistency in this baseline, not
+introduced or corrected by this pass; disclosed here rather than
+silently repeated or silently fixed.
+
+**Repository SHA-256:** `ff8105ca761c770842be7742f76757e7ba820feb7efcc5b5da101d521639dfff`
+(computed over all repository files except `RELEASES.md`, 842 files, via
+`find . -type f -not -name "RELEASES.md" -print0 | sort -z | xargs -0
+sha256sum | sort | sha256sum`)
+
+**Package SHA-256:** Generated after packaging — see delivery message for
+this release.
+
+**Confirms:** this release's starting baseline package (verified
+independently, before any RP-029-B code was written) carried SHA-256
+`71e7b2387069cb5f372775eec6c0b1b0d2f211f4a1a632c51aab787e65329370` — the
+same package RP-029-A's own entry (line 18 of this file) describes.
+
+**What changed:** Added `core/modules/intelligence/knowledge/
+cozy-knowledge-community.js` (new, additive, ~430 lines) and its test
+file (36/36 passing) — a real community contribution + validation
+lifecycle (review workflow, source-aware independent-confirmation
+checking, labeled multi-dimension confidence reporting, privacy/
+pseudonymization, read-only Rule 82 reporter, honest offline-sync data
+model) composing RP-029-A's existing ingestion pipeline rather than
+duplicating it. `cozy-knowledge-ingestion.js` confirmed byte-identical
+to its prior state (diffed before packaging); `cozy-language-registry.js`
+and `cozy-language-templates.js` also confirmed byte-identical. No
+language was promoted to `AVAILABLE`. No audio, speech, video,
+lip-reading, or machine-learning capability was added or claimed. Full
+detail: `docs/builder/knowledge/repair-history-registry.md` (RP-029-B
+entry), `HANDOFF.md`'s matching entry.
+
+**Known limitations carried forward, not this release's to fix:** the
+same three pre-existing failure groups from the RP-029-A release
+(`MD-025`/`MD-026`/`MD-027`) — re-run this pass, confirmed unchanged.
+New, disclosed limitation of this release: no admin UI is wired to
+`cozy-knowledge-community.js`'s review-workflow functions yet — the
+API is real and tested, but nothing calls it from a UI.
+`module-inventory.csv`/`.json`, listed as changed in RP-029-A's own
+entry, do not actually exist anywhere in this repository baseline
+(confirmed by `find`) — not fabricated to match that entry here
+either.
+
+---
+
+## CozyOS-main-RP-029-C-Phase1.zip
+
+RP-029-C Phase 1 — Community Review & Validation Interface: Data/State
+Layer only (no UI this phase). Baseline: `CozyOS-main-RP-029-B.zip`,
+SHA-256 `129a1d16052d5ab83b4154944e0b7d7962720cb344a49ee25d8c13558ead5206`,
+verified before any code was written and confirmed unmodified after
+(`cozy-knowledge-ingestion.js`, `cozy-knowledge-community.js`,
+`cozy-language-registry.js`, `cozy-language-templates.js` all
+byte-identical, diffed before packaging).
+
+Added `core/modules/intelligence/knowledge/cozy-knowledge-review.js` —
+review/promotion state machine composing RP-029-B's real API, a
+derived display-state mapper, and a full five-part Rule 82 gate
+(`evaluateRule82Gate`) that mechanically checks template coverage and
+translation-control against real data and honestly reports `UNKNOWN`/
+`NOT_TESTED_LIVE` for the two requirements code alone cannot verify
+(real-language-resource attestation, live runtime observation). No
+language was promoted to `AVAILABLE`; this file has no registry
+mutator and never calls one. No UI, no audio/speech/video/ML
+capability added or claimed.
+
+**Tests:** 30/30 new. Regression: RP-029-A 26/26, RP-029-B 36/36,
+Language Registry 11/11, RP-027 provider 66/66, rule-based provider
+14/14, on-device provider 8/8. **TOTAL: 191/191.**
+
+**Known limitations carried forward:** `MD-025`/`MD-026`/`MD-027` —
+outside this pass's dependency graph, not re-run, unchanged. New,
+disclosed limitation of this release: no dashboard/contribution UI is
+wired to this file yet — the data/state API is real and tested, but
+nothing calls it from a UI. Rule 82 test-pass evidence must be
+supplied by a caller who actually ran the suite; this module cannot
+run one itself from inside a browser context.
+
+---
+
+## CozyOS-main-RP-029-C-Phase2.zip
+
+RP-029-C Phase 2 — Review Dashboard UI, plus a mid-pass, explicitly
+person-directed architectural requirement: reuse existing Living
+Engines / Cozy Offline Hotspot infrastructure rather than building a
+second networking/sync system. Baseline: `CozyOS-main-RP-029-C-Phase1.zip`,
+SHA-256 `c9329383dabe2128d8204b156362b5f77c66321f1082b02b72528727bf2feda6`,
+verified before any code was written and confirmed unmodified after —
+all six locked files (`cozy-knowledge-ingestion.js`,
+`cozy-knowledge-community.js`, `cozy-knowledge-review.js`,
+`cozy-language-registry.js`, `cozy-language-templates.js`,
+`core/engines/collaboration/live-hotspot-engine.js`) byte-identical,
+diffed before packaging.
+
+Added a real browser dashboard composing RP-029-C Phase 1's real API
+only (no duplicated validation logic), with authorization via the
+existing `AuthCoordinator`, a logic-level Rule 82 promotion gate
+(refuses before ever calling `promote()`, not merely a hidden button),
+and a Cozy Offline Hotspot bridge composing the real, existing
+`LiveHotspotEngine` — every received candidate lands as an ordinary,
+unverified local candidate through the real ingestion path, never
+auto-trusted or auto-promoted. No language was promoted to `AVAILABLE`.
+
+**Tests:** 26/26 new Node tests. **12/12 real Playwright/Chromium
+browser tests, `BROWSER_TEST = PASS`** — two real bugs caught and fixed
+by this pass's own browser test before delivery (wrong-module
+`describeConfidence()` call; a `refresh()` that was silently erasing
+its own feedback message). Regression: RP-029-A 26/26, RP-029-B 36/36,
+Phase 1 30/30, Language Registry 11/11, RP-027 provider 66/66,
+rule-based provider 14/14, on-device provider 8/8. **TOTAL: 217/217.**
+
+**Known limitations carried forward:** `MD-025`/`MD-026`/`MD-027` —
+outside this pass's dependency graph, unchanged. New, disclosed
+limitations of this release: no contribution-submission screen yet;
+`REVIEWER` is this dashboard's own allowlist, not a real base-system
+role; hotspot sharing only reaches already-manually-paired peers (no
+auto-discovery/relay/multi-hop sync exists anywhere in this
+repository); of five Living Engines inspected for reuse, only the
+hotspot engine was genuinely composable this pass — the other four
+remain a disclosed future continuation point.
+
+---
+
+## CozyOS-main-RP-029-C-Phase3.zip
+
+RP-029-C Phase 3 — Community Contribution Interface. Baseline:
+`CozyOS-main-RP-029-C-Phase2.zip`, SHA-256
+`88298208ff604341b97404b09891fa67e4fcf961bf25c875366ebe63f32dbb97`,
+verified before any code was written and confirmed unmodified after —
+all twelve locked files (RP-029-A/B, Phase 1, every Phase 2 source/
+test/HTML/CSS file) byte-identical, diffed before packaging.
+
+Added a real, oral-language-first contribution form composing
+RP-029-B's real `submitContribution()`, Phase 1's real
+`computeDisplayState()`, the real language registry, and Phase 2's real
+Cozy Offline Hotspot bridge — no duplicated validation/state/networking
+logic. Consent is a hard gate enforced in the submission logic itself.
+Language list is the real registry only, honestly showing true
+AVAILABLE/NOT_READY status per language. No language was promoted to
+`AVAILABLE`.
+
+**Tests:** 21/21 new Node tests. **7/7 real Playwright/Chromium browser
+tests, `BROWSER_TEST = PASS`** (no bugs found this pass). Regression:
+RP-029-A 26/26, RP-029-B 36/36, Phase 1 30/30, Phase 2 dashboard-core
+26/26, Language Registry 11/11, RP-027 provider 66/66, rule-based
+provider 14/14, on-device provider 8/8. **Node TOTAL: 238/238.**
+Browser TOTAL: 19/19 (Phase 2's 12/12 + Phase 3's 7/7).
+
+**Known limitations carried forward:** `MD-025`/`MD-026`/`MD-027` —
+outside this pass's dependency graph, unchanged. New, disclosed
+limitations of this release: no admin-dashboard contribution analytics
+yet; `DOCUMENT_EVIDENCE`/`WEBSITE_EVIDENCE`/`OCR_TEXT` contribution
+types are metadata-only (no real OCR/fetch backend exists to compose);
+post-submission withdrawal is `CAPABILITY_UNAVAILABLE`; `SYNCED`/
+`CONFLICT` timeline states remain unreachable (no real sync/merge
+engine exists anywhere in this repository).
+
+---
+
+## CozyOS-main-RP-029-C-Phase4.zip
+
+RP-029-C Phase 4 — Mandatory Content Safety Gate. Baseline:
+`CozyOS-main-RP-029-C-Phase3.zip`, SHA-256
+`a9709e014b879c1f517759a23f343907b20b8b7daa03803cdfcb6368a012129a`,
+verified before any code was written; 13 files confirmed byte-identical
+after (diffed before packaging) — only the 2 disclosed source files
+(`cozy-knowledge-contribution-core.js`,
+`cozy-knowledge-review-hotspot-bridge.js`) and 2 HTML files (one new
+script tag each) changed.
+
+Added `cozy-knowledge-safety-gate.js` — real text-pattern SAFE/UNSAFE/
+UNCERTAIN classification composed into both local contribution
+submission and offline Cozy Offline Hotspot receipt, so offline
+transfer cannot bypass safety. UNSAFE content (credential leaks,
+malware patterns, PII patterns, explicit adult phrases, instructional-
+harm phrases) is hard-rejected before any candidate is created;
+UNCERTAIN content (ambiguous single terms, unanalyzable media
+references) is quarantined for human review. Meaning-before-judgment
+is a real, tested property: a bare ambiguous word is never auto-
+rejected. Sexual content involving minors and extremist recruitment
+material are explicitly not keyword-matched — disclosed as requiring
+real, specialized infrastructure this repository does not have; any
+adjacent signal routes to quarantine, never silent approval.
+
+**Tests:** 22/22 new. Regression: RP-029-A 26/26, RP-029-B 36/36,
+Phase 1 30/30, Phase 2 dashboard-core 26/26, Phase 3 contribution-core
+21/21, Language Registry 11/11, RP-027 provider 66/66, rule-based
+provider 14/14, on-device provider 8/8. **Node TOTAL: 260/260.** Both
+real browser suites re-run, unaffected: 19/19.
+
+**Known limitations carried forward:** `MD-025`/`MD-026`/`MD-027` —
+unchanged. New, disclosed limitation of this release: no admin-facing
+quarantine review UI yet.
+
+---
+
+## CozyOS-main-RP-029-C-Phase5.zip
+
+RP-029-C Phase 5 — Quarantine + Admin Safety Review. Baseline:
+`CozyOS-main-RP-029-C-Phase4.zip`, SHA-256
+`bb8e5505a83724b4331643fce4d49e15d46bf52196b52e563ceefc294df30b4b`,
+verified before any code was written; every non-disclosed file
+confirmed byte-identical after (diffed before packaging) — only 3
+files (`cozy-knowledge-safety-gate.js`, `cozy-knowledge-contribution-
+core.js`, `cozy-knowledge-review-hotspot-bridge.js`) received
+disclosed, minimal modifications.
+
+Added a real quarantine admin review layer: state machine
+(QUARANTINED->UNDER_REVIEW->RELEASED|REJECTED|ESCALATED), append-only
+pseudonymized audit trail, REVIEWER+-gated actions composing Phase 2's
+real authorization, and a release-to-candidate flow that reuses
+RP-029-B's real `submitContribution()` and never touches the language
+registry — Rule 82 is unaffected, verified live. A real bug (the new
+HIGH_RISK classification bypassing quarantine) was found and fixed by
+this pass's own tests before delivery. No language was promoted to
+`AVAILABLE`.
+
+**Tests:** 30/30 new (all 30 spec-minimum scenarios). **8/8 real
+Playwright/Chromium browser tests, `BROWSER_TEST = PASS`.** Regression:
+RP-029-A 26/26, RP-029-B 36/36, Phase 1 30/30, Phase 2 dashboard-core
+26/26, Phase 3 contribution-core 21/21, Phase 4 safety gate 22/22,
+Language Registry 11/11, RP-027 provider 66/66, rule-based provider
+14/14, on-device provider 8/8. **Node TOTAL: 290/290.** Browser TOTAL:
+27/27 (all three real suites).
+
+**Known limitations carried forward:** `MD-025`/`MD-026`/`MD-027` —
+unchanged. New, disclosed limitations of this release: `analytics()`
+is current-contents-only (no historical totals); escalation has no
+specialized-review backend to hand off to; `REVIEWER`/`ADMIN` remain
+dashboard-local designations (Phase 2's own disclosed limitation,
+unchanged).
+
+---
+
+## RP-035 Phase B — ChurchOS LDCE Attendance & Pastor/Admin Geographic Analytics (Checkpoints 1–3, COMPLETE)
+
+**Baseline (Checkpoint 1):** `CozyOS-main-RP-035-CozyAI-KnowledgeIntegration.zip`
+lineage continues from Section 16 above. Full Checkpoint-by-checkpoint
+baselines, hashes, and the disclosed Checkpoint-1-hash discrepancy are
+recorded in `docs/history/RP-035-PhaseB.md`.
+
+**Checkpoint 1 — Attendance Foundation:** Added
+`core/modules/ChurchOS/church-live-attendance.js`, pure composition
+over the real LDCE roster. Viewer-facing surface is `{available,
+attending}` only. 12/12 new tests.
+
+**Checkpoint 2 — Geography + Pastor/Admin Authorization:** Added
+`core/modules/ChurchOS/church-attendance-geography.js`, fail-closed
+authorization composed from real `IdentityEngine`/`OrganizationRole`
+facts only. Country data real and consented only; missing country
+honest as `"Unknown"`; no Organization home-country field exists, so
+Local area anchors to the requester's own country or honestly reports
+`LOCATION_DATA_UNAVAILABLE`. One additive line in
+`identity-engine.js`'s `getUser()`. 14/14 new tests.
+
+**Checkpoint 3 — Final Integration & Certification:** No new features.
+Full 79-file regression re-run directly: 147 tests, 92 pass, 55 fail
+(same disclosed pre-existing failures, none in Phase B scope).
+Checkpoint 1 and 2 tests (12/12, 14/14) re-run in isolation and PASS.
+All architectural guarantees re-verified directly against source.
+Consolidated Phase B history, lineage, and disclosed limitations
+recorded in `docs/history/RP-035-PhaseB.md`.
+
+**Package SHA-256 for this release:** communicated externally in the
+delivery message, per the self-reference pattern documented above
+(this file is excluded from its own repository hash).
+
+**Production artifact naming:** short identifiers adopted for this
+Phase B's production ZIPs going forward —
+`COS-RP035-PHB1.zip` / `COS-RP035-PHB2.zip` / `COS-RP035-PHB3.zip`.
+Full descriptive names are preserved in `docs/history/RP-035-PhaseB.md`
+and in this ledger; the naming change is cosmetic only and does not
+alter any previously certified file's bytes or hash.
+
+**Tests:** Checkpoint 1: 12/12. Checkpoint 2: 14/14. Checkpoint 3
+regression (full repo): 147 total, 92 pass, 55 fail (pre-existing,
+unrelated, disclosed above and in `docs/history/RP-035-PhaseB.md`).
+
+**Known limitations carried forward:** the same 55 pre-existing
+failures (document-understanding + bridge/audio/camera/media/
+playback/scene modules); `modules/live/ourcozy-live.test.js`'s broken
+require path; `modules/live/cozy-live.js`'s separate attendance sink
+left unreconciled with LDCE-derived attendance (open question, not
+resolved by Phase B); `church-membership-bridge.js`'s manual check-in
+attendance duplication (flagged since ChurchOS C001, untouched);
+Checkpoint-1-vs-Checkpoint-2 byte-identity diff not re-verified in the
+Checkpoint 3 session (Checkpoint 1 ZIP unavailable in that
+environment) — see `docs/history/RP-035-PhaseB.md`.
+
+## RP-035 Phase C — ChurchOS Live Moderation Controls
+
+**Checkpoint 3 — Final Consolidation & Governance Certification:**
+Baseline `COS-RP035-PHC2.zip`, SHA-256
+`826e28898134278e991ba4689b783fba921af85c6db1cfba1acdf59102001eaa`,
+verified twice, matched. Governance-only — no production-code
+changes. Disclosed finding: PHC2 had no prior governance record in
+this repository (LATEST.md/HANDOFF.md/RELEASES.md held only a
+Checkpoint 1 entry); this checkpoint records PHC1 and PHC2 for the
+first time in `docs/history/RP-035-PhaseC.md`.
+
+**Tests:** Checkpoint 1: 20/20. Checkpoint 2: 31/31. Checkpoint 3
+regression (81 test files, run individually, established Node
+methodology): 129 pass, 55 fail — same pre-existing set disclosed
+since Phase B, zero new regressions. 14 browser/Playwright dashboard
+tests untested this session (no headless-browser environment
+available).
+
+**Byte-identity audit, PHC2 → PHC3:** governance/history files only.
+Zero changes to `core/modules/ChurchOS/*`, LDCE, IdentityEngine,
+OrganizationRole, Section 16, or PHB.
+
+**Known limitations carried forward:** the same 55 pre-existing
+failures documented since Phase B (document-understanding,
+duplicate-detection, ourcozy-live, scene/audio/media-pipeline/
+playback/camera(×2)/bridge(×2)) — none touch ChurchOS or Phase C
+code.
+
+**Production artifact naming:** `COS-RP035-PHC1.zip` /
+`COS-RP035-PHC2.zip` / `COS-RP035-PHC3.zip`, following Phase B's
+short-identifier convention.
+
+## RP-035 Phase C, Checkpoint 4 — ChurchOS Prayer Interaction
+
+**Baseline:** `COS-RP035-PHC3.zip`, SHA-256
+`18728c333dcca5668e648987c4dba4f9848fd4de3145602f716ff7adb2a5b4ab`,
+verified twice this session, matched.
+
+**New capability:** ChurchOS Prayer Interaction — prayer-request
+submission/lifecycle and aggregate Amen reaction. Full detail in
+`docs/history/RP-035-PhaseC.md` (Checkpoint 4).
+
+**Tests:** Checkpoint 4: 38/38. Regression: PHC1 20/20, PHC2 31/31,
+PHB1 12/12, PHB2 14/14 — all re-run directly this session. Full
+repository regression (82 files, individual run): 167 pass, 55 fail
+(pre-existing, unrelated, disclosed above), 14 cancelled
+(browser/Playwright, no headless environment). Zero new regressions.
+
+**Byte-identity, PHC3 → PHC4:** 2 files added
+(`core/modules/ChurchOS/church-prayer-interaction.js` and its test
+suite), 0 modified, 0 removed.
+
+**Production artifact:** `COS-RP035-PHC4.zip` — Package SHA-256
+communicated in the delivery message, per the self-reference pattern
+documented above (this file is excluded from its own repository hash).
+
+## RP-035 Phase C, Checkpoint 5 — ChurchOS Offering Interaction
+
+**Baseline:** `COS-RP035-PHC4.zip`, SHA-256
+`f9c4e2800e16df33fb6c438d7d47036da8e27ef4fbf952c8724b9deb326a9c27`,
+verified twice this session, matched.
+
+**New capability:** ChurchOS Offering Interaction — offering-intent
+creation/cancellation with a real, honestly-bounded, non-payment-
+gateway lifecycle (only `LOCAL_QUEUED` and `CANCELLED` are ever
+actually reachable; `QUEUED`/`SUBMITTED`/`CONFIRMED`/`FAILED` are
+declared for lifecycle completeness but never assigned — no real
+payment provider exists anywhere in this repository). Privacy-safe
+owner-only individual records, moderator/admin-only full queue and
+audit log, moderator/admin-only aggregate view (counts and per-
+currency/per-category sums, zero giver-identifying fields), and real
+per-(sessionId, giverUserId, clientRequestId) duplicate-submission
+protection. Full detail in `docs/history/RP-035-PhaseC.md` (Checkpoint
+5).
+
+**Tests:** Checkpoint 5: 39/39. Regression: PHC1 20/20, PHC2 31/31,
+PHC4 38/38, PHB1 12/12, PHB2 14/14 — all re-run directly this session
+(154/154 combined). Full repository regression (83 files, individual
+run): 206 pass, 56 fail, 0 explicitly cancelled, 13 timed out (this
+session's harness times out non-headless browser/Playwright tests
+rather than marking them cancelled — same 13-14 browser-dependent
+files disclosed since Phase B, not a new category). Of the 56 fails,
+55 are the same pre-existing set disclosed since Phase B (document-
+understanding, duplicate-detection, ourcozy-live, scene/audio/media-
+pipeline/playback/camera(×2)/bridge(×2)); the 56th
+(`cozy-live-connectivity-dashboard-browser.test.js`) is the same
+pre-existing browser-dependent test previously grouped under
+"cancelled" — in this session's harness it fails fast instead of
+hanging, a harness-categorization difference, not a new regression.
+**Zero new regressions.**
+
+**Byte-identity, PHC4 → PHC5:** 2 files added
+(`core/modules/ChurchOS/church-offering-interaction.js` and its test
+suite), 0 modified, 0 removed. PHB/PHC1/PHC2/PHC3/PHC4 production
+files confirmed byte-identical against a fresh extraction of the PHC4
+baseline.
+
+**Production artifact:** `COS-RP035-PHC5.zip` — Package SHA-256
+communicated in the delivery message, per the self-reference pattern
+documented above (this file is excluded from its own repository hash).
+
+## RP-035 Phase C, Checkpoint 6 — ChurchOS Live Multi-Language Translation Integration
+
+**Baseline:** `COS-RP035-PHC5.zip`, SHA-256
+`fa9f862892e85a448bf17425eabf60ef7173e477d6a7dd229151e1f97db6ae99`,
+verified twice this session, matched.
+
+**New capability:** ChurchOS Live Multi-Language Translation
+Integration — composes the real `LDCESessionEngine` (viewer language
+selection/read), `LDCECaptionEngine` (real ASR + translation
+dispatch), `SpeechTranslationAdapter`/`SpeechTranslationProviders`/
+`CozyTranslate` (real translation execution), and `CozyLanguagePacks`
+(RP-030's 13-identity registry, read-only, never treated as
+translation proof). Reports an honest four-fact capability matrix per
+language (`registered`/`selectable`/`translationSupported`/
+`translationAvailableNow`), disclosing a genuine divergence between
+CozyLanguagePacks' 13 identities and CozyTranslate's real seeded
+target-language set (Arabic/Russian registered but not currently
+selectable). Self-only viewer-language selection and self-only
+speaker captioning; session-membership-gated availability and
+live-caption subscription with `speakerUserId` stripped from every
+relayed event. Translated audio and N-viewer broadcast are fixed
+`CAPABILITY_UNAVAILABLE` constants. Source language is always
+explicit, never guessed. Full detail in
+`docs/history/RP-035-PhaseC.md` (Checkpoint 6).
+
+**Tests:** Checkpoint 6: 28/28. Regression: PHB1 12/12, PHB2 14/14,
+PHC1 20/20, PHC2 31/31, PHC4 38/38, PHC5 39/39 — all re-run directly
+this session (182/182 combined with PHC6). Full repository regression
+(84 files, individual per-file run): 59 files fully passing, 11 files
+with real failures (55 individual failing test cases — same
+pre-existing set disclosed since Phase B), 14 files timed out
+(browser/Playwright, no headless environment this session — one more
+than PHC5's disclosed 13, a harness-categorization difference for
+`cozy-live-connectivity-dashboard-browser.test.js`, already flagged as
+variable across sessions in PHC5's own record, not a new failure
+category). **Zero new regressions.**
+
+**Byte-identity, PHC5 → PHC6:** 2 files added
+(`core/modules/ChurchOS/church-live-translation-interaction.js` and
+its test suite), 0 modified, 0 removed. PHB/PHC1/PHC2/PHC3/PHC4/PHC5
+production files confirmed byte-identical against a fresh extraction
+of the PHC5 baseline.
+
+**Checkpoint ZIPs:** `COS-RP035-PHC6-MID.zip` SHA-256
+`b92b42cac6c8ce0453fe81be34e41ce1a93c58cdb5dddb013db5a3b681e7f2a3`;
+`COS-RP035-PHC6-VERIFIED.zip` SHA-256
+`3bc26ce6b2efc56193398570d6491fdd4f19d5808b3e9ee1d6592a5ee17e70fe`.
+
+**Production artifact:** `COS-RP035-PHC6.zip` — Package SHA-256
+communicated in the delivery message, per the self-reference pattern
+documented above (this file is excluded from its own repository hash).
+
+---
+
+## WOS2 Part 5 — Order Understanding (Recovery Continuation)
+
+**Status: NOT CERTIFIED.** Continued from the physically-verified
+`COS-RP035-WOS2-P5-IMPLEMENTED.zip` (SHA-256
+`6a7475f8ccc67536233f70b992e2627c6293a6af39ddb881db2dc458c319a0a7`).
+
+**Tests:** WOS2 order-understanding 23/23 PASS; WOS1 commerce 21/21
+PASS; ChurchOS lineage 182/182 PASS.
+
+**Full-repository regression:** 86 test files run individually — 65
+PASS, 11 pre-existing FAIL (55 individual assertions), 10
+environmental/untestable timeouts (headless browser dashboards,
+classified as environmental — not failures, not regressions). **Zero
+new regressions.**
+
+**Baseline comparison note:** the actual `COS-RP035-WOS1.zip` archive
+was not physically present in this session, so this is a corroboration
+against this repository's own recorded WOS1 state (matching
+failure count and named modules), not a literal byte-for-byte
+comparison against that archive.
+
+**Byte-identity:** working tree diff-clean against a fresh extraction
+of the IMPLEMENTED zip throughout this session — no PHB/PHC/ShopOS
+production file touched.
+
+**Checkpoint ZIP:** `COS-RP035-WOS2-P5-TESTED.zip`, SHA-256 (hashed
+twice, matched)
+`bf06819a1b892a967a3a7e75420930b3f9a91dc76035a6820c3c5812039ac616`.
+Fresh-extracted and re-verified a second time; delivered-copy hash
+confirmed.
+
+Full detail: `docs/history/RP-035-WOS2-P5.md`.
+
+## RP-035 WOS2 Part 5 — CERTIFIED
+
+WOS1 baseline archive verified physically present, hashed twice,
+integrity-checked, and diffed byte-for-byte against the P5-TESTED
+tree: zero unexpected changes. See `docs/history/RP-035-WOS2-P5.md`
+Part 11.
+
+**Checkpoint ZIP:** `COS-RP035-WOS2-P5-CERTIFIED.zip`.
+**Status: CERTIFIED.**
+
+## RP-035 WOS2 Part 6 — Inventory-Validated Order Decision + Owner/Assistant Escalation Engine
+
+**Governance reconciliation session (append-only correction of the
+SPECIFICATION-ONLY entry above):** implementation confirmed real and
+re-verified directly — `wholesale-order-decision.js` (536 lines) +
+`wholesale-order-decision.test.js` (391 lines), 22/22 PASS. Baseline
+`COS-RP035-WOS2-P6-TESTED.zip`, SHA-256 (hashed twice, matched)
+`0ebd2e627734d61f5812c075253c800e07763edcbe0febf8a235e2de76b38f93`.
+
+**Regression, re-run directly:** WOS1 21/21, P5 23/23, ChurchOS
+lineage (7 files) 182/182 — all PASS.
+
+**Browser-test count reconciled:** physical tree has 10
+browser/Playwright dashboard test files, matching all three
+references in `docs/history/RP-035-WOS2-P5.md` Part 3. No 12-count
+source was found anywhere in this repository's WOS2 P5/P6 governance
+chain — 10 is confirmed correct, nothing missing.
+
+**Byte-identity, P6-SPEC → P6-TESTED:** governance files plus the two
+new production files and their test file only.
+
+**Status: governance-reconciled, not yet certified.** Full
+certification sequence (fresh extraction, hash re-verification, final
+packaging) pending.
+
+## RP-035 WOS2 Part 7 — Post-Confirmation Fulfillment Lifecycle Engine
+
+**Baseline:** `COS-RP035-WOS2-P6-CERTIFIED.zip`, SHA-256
+`29c605e00ac8772643fd37a0e82f6c2de3215099b99018fad28d35e5f9850dbf`
+(verified twice, matched).
+
+**New file:** `core/modules/WholesaleOS/wholesale-fulfillment.js` +
+test suite (22/22 PASS). Composes Part 6 `WholesaleOrderDecision`
+read-only; no stock-decrement write path exists or is fabricated.
+
+**Regression:** WOS1 21/21 · P5 23/23 · P6 22/22 · ChurchOS lineage
+182/182 — all PASS. Full repository: 11 pre-existing failing files
+(55 assertions) + 10 environmental browser timeouts, identical to the
+established baseline. Zero new regressions.
+
+**Byte-identity vs P6-CERTIFIED:** 4 files added, 0 modified.
+
+**Production ZIP:** `COS-RP035-WOS2-P7-CERTIFIED.zip`.
+**Status: CERTIFIED.**

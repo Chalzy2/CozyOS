@@ -1,0 +1,39 @@
+# Dependencies / generated environments
+node_modules/
+**/node_modules/
+
+# Python generated files
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Build / temporary files
+dist/
+build/
+.cache/
+.tmp/
+*.tmp
+
+# Logs
+*.log
+
+# Local/editor/system files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local secrets/configuration
+.env
+.env.*
+!.env.example
+
+# Git/runtime temporary data
+.git/
+
+# Backups / transient development copies
+*.backup
+*.backup2
+*.stage2-backup
+*.stage2_backup
+*.before_church_semantics

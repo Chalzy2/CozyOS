@@ -2238,5 +2238,13 @@
     "global": "AnalysisEngine",
     "milestone_introduced": "M373",
     "purpose_snippet": "Consumes Layer2GraphComposer graphs (Tier A) plus deterministic raw-text security/static-leak heuristics (Tier B) to emit evidence-backed findings; analyzes only, never repairs"
+  },
+  {
+    "path": "core/modules/intelligence/knowledge/cozy-knowledge-ingestion.js",
+    "layer": "Core / Intelligence \u2014 Community/Document Knowledge Ingestion",
+    "version": "1.0.0",
+    "global": "CozyKnowledgeIngestion",
+    "milestone_introduced": "RP-029-A",
+    "purpose_snippet": "Document/website/community-submission knowledge ingestion pipeline (SOURCE -> EXTRACTION -> LANGUAGE ID -> SEGMENTATION -> PROVENANCE -> CANDIDATE). No network fetch, no audio/video/speech capability."
   }
 ]

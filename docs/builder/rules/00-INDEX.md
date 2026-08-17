@@ -40,6 +40,7 @@ an undiscoverable rule is as good as no rule.
 | `23-large-engine-implementation-rule.md` | 78 | Large Engine Implementation — extends Rule 65/76/77: if an engine's Phase 3 cannot reasonably finish in one session, the Builder implements as much as possible, then packages that real partial state exactly like a completed phase would be packaged (full ZIP, `LATEST.md`/`HANDOFF.md`/`RELEASES.md`/Repair Queue/Waiting Queue updated, both hashes, ZIP verified, Rule 67 Delivery printed, session ended) with an explicit completed/remaining/next-step record. Phase 4 (Verification) is never attempted against an incomplete Phase 3 — that would misrepresent in-progress work as passing |
 | `24-mandatory-phase-checkpoint-rule.md` | 79 | Mandatory Phase Checkpoint — generalizes Rule 78's per-phase packaging discipline to every phase, not just Phase 3: at the end of any completed phase (0 through 9), before starting the next, the Builder must update the phase's required documents, compute both hashes, build and integrity-verify a full repository ZIP, print the Rule 67 Delivery Block, and deliver it — only then may the next phase begin. No completed phase exists without a delivered ZIP; the latest delivered ZIP is always the official recovery point if a session ends unexpectedly |
 | `25-builder-stop-gate-rule.md` | 80 | Builder Stop Gate — the repository's final safety rule. Before ending any session, ask only one question: "Has a verified ZIP been produced for the work completed this session?" If NO: do not end, do not write "Continue"/"Say continue"/any deferral, do not start new work — produce the ZIP, verify it, print the Rule 67 Delivery Block, then end. If YES: end. A minimal, one-question gate layered after Rules 67/71/73/76/79's fuller packaging procedure, deliberately restated in `HANDOFF.md`'s top-of-file checklist, `LATEST.md`'s title-line reminder, and the Builder Prompt's own final-reminder block, so it is encountered multiple times regardless of reading order |
+| `30-continuous-zip-recovery-checkpoint-rule.md` | 85 | Continuous ZIP Recovery Checkpoint — extends Rule 79/80 to the *inside* of a phase, not just its boundary: after every meaningful completed unit of work (an audit, a file created/modified-and-syntax-verified, a test suite created, tests passing, integration, regression, a governance update, packaging) the Builder must produce a checkpoint ZIP, compute its SHA-256 (single hash for ordinary recovery checkpoints, dual matching hash only when a checkpoint is promoted to certification), and continue immediately — never treating checkpoint creation itself as a stopping point while budget remains. Checkpoints are immutable and cumulative (`<MILESTONE>-START` → `-IMPLEMENTED` → `-TESTED` → `-MID` → `-REGRESSION` → `-FINAL`), must each contain the complete working tree (not a diff), and every future Builder/milestone prompt for a governed subsystem must repeat this rule's mandatory header at the top. Certification itself is unchanged and still requires the full Rule 60/65/67/70/79/80 gate |
 
 ## Related, non-rule governance files (read alongside, not instead of, the above)
 
@@ -112,3 +113,36 @@ composing, implementing, and verifying work**, in any milestone:
   milestone's `docs/history/MNNN.md` — so `LATEST.md`/`HANDOFF.md` moving
   on to a later milestone never erases the permanent record of exactly
   where an earlier one left off.
+- **Running any Repair session** (an `RP-NNN`/`RP-NNN-X` item, as
+  opposed to a Milestone/Engine session): Rule 81
+  (`26-repair-output-rule.md`) governs the whole workflow — single-path
+  FIND → FIX → TEST → RECORD → PACKAGE → HANDOFF (or, if genuinely
+  blocked, FIND → FIX what is safely possible → TEST → RECORD BLOCKER →
+  PACKAGE → HANDOFF); a capability may only be reported ONLINE/READY/
+  ACTIVE after its real operation is observed to succeed, never on
+  registration/wiring alone; and every Markdown/documentation file
+  (`HANDOFF.md`, `LATEST.md`, repair history/queue, any repair prompt
+  written for a future Builder) is delivered inside the ZIP at its real
+  repository path — never as a standalone output file. Standalone
+  output files are restricted to the full ZIP plus `.js`/`.html`/`.css`.
+- **Promoting any language from `NOT_READY` to `AVAILABLE`** in
+  `cozy-language-registry.js` (or any future language registry): Rule 82
+  (`27-language-availability-verification-rule.md`) governs it — a
+  roadmap or priority listing is never itself grounds for promotion.
+  All five conditions (real language resources, templates committed for
+  every intent, no uncontrolled machine translation, passing
+  intent×language tests, and observed runtime behavior — recorded as
+  `NOT_TESTED_LIVE` if no browser/DOM runtime is available to confirm
+  it) must be independently verified in the same session that changes
+  the registry state, and the record must state, per language, exactly
+  how each was verified.
+- **Extending the language registry's schema itself** (adding a
+  country-mapping table, dialect/variant metadata, `script`/
+  `direction`/`locale` fields, offline-resource pack states, voice
+  round-trip verification, or refactoring public-answer facts to a
+  single authoritative source): Rule 84
+  (`29-language-taxonomy-and-single-source-governance-rule.md`)
+  governs it — Target/Registered/Available must stay three
+  independent fields (never `TARGET → AVAILABLE` directly), and the
+  binding principle is that facts have one authoritative source while
+  languages only render it, never restate it independently.
