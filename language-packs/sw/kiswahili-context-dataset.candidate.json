@@ -1,0 +1,219 @@
+{
+  "_meta": {
+    "purpose": "Kiswahili linguistic knowledge/context dataset for CozyAI — candidate stage, not yet approved",
+    "pipeline_stage": "candidate_data",
+    "pipeline": "screenshot -> candidate data (THIS FILE) -> Kiswahili validation/normalization by Charles -> approved dataset -> CozyAI",
+    "schema_per_item": "kiswahili, english, exampleSentence{sw,en}, grammaticalNote, register, source, validationStatus",
+    "validationStatus_values": ["needs_review", "validated", "flagged_non_sanifu_see_note"],
+    "note": "Every item not explicitly corrected by Charles in this session is marked needs_review — Claude is not the Sanifu-Kiswahili authority here."
+  },
+  "categories": {
+
+    "interrogatives": {
+      "intentFeedCandidate": true,
+      "note": "High-value for M1 — feed both the base word AND the example sentence pattern into intent trigger phrases, not just the word:meaning pair.",
+      "items": [
+        {
+          "kiswahili": "Nani",
+          "english": "Who",
+          "exampleSentence": { "sw": "Nani amekuja?", "en": "Who has come?" },
+          "grammaticalNote": "Interrogative pronoun, subject position — precedes the verb.",
+          "register": "neutral/standard",
+          "source": "screenshot-1 (@abasbillow87316)",
+          "validationStatus": "validated"
+        },
+        {
+          "kiswahili": "Nini",
+          "english": "What",
+          "exampleSentence": { "sw": "Unafanya nini?", "en": "What are you doing?" },
+          "grammaticalNote": "Interrogative pronoun, object position — follows the verb.",
+          "register": "neutral/standard",
+          "source": "screenshot-1 (@abasbillow87316)",
+          "validationStatus": "validated"
+        },
+        {
+          "kiswahili": "Lini",
+          "english": "When",
+          "exampleSentence": { "sw": "Utaondoka lini?", "en": "When will you leave?" },
+          "grammaticalNote": "Interrogative adverb of time — typically sentence-final.",
+          "register": "neutral/standard",
+          "source": "screenshot-1 (@abasbillow87316)",
+          "validationStatus": "validated"
+        },
+        {
+          "kiswahili": "Wapi",
+          "english": "Where",
+          "exampleSentence": { "sw": "Unakaa wapi?", "en": "Where do you live?" },
+          "grammaticalNote": "Interrogative adverb of place — sentence-final.",
+          "register": "neutral/standard",
+          "source": "screenshot-1 (@abasbillow87316)",
+          "validationStatus": "validated"
+        },
+        {
+          "kiswahili": "Kwa nini",
+          "english": "Why",
+          "exampleSentence": { "sw": "Kwa nini unalia?", "en": "Why are you crying?" },
+          "grammaticalNote": "Compound interrogative ('for what') — sentence-initial.",
+          "register": "neutral/standard",
+          "source": "screenshot-1 (@abasbillow87316)",
+          "validationStatus": "validated"
+        }
+      ]
+    },
+
+    "pronouns": {
+      "intentFeedCandidate": false,
+      "note": "Foundational grammar reference — feeds sentence-pattern construction (e.g. resolving 'yake' back to a prior topic, per Charles's M4/contextual example) more than direct intent triggers.",
+      "items": [
+        { "kiswahili": "Mimi", "english": "I / Me", "exampleSentence": null, "grammaticalNote": "1st person singular subject/object pronoun.", "register": "neutral/standard", "source": "screenshot-3 (@abasbillow87316 / TikTok @billoz41)", "validationStatus": "needs_review" },
+        { "kiswahili": "Wewe", "english": "You (singular)", "exampleSentence": null, "grammaticalNote": "2nd person singular.", "register": "neutral/standard", "source": "screenshot-3", "validationStatus": "needs_review" },
+        { "kiswahili": "Yeye", "english": "He / She", "exampleSentence": null, "grammaticalNote": "3rd person singular — no grammatical gender distinction.", "register": "neutral/standard", "source": "screenshot-3", "validationStatus": "needs_review" },
+        { "kiswahili": "Sisi", "english": "We / Us", "exampleSentence": null, "grammaticalNote": "1st person plural.", "register": "neutral/standard", "source": "screenshot-3", "validationStatus": "needs_review" },
+        { "kiswahili": "Ninyi", "english": "You (plural)", "exampleSentence": null, "grammaticalNote": "2nd person plural.", "register": "neutral/standard", "source": "screenshot-3", "validationStatus": "needs_review" },
+        { "kiswahili": "Wao", "english": "They / Them", "exampleSentence": null, "grammaticalNote": "3rd person plural.", "register": "neutral/standard", "source": "screenshot-3", "validationStatus": "needs_review" }
+      ]
+    },
+
+    "adjectives": {
+      "intentFeedCandidate": false,
+      "items": [
+        { "kiswahili": "Mzuri", "english": "Good", "exampleSentence": null, "grammaticalNote": "M-/Wa- class agreement adjective.", "register": "neutral/standard", "source": "screenshot-4 (@teacherbilloz1)", "validationStatus": "needs_review" },
+        { "kiswahili": "Mbaya", "english": "Bad", "exampleSentence": null, "grammaticalNote": "M-/Wa- class agreement adjective.", "register": "neutral/standard", "source": "screenshot-4", "validationStatus": "needs_review" },
+        { "kiswahili": "Mrefu", "english": "Tall", "exampleSentence": null, "grammaticalNote": "Also means 'long' depending on noun class/context.", "register": "neutral/standard", "source": "screenshot-4", "validationStatus": "needs_review" },
+        { "kiswahili": "Mfupi", "english": "Short", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-4", "validationStatus": "needs_review" },
+        { "kiswahili": "Mpya", "english": "New", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-4", "validationStatus": "needs_review" },
+        { "kiswahili": "Kale / Zamani", "english": "Old (ancient / from long ago)", "exampleSentence": null, "grammaticalNote": "Two related forms shown together in source — likely distinct usage contexts; needs Charles to disambiguate.", "register": "neutral/standard", "source": "screenshot-4", "validationStatus": "needs_review" },
+        { "kiswahili": "Mkubwa", "english": "Big", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-4", "validationStatus": "needs_review" },
+        { "kiswahili": "Mdogo", "english": "Small / Young", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-4", "validationStatus": "needs_review" },
+        { "kiswahili": "Rahisi", "english": "Easy / Cheap", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-4", "validationStatus": "needs_review" },
+        { "kiswahili": "Ngumu", "english": "Hard / Difficult", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-4", "validationStatus": "needs_review" }
+      ]
+    },
+
+    "basicPhrases": {
+      "intentFeedCandidate": true,
+      "note": "Greeting/help/register-style phrases overlap directly with existing RP-036/RP-027 greeting intents — good candidates for expanding those trigger sets.",
+      "items": [
+        { "kiswahili": "Habari", "english": "Hello / How are you?", "exampleSentence": null, "grammaticalNote": "Standard greeting, functions as both greeting and 'how are things'.", "register": "neutral/standard", "source": "screenshot-5", "validationStatus": "validated" },
+        { "kiswahili": "Nzuri", "english": "Fine / Good", "exampleSentence": null, "grammaticalNote": "Standard reply to 'Habari'.", "register": "neutral/standard", "source": "screenshot-5", "validationStatus": "validated" },
+        { "kiswahili": "Asante", "english": "Thank you", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-5", "validationStatus": "validated" },
+        { "kiswahili": "Karibu", "english": "You're welcome", "exampleSentence": null, "grammaticalNote": "Also used as 'welcome' when greeting a visitor.", "register": "neutral/standard", "source": "screenshot-5", "validationStatus": "validated" },
+        { "kiswahili": "Ndiyo", "english": "Yes", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-5", "validationStatus": "validated" },
+        { "kiswahili": "Hapana", "english": "No", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-5", "validationStatus": "validated" },
+        { "kiswahili": "Samahani", "english": "Excuse me / Sorry", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-5", "validationStatus": "validated" },
+        { "kiswahili": "Jina lako nani?", "english": "What is your name?", "exampleSentence": null, "grammaticalNote": "Literally 'your name [is] who' — 'nani' used non-standardly for 'what' here by convention, common in this exact fixed phrase.", "register": "neutral/standard", "source": "screenshot-5", "validationStatus": "needs_review" }
+      ]
+    },
+
+    "familyMembers": {
+      "intentFeedCandidate": false,
+      "items": [
+        { "kiswahili": "Babu", "english": "Grandfather", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-6", "validationStatus": "validated" },
+        { "kiswahili": "Bibi", "english": "Grandmother", "exampleSentence": null, "grammaticalNote": "Also used as a polite term for 'Mrs./Madam' depending on context.", "register": "neutral/standard", "source": "screenshot-6", "validationStatus": "needs_review" },
+        { "kiswahili": "Baba", "english": "Father", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-6", "validationStatus": "validated" },
+        { "kiswahili": "Mama", "english": "Mother", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-6", "validationStatus": "validated" },
+        { "kiswahili": "Kaka", "english": "Brother", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-6", "validationStatus": "validated" },
+        { "kiswahili": "Dada", "english": "Sister", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-6", "validationStatus": "validated" }
+      ]
+    },
+
+    "adverbsOfTime": {
+      "intentFeedCandidate": false,
+      "note": "Two overlapping source lists (screenshot-7 typed, screenshot-9 handwritten) merged; duplicates deduped, both sources kept in provenance.",
+      "items": [
+        { "kiswahili": "Sasa", "english": "Now", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-7 (@billoz41)", "validationStatus": "needs_review" },
+        { "kiswahili": "Hivi sasa", "english": "Right now / At this moment", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-7", "validationStatus": "needs_review" },
+        { "kiswahili": "Leo", "english": "Today", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-7 / screenshot-9", "validationStatus": "needs_review" },
+        { "kiswahili": "Kesho", "english": "Tomorrow", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-7 / screenshot-9", "validationStatus": "needs_review" },
+        { "kiswahili": "Jana", "english": "Yesterday", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-7 / screenshot-9", "validationStatus": "needs_review" },
+        { "kiswahili": "Mara moja", "english": "Immediately / At once", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-7", "validationStatus": "needs_review" },
+        { "kiswahili": "Hapo awali", "english": "Earlier / Previously", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-7", "validationStatus": "needs_review" },
+        { "kiswahili": "Baadaye", "english": "Later", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-7", "validationStatus": "needs_review" },
+        { "kiswahili": "Usiku huu", "english": "Tonight", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-9 (handwritten)", "validationStatus": "needs_review" },
+        { "kiswahili": "Kila mwezi", "english": "Every month", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-9", "validationStatus": "needs_review" },
+        { "kiswahili": "Katika wikendi", "english": "On/during the weekend", "exampleSentence": null, "grammaticalNote": "Uses borrowed term 'wikendi' — flagging in case a more Sanifu form is preferred.", "register": "colloquial/borrowed", "source": "screenshot-9", "validationStatus": "flagged_non_sanifu_see_note" },
+        { "kiswahili": "Mwezi ujao", "english": "Next month", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-9", "validationStatus": "needs_review" },
+        { "kiswahili": "Mwaka ujao", "english": "Next year", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-9", "validationStatus": "needs_review" },
+        { "kiswahili": "Kabla ya", "english": "Before", "exampleSentence": null, "grammaticalNote": "Preposition, requires an object noun following ('kabla ya chakula' = before food).", "register": "neutral/standard", "source": "screenshot-9", "validationStatus": "needs_review" },
+        { "kiswahili": "Baada ya", "english": "After", "exampleSentence": null, "grammaticalNote": "Preposition, requires an object noun following.", "register": "neutral/standard", "source": "screenshot-9", "validationStatus": "needs_review" }
+      ]
+    },
+
+    "kitchenUtensils": {
+      "intentFeedCandidate": false,
+      "items": [
+        { "kiswahili": "Kisu", "english": "Knife", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-11", "validationStatus": "validated" },
+        { "kiswahili": "Furushi", "english": "Fork", "exampleSentence": null, "grammaticalNote": "Standard Sanifu term for 'fork' is normally 'Uma' — flagging 'Furushi' as possibly non-standard/regional; needs Charles's call.", "register": "unclear", "source": "screenshot-11", "validationStatus": "flagged_non_sanifu_see_note" },
+        { "kiswahili": "Kijiko", "english": "Spoon", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-11", "validationStatus": "validated" },
+        { "kiswahili": "Kijiko cha chuma", "english": "Ladle", "exampleSentence": null, "grammaticalNote": "Literally 'metal/iron spoon' — used contextually for ladle in source.", "register": "neutral/standard", "source": "screenshot-11", "validationStatus": "needs_review" },
+        { "kiswahili": "Kijiko cha kuchuja", "english": "Slotted spoon", "exampleSentence": null, "grammaticalNote": "Text partially cut off in source image — reconstructed from visible characters.", "register": "neutral/standard", "source": "screenshot-11", "validationStatus": "needs_review" },
+        { "kiswahili": "Pupa", "english": "Whisk", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-11", "validationStatus": "needs_review" },
+        { "kiswahili": "Kiyauma / Kiyama", "english": "Tongs", "exampleSentence": null, "grammaticalNote": "Source shows two different spellings for the same item across two entries (#7 'Kiyauma', #8 'Kiyama') — likely one is a typo; needs Charles to pick the correct form.", "register": "unclear", "source": "screenshot-11", "validationStatus": "flagged_non_sanifu_see_note" },
+        { "kiswahili": "Kikombe cha kupimia", "english": "Measuring cup", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-11", "validationStatus": "needs_review" },
+        { "kiswahili": "Chungu cha kupikia", "english": "Colander", "exampleSentence": null, "grammaticalNote": "Text partially cut off in source — reconstructed; 'chungu' more commonly means 'cooking pot', so this pairing needs verification against 'colander' specifically.", "register": "unclear", "source": "screenshot-11", "validationStatus": "flagged_non_sanifu_see_note" }
+      ]
+    },
+
+    "romanticPhrases": {
+      "intentFeedCandidate": false,
+      "note": "Register-sensitive category — highest priority for Charles's normalization pass. Two items already corrected by Charles are marked validated with his replacement; the rest are needs_review pending the same treatment.",
+      "items": [
+        { "kiswahili": "Nakupenda sana.", "english": "I love you so much.", "exampleSentence": null, "grammaticalNote": null, "register": "romantic/intimate", "source": "screenshot-2 (@abasbillow87316)", "validationStatus": "needs_review" },
+        { "kiswahili": "Wewe ni moyo wangu.", "english": "You are my heart.", "exampleSentence": null, "grammaticalNote": null, "register": "romantic/intimate", "source": "screenshot-2", "validationStatus": "needs_review" },
+        { "kiswahili": "Nakukumbuka kila wakati.", "english": "I miss you all the time.", "exampleSentence": null, "grammaticalNote": null, "register": "romantic/intimate", "source": "screenshot-2", "validationStatus": "needs_review" },
+        {
+          "kiswahili": "Wewe ni ndoto yangu iliyotimia.",
+          "english": "You are my dream come true.",
+          "exampleSentence": null,
+          "grammaticalNote": "Charles's correction — original source had 'Wewe ni ndoto yangu ya kweli', which is understandable but less idiomatic for this specific meaning.",
+          "register": "romantic/intimate",
+          "source": "screenshot-2, corrected by Charles this session",
+          "validationStatus": "validated"
+        },
+        {
+          "kiswahili": "Ninapokuwa na wewe, ninahisi furaha.",
+          "english": "When I'm with you, I feel happy.",
+          "exampleSentence": null,
+          "grammaticalNote": "Charles's correction — original source had 'najihisi mwenye furaha', flagged as awkward/non-Sanifu. Alternate form Charles also offered: 'Nikiwa na wewe, huwa ninajisikia mwenye furaha.'",
+          "register": "romantic/intimate",
+          "source": "screenshot-2, corrected by Charles this session",
+          "validationStatus": "validated"
+        },
+        { "kiswahili": "Sauti yako ni muziki kwa masikio yangu.", "english": "Your voice is music to my ears.", "exampleSentence": null, "grammaticalNote": null, "register": "romantic/intimate", "source": "screenshot-2", "validationStatus": "needs_review" },
+        { "kiswahili": "Nataka kukaa na wewe milele.", "english": "I want to stay with you forever.", "exampleSentence": null, "grammaticalNote": null, "register": "romantic/intimate", "source": "screenshot-2", "validationStatus": "needs_review" },
+        { "kiswahili": "Wewe ni mwanga wa maisha yangu.", "english": "You are the light of my life.", "exampleSentence": null, "grammaticalNote": "Bottom of source image partially cut off — reconstructed from visible fragment.", "register": "romantic/intimate", "source": "screenshot-2", "validationStatus": "needs_review" }
+      ]
+    },
+
+    "objectVocabulary": {
+      "intentFeedCandidate": false,
+      "note": "From Charles's own handwritten notes (screenshot-8) — pattern practice using 'Hii ni ___' (This is a ___).",
+      "items": [
+        { "kiswahili": "Hii ni gari.", "english": "This is a car.", "exampleSentence": null, "grammaticalNote": "'Gari' partially cut off by pen in source, reconstructed.", "register": "neutral/standard", "source": "screenshot-8 (Charles's handwriting)", "validationStatus": "needs_review" },
+        { "kiswahili": "Hii ni nyumba.", "english": "This is a house.", "exampleSentence": null, "grammaticalNote": "Word partially obscured by pen in source; reconstructed as 'nyumba' (house) — needs Charles to confirm intended word.", "register": "neutral/standard", "source": "screenshot-8", "validationStatus": "needs_review" },
+        { "kiswahili": "Hii ni shati.", "english": "This is a shirt.", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-8", "validationStatus": "needs_review" },
+        { "kiswahili": "Hii ni suruali.", "english": "This is a trouser.", "exampleSentence": null, "grammaticalNote": "Source spelled 'Suryali' — corrected to standard spelling 'Suruali'.", "register": "neutral/standard", "source": "screenshot-8", "validationStatus": "flagged_non_sanifu_see_note" },
+        { "kiswahili": "Huu ni mti.", "english": "This is a tree.", "exampleSentence": null, "grammaticalNote": "Correctly uses 'Huu' (not 'Hii') since 'mti' is U-class noun — Charles's own notes already got this class agreement right.", "register": "neutral/standard", "source": "screenshot-8", "validationStatus": "validated" }
+      ]
+    },
+
+    "everydayFunctionalPhrases": {
+      "intentFeedCandidate": true,
+      "note": "From Charles's handwritten notes (screenshots 10, 12) — practical phrases, some directly overlap basicPhrases. Several are cut off at the image edge and need Charles to supply the missing tail.",
+      "items": [
+        { "kiswahili": "Hujambo", "english": "How are you", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-10 (Charles's handwriting)", "validationStatus": "needs_review" },
+        { "kiswahili": "Sijambo", "english": "I am fine", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-10", "validationStatus": "needs_review" },
+        { "kiswahili": "Hakuna [matata?]", "english": "No worries", "exampleSentence": null, "grammaticalNote": "Cut off at image edge — Charles likely intended 'Hakuna matata', needs confirmation.", "register": "neutral/standard", "source": "screenshot-10", "validationStatus": "needs_review" },
+        { "kiswahili": "Usijali", "english": "Never mind", "exampleSentence": null, "grammaticalNote": "Cut off at image edge — reconstructed from visible fragment 'Usijaw...', needs confirmation.", "register": "neutral/standard", "source": "screenshot-10", "validationStatus": "needs_review" },
+        { "kiswahili": "Nakupenda sana", "english": "I love you so much", "exampleSentence": null, "grammaticalNote": "Duplicate of romanticPhrases entry — cut off at image edge in this source, kept for provenance only.", "register": "romantic/intimate", "source": "screenshot-10", "validationStatus": "needs_review" },
+        { "kiswahili": "Tafadhali nisaidie", "english": "Please help me", "exampleSentence": null, "grammaticalNote": "Cut off at image edge — reconstructed from visible fragment 'Tafad...', needs confirmation.", "register": "neutral/standard", "source": "screenshot-10", "validationStatus": "needs_review" },
+        { "kiswahili": "Hii ni bei gani?", "english": "How much is this?", "exampleSentence": null, "grammaticalNote": "Cut off at image edge — reconstructed, needs confirmation.", "register": "neutral/standard", "source": "screenshot-10", "validationStatus": "needs_review" },
+        { "kiswahili": "Nipigie", "english": "Call me", "exampleSentence": null, "grammaticalNote": null, "register": "neutral/standard", "source": "screenshot-12 (Charles's handwriting)", "validationStatus": "needs_review" },
+        { "kiswahili": "Nipigie tena", "english": "Call me again", "exampleSentence": null, "grammaticalNote": "Cut off at image edge — reconstructed.", "register": "neutral/standard", "source": "screenshot-12", "validationStatus": "needs_review" },
+        { "kiswahili": "Unaishi wapi?", "english": "Where do you live?", "exampleSentence": null, "grammaticalNote": "Directly reuses the interrogatives 'wapi' pattern — good intent-trigger candidate.", "register": "neutral/standard", "source": "screenshot-12", "validationStatus": "needs_review" },
+        { "kiswahili": "Sina wakati", "english": "I don't have time", "exampleSentence": null, "grammaticalNote": "Cut off at image edge — reconstructed.", "register": "neutral/standard", "source": "screenshot-12", "validationStatus": "needs_review" },
+        { "kiswahili": "Uko wapi?", "english": "Where are you?", "exampleSentence": null, "grammaticalNote": "Cut off at image edge — reconstructed. Distinct from 'Unaishi wapi?' (where do you live) — this is 'where are you [right now]'.", "register": "neutral/standard", "source": "screenshot-12", "validationStatus": "needs_review" }
+      ]
+    }
+  }
+}
