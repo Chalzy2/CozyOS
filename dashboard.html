@@ -1495,7 +1495,30 @@
          window.CozyOS.*Engine, best-effort per engine (fail closed; a
          missing/broken engine does not block the rest of the dashboard). -->
     <script type="module" src="core/bridge/engine-bridge-bootstrap.js"></script>
+    --- a/dashboard.html
++++ b/dashboard.html
+@@ -789,6 +789,15 @@
+<script src="core/modules/founder-story/founder-story-seed.js"></script>
 
+<!-- RP-037: seeds the five public+published CozyOS public-knowledge  entries (project-origin, public-story, vision, mission,
+
+project-history) so CozyAI's rule-based-conversational-provider
+
+can answer "What is CozyOS?", "Why was CozyOS created?", "What
+
+is the vision?", and "Where is CozyOS going?" with real,
+
+owner-sourced content instead of its honest ":not_found"
+
+fallback. Loads after founder-story-engine.js above (same
+
+requirement founder-story-seed.js has) and never touches that
+
+file's own Chapter 1 autobiography story. -->
+
+<script src="core/modules/founder-story/founder-story-public-knowledge-seed.js"></script>  <!-- Milestone 361, Stage 1: read-focused Glass UI panel.  
+
+    
     <!-- 3. BOOTSTRAP: mount the Workspace Shell once it and its scripts have
          loaded. Bounded retry (same convention already used elsewhere in
          CozyOS, e.g. developer-hub.js's own initStandaloneMount) covers
@@ -1586,7 +1609,7 @@
                     mountWorkspaceWhenReady();
                 }
             }
-
+             
             const bus = window.CozyOS && window.CozyOS.PlatformEventBus;
             if (bus && typeof bus.once === "function") {
                 let proceeded = false;
