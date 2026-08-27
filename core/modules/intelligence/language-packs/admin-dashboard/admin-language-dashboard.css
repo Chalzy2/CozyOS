@@ -1,0 +1,102 @@
+/**
+ * core/modules/intelligence/language-packs/admin-dashboard/admin-language-dashboard.css
+ * Repair: RP-031-B — Increment 5
+ * Layout only. Colors/typography/buttons/badges/inputs come from
+ * core/ui/cozy-tokens.css + core/ui/cozy-components.css — this file
+ * adds only the responsive tab/grid/table rules those don't cover.
+ */
+
+.cozy-admin-dashboard {
+    padding: 16px;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.cozy-admin-dashboard-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.cozy-admin-dashboard-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.cozy-admin-dashboard-controls input {
+    flex: 1 1 200px;
+    min-width: 160px;
+    padding: 8px 10px;
+    border: 1px solid var(--cozy-border, #d1d5db);
+    border-radius: 6px;
+}
+
+.cozy-admin-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    border-bottom: 1px solid var(--cozy-border, #d1d5db);
+    margin-bottom: 16px;
+}
+
+.cozy-admin-tab-btn {
+    padding: 8px 12px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 6px 6px 0 0;
+    font-size: var(--cozy-text-secondary, 14px);
+}
+
+.cozy-admin-tab-btn:focus-visible {
+    outline: 2px solid var(--cozy-accent, #2563eb);
+    outline-offset: 2px;
+}
+
+.cozy-admin-tab-active {
+    font-weight: 600;
+    border-bottom: 2px solid var(--cozy-accent, #2563eb);
+}
+
+.cozy-admin-tab-panel {
+    min-height: 120px;
+}
+
+.cozy-admin-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.cozy-admin-tab-panel {
+    overflow-x: auto;
+}
+
+.cozy-admin-table th,
+.cozy-admin-table td {
+    text-align: left;
+    padding: 8px;
+    border-bottom: 1px solid var(--cozy-border, #e5e7eb);
+    font-size: var(--cozy-text-secondary, 14px);
+}
+
+.cozy-admin-empty-state,
+.cozy-admin-unavailable,
+.cozy-admin-unauthorized,
+.cozy-admin-error-state {
+    padding: 16px;
+    color: var(--cozy-muted, #6b7280);
+}
+
+.cozy-admin-note {
+    font-size: var(--cozy-text-tertiary, 13px);
+    color: var(--cozy-muted, #6b7280);
+}
+
+@media (max-width: 640px) {
+    .cozy-admin-dashboard { padding: 8px; }
+    .cozy-admin-tabs { overflow-x: auto; flex-wrap: nowrap; }
+    .cozy-admin-table th, .cozy-admin-table td { padding: 6px 4px; font-size: 13px; }
+}

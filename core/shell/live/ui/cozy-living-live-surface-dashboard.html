@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CozyOS — Living Live Surface</title>
+<style>
+  html, body { height: 100%; margin: 0; }
+  body { font-family: system-ui, sans-serif; background: #f2f2f4; color: #1a1a1a; overflow: hidden; }
+  * { box-sizing: border-box; }
+  .shell-toolbar { padding: 12px 16px; background: #fff; border-bottom: 1px solid #eee; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .shell-btn { padding: 6px 12px; border: none; border-radius: 6px; background: #2b6cb0; color: #fff; cursor: pointer; font-size: 13px; }
+  .shell-btn:disabled { background: #ccc; cursor: not-allowed; }
+  .shell-app-area { padding: 16px; color: #555; font-size: 13px; }
+  .live-status { padding: 4px 16px; font-size: 12px; color: #777; }
+
+  /* Living Live Surface — position:fixed so it survives "navigation" (in this demo, switching .shell-app-area content) */
+  .living-surface {
+    position: fixed;
+    background: #111;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    touch-action: none;
+    user-select: none;
+  }
+  .living-surface[data-mode="MINIMIZED"] { width: 160px; height: 90px; }
+  .living-surface[data-mode="LIVE"], .living-surface[data-mode="EXPANDED"] { width: 320px; height: 240px; }
+  .living-surface[data-mode="FULLSCREEN"] { top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; border-radius: 0; }
+  .living-surface[data-mode="STOPPED"] { display: none; }
+
+  .surface-header { display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; background: rgba(0,0,0,0.5); color: #fff; font-size: 12px; cursor: move; }
+  .surface-header .live-dot { color: #ff3b3b; font-weight: 700; margin-right: 4px; }
+  .surface-btn { background: rgba(255,255,255,0.15); border: none; color: #fff; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 12px; margin-left: 4px; }
+  .surface-video-area { flex: 1; min-height: 0; background: #000; position: relative; }
+  .surface-video-area video { width: 100%; height: 100%; object-fit: cover; }
+  .resize-handle { position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; background: rgba(255,255,255,0.3); }
+
+  .surface-panel { background: #1c1c1e; color: #eee; font-size: 12px; padding: 6px 8px; max-height: 120px; overflow-y: auto; display: none; }
+  .living-surface[data-mode="EXPANDED"] .surface-panel, .living-surface[data-mode="FULLSCREEN"] .surface-panel { display: block; }
+  .comment-row { padding: 2px 0; }
+  .comment-input-row { display: flex; gap: 4px; margin-top: 4px; }
+  .comment-input-row input { flex: 1; padding: 4px; border-radius: 4px; border: 1px solid #444; background: #111; color: #eee; }
+</style>
+</head>
+<body>
+<div class="shell-toolbar">
+  <button class="shell-btn go-live-btn">Go Live</button>
+  <button class="shell-btn nav-dashboard-btn">Dashboard</button>
+  <button class="shell-btn nav-quarry-btn">QuarryOS</button>
+  <button class="shell-btn rotate-btn">Rotate</button>
+</div>
+<div class="shell-app-area" id="shell-app-area">Current app: shell</div>
+<div class="live-status" id="live-status">No live session.</div>
+
+<div class="living-surface" id="living-surface" data-mode="STOPPED">
+  <div class="surface-header">
+    <span><span class="live-dot">\u25CF</span>LIVE</span>
+    <span>
+      <button class="surface-btn toggle-btn">\u25A2</button>
+      <button class="surface-btn fullscreen-btn">\u26F6</button>
+      <button class="surface-btn stop-btn">\u2715</button>
+    </span>
+  </div>
+  <div class="surface-video-area">
+    <video class="surface-video" autoplay muted></video>
+    <div class="resize-handle"></div>
+  </div>
+  <div class="surface-panel">
+    <div class="comments-list"></div>
+    <div class="comment-input-row">
+      <input class="comment-input" type="text" placeholder="Write a comment..." />
+      <button class="shell-btn send-comment-btn">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- Real dependency chain -->
+<script src="../../../security/trusted-device-manager.js"></script>
+<script src="../../../connectivity/cozy-connect.js"></script>
+<script src="../../../engines/collaboration/live-hotspot-engine.js"></script>
+<script src="../../../collaboration/cozy-share.js"></script>
+<script src="../../../connectivity/cozy-living-connectivity.js"></script>
+<script src="../../../connectivity/cozy-connectivity-transport.js"></script>
+<script src="../../../engines/camera/browser-camera-provider.js"></script>
+<script src="../../../engines/video/live-video-capture-engine.js"></script>
+<script src="../../../engines/video/ui/clarity/cozy-camera-clarity-engine.js"></script>
+<script src="../../../modules/identity/identity-engine.js"></script>
+<script src="../../../registry/cozy-registry.js"></script>
+<script src="../cozy-live-session.js"></script>
+<script src="../cozy-advertising-policy.js"></script>
+
+<script>
+  (function () {
+    var liveSession = window.CozyOS.CozyLiveSession;
+    var identity = window.CozyOS.IdentityEngine;
+    var surface = document.getElementById('living-surface');
+    var statusEl = document.getElementById('live-status');
+    var video = surface.querySelector('.surface-video');
+    var currentSessionId = null;
+    var demoUserId = null;
+    var orientation = 'portrait';
+
+    liveSession.registerAsApplication();
+
+    async function ensureDemoUser() {
+      if (demoUserId) return demoUserId;
+      var result = await identity.createUser({ username: 'demo-live-host-' + Date.now(), password: 'Str0ngPassw0rd!', roles: [] });
+      demoUserId = result.userId;
+      identity.assignApplication(demoUserId, 'live-session');
+      return demoUserId;
+    }
+
+    function renderStatus() {
+      if (!currentSessionId) { statusEl.textContent = 'No live session.'; return; }
+      var session = liveSession.getSession(currentSessionId);
+      if (!session) { statusEl.textContent = 'No live session.'; return; }
+      statusEl.textContent = 'sessionId=' + session.sessionId + ' state=' + session.state + ' orientation=' + session.surface.orientation;
+    }
+
+    function renderComments() {
+      if (!currentSessionId) return;
+      var r = liveSession.listComments(currentSessionId);
+      var list = surface.querySelector('.comments-list');
+      list.innerHTML = r.comments.map(function (c) {
+        return '<div class="comment-row">' + c.author + ': ' + c.text + ' [' + c.state + ']</div>';
+      }).join('');
+    }
+
+    document.querySelector('.go-live-btn').addEventListener('click', async function () {
+      var userId = await ensureDemoUser();
+      var start = await liveSession.startSession(userId, { appContext: 'shell' });
+      if (start.status !== 'OK') { statusEl.textContent = 'Failed: ' + start.status; return; }
+      currentSessionId = start.sessionId;
+      await liveSession.confirmCapture(currentSessionId, video);
+      surface.setAttribute('data-mode', 'LIVE');
+      surface.style.top = '260px';
+      surface.style.left = '24px';
+      renderStatus();
+    });
+
+    document.querySelector('.stop-btn').addEventListener('click', function () {
+      if (!currentSessionId) return;
+      liveSession.stopSession(currentSessionId);
+      surface.setAttribute('data-mode', 'STOPPED');
+      currentSessionId = null;
+      renderStatus();
+    });
+
+    document.querySelector('.toggle-btn').addEventListener('click', function () {
+      if (!currentSessionId) return;
+      var session = liveSession.getSession(currentSessionId);
+      var action = session.state === 'MINIMIZED' ? 'expand' : 'minimize';
+      var r = liveSession.transitionSurface(currentSessionId, action);
+      if (r.status === 'OK') surface.setAttribute('data-mode', r.state);
+      renderStatus();
+    });
+
+    document.querySelector('.fullscreen-btn').addEventListener('click', function () {
+      if (!currentSessionId) return;
+      var session = liveSession.getSession(currentSessionId);
+      var action = session.state === 'FULLSCREEN' ? 'exitFullscreen' : 'fullscreen';
+      var r = liveSession.transitionSurface(currentSessionId, action);
+      if (r.status === 'OK') surface.setAttribute('data-mode', r.state);
+      renderStatus();
+    });
+
+    document.querySelector('.rotate-btn').addEventListener('click', function () {
+      if (!currentSessionId) return;
+      orientation = orientation === 'portrait' ? 'landscape' : 'portrait';
+      var r = liveSession.rotateSurface(currentSessionId, orientation);
+      renderStatus();
+    });
+
+    ['nav-dashboard-btn', 'nav-quarry-btn'].forEach(function (cls) {
+      document.querySelector('.' + cls).addEventListener('click', function () {
+        var target = cls === 'nav-dashboard-btn' ? 'dashboard' : 'quarry';
+        document.getElementById('shell-app-area').textContent = 'Current app: ' + target;
+        if (currentSessionId) liveSession.navigateApp(currentSessionId, target);
+        renderStatus();
+      });
+    });
+
+    document.querySelector('.send-comment-btn').addEventListener('click', function () {
+      if (!currentSessionId || !demoUserId) return;
+      var input = surface.querySelector('.comment-input');
+      var text = input.value;
+      if (!text.trim()) return;
+      liveSession.addComment(currentSessionId, demoUserId, text);
+      input.value = '';
+      renderComments();
+    });
+
+    // Real drag (pointer events)
+    var header = surface.querySelector('.surface-header');
+    var dragState = null;
+    header.addEventListener('pointerdown', function (e) {
+      var rect = surface.getBoundingClientRect();
+      dragState = { startX: e.clientX, startY: e.clientY, origX: rect.left, origY: rect.top };
+    });
+    window.addEventListener('pointermove', function (e) {
+      if (!dragState) return;
+      var dx = e.clientX - dragState.startX;
+      var dy = e.clientY - dragState.startY;
+      var newX = dragState.origX + dx;
+      var newY = dragState.origY + dy;
+      surface.style.left = newX + 'px';
+      surface.style.top = newY + 'px';
+      if (currentSessionId) liveSession.moveSurface(currentSessionId, newX, newY);
+    });
+    window.addEventListener('pointerup', function () { dragState = null; });
+
+    // Real resize (pointer events on handle)
+    var handle = surface.querySelector('.resize-handle');
+    var resizeState = null;
+    handle.addEventListener('pointerdown', function (e) {
+      e.stopPropagation();
+      var rect = surface.getBoundingClientRect();
+      resizeState = { startX: e.clientX, startY: e.clientY, origW: rect.width, origH: rect.height };
+    });
+    window.addEventListener('pointermove', function (e) {
+      if (!resizeState) return;
+      var dw = e.clientX - resizeState.startX;
+      var dh = e.clientY - resizeState.startY;
+      var newW = resizeState.origW + dw;
+      var newH = resizeState.origH + dh;
+      var result = currentSessionId ? liveSession.resizeSurface(currentSessionId, newW, newH) : { size: { width: newW, height: newH } };
+      surface.style.width = result.size.width + 'px';
+      surface.style.height = result.size.height + 'px';
+    });
+    window.addEventListener('pointerup', function () { resizeState = null; });
+
+    setInterval(renderComments, 400);
+  })();
+</script>
+</body>
+</html>

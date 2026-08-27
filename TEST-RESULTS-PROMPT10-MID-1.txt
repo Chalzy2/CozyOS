@@ -1,0 +1,444 @@
+TAP version 13
+# Subtest: construction requires a real filePath
+ok 1 - construction requires a real filePath
+  ---
+  duration_ms: 1.872305
+  type: 'test'
+  ...
+# Subtest: first run creates a valid empty file at the given path
+ok 2 - first run creates a valid empty file at the given path
+  ---
+  duration_ms: 1.430502
+  type: 'test'
+  ...
+# Subtest: unknown user returns null, not a fabricated record
+ok 3 - unknown user returns null, not a fabricated record
+  ---
+  duration_ms: 0.596493
+  type: 'test'
+  ...
+# Subtest: setRecord persists synchronously and survives real adapter destroy/recreate (real reload/restart simulation)
+ok 4 - setRecord persists synchronously and survives real adapter destroy/recreate (real reload/restart simulation)
+  ---
+  duration_ms: 0.816292
+  type: 'test'
+  ...
+# Subtest: findUserIdByGoogleUid finds the real owner and survives adapter recreation
+ok 5 - findUserIdByGoogleUid finds the real owner and survives adapter recreation
+  ---
+  duration_ms: 0.732928
+  type: 'test'
+  ...
+# Subtest: corrupted backing file fails closed at construction (never silently starts empty)
+ok 6 - corrupted backing file fails closed at construction (never silently starts empty)
+  ---
+  duration_ms: 0.453452
+  type: 'test'
+  ...
+# Subtest: backing file that is valid JSON but not an object fails closed
+ok 7 - backing file that is valid JSON but not an object fails closed
+  ---
+  duration_ms: 0.479684
+  type: 'test'
+  ...
+# Subtest: record replacement is reflected immediately and survives reload
+ok 8 - record replacement is reflected immediately and survives reload
+  ---
+  duration_ms: 1.143122
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 27.594897
+TAP version 13
+# Subtest: REAL END-TO-END: link persists to disk, and login resolves correctly after a genuine server stop/restart against the same file
+ok 1 - REAL END-TO-END: link persists to disk, and login resolves correctly after a genuine server stop/restart against the same file
+  ---
+  duration_ms: 74.95832
+  type: 'test'
+  ...
+# Subtest: REAL END-TO-END: cross-account Google UID collision is rejected even after a restart
+ok 2 - REAL END-TO-END: cross-account Google UID collision is rejected even after a restart
+  ---
+  duration_ms: 4.392037
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 85.111985
+TAP version 13
+# Subtest: valid, verified, linked Google identity resolves to the linked CozyOS userId
+ok 1 - valid, verified, linked Google identity resolves to the linked CozyOS userId
+  ---
+  duration_ms: 52.168284
+  type: 'test'
+  ...
+# Subtest: malformed token is rejected (generic 401)
+ok 2 - malformed token is rejected (generic 401)
+  ---
+  duration_ms: 9.316103
+  type: 'test'
+  ...
+# Subtest: invalid signature (wrong signing key) is rejected
+ok 3 - invalid signature (wrong signing key) is rejected
+  ---
+  duration_ms: 9.192779
+  type: 'test'
+  ...
+# Subtest: expired token is rejected
+ok 4 - expired token is rejected
+  ---
+  duration_ms: 9.333666
+  type: 'test'
+  ...
+# Subtest: wrong issuer is rejected
+ok 5 - wrong issuer is rejected
+  ---
+  duration_ms: 15.704451
+  type: 'test'
+  ...
+# Subtest: wrong audience is rejected
+ok 6 - wrong audience is rejected
+  ---
+  duration_ms: 14.652624
+  type: 'test'
+  ...
+# Subtest: future auth_time is rejected
+ok 7 - future auth_time is rejected
+  ---
+  duration_ms: 21.147426
+  type: 'test'
+  ...
+# Subtest: client-supplied userId is ignored; resolution still comes from the verified token
+ok 8 - client-supplied userId is ignored; resolution still comes from the verified token
+  ---
+  duration_ms: 12.340697
+  type: 'test'
+  ...
+# Subtest: client-supplied googleId is ignored
+ok 9 - client-supplied googleId is ignored
+  ---
+  duration_ms: 15.820237
+  type: 'test'
+  ...
+# Subtest: client-supplied role/isAdmin are ignored (never echoed, never used to authorize)
+ok 10 - client-supplied role/isAdmin are ignored (never echoed, never used to authorize)
+  ---
+  duration_ms: 10.312615
+  type: 'test'
+  ...
+# Subtest: the classic attack shape { userId: "victim", googleId: "attacker" } cannot obtain the victim account
+ok 11 - the classic attack shape { userId: "victim", googleId: "attacker" } cannot obtain the victim account
+  ---
+  duration_ms: 9.543955
+  type: 'test'
+  ...
+# Subtest: verified-but-unlinked Google identity is rejected (no auto-account-creation, no email fallback)
+ok 12 - verified-but-unlinked Google identity is rejected (no auto-account-creation, no email fallback)
+  ---
+  duration_ms: 19.470077
+  type: 'test'
+  ...
+# Subtest: a Google identity linked to account A never resolves to account B
+ok 13 - a Google identity linked to account A never resolves to account B
+  ---
+  duration_ms: 18.830527
+  type: 'test'
+  ...
+# Subtest: googleLoginEnabled:false on an otherwise-linked record is rejected (generic, not distinguishable from unlinked)
+ok 14 - googleLoginEnabled:false on an otherwise-linked record is rejected (generic, not distinguishable from unlinked)
+  ---
+  duration_ms: 8.41488
+  type: 'test'
+  ...
+# Subtest: missing idToken field is rejected with 400
+ok 15 - missing idToken field is rejected with 400
+  ---
+  duration_ms: 6.971559
+  type: 'test'
+  ...
+# Subtest: empty-string idToken is rejected
+ok 16 - empty-string idToken is rejected
+  ---
+  duration_ms: 19.846682
+  type: 'test'
+  ...
+# Subtest: non-string idToken is rejected
+ok 17 - non-string idToken is rejected
+  ---
+  duration_ms: 2.865951
+  type: 'test'
+  ...
+# Subtest: malformed JSON body is rejected with 400, not a 500 crash
+ok 18 - malformed JSON body is rejected with 400, not a 500 crash
+  ---
+  duration_ms: 21.688542
+  type: 'test'
+  ...
+# Subtest: non-object JSON body (array) is rejected
+ok 19 - non-object JSON body (array) is rejected
+  ---
+  duration_ms: 13.350521
+  type: 'test'
+  ...
+# Subtest: oversized body is rejected with 413 (connection stays usable, not aborted)
+ok 20 - oversized body is rejected with 413 (connection stays usable, not aborted)
+  ---
+  duration_ms: 14.717219
+  type: 'test'
+  ...
+# Subtest: wrong content-type is rejected with 415
+ok 21 - wrong content-type is rejected with 415
+  ---
+  duration_ms: 8.419064
+  type: 'test'
+  ...
+# Subtest: unsupported method (GET) is rejected with 405
+ok 22 - unsupported method (GET) is rejected with 405
+  ---
+  duration_ms: 7.944209
+  type: 'test'
+  ...
+# Subtest: unknown path returns generic 404, not a stack trace or server info
+ok 23 - unknown path returns generic 404, not a stack trace or server info
+  ---
+  duration_ms: 11.480949
+  type: 'test'
+  ...
+# Subtest: successful response never includes a session token or session-shaped field
+ok 24 - successful response never includes a session token or session-shaped field
+  ---
+  duration_ms: 8.639152
+  type: 'test'
+  ...
+# Subtest: failed verification never leaves a usable record behind and repeated attempts stay rejected
+ok 25 - failed verification never leaves a usable record behind and repeated attempts stay rejected
+  ---
+  duration_ms: 11.278586
+  type: 'test'
+  ...
+1..25
+# tests 25
+# suites 0
+# pass 25
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 361.035738
+TAP version 13
+# Subtest: linkAccount: a genuinely signed token links the account for real
+ok 1 - linkAccount: a genuinely signed token links the account for real
+  ---
+  duration_ms: 3.577433
+  type: 'test'
+  ...
+# Subtest: linkAccount: fails closed with no userId (never links anonymously)
+ok 2 - linkAccount: fails closed with no userId (never links anonymously)
+  ---
+  duration_ms: 0.73731
+  type: 'test'
+  ...
+# Subtest: linkAccount: a forged/tampered token never links (real signature check)
+ok 3 - linkAccount: a forged/tampered token never links (real signature check)
+  ---
+  duration_ms: 0.93402
+  type: 'test'
+  ...
+# Subtest: linkAccount: an expired token never links
+ok 4 - linkAccount: an expired token never links
+  ---
+  duration_ms: 2.338724
+  type: 'test'
+  ...
+# Subtest: linkAccount: cross-account reuse of an already-linked Google identity is rejected (fail closed)
+ok 5 - linkAccount: cross-account reuse of an already-linked Google identity is rejected (fail closed)
+  ---
+  duration_ms: 1.554282
+  type: 'test'
+  ...
+# Subtest: linkAccount: the SAME account re-linking the SAME Google identity is allowed (not a takeover)
+ok 6 - linkAccount: the SAME account re-linking the SAME Google identity is allowed (not a takeover)
+  ---
+  duration_ms: 1.563428
+  type: 'test'
+  ...
+# Subtest: security: a client cannot declare itself Google-verified by shape alone — only a real signature check links
+ok 7 - security: a client cannot declare itself Google-verified by shape alone — only a real signature check links
+  ---
+  duration_ms: 0.413704
+  type: 'test'
+  ...
+# Subtest: resolveLoginCandidate: a verified but unlinked Google identity is NOT a login (no email-matching fallback)
+ok 8 - resolveLoginCandidate: a verified but unlinked Google identity is NOT a login (no email-matching fallback)
+  ---
+  duration_ms: 0.963181
+  type: 'test'
+  ...
+# Subtest: resolveLoginCandidate: a linked, real identity resolves to the correct account
+ok 9 - resolveLoginCandidate: a linked, real identity resolves to the correct account
+  ---
+  duration_ms: 1.955187
+  type: 'test'
+  ...
+# Subtest: resolveLoginCandidate: an invalid/forged token never resolves to any account
+ok 10 - resolveLoginCandidate: an invalid/forged token never resolves to any account
+  ---
+  duration_ms: 1.161835
+  type: 'test'
+  ...
+# Subtest: resolveLoginCandidate: unlinking disables login even though the Google identity itself is still valid
+ok 11 - resolveLoginCandidate: unlinking disables login even though the Google identity itself is still valid
+  ---
+  duration_ms: 1.447007
+  type: 'test'
+  ...
+# Subtest: extractEmailFromVerifiedToken: reads the email claim from a well-formed token
+ok 12 - extractEmailFromVerifiedToken: reads the email claim from a well-formed token
+  ---
+  duration_ms: 0.530992
+  type: 'test'
+  ...
+# Subtest: extractEmailFromVerifiedToken: returns null for a malformed token rather than throwing
+ok 13 - extractEmailFromVerifiedToken: returns null for a malformed token rather than throwing
+  ---
+  duration_ms: 0.095536
+  type: 'test'
+  ...
+# Subtest: constructor: throws without a real store adapter
+ok 14 - constructor: throws without a real store adapter
+  ---
+  duration_ms: 0.27328
+  type: 'test'
+  ...
+# Subtest: constructor: throws without a projectId
+ok 15 - constructor: throws without a projectId
+  ---
+  duration_ms: 0.131913
+  type: 'test'
+  ...
+1..15
+# tests 15
+# suites 0
+# pass 15
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 31.685665
+TAP version 13
+# Subtest: passkey enrolled + device-supported -> primaryFactor is passkey
+ok 1 - passkey enrolled + device-supported -> primaryFactor is passkey
+  ---
+  duration_ms: 33.423609
+  type: 'test'
+  ...
+# Subtest: no passkey, real verified+usable phone linkage -> primaryFactor is phone
+ok 2 - no passkey, real verified+usable phone linkage -> primaryFactor is phone
+  ---
+  duration_ms: 20.391616
+  type: 'test'
+  ...
+# Subtest: no passkey, no phone linkage loaded -> falls back to password as primary
+ok 3 - no passkey, no phone linkage loaded -> falls back to password as primary
+  ---
+  duration_ms: 19.164496
+  type: 'test'
+  ...
+# Subtest: no strong factor and password unavailable, but a real email exists -> RECOVERY_REQUIRED
+ok 4 - no strong factor and password unavailable, but a real email exists -> RECOVERY_REQUIRED
+  ---
+  duration_ms: 18.096179
+  type: 'test'
+  ...
+# Subtest: WebAuthnProvider reports no credential for this user -> passkey never selected
+ok 5 - WebAuthnProvider reports no credential for this user -> passkey never selected
+  ---
+  duration_ms: 19.312479
+  type: 'test'
+  ...
+# Subtest: phone linkage reports verified:false -> phone never selected even if loginUsable claims true
+ok 6 - phone linkage reports verified:false -> phone never selected even if loginUsable claims true
+  ---
+  duration_ms: 19.081006
+  type: 'test'
+  ...
+# Subtest: this method exposes no parameter through which a caller can inject factor state
+ok 7 - this method exposes no parameter through which a caller can inject factor state
+  ---
+  duration_ms: 20.815756
+  type: 'test'
+  ...
+# Subtest: a non-admin account never receives trusted-device in an ordinary login context, regardless of any input
+ok 8 - a non-admin account never receives trusted-device in an ordinary login context, regardless of any input
+  ---
+  duration_ms: 22.313284
+  type: 'test'
+  ...
+# Subtest: GoogleAccountLinkage not loaded (matches production today) -> google never selected
+ok 9 - GoogleAccountLinkage not loaded (matches production today) -> google never selected
+  ---
+  duration_ms: 20.021086
+  type: 'test'
+  ...
+# Subtest: empty/missing username fails closed with the generic reason, never REJECTED-with-detail
+ok 10 - empty/missing username fails closed with the generic reason, never REJECTED-with-detail
+  ---
+  duration_ms: 2.075291
+  type: 'test'
+  ...
+# Subtest: unknown username fails closed with the same generic reason as a real failed password login
+ok 11 - unknown username fails closed with the same generic reason as a real failed password login
+  ---
+  duration_ms: 1.845368
+  type: 'test'
+  ...
+# Subtest: an inactive/locked account is REJECTED by the real Account-is-not-active rule, even with a real enrolled passkey
+ok 12 - an inactive/locked account is REJECTED by the real Account-is-not-active rule, even with a real enrolled passkey
+  ---
+  duration_ms: 20.316117
+  type: 'test'
+  ...
+# Subtest: AuthFactorSnapshot/LoginDecisionEngine not loaded -> fails closed, never throws
+ok 13 - AuthFactorSnapshot/LoginDecisionEngine not loaded -> fails closed, never throws
+  ---
+  duration_ms: 18.381989
+  type: 'test'
+  ...
+# Subtest: registrationMethod:"email" never forces password to be primary when a real passkey is usable
+ok 14 - registrationMethod:"email" never forces password to be primary when a real passkey is usable
+  ---
+  duration_ms: 19.133042
+  type: 'test'
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 14
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 50272.741436
+
+=====================================================================
+NOT RUN THIS PASS (honest disclosure, not fabricated):
+Full repository regression (155+ total *.test.js files) was NOT
+attempted this pass given the prior checkpoint's confirmed timeout at
+that scale. Only the five files directly relevant to this milestone's
+Google persistence work were run to completion, listed above.
+FULL REPO REGRESSION: NOT COMPLETED. Reason: not attempted this pass,
+following the prior checkpoint's documented time-limit finding.
+=====================================================================

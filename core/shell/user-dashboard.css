@@ -1,0 +1,88 @@
+/*
+ * CozyOS — User Dashboard shell styling
+ * File Reference: core/shell/user-dashboard.css
+ * Dashboard Prompt 1 — mobile-first, targets a small-Android-class
+ * device first (Prompt 1 §19), scales up without a second layout.
+ * Additive only: no existing CozyOS stylesheet rule is modified here;
+ * no prior stylesheet for #cozy-ud-* selectors existed before this
+ * file (confirmed by repository-wide search before writing it).
+ */
+
+#cozy-user-dashboard {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 100vh;
+    box-sizing: border-box;
+}
+
+#cozy-ud-surfaces {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 12px;
+    padding-bottom: 84px; /* keep content clear of the fixed bottom nav */
+}
+
+.cozy-ud-surface[hidden] { display: none; }
+
+.cozy-ud-surface h3 {
+    margin: 4px 0 12px;
+    font-size: 1.1rem;
+}
+
+.cozy-ud-state-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    border: 1px solid currentColor;
+    opacity: 0.8;
+}
+
+/* Bottom navigation — five equal, large touch targets. */
+#cozy-ud-bottomnav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    justify-content: space-around;
+    align-items: stretch;
+    z-index: 20;
+}
+
+.cozy-ud-navtab {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-height: 56px; /* Prompt 1 §31 — large touch target */
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font: inherit;
+}
+
+.cozy-ud-navtab:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: -2px;
+}
+
+.cozy-ud-navtab-icon { font-size: 1.25rem; line-height: 1; }
+.cozy-ud-navtab-label { font-size: 0.7rem; line-height: 1; }
+
+.cozy-ud-navtab[aria-current="page"] {
+    font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #cozy-ud-surfaces, .cozy-ud-navtab { transition: none !important; }
+}
+
+/* Tablet/desktop: same architecture, more breathing room — no second layout. */
+@media (min-width: 900px) {
+    #cozy-ud-surfaces { padding: 24px 48px 96px; }
+}

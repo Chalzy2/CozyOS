@@ -1,0 +1,11 @@
+# CHANGED-FILE-HASHES-PROMPT10B-MID-1.txt
+# SHA-256 of every file created or modified this slice.
+# Generated after all edits, before packaging.
+
+## NEW FILES
+630362cdd3d5e7b7f07f90363f14686d47ee478fd15affe06b7913f8d788711c  core/security/google-account-link-client.js
+5afd5511fca8fcfc599a424325e2b231614bf51c730f9a244606f13f002dd4e5  core/security/test/google-account-link-client.test.js
+
+## MODIFIED FILES
+2e38f9f59d6e4d1b6f20e6b98ea64c28f64f8c32f35f1015d56f1d403b482ccf  core/modules/security/authentication-settings-module.js
+ed79d24bae19dc0762a001fd289387bfeed021ef124511788b81f65ef17306d3  dashboard.html

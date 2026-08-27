@@ -1,0 +1,198 @@
+PHASE 10A TEST REPORT
+======================
+
+=== core/modules/builder/tests/capability-dependency-graph.test.js ===
+  ✓ 1. graph initializes with zero nodes/edges
+  ✓ 2. capability node registration
+  ✓ 3. dependency node registration
+  ✓ 4. capability -> dependency edge (depends_on)
+  ✓ 5. capability -> implementation edge (implemented_by)
+  ✓ 6. capability -> test/evidence edge (verified_by)
+  ✓ 7. provenance preservation on edges
+  ✓ 8. status preservation — source-native status carried through unchanged
+  ✓ 9. blocker detection — getBlockers() separates blocking from clear
+  ✓ 10. missing dependency detection — unregistered capability returns available:false
+  ✓ 10b. missing dependency detection — MISSING status surfaces as a blocker
+  ✓ 11. capability-level circular dependency is honestly reported, not hidden
+  ✓ 11b. module-level circular report delegates to the real platform engine
+  ✓ 12. bestEffort/manifest confidence distinction is preserved on edges
+  ✓ 13. edge with no evidence is recorded honestly as unverified, not fabricated
+  ✓ 14. duplicate edge is merged, not double-registered
+  ✓ 15. Kiswahili dependency graph proof case builds from real live registries
+  ✓ 16. Phase 2 unified-capability-contract.js is untouched by Phase 3
+  ✓ 17. core/platform/dependency-engine.js behavior is unchanged by Phase 3
+
+19 passed, 0 failed
+
+=== core/modules/builder/tests/capability-governance-diagnosis-phase10a.test.js ===
+  ✓ 1. operation creation: OPERATION_SEMANTICS defines all 16 requested operation names
+  ✓ 2. operation ordering: real pipeline trace entries appear in the order the pipeline actually computes them
+  ✓ 3. trace structure: every entry carries operation/description/input/output/confidence/whatRemainsUnknown/discardedAlternatives
+  ✓ 4. confidence preservation: WEIGH/TRIANGULATE/CRYSTALLIZE/RECKON confidence reflects the real blocker confidence (manifest -> SOURCE_VERIFIED_LIVE)
+  ✓ 5. UNKNOWN preservation: an unverified blocker is never upgraded to a fabricated confidence, and remaining unknowns are stated, not hidden
+  ✓ 6. discarded alternatives: WEIGH lists real other requiredBuilds candidates, never a fabricated list
+  ✓ 7. PONDER has a real semantic purpose and appears on a live trace
+  ✓ 8. CONTEMPLATE has a real semantic purpose (honestly not yet emitted by this pipeline)
+  ✓ 9. THINK has a real semantic purpose (honestly not yet emitted by this pipeline)
+  ✓ 10. HOME_IN has a real semantic purpose (honestly not yet emitted by this pipeline)
+  ✓ 11. MUSE has a real semantic purpose (honestly not yet emitted by this pipeline)
+  ✓ 12. FATHOM has a real semantic purpose (honestly not yet emitted by this pipeline)
+  ✓ 13. MULL has a real semantic purpose (honestly not yet emitted by this pipeline)
+  ✓ 14. SIFT has a real semantic purpose and appears on a live trace
+  ✓ 15. CRYSTALLIZE has a real semantic purpose and appears on a live trace
+  ✓ 16. TRIANGULATE has a real semantic purpose and appears on a live trace
+  ✓ 17. UNTANGLE has a real semantic purpose and appears on a live trace
+  ✓ 18. WEIGH has a real semantic purpose and appears on a live trace
+  ✓ 19. COGITATE has a real semantic purpose (honestly not yet emitted by this pipeline)
+  ✓ 20. FIGURE has a real semantic purpose (honestly not yet emitted by this pipeline)
+  ✓ 21. HONE has a real semantic purpose (honestly not yet emitted by this pipeline)
+  ✓ 22. RECKON has a real semantic purpose and appears on a live trace
+  ✓ 23. existing Phase 8 behavior unchanged: governanceStatus/overallStatus/topBlocker still computed exactly as before
+  ✓ 24. existing Phase 8 behavior unchanged: compareDiagnoses()/explain() untouched by the trace additions
+
+24 passed, 0 failed
+
+
+=== core/modules/builder/tests/capability-governance-diagnosis.test.js ===
+  ✓ 1. module registers exactly once under window.CozyOS.Modules["capability-governance-diagnosis"]
+  ✓ 2. live Kiswahili diagnosis: vocabulary blocker is detected against the real chain
+  ✓ 3. knowledge vs software classification: real vocabulary blocker classifies as KNOWLEDGE
+  ✓ 4. no acquisition request yet -> governanceStatus KNOWLEDGE_MISSING
+  ✓ 5. acquisition request detection: an existing REQUESTED request is found and reported
+  ✓ 6. requested-but-unresolved state is distinguished from contribution-pending
+  ✓ 7. contribution-pending / promotion states are surfaced honestly after a real submitted contribution
+  ✓ 8. safety-blocked state is reported when the safety gate actually rejects the content
+  ✓ 9. rule 82 blocked / structurally-unreachable is disclosed, never silently ELIGIBLE
+  ✓ 10. no fabricated consent: this file never actually invokes submitAcquisitionContribution or evaluateRule82Gate (only discusses them in header prose)
+  ✓ 11. no fabricated provenance: attestation/consent fields are never assigned in this file
+  ✓ 12. no false AVAILABLE: source never assigns resourceState or "AVAILABLE" as a literal state
+  ✓ 13. no false VERIFIED: source never assigns "VERIFIED" as a literal overallStatus
+  ✓ 14. MD-028 behavior: cozy-language-pack-registry map already covers every real reachable resourceState (NOT_READY, COMMUNITY_BUILDING) — MD-028 confirmed still dormant
+  ✓ 15. Rule 82 RP-030 behavior: gate result on an sw request carries languageCode "sw" (the axis mismatch documented in the header, not fixed here)
+  ✓ 16. post-promotion re-evaluation reads live state, never a cached judgment (two calls in a row agree with the live store)
+  ✓ 17. dependency resolution / 18. next-blocker discovery: the hard case (vocabulary resolved, grammar remains) surfaces grammar, never hard-coded
+  ✓ 19. blocker prioritization is inherited from Phase 5's own ranking, not reimplemented here
+  ✓ 20. change detection: DEPENDENCY_RESOLVED + NEW_DEPENDENCY_DISCOVERED both reported when the top blocker changes
+  ✓ 21. no-change detection: two identical evaluations report NO_CHANGE
+  ✓ 22. evidence-change detection: same dependency, different evidence -> EVIDENCE_CHANGED
+  ✓ 23. software/knowledge separation: a SOFTWARE-domain blocker never produces an acquisition-linked governanceStatus
+  ✓ 24. acquisition request integration: reevaluateCapability never actually invokes createAcquisitionRequest (only discusses it in header prose) — it only reads existing requests
+  ✓ 25. repair planner integration: buildPlan() is called, never reimplemented
+  ✓ 26. dependency graph integration: reached only indirectly through Phase 5/4, never required directly
+  ✓ 27. synthetic fixture isolation: this file's own fixtures use a literal test contributor id, never presented as real
+  ✓ 28. no production vocabulary mutation: real pack resourceState only ever advances to COMMUNITY_BUILDING, never AVAILABLE, across this whole test run
+  ✓ 29. Phase 7 regression: capability-knowledge-acquisition.js unaffected after Phase 8 loads
+  ✓ 30. Phase 6 regression: real Kiswahili record is still PARTIALLY_VERIFIED, not falsely VERIFIED
+  ✓ 31. Phase 5 regression: capability-repair-planner.js buildPlan() unchanged after Phase 8 loads
+  ✓ 32. Phase 4 regression: capability-self-diagnosis.js diagnose() unchanged after Phase 8 loads
+  ✓ 33. Phase 3 regression: capability-dependency-graph.js unchanged after Phase 8 loads
+  ✓ 34. Phase 2 regression: unified-capability-contract.js unchanged after Phase 8 loads
+  ✓ 35. language registry regression: cozy-language-registry.js still resolves sw as AVAILABLE (templates axis)
+  ✓ 36. language-pack registry regression: cozy-language-pack-registry.js still resolves sw as NOT_READY before any contribution
+  ✓ 37. explain() produces a real, state-derived sentence, not a fixed demo string
+  ✓ 38. cognitiveTrace exposes real, inspectable inputs/outputs, not opaque placeholders
+
+37 passed, 0 failed
+
+
+=== core/modules/builder/tests/capability-knowledge-acquisition.test.js ===
+  ✓ module registers exactly once under window.CozyOS.Modules["capability-knowledge-acquisition"]
+  ✓ module never claims it can promote/verify anything itself
+  ✓ 1. classifyDependencyDomain(): a "-CONTENT" repair id classifies as KNOWLEDGE
+  ✓ 2. classifyDependencyDomain(): a non-"-CONTENT" repair id classifies as SOFTWARE
+  ✓ 3. classifyDependencyDomain(): no Repair Queue reference at all classifies as UNKNOWN, never guessed
+  ✓ 4. request creation succeeds for a real KNOWLEDGE blocker and has a real requestId
+  ✓ 5. request identifies language:sw:vocabulary and RP-030-CONTENT
+  ✓ 6. request reason is derived from real evidence, not a hard-coded assertion
+  ✓ 7. request rejects an unknown/ambiguous capability (AMBIGUOUS plan)
+  ✓ 8. request rejects on insufficient evidence rather than fabricating one
+  ✓ 9. no misleading request is created when the dependency has no blocker (NOT_BUILDABLE)
+  ✓ 9b. a SOFTWARE-domain blocker is refused, not silently converted into a knowledge request
+  ✓ 10. a safe, consented contribution attaches to the request and reaches CONTRIBUTION_RECEIVED
+  ✓ 11. missing consent blocks the contribution using the real pipeline's own terminology
+  ✓ 12. Rule 82 gate is actually called after a real SUBMITTED contribution, and its caveat is disclosed
+  ✓ 13. the safety gate is actually delegated to — clearly unsafe content is blocked, never a fabricated SAFE pass
+  ✓ 14. no direct AVAILABLE/VERIFIED/PROMOTED mutation exists anywhere in this module
+  ✓ 15. request/contribution never sets resourceState directly to AVAILABLE — only the real pack registry's own submitExpression() (NOT_READY -> COMMUNITY_BUILDING) can move it at all, and it stops there
+  ✓ 16. this module never reads/requires/fetches church_sw.json or church_language_pack.py (naming them in header disclosure prose is fine and expected)
+  ✓ 17. synthetic test fixtures in this file never reach the real language pack unlabeled
+  ✓ 18. RP-030-CONTENT is referenced verbatim from the real repair-planner reference table, not invented here
+  ✓ 19. Kiswahili end-to-end: real diagnosis chain produces a real KNOWLEDGE acquisition request
+  ✓ 20. Kiswahili end-to-end: a real contribution against the live pack registry is routed and reported honestly
+  ✓ 21. unified-capability-contract.js (Phase 2) still resolves the real Kiswahili record after Phase 7 loads
+  ✓ 22. capability-dependency-graph.js (Phase 3) getBlockers() unchanged after Phase 7 loads
+  ✓ 23. capability-self-diagnosis.js (Phase 4) diagnose() unchanged after Phase 7 loads
+  ✓ 24. capability-repair-planner.js (Phase 5) buildPlan() unchanged after Phase 7 loads
+  ✓ 25. cozy-language-registry.js still resolves sw as AVAILABLE (templates axis) after Phase 7 loads
+  ✓ 26. cozy-language-pack-registry.js still resolves sw as NOT_READY (vocabulary axis) after Phase 7 loads
+  ✓ 27. no direct call path from this module can flip requestPromotion() off BLOCKED
+
+30 passed, 0 failed
+
+
+=== core/modules/builder/tests/capability-repair-planner.test.js ===
+  ✓ 1. diagnosis -> build plan produces a real plan object for the Kiswahili case
+  ✓ 2. required dependency ordering places all REQUIRED builds before REEVALUATE_CAPABILITY
+  ✓ 3. optional/placeholder dependency never appears in requiredBuilds or buildOrder
+  ✓ 4. placeholder ("grammar") is classified OPTIONAL, never REQUIRED
+  ✓ 5. evidence-backed required "vocabulary" is ranked and chosen ahead of placeholder "grammar"
+  ✓ 6. multiple blockers all appear in blockingDependencies, classified independently
+  ✓ 7. topologicalOrder() resolves a real multi-level dependency chain
+  ✓ 8. topologicalOrder() detects a circular dependency instead of ordering it
+  ✓ 9. missing Phase 4 engine yields INSUFFICIENT_EVIDENCE, not a fabricated plan
+  ✓ 10. empty/unmatched question yields AMBIGUOUS, never a guessed target
+  ✓ 11. unknown implementation detail is explicitly marked, never invented
+  ✓ 12. validatePlan() fails check 7 when verificationCriteria is absent
+  ✓ 13. Kiswahili plan reaches status READY with a passing validation
+  ✓ 14. validatePlan() reports BLOCKED-driving failures for a malformed plan
+  ✓ 15. Kiswahili proof case matches spec §9's required structural shape
+  ✓ 16. Repair Queue integration references RP-030-CONTENT for vocabulary and refuses to invent one for unknowns
+  ✓ 17. toBuilderOrchestratorPlanningShape() reshapes the plan without calling BuilderOrchestrator
+  ✓ 18. capability-self-diagnosis.js (Phase 4) behaves identically after Phase 5 loads
+  ✓ 19. capability-dependency-graph.js (Phase 3) getBlockers() unchanged after Phase 5 loads
+  ✓ 20. unified-capability-contract.js (Phase 2) still resolves the real Kiswahili record after Phase 5 loads
+
+20 passed, 0 failed
+
+=== core/modules/builder/tests/capability-self-diagnosis.test.js ===
+  ✓ 1. known capability question resolves to DIAGNOSED
+  ✓ 2. unknown capability returns IDENTIFICATION_UNCERTAIN, not a guess
+  ✓ 3. empty question returns IDENTIFICATION_UNCERTAIN with candidate list
+  ✓ 4. a fully-positive record derives overall VERIFIED via analyzeStatus (Phase 2 vocabulary, unmodified)
+  ✓ 5. Kiswahili diagnosis reports PARTIALLY_VERIFIED, matching Phase 2 record directly
+  ✓ 6. blocker identification returns real, non-empty blockers for Kiswahili
+  ✓ 7. missing-dependency stage finds MISSING-status placeholder dimensions
+  ✓ 8. real evidence of "not ready" is NOT_VERIFIED, never relabelled MISSING
+  ✓ 9. a synthetic FAILED-status edge surfaces as a blocker with status preserved verbatim
+  ✓ 10. evidence analysis classifies manifest confidence as SOURCE_VERIFIED_LIVE
+  ✓ 11. missing Phase 3 module yields INSUFFICIENT_EVIDENCE, not a fabricated diagnosis
+  ✓ 12. all ten Phase 2 dimensions appear in dimension analysis
+  ✓ 13. dimension analysis preserves raw sourceStatus values verbatim
+  ✓ 14. dependency traversal count matches graph edges from the capability node
+  ✓ 15. response_generation (AVAILABLE) is excluded from blockers
+  ✓ 16. next-build recommendation picks required "vocabulary", not a non-required placeholder
+  ✓ 17. Kiswahili end-to-end diagnosis produces every required §9 field from real data
+  ✓ 18. every dependency-traversal target exists as a real graph node
+  ✓ 19. unified-capability-contract.js still resolves the real Kiswahili record after Phase 4 loads
+  ✓ 20. capability-dependency-graph.js getBlockers() still behaves identically after Phase 4 loads
+
+20 passed, 0 failed
+
+=== core/modules/builder/tests/unified-capability-contract.test.js ===
+  ✓ 1. capability can be represented via createCapabilityRecord()
+  ✓ 2. multiple dimensions coexist independently on one record
+  ✓ 3. source-native raw value is preserved verbatim, not renamed
+  ✓ 4. provenance array on the record names registry/file/retrieval method
+  ✓ 5. evidenceRef is carried on the dimension untouched
+  ✓ 6. dependencyRefs are pointers only, no graph resolution attempted
+  ✓ 7. integrationPoints use existing CozyOS naming conventions (provider/engine)
+  ✓ 8. observedAt is a real ISO timestamp; sourceVerifiedAt is honestly null when absent
+  ✓ 9. two different dimensions each with their own source are NOT silently merged into one status
+  ✓ 9b. a true same-key conflict (two sources, same dimension, disagreeing) is flagged CONFLICT
+  ✓ 10. buildKiswahiliValidationRecord() reflects the real AA-007 case: PARTIALLY_VERIFIED, not VERIFIED
+  ✓ 11a. cozy-language-registry.js still resolves sw as AVAILABLE after this file is loaded alongside it
+  ✓ 11b. cozy-language-pack-registry.js still resolves sw as NOT_READY after this file is loaded alongside it
+  ✓ 12. evidence-engine.js loads and reports its own version unchanged
+  ✓ 13. core/platform/dependency-engine.js loads and reports its own version unchanged
+
+15 passed, 0 failed

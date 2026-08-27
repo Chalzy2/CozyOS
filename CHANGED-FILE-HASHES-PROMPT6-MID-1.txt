@@ -1,0 +1,4 @@
+90b7a627ab7b1a55ead86e39038d103b92424607ca9ba6b5e755aca2c158a80b  core/security/password-reset-service.js
+9e5085f2e391765207ced70b534effd68175597f07e2a50b1ce023d7ca417fee  core/security/test/password-reset-service.test.js
+10a8da2d1fe9e77849ab52e9815843d7dc0409830a1b47db887dd9c8b2a7c8c6  core/modules/identity/identity-engine.js
+c5706e3ecc495415ca4829e3db2165b9b2b2ac8472dc851872b3008165304b5a  core/modules/identity/identity-storage.js

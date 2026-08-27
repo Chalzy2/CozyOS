@@ -1,0 +1,224 @@
+/**
+ * CozyOS — Shared Launch Sequence Styling (Stages 1-6)
+ * File Reference: core/shell/launch-sequence.css
+ * Milestone: 364.3 — Startup/Login Sequencing Correction
+ *
+ * Extracted verbatim from dashboard.html's own <style> block (same
+ * milestones as core/shell/launch-sequence.js) so both dashboard.html
+ * and index.html render the identical, single approved launch screen —
+ * never two different or duplicated versions of it.
+ */
+        html, body { background: #011c15 !important; margin: 0; }
+        #cozy-launch-screen {
+            position: fixed; inset: 0; z-index: 999999;
+            background: #011c15;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-family: system-ui, sans-serif; color: #F9A825;
+            transition: opacity 0.6s ease;
+            /* M366.2 UX audit: safety net for very short landscape
+               viewports (small phones) so content can never be clipped
+               with no way to reach it - no visual change on any normal
+               viewport, since content already fits within 100vh there. */
+            overflow-y: auto;
+            /* M366.2 UX audit: hints the compositor this element will
+               animate opacity, same GPU-friendly practice as the rest of
+               this file - no behavior change. */
+            will-change: opacity;
+        }
+        /* Milestone M252 — logo + slogan reveal delayed to the 1.5s
+           mark (Stage 1's minimum stated duration: 1.5-3s of pure
+           green before the logo appears), not the earlier 1.0s used
+           before this spec revision. */
+        #cozy-launch-logo {
+            width: min(320px, 70vw); height: auto;
+            /* M366.2 — dual-tone glow matching the official CozyOS mark:
+               a tight emerald glow close to the artwork, plus a softer,
+               wider gold glow further out. Same var(--living-glow)
+               override point as before, just layered instead of single. */
+            filter: drop-shadow(0 0 14px rgba(46,125,50,0.55)) drop-shadow(var(--living-glow, 0 0 36px rgba(249,168,37,0.30)));
+            opacity: 0;
+            /* M366.2 UX audit item 1 - "logo slightly rises upward
+               during startup": added a gentle 10px upward drift to the
+               existing scale-up, both driven by the same single
+               transform property/transition (never two competing
+               transform declarations), so it reads as one smooth
+               gesture rather than a bounce or jitter. */
+            transform: scale(0.85) translateY(10px);
+            transition: opacity 1.2s ease, transform 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+            will-change: opacity, transform;
+        }
+        /* Living Logo Lighting (Phase 2, section 7): brightness breathes
+           every 5s exactly, per spec - real fix from the prior 4s. */
+        #cozy-launch-logo.cozy-reveal { opacity: 1; transform: scale(1) translateY(0); animation: cozyLaunchBreathe calc(5s / var(--living-speed, 1)) ease-in-out infinite; animation-delay: 1.2s; }
+        /* M351: "Logo animates to top center and scales down." Kept as a
+           separate class (added after the wordmark/tagline finish typing)
+           rather than folded into .cozy-reveal, so the existing verified
+           breathing-glow reveal above is completely unchanged. */
+        #cozy-launch-logo.cozy-launch-shrink {
+            position: fixed; top: 18px; left: 50%;
+            width: 56px; height: auto; animation: none;
+            transform: translateX(-50%) scale(1);
+            transition: top 0.9s cubic-bezier(0.16,1,0.3,1), width 0.9s cubic-bezier(0.16,1,0.3,1), transform 0.9s cubic-bezier(0.16,1,0.3,1);
+            /* M366.2 UX audit item 10 (performance): this one-time,
+               ~0.9s shrink still animates layout-triggering properties
+               (top/width) rather than pure transform - flagged in the
+               audit report as a WARNING rather than rewritten here,
+               since removing them requires recomputing the shrink as a
+               transform-only translate/scale and re-verifying pixel
+               position, which is real layout work beyond a safe
+               same-behavior CSS tweak. will-change at least gives the
+               browser advance notice so it can promote the layer ahead
+               of the transition rather than mid-frame. */
+            will-change: top, left, width, transform;
+        }
+        /* M351: admin-selectable wordmark reveal styles (typing uses the
+           real per-letter typeSplitColorText() above in JS; these four
+           are pure-CSS variants for when the administrator selects
+           fade/rise/fall/draw instead). */
+        #cozy-launch-title.cozy-launch-anim-fade { opacity: 0; transition: opacity 1s ease; }
+        #cozy-launch-title.cozy-launch-anim-fade.cozy-launch-anim-play { opacity: 1; }
+        #cozy-launch-title.cozy-launch-anim-rise { opacity: 0; transform: translateY(24px); transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.16,1,0.3,1); }
+        #cozy-launch-title.cozy-launch-anim-rise.cozy-launch-anim-play { opacity: 1; transform: translateY(0); }
+        #cozy-launch-title.cozy-launch-anim-fall { opacity: 0; transform: translateY(-24px); transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.16,1,0.3,1); }
+        #cozy-launch-title.cozy-launch-anim-fall.cozy-launch-anim-play { opacity: 1; transform: translateY(0); }
+        #cozy-launch-title.cozy-launch-anim-draw { opacity: 0; letter-spacing: 6px; filter: blur(3px); transition: opacity 1s ease, letter-spacing 1s ease, filter 1s ease; }
+        #cozy-launch-title.cozy-launch-anim-draw.cozy-launch-anim-play { opacity: 1; letter-spacing: 0.08em; filter: blur(0); }
+        @keyframes cozyLaunchBreathe { 0%, 100% { transform: scale(1); filter: brightness(1); } 50% { transform: scale(1.015); filter: brightness(1.12); } }
+        #cozy-launch-title {
+            font-family: Georgia, 'Times New Roman', serif; font-weight: 700;
+            font-size: 52px; letter-spacing: 0.06em; margin: 24px 0 0 0;
+            min-height: 1.2em;
+        }
+        /* M364.3: responsive sizing per the approved spec (mobile
+           48-72px, tablet 56-64px, desktop 64-72px) - font-family/weight
+           and the existing typing engine/cursor/split-color classes
+           below are all unchanged, only size and spacing increased. */
+        @media (min-width: 600px) {
+            #cozy-launch-title { font-size: 60px; }
+        }
+        @media (min-width: 1024px) {
+            #cozy-launch-title { font-size: 68px; }
+        }
+        #cozy-launch-title .cozy-title-cozy { color: #2E7D32; }
+        #cozy-launch-title .cozy-title-os { color: #F9A825; }
+        #cozy-launch-screen p { font-size: 14px; color: #81C784; margin: 16px 0 0 0; letter-spacing: 0.03em; min-height: 1.2em; }
+        #cozy-launch-screen.cozy-launch-hidden { opacity: 0; pointer-events: none; }
+        /* M355: approved Stage 6 (6.00-6.30s) - motto letters settle like
+           polished metal, not a bounce. Pure CSS, applied once by JS after
+           typeSplitColorText()'s own real completion callback fires. */
+        @keyframes cozyMottoSettle {
+            0%   { transform: translateY(-3px); filter: brightness(1.35); }
+            100% { transform: translateY(0); filter: brightness(1); }
+        }
+        #cozy-launch-slogan.cozy-motto-settle { animation: cozyMottoSettle 0.3s cubic-bezier(0.16,1,0.3,1); }
+        .cozy-typing-cursor {
+            display: inline-block; width: 2px; margin-left: 2px;
+            animation: cozyLaunchCursorBlink 0.9s step-end infinite;
+        }
+        @keyframes cozyLaunchCursorBlink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+        @keyframes cozyLetterPulse { 0% { filter: brightness(1.4); } 100% { filter: brightness(1); } }
+        .cozy-letter-pulse { animation: cozyLetterPulse 0.2s ease-out; }
+        @media (prefers-reduced-motion: reduce) {
+            #cozy-launch-logo.cozy-reveal { animation: none; }
+            .cozy-typing-cursor { animation: none; }
+            .cozy-letter-pulse { animation: none; }
+        }
+        /* M370 Phase 2 — Engine Initialization checklist. Fades in with
+           the Living Background, fades out before the login card. Real
+           status only (see launch-sequence.js) - dots start dim/amber
+           and turn genuinely green once their composed check passes. */
+        #cozy-launch-engine-checklist {
+            position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%) translateY(8px);
+            display: flex; flex-direction: column; gap: 4px; opacity: 0;
+            transition: opacity 400ms ease, transform 400ms ease;
+            font-size: 0.8rem; color: rgba(232,245,233,0.85); z-index: 5;
+        }
+        #cozy-launch-engine-checklist.cozy-reveal { opacity: 1; transform: translateX(-50%) translateY(0); }
+        #cozy-launch-engine-checklist.cozy-launch-check-fadeout { opacity: 0; transition: opacity 400ms ease; }
+        .cozy-launch-check-row { display: flex; align-items: center; gap: 8px; }
+        .cozy-launch-check-dot {
+            width: 8px; height: 8px; border-radius: 50%; background: #FFCA28;
+            transition: background 300ms ease, box-shadow 300ms ease;
+        }
+        .cozy-launch-check-row.cozy-check-ready .cozy-launch-check-dot { background: #4CAF50; box-shadow: 0 0 6px rgba(76,175,80,0.6); }
+        @media (prefers-reduced-motion: reduce) {
+            #cozy-launch-engine-checklist, #cozy-launch-engine-checklist.cozy-reveal { transition: none; }
+            .cozy-launch-check-dot { transition: none; }
+        }
+
+        /* ================================================================
+           M373 — "ABOVE ONLY" inserted stage.
+           Layered on top of the existing #cozy-launch-screen (same host,
+           same living background canvas behind it - never a second
+           background/overlay system). Reuses the existing wordmark's
+           serif font-family/weight (Georgia, 'Times New Roman', serif;
+           700) so it reads as part of the same CozyOS launch-gate
+           typography rather than an unrelated style. One new color token
+           (--cozy-above-only-gold, a golden-brown) is added alongside -
+           not in place of - the existing #F9A825/#2E7D32/#81C784 tokens
+           already defined above; nothing existing is recolored.
+           ================================================================ */
+        :root { --cozy-above-only-gold: #C9832E; --cozy-above-only-gold-deep: #8C5A1E; }
+        #cozy-launch-above-only {
+            position: absolute; left: 50%; top: 50%; z-index: 6;
+            transform: translate(-50%, -50%) scale(0.05);
+            /* Responsive "~75% of the usable screen width" per the spec -
+               clamp() keeps it readable on small phones and safely
+               margined on very large/desktop screens, rather than one
+               fixed px value for every device (matches the approach the
+               responsive #cozy-launch-title media queries above already
+               take). */
+            font-size: clamp(28px, 12vw, 168px);
+            width: max-content;
+            max-width: 92vw;
+            text-align: center;
+            font-family: Georgia, 'Times New Roman', serif;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
+            overflow: visible;
+            pointer-events: none;
+            color: var(--cozy-above-only-gold);
+            background: linear-gradient(180deg, var(--cozy-above-only-gold) 0%, var(--cozy-above-only-gold-deep) 100%);
+            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 18px rgba(201,131,46,0.45));
+            opacity: 0;
+            /* Cinematic expansion, not a plain font-size jump: scale
+               animates from tiny (0.05) up past its resting size (1) with
+               a slight overshoot/settle, matching the same
+               cubic-bezier "premium" easing already used elsewhere in
+               this file (e.g. #cozy-launch-logo.cozy-launch-shrink). */
+            transition: transform 4.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 1.1s ease;
+            will-change: transform, opacity;
+        }
+        #cozy-launch-above-only.cozy-above-only-expand {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        /* Disappearance: begins ~1.2s before the stage's hard 9s cutoff
+           (see computeAboveOnlyPlan() in launch-sequence.js) so the
+           transition genuinely finishes, rather than being clipped, by
+           the point the existing motto is allowed to begin. */
+        #cozy-launch-above-only.cozy-above-only-fade {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(1.12);
+            transition: transform 1.1s cubic-bezier(0.4, 0, 1, 1), opacity 1.1s ease;
+        }
+        @media (max-width: 480px) {
+            #cozy-launch-above-only { font-size: clamp(26px, 15vw, 64px); letter-spacing: 0.02em; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            /* Same specificity as the non-reduced-motion rules above
+               (element#id[.class]) so this genuinely overrides them
+               rather than losing on cascade order - no scale animation
+               at all when reduced motion is requested, only a plain
+               opacity fade, matching the same pattern already used by
+               #cozy-launch-logo.cozy-reveal and .cozy-typing-cursor
+               above for reduced motion. */
+            #cozy-launch-above-only,
+            #cozy-launch-above-only.cozy-above-only-expand,
+            #cozy-launch-above-only.cozy-above-only-fade {
+                transform: translate(-50%, -50%) scale(1);
+                transition: opacity 0.4s ease;
+            }
+        }

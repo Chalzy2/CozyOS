@@ -1,0 +1,9 @@
+# CHANGED-FILE-HASHES-PROMPT9A-MID-1.txt
+# SHA-256 of every file changed or added in this slice.
+# Generated after all edits, before packaging.
+
+90f1f8bb652c28ecee312e4f09b0e9310dd2ed7f59c26c0b46fd418c842ef040  core/modules/identity/identity-engine.js
+5d9d13a3e4286e6e96b398ad7c5737c880998f02f66b5dcd6eae3e08047b164b  core/security/auth-factor-snapshot.js
+856b8ce8df33d9a0b7946a19da17fa7687ed5714982ad2436b628ae8a14fecfa  core/modules/identity/auth-coordinator.js
+54c1c2e4319357952e3b6002cf8f8703a68b42a10399ef4c876d70fdfb175800  login.html
+0a6a6ac71b1dac97cc41d931d1fe1eaa10bbf7a86996597d703daab367996884  core/modules/identity/test/auth-coordinator.test.js

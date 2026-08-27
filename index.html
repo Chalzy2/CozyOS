@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CozyOS Enterprise</title>
+<link rel="stylesheet" href="core/ui/cozy-tokens.css">
+<!-- Real bug fix (M387.5 Finding 7): index.html never linked any file
+     defining the --cozy-* theme tokens CozyTheme validates against, so
+     every theme was rejected on this page. core/ui/cozy-tokens.css
+     confirmed authoritative per Rule 51 (defines all 8 REQUIRED_TOKENS for
+     all 10 themes; the core/shell/ copy is a stale duplicate missing one
+     theme; core/shell/cozy-theme.css defines none of these tokens at all). -->
+<link rel="stylesheet" href="core/shell/cozy-animations.css">
+<link rel="stylesheet" href="core/shell/launch-sequence.css">
+<!--
+  M364.3 — Startup/Login Sequencing Correction.
+
+  Previously this file showed its own, much simpler startup screen
+  (static logo/wordmark/tagline, no typing/voice/motto animation) and,
+  after M364.2's routing fix, redirected to login.html almost
+  immediately once the (fast, in-memory) auth check resolved — the
+  approved 8-10s Stage 1-6 sequence was never actually shown to public
+  visitors at all, only to Chalzydashboard.html/dashboard.html.
+
+  Fixed: this file now renders the exact same #cozy-launch-screen
+  markup dashboard.html uses, and runs the identical, single, shared
+  core/shell/launch-sequence.js (extracted verbatim from dashboard.html,
+  not rewritten or duplicated) — the real logo reveal, COZYOS typing,
+  welcome voice, and motto fall-bounce, all unchanged. Routing to
+  login.html (or the signed-in placeholder) now waits for the real
+  "cozy:launch-sequence-complete" event that file emits at the true end
+  of Stage 6 — never before it, per explicit instruction. A bounded
+  fallback (matching the approved timeline's real total duration) covers
+  the case where the event is somehow never emitted, so a visitor can
+  never be stranded.
+-->
+<style>
+  html, body { margin: 0; padding: 0; }
+  #cozy-startup-error { color: #ff8a80; font-size: 13px; max-width: 420px; text-align: center; white-space: pre-wrap; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 1000000; display: none; }
+</style>
+</head>
+<body>
+
+<div id="cozy-launch-screen">
+    <img id="cozy-launch-logo" src="assets/branding/cozyoslogo-emblem.png" alt="CozyOS">
+    <h1 id="cozy-launch-title"></h1>
+    <p id="cozy-launch-slogan"></p>
+</div>
+<div id="cozy-startup-error"></div>
+
+<!-- Same real dependency set the shared launch sequence composes on
+     dashboard.html — none new, none duplicated. -->
+<script src="core/ui/cozy-theme.js"></script>
+<script src="core/ui/cozy-background.js"></script>
+<!-- M370.5/M372 — CozyEnvironment. Single, read-only facade over the
+     Living Background's real state - composes it, never duplicates it. -->
+<script src="core/living/cozy-environment.js"></script>
+<script src="core/ui/live-animation-engine.js"></script>
+<script src="core/living/cozy-living-sounds.js"></script>
+<script src="core/living/cozy-living-audio.js"></script>
+<script src="core/shell/platform-event-bus.js"></script>
+<script src="core/modules/speech/cozy-speech.js"></script>
+<script src="core/modules/speech/adapters/cozy-tts-browser-adapter.js"></script>
+<script src="core/modules/speech/providers/charles-voice-provider.js"></script>
+<script src="core/modules/speech/voice-manager.js"></script>
+<!-- Living TTS — composes CozySpeech + VoiceManager into one honest
+     speak() facade for Living experiences (login gate consumes this
+     separately once its own sequence work is complete). Loaded after
+     both real dependencies; registration is self-deferring if either
+     isn't ready yet, same pattern as voice-manager.js itself. -->
+<script src="core/living/living-tts.js"></script>
+<script src="core/modules/speech/adapters/speech-recognition-adapter.js"></script>
+<!-- M374 — same critical fix as login.html: these two files were
+     never loaded here either. Order matters: identity-storage.js
+     before identity-engine.js. -->
+<script src="core/modules/identity/identity-storage.js"></script>
+<script src="core/modules/identity/identity-engine.js"></script>
+<script src="core/security/otp-provider.js"></script>
+<!-- M372 — real, confirmed fix: see login.html's identical comment.
+     cozy-session-service.js was missing here too. -->
+<script src="core/modules/session/cozy-session-service.js"></script>
+<script src="core/modules/identity/auth-coordinator.js"></script>
+<script src="core/living/cozy-living-ai.js"></script>
+<!-- Phase 10C-3E: real Gemini cloud provider — registers into LivingAI's
+     existing "gemini-api" provider slot via the existing, unmodified
+     registerProvider() public method. Never auto-activates: the default
+     active provider remains "reasoning-pipeline", exactly as
+     cozy-living-ai.js's own constructor already sets it. The API key is
+     never present in either of these two files — gemini-cloud-provider.js
+     only calls the same-origin server/ai/gemini-backend-endpoint.js,
+     which is the sole place GEMINI_API_KEY is ever read (from the
+     server process's environment). Order matters: the factory must load
+     before the bootstrap that consumes it. -->
+<script src="core/living/providers/gemini-cloud-provider.js"></script>
+<script src="core/living/providers/gemini-cloud-provider-bootstrap.js"></script>
+<!-- RP-025-A: real on-device conversational provider — registers into
+     LivingAI's existing "on-device" provider slot; never auto-activates. -->
+<script src="core/modules/intelligence/providers/on-device-conversational-provider.js"></script>
+<!-- Real fix — closes the "founder"/"public story" NOT_FOUND gap: this
+     page previously never loaded cozyai-identity.js, ServiceRegistry,
+     ProviderManager, or the Founder Story chain at all (see the removed
+     version of this comment, still accurate about the OLD state) — so
+     CozyKnowledge.getFounderFact()/getPublicStoryFact() always
+     degraded to NOT_FOUND here, in every language including Kiswahili,
+     regardless of cozy-language-templates.js already carrying real
+     Kiswahili content for those intents. Same real files, same proven
+     order, as dashboard.html — nothing new, nothing duplicated. -->
+<script src="core/registry/cozy-registry.js"></script>
+<!-- cozyai-identity.js's own fail-closed rule: it will not register
+     window.CozyOS.DeveloperIdentity at all unless all three of these
+     parts loaded first, in this order. -->
+<script src="core/identity/developer-profile.js"></script>
+<script src="core/identity/project-history.js"></script>
+<script src="core/identity/african-knowledge-initiative.js"></script>
+<script src="core/identity/cozyai-identity.js"></script>
+<script src="core/shell/provider-manager.js"></script>
+<!-- Vault (Secrets/Encryption) — internal modules first, then the
+     composing facade, per cozy-vault-engine.js's own stated load-order
+     requirement (same order as dashboard.html). Founder Story is this
+     page's first real caller of it. -->
+<script src="core/modules/vault/secret-registry.js"></script>
+<script src="core/modules/vault/encryption-manager.js"></script>
+<script src="core/modules/vault/secret-manager.js"></script>
+<script src="core/modules/vault/typed-managers.js"></script>
+<script src="core/modules/vault/rotation-and-health.js"></script>
+<script src="core/modules/vault/cozy-vault-engine.js"></script>
+<!-- Document Engine + Storage Provider — Founder Story's attachMedia()
+     dependency; engine before its storage provider, matching the
+     provider's own registration requirement. -->
+<script src="core/modules/documents/cozy-document-engine.js"></script>
+<script src="core/modules/documents/cozy-document-storage-provider.js"></script>
+<!-- Founder Story Vault — composes window.CozyOS.Vault (above),
+     Session and IdentityEngine (both already loaded above this block
+     on this page). founder-story-seed.js is the Founder's real,
+     committed content; window.CozyOS.FounderStory.getPublicStory() is
+     the one narrow, public+published-only read path
+     cozy-knowledge-registry.js's getProjectKnowledgeFact() composes. -->
+<script src="core/modules/founder-story/founder-story-engine.js"></script>
+<script src="core/modules/founder-story/founder-story-seed.js"></script>
+<!-- Checkpoint K — CozyMemory (real, existing, unmodified). Composed by
+     CozyAI.getContext() below for the verified Question -> Context ->
+     Answer -> Advisor chain the Living Assistant now uses. No new
+     memory engine. -->
+<script src="core/modules/memory/cozy-memory-engine.js"></script>
+<!-- RP-027: language + knowledge registries, read defensively (at call
+     time, not load time) by rule-based-conversational-provider.js
+     below — order relative to the chain above is not load-bearing per
+     that file's own header, but is kept after it for readability. -->
+<script src="core/modules/intelligence/language/cozy-language-registry.js"></script>
+<script src="core/modules/intelligence/language/cozy-language-templates.js"></script>
+<script src="core/modules/intelligence/knowledge/cozy-knowledge-registry.js"></script>
+<!-- Checkpoint K — the verified intelligence chain (Checkpoints F-J),
+     real and previously reachable only from admin-workspace.html /
+     Node tests. Wired here, in the same dependency order already
+     proven by core/modules/intelligence/advisor/tests/
+     cozy-runtime-wiring-audit.test.js, so the visible Living Assistant
+     (core/living/cozy-living-assistant.js, below) can compose it.
+     CozyAI (getContext) -> CozyIdentityFAQRouter -> CozyAnswerEngine ->
+     CozyAdvisor. No new AI/Answer/Advisor/Memory/Knowledge engine. -->
+<script src="core/modules/intelligence/cozy-ai.js"></script>
+<script src="core/modules/knowledge/cozyos-identity-faq-router.js"></script>
+<script src="core/modules/intelligence/answer/cozy-answer-engine.js"></script>
+<script src="core/modules/intelligence/advisor/cozy-advisor.js"></script>
+<script src="core/modules/intelligence/providers/rule-based-conversational-provider.js"></script>
+<script src="core/ui/living-message-engine.js"></script>
+<script src="core/platform/application-visibility.js"></script>
+<script src="core/shell/cozy-workspace.js"></script>
+<link rel="stylesheet" href="core/living/cozy-living.css">
+<!-- M365.0: real dependencies for the composed User Dashboard - none
+     new; the same real engines already proven across M364.1-M364.9. -->
+<!-- Dashboard Prompt 1: the real knowledge/community pipeline was not
+     previously loaded on this page at all (confirmed by Checkpoint A) -
+     additive only, no existing script tag reordered or removed.
+     Ingestion must load before Community (Community composes it). -->
+<script src="core/modules/intelligence/knowledge/cozy-knowledge-ingestion.js"></script>
+<script src="core/modules/intelligence/knowledge/cozy-knowledge-community.js"></script>
+<!-- Dashboard Prompt 2: cozy-knowledge-review.js (RP-029-C Phase 1) was
+     not previously loaded on this page - additive only. Real, existing
+     engine; provides computeDisplayState(), the real per-record display
+     state authority the Community surface now composes instead of
+     showing raw internal reviewState values. -->
+<script src="core/modules/intelligence/knowledge/cozy-knowledge-review.js"></script>
+<!-- Dashboard Prompt 2: pure-logic module that groups real Community
+     records into honest UI buckets (Pending Review/Community
+     Verified/Needs Correction/Rejected/Learned Knowledge) via
+     CozyKnowledgeReview.computeDisplayState() above. No new review
+     engine - see that file's own header. -->
+<script src="core/shell/dashboard-community-summary-core.js"></script>
+<!-- Dashboard Prompt 1: pure-logic navigation/AI-context module. Loads
+     before user-dashboard.js, which now composes it for the real
+     Home/Community/AI/Apps/Settings shell. -->
+<script src="core/shell/dashboard-navigation-core.js"></script>
+<!-- Dashboard Prompt 2 §15: pure-logic admin-only Settings-section
+     boundary decision. Composes IdentityEngine.getDashboardConfig()'s
+     real isPlatformAdmin field only - see that file's own header. -->
+<script src="core/shell/dashboard-settings-admin-boundary-core.js"></script>
+<link rel="stylesheet" href="core/shell/user-dashboard.css">
+<script src="core/shell/user-dashboard.js"></script>
+<script src="core/living/cozy-living-assistant.js"></script>
+<script src="core/shell/startup-orchestrator.js"></script>
+<script src="core/shell/launch-sequence.js"></script>
+<script>
+  // M366.8 — Emergency Bootstrap Recovery: defensive-only fix. No code
+  // in this repository currently calls navigator.serviceWorker.register()
+  // anywhere (confirmed by repository-wide search before this was
+  // added) - so this never registers anything new. It only unregisters
+  // a service worker that may already be installed in a returning
+  // visitor's browser from an earlier deployment (sw.js/PWA/sw.js exist
+  // in this repository and are real, functional PWA files - if either
+  // was ever registered by a past version of this site, it would keep
+  // serving its own previously-cached content indefinitely, since it
+  // was never version-bumped before this milestone). This runs before
+  // anything else so a stale worker cannot intercept the requests the
+  // real launch sequence below depends on.
+  if (typeof navigator !== "undefined" && navigator.serviceWorker && typeof navigator.serviceWorker.getRegistrations === "function") {
+    navigator.serviceWorker.getRegistrations().then((regs) => {
+      regs.forEach((reg) => reg.unregister());
+    }).catch(() => { /* real, honest no-op - nothing to clean up or the API isn't available */ });
+  }
+
+  // M364.3: routing (login.html redirect, or the signed-in placeholder)
+  // is gated entirely behind the real "cozy:launch-sequence-complete"
+  // event — this script does nothing until that fires (or the bounded
+  // fallback below elapses). The real auth check (M364.2, unchanged in
+  // substance) still runs in parallel so it's ready the moment the
+  // sequence finishes, but its RESULT is never acted on early.
+  (function () {
+    const errorEl = document.getElementById("cozy-startup-error");
+
+    function mountUserDashboard(userId) {
+      const screen = document.getElementById("cozy-launch-screen");
+      if (!screen) return;
+      screen.classList.add("cozy-launch-hidden");
+      setTimeout(() => {
+        // M365.0: the honest "not built yet" placeholder is replaced by
+        // the real, composed User Dashboard (core/shell/user-dashboard.js).
+        // Same real fade-out of the launch screen as before; only what
+        // replaces it has changed.
+        screen.innerHTML = "";
+        screen.classList.remove("cozy-launch-hidden");
+        const dashboard = window.CozyOS && window.CozyOS.UserDashboard;
+        if (dashboard && typeof dashboard.render === "function") {
+          dashboard.render(screen, userId);
+        } else {
+          // Honest fallback if the real module somehow failed to load -
+          // never fabricate a working dashboard in its place.
+          screen.innerHTML = `<p style="color:#9fd6ae;text-align:center;margin-top:60px;">Signed in${userId ? " as " + String(userId).replace(/</g, "&lt;") : ""}. The dashboard failed to load - please refresh.</p>`;
+        }
+      }, 600);
+    }
+
+    async function resolveAuthState() {
+      const auth = window.CozyOS && window.CozyOS.AuthCoordinator;
+      if (!auth) return { authenticated: false };
+      // M373 — real, confirmed fix: IdentityEngine.restorePersistedUsers()
+      // (rehydrates #users from the real IdentityStorage/IndexedDB layer)
+      // existed but was never called anywhere in this repository,
+      // confirmed by exhaustive search. Without it, restoreSession()'s
+      // own fallback path (which looks up this.#users.get(userId)) would
+      // always fail even with a correctly-stored Remember Me pointer,
+      // since #users starts empty on every fresh page load.
+      const identity = window.CozyOS && window.CozyOS.IdentityEngine;
+      if (identity && typeof identity.restorePersistedUsers === "function") {
+        try { await identity.restorePersistedUsers(); } catch (_err) { /* honest no-op */ }
+      }
+      if (typeof auth.restoreSession === "function") {
+        try { await auth.restoreSession(); } catch (_err) { /* honest no-op */ }
+      }
+      const authenticated = typeof auth.isAuthenticated === "function" && auth.isAuthenticated();
+      if (!authenticated) return { authenticated: false };
+      const identityResult = typeof auth.getCurrentIdentity === "function" ? auth.getCurrentIdentity() : null;
+      return { authenticated: true, userId: identityResult && identityResult.userId };
+    }
+
+    function proceedPastSequence(authState) {
+      // Per the explicit routing requirement (M364.2, unchanged): the
+      // public entry never auto-mounts the Administrator Workspace,
+      // authenticated or not, admin or not. M365.0: authenticated
+      // visitors now see the real, composed User Dashboard instead of
+      // the earlier honest placeholder; unauthenticated visitors still
+      // go to the real login.html.
+      if (authState && authState.authenticated) {
+        mountUserDashboard(authState.userId);
+      } else {
+        window.location.href = "login.html";
+      }
+    }
+
+    // Real auth check runs in parallel with the visible sequence -
+    // never blocks or shortens it, just has its result ready in time.
+    const authStatePromise = resolveAuthState().catch(() => ({ authenticated: false }));
+
+    const bus = window.CozyOS && window.CozyOS.PlatformEventBus;
+    let proceeded = false;
+    function proceedOnce() {
+      if (proceeded) return;
+      proceeded = true;
+      authStatePromise.then(proceedPastSequence);
+    }
+
+    if (bus && typeof bus.once === "function") {
+      bus.once("cozy:launch-sequence-complete", proceedOnce);
+      // Honest, bounded fallback matching the approved timeline's real
+      // total duration (500ms Stage1 + 2500ms Stage2 + ~1000ms typing/
+      // hold + voice + ~1000ms motto + settle, generously rounded up so
+      // real voice-playback variance never cuts the sequence short) -
+      // never blocks forever if the event is somehow never emitted.
+      setTimeout(proceedOnce, 10000);
+    } else {
+      // PlatformEventBus or the shared sequence genuinely failed to
+      // load - honest fallback so a visitor is never stuck on a green
+      // screen forever, while still never skipping straight past a
+      // sequence that never started.
+      errorEl.style.display = "block";
+      errorEl.textContent = "Startup sequence could not fully load — continuing to sign-in.";
+      setTimeout(proceedOnce, 1500);
+    }
+  })();
+</script>
+</body>
+</html>

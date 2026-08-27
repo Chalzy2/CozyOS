@@ -1,0 +1,1860 @@
+<!-- ROUTING FIX (RP-ADMIN-ROUTING-SPLIT): this file is the real,
+     unchanged Administrator Workspace source of truth. It used to live
+     at dashboard.html and be reachable directly at that URL/path
+     (client-side-gated, but still the literal file GitHub Pages would
+     serve for "/dashboard" and "/dashboard.html"). It has been moved to
+     admin-workspace.html so those two public routes can become genuine,
+     ungated User Dashboard entry points instead (see the new
+     dashboard.html). This file's own gate logic (mountWorkspaceIfAdmin,
+     the real /webauthn/session check below) is completely unchanged -
+     only its filename and the one fetch() target in
+     core/bootstrap/bootstrap.js that loads it were updated. The only
+     real, public entry point to this file's content remains
+     chalzydashboard.html, via Bootstrap.start(). -->
+<!DOCTYPE html>
+<html lang="en" data-cozy-app="platform-admin">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>CozyOS Enterprise</title>
+    <meta name="description" content="CozyOS Enterprise — Built for Africa. Ready for the World. Intelligent offline-first enterprise platform.">
+    <meta name="theme-color" content="#011c15">
+    <meta name="msapplication-TileColor" content="#011c15">
+    <meta name="color-scheme" content="dark">
+    <link rel="icon" href="assets/branding/favicon-32.png?v=1.13.1" sizes="32x32">
+    <link rel="icon" href="assets/branding/favicon-16.png?v=1.13.1" sizes="16x16">
+    <link rel="shortcut icon" href="assets/branding/favicon-32.png?v=1.13.1">
+    <link rel="apple-touch-icon" href="assets/branding/apple-touch-icon.png?v=1.13.1">
+    <link rel="canonical" href="https://cozyos.org">
+    <meta property="og:title" content="CozyOS Enterprise">
+    <meta property="og:description" content="Built for Africa. Ready for the World.">
+    <meta property="og:image" content="https://cozyos.org/assets/branding/cozyoslogo.png?v=1.13.1">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://cozyos.org">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="CozyOS Enterprise">
+    <meta name="twitter:image" content="https://cozyos.org/assets/branding/cozyoslogo.png?v=1.13.1">
+    <script>
+    // RP-018 — defensive-only, same real snippet already present in
+    // index.html/login.html since M366.8. dashboard.html is this PWA's
+    // manifest start_url, so it's the *first* page a home-screen install
+    // ever loads - it needs this cleanup at least as much as the other
+    // two. Never registers a worker (still true repository-wide);
+    // only unregisters one that may already be installed from an
+    // earlier deployment. Runs before any engine script below loads.
+    if (typeof navigator !== "undefined" && navigator.serviceWorker && typeof navigator.serviceWorker.getRegistrations === "function") {
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        regs.forEach((reg) => reg.unregister());
+      }).catch(() => { /* real, honest no-op */ });
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "CozyOS Enterprise",
+        "url": "https://cozyos.org",
+        "logo": "https://cozyos.org/assets/branding/cozyoslogo-emblem.png?v=1.13.1",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "description": "Built for Africa. Ready for the World."
+    }
+    </script>
+    <!--
+      Milestone M211F — No White Screen on Startup (permanent rule).
+      This inline style is deliberately placed before every external
+      stylesheet <link> below. cozy-tokens.css defines --bg-primary, but
+      that file is a real network request - until it completes, the
+      body has no defined background and the browser's default white
+      shows through. An inline <style> block is parsed and applied
+      immediately, before any network request finishes, which is the
+      only way to guarantee zero white flash. Unconditional emerald
+      color here, not a CSS variable, so it never depends on anything
+      else loading first.
+    -->
+    <link rel="stylesheet" href="core/shell/launch-sequence.css">
+    <!-- M364.3: this launch-screen CSS now lives in the single,
+         shared core/shell/launch-sequence.css (extracted verbatim
+         from what was here before — zero visual change), so
+         index.html renders the identical approved launch screen. -->
+    <link rel="stylesheet" href="core/living/cozy-living.css">
+    <link rel="stylesheet" href="core/ui/cozy-components.css">
+    <link rel="stylesheet" href="core/modules/developer/developer-hub.css">
+    <!-- Milestone 132a: CozyAuthenticator, now a real dashboard.html module
+         (was a standalone page at applications/Cozy-Authenticator/index.html).
+         Consumes the already-loaded IdentityEngine/AuthCoordinator/
+         AuthorizationCoordinator/AuthFactorRegistry/OtpProvider below —
+         loads none of them itself. See MIGRATION_LOG.md. -->
+    <link rel="stylesheet" href="core/modules/Cozy-Authenticator/authenticator.css">
+    <style>
+        /* REWORKED (visual redesign per reference design): light content
+         * area with a dark navy sidebar and a proper header bar, replacing
+         * the earlier dark-glass-everywhere look. Every color below reads
+         * from the shared --cozy-* tokens (cozy-tokens.css's reworked
+         * platform-admin block) with the same value hardcoded as a
+         * fallback, so nothing breaks if tokens fail to load. */
+        :root {
+            --bg-primary: var(--cozy-bg-gradient, #f8fafc);
+            --bg-surface: var(--cozy-glass-bg, #ffffff);
+            --accent-gold: var(--cozy-brand-primary, #1B5E20);
+            --accent-gold-hover: var(--cozy-brand-glow, rgba(27,94,32,0.15));
+            --accent-emerald: #1B5E20;
+            --emerald-glow: #00A86B;
+            --text-primary: var(--cozy-text, #0f172a);
+            --text-secondary: var(--cozy-muted, #475569);
+            --border-color: var(--cozy-border, #E2E8F0);
+            --sidebar-bg: var(--cozy-sidebar-bg, #0f172a);
+            --sidebar-text: var(--cozy-sidebar-text, #e2e8f0);
+            --sidebar-text-muted: var(--cozy-sidebar-text-muted, #94a3b8);
+            --sidebar-hover: var(--cozy-sidebar-hover, #1e293b);
+            --sidebar-active-bg: var(--cozy-sidebar-active-bg, #16A34A);
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--cozy-font-family, var(--cozy-font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif));
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        /* --------------------------------------------------------------
+         * Structural CSS for cozy-workspace.js's real generated markup
+         * (.cozy-shell / .cozy-sidebar / .cozy-nav-link / etc.).
+         * -------------------------------------------------------------- */
+        #cozy-workspace-root { min-height: 100vh; }
+
+        .cozy-shell {
+            display: grid;
+            grid-template-columns: 1fr;
+            min-height: 100vh;
+        }
+        /* Lowered from 768px: Chrome's "Request Desktop Site" on mobile
+         * doesn't reliably override an effective viewport width above this
+         * page's own width=device-width meta tag, so a higher breakpoint
+         * could fail to trigger even in desktop-site mode on some devices.
+         * 600px triggers reliably while still being a reasonable mobile
+         * cutoff for genuinely narrow real phone viewports. */
+        @media (min-width: 600px) {
+            .cozy-shell { grid-template-columns: 260px 1fr; transition: grid-template-columns 0.25s cubic-bezier(0.16,1,0.3,1); }
+            .cozy-shell.cozy-sidebar-collapsed { grid-template-columns: 64px 1fr; }
+        }
+
+        .cozy-sidebar-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .cozy-sidebar-toggle {
+            flex: 0 0 auto; width: 28px; height: 28px; border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.12); background: transparent;
+            color: var(--sidebar-text-muted); cursor: pointer; font-size: 13px;
+        }
+        .cozy-sidebar-toggle:hover { color: #fff; border-color: var(--emerald-glow); }
+
+        /* Accordion nav sections: one open at a time via JS-driven .open class */
+        .cozy-nav-section-label {
+            display: flex; align-items: center; gap: 8px; width: 100%;
+            background: none; border: none; cursor: pointer; text-align: left;
+            color: var(--sidebar-text-muted);
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 10px 12px 4px;
+        }
+        .cozy-nav-section-arrow { display: inline-block; font-size: 9px; transition: transform 0.15s ease; }
+        .cozy-nav-section.open > .cozy-nav-section-label .cozy-nav-section-arrow { transform: rotate(90deg); }
+        .cozy-nav-section-items {
+            display: grid; grid-template-rows: 0fr; overflow: hidden;
+            transition: grid-template-rows 0.25s cubic-bezier(0.16,1,0.3,1);
+        }
+        .cozy-nav-section-items > * { min-height: 0; }
+        .cozy-nav-section.open > .cozy-nav-section-items { grid-template-rows: 1fr; }
+
+        /* Collapsed: icons/labels hidden except via title tooltip, sections
+         * force-expanded so items are still reachable as an icon rail. */
+        .cozy-shell.cozy-sidebar-collapsed .cozy-shell-title,
+        .cozy-shell.cozy-sidebar-collapsed .cozy-rediscover-btn,
+        .cozy-shell.cozy-sidebar-collapsed .cozy-nav-section-label span:not(.cozy-nav-section-arrow),
+        .cozy-shell.cozy-sidebar-collapsed .cozy-nav-link-label {
+            display: none;
+        }
+        .cozy-shell.cozy-sidebar-collapsed .cozy-nav-section-items { grid-template-rows: 1fr !important; }
+        .cozy-shell.cozy-sidebar-collapsed .cozy-sidebar { width: 64px; overflow-x: hidden; }
+        .cozy-shell.cozy-sidebar-collapsed .cozy-nav-link { text-align: center; }
+
+        .cozy-mobile-menu-btn {
+            display: none; width: 32px; height: 32px; border-radius: 6px;
+            border: 1px solid var(--border-color); background: transparent;
+            color: var(--text-primary); cursor: pointer; font-size: 15px; order: -1;
+        }
+
+        .cozy-mobile-overlay { display: none; }
+        @media (max-width: 599px) {
+            .cozy-mobile-menu-btn { display: inline-flex; align-items: center; justify-content: center; }
+            .cozy-sidebar-toggle { display: none; }
+            .cozy-mobile-overlay {
+                display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 25;
+            }
+            .cozy-sidebar {
+                position: fixed; top: 0; bottom: 0; left: 0; width: 240px; z-index: 30;
+                transform: translateX(-100%); transition: transform 0.25s cubic-bezier(0.16,1,0.3,1);
+            }
+            .cozy-shell.cozy-sidebar-mobile-open .cozy-sidebar { transform: translateX(0); }
+            .cozy-shell.cozy-sidebar-mobile-open .cozy-mobile-overlay { display: block; }
+            .cozy-shell.cozy-sidebar-mobile-open .cozy-shell-title,
+            .cozy-shell.cozy-sidebar-mobile-open .cozy-rediscover-btn,
+            .cozy-shell.cozy-sidebar-mobile-open .cozy-nav-link-label { display: initial; }
+        }
+
+        .cozy-sidebar {
+            background-color: var(--sidebar-bg);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            padding: 20px 12px;
+        }
+        @media (min-width: 600px) {
+            .cozy-sidebar {
+                border-bottom: none;
+                height: 100vh;
+                position: sticky;
+                top: 0;
+                overflow-y: auto;
+            }
+        }
+
+        .cozy-shell-title {
+            color: #ffffff;
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            padding: 0 8px;
+        }
+
+        .cozy-rediscover-btn {
+            width: 100%;
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.12);
+            color: var(--sidebar-text-muted);
+            border-radius: 6px;
+            padding: 8px;
+            cursor: pointer;
+            margin-bottom: 16px;
+        }
+        .cozy-rediscover-btn:hover { border-color: var(--emerald-glow); color: #ffffff; }
+
+        .cozy-nav-section { margin-bottom: 10px; }
+        .cozy-nav-section-label {
+            color: var(--sidebar-text-muted);
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 10px 12px 4px;
+        }
+        /* .cozy-nav-link base layout comes from cozy-components.css; these
+         * rules restyle it specifically for the dark sidebar context. */
+        .cozy-sidebar .cozy-nav-link {
+            color: var(--sidebar-text);
+            border-radius: 6px;
+            margin: 1px 4px;
+        }
+        .cozy-sidebar .cozy-nav-link:hover { background: var(--sidebar-hover); color: #ffffff; }
+        .cozy-sidebar .cozy-nav-link.active {
+            background: var(--sidebar-active-bg);
+            color: #ffffff;
+            border-left-color: var(--emerald-glow);
+            font-weight: 600;
+        }
+
+        .cozy-main-wrap { display: flex; flex-direction: column; min-height: 100vh; }
+
+        /* Header bar: brand context lives in the sidebar already, so this
+         * status bar plays the "top header" role (search/status/session) —
+         * restyled to sit on light background with real contrast, matching
+         * the reference header's spirit without fabricating a search box
+         * or notification system that isn't real yet. */
+        .cozy-status-bar {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding: 14px 28px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-surface);
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+        .cozy-main { padding: 28px; flex-grow: 1; }
+        .cozy-main h2 { font-size: 1.5rem; margin: 0 0 12px; color: var(--text-primary); }
+        .cozy-main h3 { color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+
+        .cozy-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+        .cozy-list > .cozy-nav-link {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            color: var(--text-primary);
+        }
+        .cozy-module-row {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            color: var(--text-primary);
+        }
+        .cozy-module-row-main {
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        }
+        .cozy-module-row-main b { font-size: 0.95rem; }
+        .cozy-module-row-meta {
+            display: flex; gap: 18px; flex-wrap: wrap;
+            font-size: 0.8rem; color: var(--text-secondary);
+        }
+
+        .cozy-grid { display: grid; gap: 16px; margin-top: 12px; }
+        .cozy-card-label { color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+        .cozy-card-value { font-size: 1.6rem; font-weight: 700; color: var(--text-primary); }
+
+        .cozy-disclosure-note { color: var(--text-secondary); font-size: 0.8rem; font-style: italic; margin: 4px 0 12px; }
+
+        .cozy-devhub-embedded-nav {
+            display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 18px;
+            padding: 10px; background: var(--bg-surface); border: 1px solid var(--border-color);
+            border-radius: 10px;
+        }
+        .cozy-devhub-embedded-nav .cozy-nav-item {
+            padding: 6px 12px; border-radius: 6px; font-size: 0.82rem; text-decoration: none;
+        }
+        .cozy-devhub-embedded-nav .cozy-nav-item.active {
+            background: var(--sidebar-active-bg); color: #ffffff; font-weight: 600;
+        }
+
+        /* --- New: Dashboard hero + stat cards + quick actions, matching
+         * the reference design's home layout. Real data only — stat
+         * numbers come from actual connected coordinators (Certification's
+         * application count, Module Manager's coordinator count, real user
+         * count when Identity is connected), never fabricated. --- */
+        .cozy-hero {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px 28px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+            box-shadow: var(--cozy-glass-shadow, none);
+        }
+        .cozy-hero h1 { margin: 0 0 4px; font-size: 1.4rem; color: var(--text-primary); }
+        .cozy-hero p { margin: 0; color: var(--text-secondary); font-size: 0.9rem; }
+        .cozy-hero-status {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(27,94,32,0.1); color: var(--accent-emerald);
+            padding: 6px 14px; border-radius: 999px; font-size: 0.8rem; font-weight: 600;
+        }
+        .cozy-hero-status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-emerald); display: inline-block; }
+
+        .cozy-stat-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px; margin-bottom: 20px;
+        }
+        .cozy-stat-card {
+            background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 10px;
+            padding: 16px 18px; box-shadow: var(--cozy-glass-shadow, none);
+        }
+        .cozy-quick-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px;
+        }
+        .cozy-quick-card {
+            background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 10px;
+            padding: 16px; cursor: pointer; transition: border-color 0.15s;
+            box-shadow: var(--cozy-glass-shadow, none);
+        }
+        .cozy-quick-card:hover { border-color: var(--accent-emerald); }
+        .cozy-quick-card .cozy-card-label { margin-bottom: 2px; }
+
+        .cozy-feature-card {
+            background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 10px;
+            padding: 18px 20px; margin-bottom: 16px; box-shadow: var(--cozy-glass-shadow, none);
+        }
+        .cozy-feature-card-head {
+            display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+        }
+
+        .cozy-shell-footer {
+            padding: 16px 28px;
+            text-align: center;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            border-top: 1px solid var(--border-color);
+        }
+
+        #terminal-input:focus { border-color: var(--accent-gold); outline: none; }
+        #terminal-input, #execute-btn { transition: border-color var(--cozy-transition-fast, 0.15s), background var(--cozy-transition-fast, 0.15s); }
+        #terminal-input { background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); }
+        #terminal-output { background: #ffffff !important; color: var(--text-secondary) !important; border: 1px solid var(--border-color); }
+
+        /* M346 — real bug fix. cozy-workspace.js uses class="cozy-field" on
+         * every real form input/textarea/select it generates (Message
+         * Publisher, Living Theme Engine search/filter/sort, Create
+         * Administrator, etc. — 15 real usages) but no rule for it existed
+         * anywhere in the repository, so every one of those controls was
+         * rendering as an unstyled, out-of-place browser default — the
+         * likely reason newly added controls looked "not in the UI." Same
+         * token-driven convention as .cozy-input (core/ui/cozy-components.css)
+         * so it matches the rest of the shell, not a second style system. */
+        .cozy-field {
+            display: block; width: 100%; max-width: 420px; box-sizing: border-box;
+            background: var(--bg-surface); color: var(--text-primary);
+            border: 1px solid var(--border-color); border-radius: 8px;
+            padding: 8px 12px; font: inherit; font-size: 0.85rem; margin: 4px 0;
+        }
+        .cozy-field:focus { outline: none; border-color: var(--accent-emerald); }
+        textarea.cozy-field { min-height: 90px; resize: vertical; }
+        select.cozy-field { cursor: pointer; }
+
+        /* M346 — Living Theme Engine restructure: filter bar and
+         * per-category grouping, using the same card/list tokens as
+         * everywhere else in the shell. */
+        .cozy-filter-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+        .cozy-filter-bar .cozy-field { margin: 0; width: auto; flex: 1 1 180px; }
+        .cozy-theme-category-group { margin-bottom: 18px; }
+        .cozy-theme-category-heading {
+            font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+            color: var(--text-secondary); margin: 0 0 8px;
+        }
+        .cozy-color-swatch:hover { transform: scale(1.08); }
+    </style>
+</head>
+<body>
+
+    <!-- Milestone M211F — real, instant emerald launch screen. First
+         element in body, no JS required for it to appear. Removed once
+         the login gate is actually about to render (see bootstrap
+         script below) - never left up indefinitely, never removed
+         before real content is ready. -->
+    <div id="cozy-launch-screen">
+        <img id="cozy-launch-logo" src="assets/branding/cozyoslogo-emblem.png?v=1.13.1" alt="CozyOS">
+        <h1 id="cozy-launch-title"></h1>
+        <p id="cozy-launch-slogan"></p>
+    </div>
+
+    <script src="core/shell/launch-sequence.js"></script>
+    <!-- M364.3: the Stage 1-6 sequence itself now lives in the
+         single, shared core/shell/launch-sequence.js (extracted
+         verbatim from what was here before — zero behavior change),
+         so index.html can show the identical approved launch
+         experience instead of a second, different one. -->
+
+    <!-- Additive: single mount point for the real Enterprise Control Center
+         (core/shell/cozy-workspace.js). Its mount() call builds its own
+         sidebar/topbar/main structure inside this div — nothing else in
+         this file writes to it directly. -->
+    <div id="cozy-workspace-root">
+        <noscript>The CozyOS Administrator Workspace requires JavaScript.</noscript>
+    </div>
+
+    <!-- CozyOS Shell UI Services (core/ui/). Loaded first: cozy-theme.js
+         applies the active theme immediately on construction (reading the
+         data-cozy-app="platform-admin" attribute already set on <html>
+         above), so it should run before anything else that might read
+         theme-dependent CSS variables.
+         - cozy-theme.js / cozy-background.js: real, verified compatible,
+           but required a new "platform-admin" theme profile to be added
+           (see migration log) — without it, both would have defaulted the
+           whole Administrator Workspace to Developer Hub's green/gold theme
+           and particle background. That gap is now closed: cozy-tokens.css
+           has a platform-admin block, cozy-theme.js registers it, and
+           cozy-background.js has a dedicated (subtle, emerald/gold mesh)
+           scene for it — Developer Hub keeps its own "developer" theme.
+         - cozy-toast.js / cozy-live.js: zero risk, no per-app coupling,
+           real API verified to match every existing call in
+           developer-hub.js and cozy-ui.js exactly (Toast.show(),
+           Live.publish()/subscribe()). -->
+    <script src="core/ui/cozy-theme.js"></script>
+    <script src="core/ui/cozy-background.js"></script>
+    <!-- M370.5 — CozyEnvironment. Single, read-only facade over the
+         Living Background's real state, available for future
+         ChurchOS/ShopOS/Calendar/CozyAI consumers. -->
+    <script src="core/living/cozy-environment.js"></script>
+    <!-- M350 real fix: core/ui/live-animation-engine.js is a real,
+         self-initializing, self-contained file (window.CozyOS.LiveAnimationEngine
+         = new CozyLiveAnimationEngine() at its own end) but had no <script>
+         tag anywhere in the repository - index.html's startup sequence
+         composes it (showTyping/applyAnimation) but it could never actually
+         load, so the typed wordmark/tagline/feature-badge reveal silently
+         never fired. Placed beside cozy-theme.js/cozy-background.js since
+         it has the same "real UI service, no dependencies" shape. -->
+    <script src="core/ui/live-animation-engine.js"></script>
+    <!-- M350 — Startup Orchestrator: coordinates the above (and LivingAudio)
+         for the living startup sequence. Composes only; no engine logic
+         lives here. Loaded on dashboard.html too (not just index.html) so
+         it is a real, always-available shell service, consistent with
+         cozy-theme.js/cozy-background.js above. -->
+    <script src="core/shell/startup-orchestrator.js"></script>
+    <script src="core/living/cozy-living-particles.js"></script>
+    <script src="core/living/cozy-living-sounds.js"></script>
+    <script src="core/living/cozy-living-audio.js"></script>
+    <script src="core/living/cozy-living-ai.js"></script>
+    <!-- Phase 10C-3E: real Gemini cloud provider — registers into LivingAI's
+         existing "gemini-api" provider slot via the existing, unmodified
+         registerProvider() public method. Never auto-activates: the default
+         active provider remains "reasoning-pipeline", exactly as
+         cozy-living-ai.js's own constructor already sets it. The API key is
+         never present in either of these two files — gemini-cloud-provider.js
+         only calls the same-origin server/ai/gemini-backend-endpoint.js,
+         which is the sole place GEMINI_API_KEY is ever read (from the
+         server process's environment). Order matters: the factory must load
+         before the bootstrap that consumes it. -->
+    <script src="core/living/providers/gemini-cloud-provider.js"></script>
+    <script src="core/living/providers/gemini-cloud-provider-bootstrap.js"></script>
+    <script src="core/connectivity/cozy-connect.js"></script>
+    <script src="core/connectivity/offline.js"></script>
+    <script src="core/living/cozy-living-offline.js"></script>
+    <script src="core/shell/cozy-toast.js"></script>
+    <script src="core/shell/cozy-live.js"></script>
+
+    <!-- 0. PLATFORM FOUNDATION REGISTRIES — loaded first (plain, non-deferred)
+         so their synchronous self-registration completes before anything
+         else queries them. cozy-workspace.js already has dormant,
+         bounded-retry integration code expecting window.CozyOS.ServiceRegistry
+         (Application Center + Module Manager metadata) — no code change was
+         needed there, only loading this file. module-registry.js is loaded
+         too (real, verified file) but has no current Administrator Workspace
+         consumer yet — it's the app-launch/dashboard-placement resolver for
+         a future loadModule() flow, not a catalog/display coordinator. -->
+    <script src="core/registry/cozy-registry.js"></script>
+    <!-- Milestone 216 — real Firebase Runtime Integration, first live use
+         of the platform layer that Firebase/firebase-config.js,
+         firebase-app.js, and firebase-firestore.js already anticipated
+         in their own "STATUS: Not wired into dashboard.html" comments.
+         Loaded in their documented dependency order: Config -> App ->
+         Firestore. This does NOT change Firebase/firebase.js's own
+         dormant/orphaned status (still unloaded, still flagged
+         separately) — no second Firebase App instance is created here.
+         KNOWN GAP: requires real Firestore security rules to be deployed
+         in the Firebase Console before this is safe in production; see
+         the Milestone 216 report. -->
+    <script src="Firebase/firebase-config.js"></script>
+    <script src="Firebase/firebase-app.js"></script>
+    <script src="Firebase/firebase-auth.js"></script>
+    <script src="Firebase/firebase-firestore.js"></script>
+    <script src="Firebase/firebase-storage.js"></script>
+    <script src="Firebase/firebase-provider.js"></script>
+    <script src="Firebase/firebase-session.js"></script>
+    <!-- Milestone 132a (Production Mode session): firebase-bootstrap.js's own
+         header requires exactly this load order (Config, App, Auth,
+         Firestore, Storage, Provider, Session, then itself) and states it
+         was written to be the first thing that script-tags the
+         core/firebase/ layer into dashboard.html and awaits
+         window.CozyOS.Firebase.ready. That condition is now true. -->
+    <script src="Firebase/firebase-bootstrap.js"></script>
+    <!-- Milestone 216 — Platform Identity Bridge. Composes the three
+         Firebase files above to answer one real, cross-device question
+         ("does this platform already have an administrator") for
+         cozy-login-gate.js. Loaded after Firestore, before IdentityEngine
+         so PlatformIdentity exists (or is honestly reported as
+         unavailable) the first time the login gate checks it. Never a
+         second identity/auth/session engine — see the file's own header. -->
+    <script src="core/modules/identity/platform-identity-bridge.js"></script>
+    <!-- Milestone M212B — real bug fix: identity-storage.js has never had
+         a script tag on this page either, the same gap identity-engine.js
+         had before the fix above. IdentityEngine's own persistence code
+         (createUser(), restorePersistedUsers()) already correctly checks
+         `if (window.CozyOS.IdentityStorage && ...)` and fails closed —
+         but since IdentityStorage was never loaded at all, that check
+         always silently skipped, and every administrator ever created on
+         this page existed only in memory, gone on refresh. Positioned
+         before identity-engine.js since it is a real, required
+         dependency for persistence. -->
+    <script src="core/modules/identity/identity-storage.js"></script>
+    <!-- Real bug fix: identity-engine.js has never had a script tag on this
+         page, despite every PlatformOperations/PlatformResourceManager/
+         ApplicationVisibility/ContentPresentation permission check
+         depending on window.CozyOS.IdentityEngine. Every one of those
+         checks has been correctly failing closed this whole time (never
+         wrongly open) — but Identity itself needs to actually load for a
+         real login flow to ever succeed here. -->
+    <script src="core/modules/identity/identity-engine.js"></script>
+    <!-- M366.4 — Cozy Share collaboration layer. Composes the existing
+         CozyConnect (transport, unmodified) and IdentityEngine (user
+         validation, unmodified). No new communication engine. -->
+    <script src="core/collaboration/cozy-share.js"></script>
+    <!-- Milestone 176C: real implementation, replacing the prior 0.0.1
+         stub. Platform Administrator trusted-device login and
+         admin-recovery session listing/forced-sign-out only — delegates
+         device trust to the real AuthFactorRegistry "trusted-device"
+         provider and reads window.CozyOS.IdentityEngine.isPlatformAdmin()
+         for role checks (loaded right after IdentityEngine so that
+         dependency is ready first). Does NOT issue or verify emergency
+         recovery codes, recovery phrases, OTP, questions, or keys — each
+         of those remains independently owned and is already orchestrated
+         by core/shell/cozy-admin-recovery-wizard.js, not this file. -->
+    <script src="core/modules/identity/admin-recovery-policy.js"></script>
+    <!-- Milestone 120: real session snapshot service. Milestone 220b
+         moved this ahead of cozy-auth.js: CozyOS.Auth now attaches to
+         CozySessionService's own session-started/session-ended events
+         (the one real convergence point every session-establishment
+         path reports through) instead of IdentityEngine's private
+         events directly, so Session must exist first for CozyOS.Auth's
+         constructor-time tryAttach() to succeed on first load rather
+         than silently staying unattached until something else calls it
+         again. -->
+    <script src="core/modules/session/cozy-session-service.js"></script>
+    <!-- Real implementation of window.CozyOS.Auth.getCurrentIdentity(),
+         a contract already referenced elsewhere in this codebase
+         (core/ui/cozy-base-linker.js, modules/quarry/*) but never
+         implemented until now. Milestone 220b: now listens to
+         CozySessionService's real events (loaded immediately above),
+         not IdentityEngine's/AdminRecoveryPolicy's private ones — see
+         this file's own header for the verified gap that fixed. -->
+    <script src="core/security/cozy-auth.js"></script>
+    <!-- Milestone 132a (Production Mode session): real bug fix. This bridge
+         (core/modules/session/firebase-session-bridge.js) previously had
+         no script tag anywhere in the platform — Firebase login could
+         never reach CozyOS.Session no matter what the Firebase layer
+         above does, since nothing was listening for
+         CozyOS.Firebase.Auth's auth-state changes and calling
+         CozyOS.Session.establishFromExternalAuth(). Loaded after
+         cozy-session-service.js (needs window.CozyOS.Session to exist)
+         and after the Firebase layer above (needs window.CozyOS.Firebase.Auth
+         to exist). KNOWN LIMITATION (disclosed, not fixed this session):
+         this file's internal dynamic import still points at a
+         "../../../firebase.js" path that does not exist in this
+         repository — see this session's reported limitations. Loading it
+         now does not create a duplicate session system; it only means the
+         one broken internal import will surface as a caught/logged
+         failure the next time this session's disclosed follow-up task
+         fixes it, rather than the bridge being silently absent. -->
+    <script src="core/modules/session/firebase-session-bridge.js"></script>
+    <!-- Milestone 120: thin Administrator Login orchestration only.
+         Composes IdentityEngine, CozyOS.Auth, CozyOS.Session, and
+         AdminRecoveryPolicy — does not duplicate or replace any of them.
+         Loaded last in this chain since it depends on all four. -->
+    <script src="core/modules/identity/auth-coordinator.js"></script>
+    <!-- Milestone 130: Administrator Recovery Wizard dependency chain.
+         Real, dependency-ordered load: factor-provider-base before any
+         provider that composes it; auth-factor-registry and
+         auth-policy-engine before every real provider that registers
+         itself into them; recovery managers and WebAuthn provider next;
+         cozy-login-gate.js (this page's bootstrap script at the bottom
+         already calls window.CozyOS.LoginGate.mountIfNeeded() but had
+         no script tag anywhere on this page until now — a real,
+         separate, pre-existing gap, disclosed in this milestone's
+         changelog, not expanded on further here); AdminRecoveryWizard
+         loaded last since it composes all of the above. -->
+    <!-- ============================================================
+         Milestone 131a — Shell Ownership Review DECISION:
+         CORRECTION (Milestone 132a, Production Mode session): the note
+         above was superseded by Milestone 131d, found written directly
+         in core/shell/cozy-shell.html: "dashboard.html is the permanent
+         CozyOS production shell. This file is a shared shell COMPONENT
+         only — it does not authenticate and is not a production entry
+         point. Do not add an auth chain here." core/manifest.json's own
+         start_url ("/dashboard.html") agrees. dashboard.html IS the one
+         canonical production entry point and the one real Login Gate.
+         Neither core/cozy-shell.html nor core/shell/cozy-shell.html
+         loads IdentityEngine, AuthCoordinator, Session Service, or any
+         auth chain — verified by reading both files — so there is no
+         competing/duplicate auth system to remove. They remain in the
+         platform-discovery manifest as shared shell UI COMPONENTS
+         (used by developer-hub.js and cozy-context-engine.js), not as
+         alternate login entry points. This Login Gate bootstrap stays
+         permanently wired here; it is not scheduled for removal.
+         ============================================================ -->
+    <script src="core/security/factor-provider-base.js"></script>
+    <script src="core/security/auth-factor-registry.js"></script>
+    <script src="core/security/otp-provider.js"></script>
+    <!-- M374 — Living Recovery Vault. Part of CozyOS Identity, composes
+         OtpProvider's real device-bound encryption (OtpCrypto),
+         IdentityStorage, and IdentityEngine - no new encryption engine. -->
+    <script src="core/security/living-recovery-vault.js"></script>
+    <script src="core/security/auth-policy-engine.js"></script>
+    <!-- Prompt 9B — real bug fix: none of these five files had a
+         script tag on this page (confirmed by direct search), so
+         window.CozyOS.PhoneAccountLinkage was never assigned despite
+         core/modules/identity/auth-coordinator.js already reading it
+         (AuthCoordinator's own `window.CozyOS && ...` check was
+         correctly failing closed the whole time — never wrongly
+         open). Order: phone-provider.js/delivery-backend-registry.js
+         (real dependencies) and phone-account-linkage.js before
+         phone-linkage-store-adapter.js (needs the linkage module's
+         registration hook); phone-linkage-bootstrap.js loaded last
+         since it composes all four plus the already-loaded
+         IdentityStorage into the one authoritative production
+         instance. auth-factor-snapshot.js has never had a script tag
+         either — the same gap — loaded here since AuthCoordinator
+         composes it once these real factor engines exist. There is
+         no equivalent Google linkage wiring here: google-account-linkage.js
+         is a server-side-only Node module (requires
+         server/live-relay/firebase-identity-issuer.js's real
+         certificate-fetch/crypto boundary) and cannot run in this
+         browser page — see phone-linkage-store-adapter.js's header
+         and this milestone's implementation report for the full
+         reasoning. -->
+    <script src="core/security/phone-provider.js"></script>
+    <script src="core/security/delivery-backend-registry.js"></script>
+    <script src="core/security/phone-account-linkage.js"></script>
+    <script src="core/security/phone-linkage-store-adapter.js"></script>
+    <script src="core/security/phone-linkage-bootstrap.js"></script>
+    <script src="core/security/auth-factor-snapshot.js"></script>
+    <!-- Prompt 9B — real, separate pre-existing bug fix, found while
+         verifying AuthCoordinator.getLoginDecision() actually reaches
+         a real decision (Prompt 9B §10/§21): login-decision-engine.js
+         also had no script tag anywhere on this page. Without it,
+         getLoginDecision() was unconditionally returning its own
+         "AuthFactorSnapshot/LoginDecisionEngine are not loaded —
+         failing closed" rejection for every login, regardless of any
+         linkage work — a real, independent gap from the phone/Google
+         linkage gap this milestone targets, disclosed here rather
+         than silently left in place. -->
+    <script src="core/security/login-decision-engine.js"></script>
+    <script src="core/security/recovery-phrase-manager.js"></script>
+    <script src="core/security/recovery-question-manager.js"></script>
+    <script src="core/security/trusted-device-manager.js"></script>
+    <!-- Milestone 176A: real bug fix. core/security/session-manager.js
+         (window.CozyOS.SessionManager — idle-timeout tracking,
+         trusted-device session binding, admin bulk logout ops) existed
+         in the repository but had never received a script tag on this
+         page, matching the exact pattern of the identity-engine.js gap
+         fixed earlier in this file. Its only hard dependency is
+         IdentityEngine (loaded above); TrustedDeviceManager is a soft,
+         lazily-checked dependency, so loading it directly after
+         TrustedDeviceManager here is a logical grouping, not a
+         requirement. -->
+    <script src="core/security/session-manager.js"></script>
+    <script src="core/security/recovery-key-manager.js"></script>
+    <script src="core/security/emergency-recovery-code-manager.js"></script>
+    <script src="core/security/webauthn-provider.js"></script>
+    <!-- M381 — Living Security Coordinator. Composes TrustedDeviceManager,
+         WebauthnProvider, OtpProvider, SessionManager, LivingRecoveryVault,
+         IdentityEngine, PlatformEventBus (all loaded above). No new
+         encryption, no duplicate engine. -->
+    <script src="core/security/living-security-coordinator.js"></script>
+    <!-- M382 — Living Risk Engine. Independent from
+         LivingSecurityCoordinator; composes its already-computed risk
+         breakdown plus SessionManager/CozyEnvironment for new
+         categories. Event-driven, no polling. -->
+    <script src="core/security/living-risk-engine.js"></script>
+    <!-- M383 — Living Trust Engine. Independent from
+         LivingSecurityCoordinator; composes it for one-time seeding and
+         LivingRiskEngine for real risk-driven reduction. Persistent via
+         IdentityStorage's new trustScores store. -->
+    <script src="core/security/living-trust-engine.js"></script>
+    <!-- M384 — Living Behavior Engine. Composes IdentityEngine's real
+         session/audit data only. Window Manager events/navigation
+         patterns confirmed to have no real signal - not composed. -->
+    <script src="core/security/living-behavior-engine.js"></script>
+    <!-- M385 — Living AI Context Engine. Registered as
+         window.CozyOS.LivingAIContextEngine (deliberately distinct from
+         the existing window.CozyOS.LivingAI state machine). Composes
+         LSE/LRE/LTE/CozyEnvironment/IdentityEngine read-only; composes
+         CozyAI (loaded later in this file) for memory at call time, not
+         load time - script order between them doesn't matter. -->
+    <script src="core/security/living-ai-context-engine.js"></script>
+    <!-- M386 — Living Device Intelligence Engine. Composes
+         TrustedDeviceManager (fingerprint + trust correlation),
+         IdentityStorage (new deviceProfiles store, DB_VERSION 6→7),
+         PlatformEventBus. Real browser signals only — no root/
+         jailbreak/SIM/Bluetooth/USB/hardware-serial/debugger/memory-
+         tamper detection (not real browser APIs, documented not
+         fabricated). Never authenticates; never computes trust/risk
+         itself, only feeds LivingRiskEngine/LivingTrustEngine events. -->
+    <script src="core/security/living-device-intelligence-engine.js"></script>
+    <!-- M387 — Living Decision Engine. Composes LivingSecurityCoordinator/
+         LivingRiskEngine/LivingTrustEngine/LivingBehaviorEngine/
+         LivingDeviceIntelligenceEngine/LivingAIContextEngine/
+         AuthPolicyEngine (all loaded above), read-only. Maps their real
+         outputs to a 7-level decision (Normal→Emergency). Never
+         executes; recommendations only, from a closed vocabulary. -->
+    <script src="core/security/living-decision-engine.js"></script>
+    <!-- Milestone 132a: window.CozyOS.AuthorizationCoordinator — authorization/
+         policy/step-up decisions. Distinct global from window.CozyOS.AuthCoordinator
+         (core/modules/identity/auth-coordinator.js, login orchestration only).
+         See changelog.md for the Ownership Report. -->
+    <script src="core/security/auth-coordinator.js"></script>
+    <!-- M357 Step 1 fix: these four honest-stub providers already existed
+         as real files but had never received a script tag on this page —
+         same class of gap as the session-manager.js/cozy-context-engine.js
+         fixes noted above. Without these tags, AuthFactorRegistry never
+         receives their real registerFactor() calls and the corresponding
+         factors stay on their constructor-time stub note instead of each
+         provider's own, more specific honest-stub description. -->
+    <script src="core/security/fingerprint-provider.js"></script>
+    <script src="core/security/face-provider.js"></script>
+    <script src="core/security/voice-provider.js"></script>
+    <script src="core/security/google-account-provider.js"></script>
+    <!-- Prompt 10 STEP A: google-account-link-client.js — real, additive
+         browser-side client for server/auth/account-link-server.js's
+         two real HTTP routes (/auth/session/issue, /auth/google/link).
+         Independent of AuthFactorRegistry (calls a server, not a local
+         provider) — loaded here purely so it is reachable on this page
+         at all (same "no dead code" principle as the M357 fix above),
+         not because authentication-settings-module.js calls it yet (it
+         doesn't — see that file's buildGoogleLoginFactor() comment).
+         No click handler anywhere on this page calls it this slice. -->
+    <script src="core/security/google-account-link-client.js"></script>
+    <!-- Milestone 358: persistent authentication enrollment lifecycle/metadata store.
+         Loads after AuthFactorRegistry and all real providers so factor-name
+         validation (isKnownFactor) has real data to check against. -->
+    <script src="core/security/authentication-enrollment-store.js"></script>
+    <script src="core/modules/security/authentication-settings-module.js"></script>
+    <!-- Milestone 359: additive enrollment UI panel. Composes AuthEnrollmentStore
+         (Milestone 358) and the real providers above; never modifies the
+         Milestone 357 authentication-settings-module.js it loads after. -->
+    <script src="core/modules/security/authentication-enrollment-panel.js"></script>
+    <!-- Milestone 360 (Stage 2): factor management (Enroll/Enable/Disable/Rename/Remove/View)
+         for Passkey, TOTP, Trusted Device. Independent module, own registry key, loads after
+         AuthEnrollmentStore, WebAuthnProvider, OtpProvider, TrustedDeviceManager. -->
+    <script src="core/modules/security/authentication-factor-management-panel.js"></script>
+    <!-- Milestone 360 (Stage 3): read-only security dashboard and enrollment history.
+         Independent modules, own registry keys, load after AuthEnrollmentStore,
+         WebAuthnProvider, OtpProvider, TrustedDeviceManager, and the Stage 2 panel. -->
+    <script src="core/modules/security/authentication-security-dashboard.js"></script>
+    <script src="core/modules/security/authentication-enrollment-history.js"></script>
+    <!-- Milestone 360 (Stage 4): read-only analytics + insights panel.
+         Load after AuthEnrollmentStore, RecoveryPhraseManager, and Stage 2/3 panels. -->
+    <script src="core/modules/security/authentication-analytics.js"></script>
+    <script src="core/modules/security/security-insights-panel.js"></script>
+    <script src="core/shell/cozy-login-gate.js"></script>
+    <!-- Milestone 361: Founder Story Vault (Foundation), Stage 1.
+         The Vault (Secrets/Encryption) engine already existed in the
+         repository but was not previously loaded by any page — these
+         5 internal modules + facade are its own real, pre-existing
+         code (core/modules/vault/), wired here for the first time
+         because Founder Story is the first real caller. No file in
+         this block is new; nothing here duplicates or re-implements
+         encryption. Order: independent internal modules first, then
+         the composing facade (window.CozyOS.Vault), per
+         cozy-vault-engine.js's own stated load-order requirement. -->
+    <script src="core/modules/vault/secret-registry.js"></script>
+    <script src="core/modules/vault/encryption-manager.js"></script>
+    <script src="core/modules/vault/secret-manager.js"></script>
+    <script src="core/modules/vault/typed-managers.js"></script>
+    <script src="core/modules/vault/rotation-and-health.js"></script>
+    <script src="core/modules/vault/cozy-vault-engine.js"></script>
+    <!-- Milestone 361, Stage 1: Founder Story Vault data/authorization
+         layer. Composes window.CozyOS.Vault (above), window.CozyOS.Session,
+         and window.CozyOS.IdentityEngine only — new feature namespace
+         core/modules/founder-story/, deliberately not under
+         core/modules/vault/ (that remains the Secrets Vault). Own
+         registry key, own audit log, own DOM root. -->
+    <!-- Milestone 361, Stage 2: Document Engine + Storage Provider.
+         Both already existed in the repository but, like Vault in Stage
+         1, were not previously loaded by any page. Founder Story's
+         attachMedia() is their first real caller for image/PDF/DOCX
+         attachments — composed via DocumentStorageProvider.save(), never
+         a duplicate storage implementation. Engine loads before its
+         storage provider, matching the provider's own registration
+         dependency (registerStorageProvider() requires the engine to
+         already exist). -->
+    <script src="core/modules/documents/cozy-document-engine.js"></script>
+    <script src="core/modules/documents/cozy-document-storage-provider.js"></script>
+    <script src="core/modules/founder-story/founder-story-engine.js"></script>
+    <!-- Milestone 361, Stage 1: the Founder's real initial content
+         (autobiography, Part 1) — calls only the public engine API
+         above; implements no storage/encryption of its own. -->
+    <script src="core/modules/founder-story/founder-story-seed.js"></script>
+    <!-- Milestone 361, Stage 1: read-focused Glass UI panel. Lazy
+         init(), matching the security-insights-panel.js convention —
+         does not self-attach to the page; a future stage wires it into
+         dashboard navigation. -->
+    <script src="core/modules/founder-story/founder-story-panel.js"></script>
+    <script src="core/shell/cozy-admin-recovery-wizard.js"></script>
+    <!-- Real bug fix: cozy-context-engine.js was migrated to
+         PlatformEventBus in an early milestone but never received a
+         script tag on this specific page. -->
+    <script src="core/context/cozy-context-engine.js"></script>
+    <script src="core/modules/module-registry.js"></script>
+    <script src="core/shell/application-launcher.js"></script>
+    <!-- M366.6 — CozyOS Window Manager. Core platform service: real
+         drag/resize/minimize/maximize/fullscreen/close/z-index for every
+         CozyOS application window. Loaded early so any consumer below
+         can register with it. -->
+    <script src="core/shell/window-manager.js"></script>
+    <script src="core/shell/application-health-monitor.js"></script>
+    <script src="core/shell/dashboard-data-provider.js"></script>
+
+    <!-- Shared Platform Strengthening: PlatformEventBus / ModuleLoadingManager
+         (core/shell/) — the one shared event bus and load-lifecycle manager
+         every coordinator/application should use. -->
+    <script src="core/shell/platform-event-bus.js"></script>
+    <script src="core/shell/admin-gate-core.js"></script>
+    <script src="core/shell/module-loading-manager.js"></script>
+
+    <!-- Platform Discovery Engine dependency chain (core/platform/) — load
+         order matters: FileRegistry/ManifestRegistry are pure storage (no
+         dependencies), DependencyEngine/UsageEngine read FileRegistry,
+         HealthEngine reads both of those, and platform-discovery.js
+         (the merged engine) reads/writes all of them. Each degrades
+         honestly if an earlier one in the chain isn't present — see each
+         file's own header for its exact optional-dependency behavior. -->
+    <script src="core/platform/file-registry.js"></script>
+    <script src="core/platform/manifest-registry.js"></script>
+    <script src="core/platform/dependency-engine.js"></script>
+    <script src="core/platform/usage-engine.js"></script>
+    <script src="core/platform/health-engine.js"></script>
+
+    <!-- Platform Discovery Engine (core/shell/platform-discovery.js) — reads
+         and writes to the five files above; does not reimplement any of
+         them. Merged from two independently-built implementations into one
+         authoritative engine — see its own header for the full merge
+         history and the Runtime-vs-Manifest provider model. -->
+    <script src="core/shell/platform-discovery.js"></script>
+
+    <!-- Platform Audit Engine (core/platform/audit-engine.js) — pure
+         consumer, sits above Discovery/Dependency/Usage/Health/Registry in
+         the chain. Discovers nothing itself; answers diagnostic questions
+         by correlating what those engines already report. -->
+    <script src="core/platform/audit-engine.js"></script>
+
+    <!-- Session Workspace (core/modules/session/cozy-session-workspace.js) —
+         Milestone 176B. Read-only orchestration facade over SessionManager,
+         TrustedDeviceManager, IdentityEngine, AuthorizationCoordinator, and
+         PlatformAudit (all five loaded above). Owns no session state, no
+         trusted-device state, no authentication or authorization logic. -->
+    <script src="core/modules/session/cozy-session-workspace.js"></script>
+
+    <!-- Platform Operations Engine (core/platform/platform-operations.js) —
+         the execution layer. Orchestrator only; never fabricates a
+         lifecycle capability a coordinator doesn't have. Fails closed
+         without real Identity authorization. -->
+    <script src="core/platform/platform-operations.js"></script>
+
+    <!-- Platform Resource Manager (core/platform/platform-resource-manager.js)
+         — manages ownership, allocation, tracking, and release of shared
+         resources. Does not discover, execute operations, or classify
+         health/usage — reuses PlatformDiscovery/FileRegistry/PluginManager/
+         CozyStorage/UsageEngine/HealthEngine for all of that. -->
+    <script src="core/platform/platform-resource-manager.js"></script>
+
+    <!-- Reference Integrity Engine (core/platform/reference-integrity-engine.js)
+         — proactively checks real script/stylesheet/image tag resolution.
+         The exact class of check that would have caught the mpesaOS.js,
+         developer-hub.css, QuarryOS, and Certification path bugs before
+         deployment. -->
+    <script src="core/platform/reference-integrity-engine.js"></script>
+    <script src="core/modules/builder/deployment/entrypoint-scanner.js"></script>
+    <script src="core/modules/builder/deployment/zip-validator.js"></script>
+    <script src="core/modules/builder/deployment/asset-validator.js"></script>
+    <script src="core/modules/builder/deployment/cloudflare-validator.js"></script>
+    <script src="core/modules/builder/deployment/deployment-report.js"></script>
+    <script src="core/modules/builder/deployment/deployment-validator.js"></script>
+    <script src="core/modules/builder/deployment/deployment-repairer.js"></script>
+    <script src="core/modules/builder/generation-flow.js"></script>
+
+    <!-- Vendor System (Rule 61) — moved from core/platform/ to core/
+         directly, matching the final requested architecture where all 5
+         vendor files sit as siblings. Loaded in real dependency order:
+         Registry and Loader have no dependencies on each other; Events
+         wraps the existing PlatformEventBus; Diagnostics reads Registry+
+         Loader; Manager coordinates all three plus Events. -->
+    <!-- Output Center (Rule 68) — promoted from a private Developer Hub
+         field to a real, shared platform service, matching the same
+         pattern as the Vendor system below. Loaded in real dependency
+         order: core engine first (storage's restore() call at load time
+         depends on it existing), then storage, then the independent
+         history/collections/export helpers. -->
+    <script src="core/output/output-center.js"></script>
+    <script src="core/output/output-storage.js"></script>
+    <script src="core/output/output-history.js"></script>
+    <script src="core/output/output-events.js"></script>
+    <script src="core/output/output-collections.js"></script>
+    <script src="core/output/output-export.js"></script>
+    <!-- Output Inbox (Rule 71) — real, single arrival point forwarding to
+         OutputCenter.publish(); adds a genuinely separate "every arrival,
+         accepted or rejected" audit trail. -->
+    <script src="core/output/output-inbox.js"></script>
+
+    <!-- Calculation Engine (Rule 74) — single, shared platform service for
+         formulas every CozyOS application should use instead of
+         implementing its own math. Registry and History load first (no
+         mutual dependencies); Library registers real formulas against
+         Registry; Engine and Certification both depend on Registry. -->
+    <script src="core/calculation/formula-registry.js"></script>
+    <script src="core/calculation/calculation-history.js"></script>
+    <script src="core/calculation/formula-library.js"></script>
+    <script src="core/calculation/formula-library-church.js"></script>
+    <script src="core/calculation/formula-library-construction.js"></script>
+    <!-- New packs (Rule 77) — added after the existing, certified Business/
+         Church packs above, neither of which was modified. -->
+    <script src="core/calculation/packs/statistics.js"></script>
+    <script src="core/calculation/packs/education.js"></script>
+    <script src="core/calculation/packs/healthcare.js"></script>
+    <script src="core/calculation/packs/payroll.js"></script>
+    <script src="core/calculation/packs/conversions.js"></script>
+    <script src="core/calculation/packs/inventory.js"></script>
+    <script src="core/calculation/packs/accounting.js"></script>
+    <script src="core/calculation/packs/finance.js"></script>
+    <script src="core/calculation/packs/logistics.js"></script>
+    <script src="core/calculation/packs/agriculture.js"></script>
+    <script src="core/calculation/packs/construction.js"></script>
+    <script src="core/calculation/packs/manufacturing.js"></script>
+    <script src="core/calculation/packs/engineering.js"></script>
+
+    <!-- Formula Dependency Engine (Rule 84) — real, explicit dependsOn
+         metadata only, never source parsing. Graph/History load first (no
+         mutual dependencies); Events depends on History; Engine depends
+         on Graph; Certification depends on Engine. -->
+    <script src="core/calculation/dependency-graph.js"></script>
+    <script src="core/calculation/dependency-history.js"></script>
+    <script src="core/calculation/dependency-events.js"></script>
+    <script src="core/calculation/dependency-engine.js"></script>
+    <script src="core/calculation/dependency-certification.js"></script>
+
+    <!-- Enterprise UI Standard — Module Dashboard (Rule 87) — shared,
+         reusable dashboard component every CozyOS module can call with
+         its own config. -->
+    <script src="core/ui/module-dashboard.js"></script>
+    <script src="core/calculation/calculation-engine.js"></script>
+    <script src="core/calculation/calculation-certification.js"></script>
+
+    <!-- Organization Builder (Rule 75) — shared platform engine every
+         CozyOS application (ChurchOS, SchoolOS, WholesaleOS, etc.) should
+         consume instead of building its own organization system. Registry
+         first (Role and Hierarchy both depend on it). -->
+    <script src="core/organization/organization-registry.js"></script>
+    <script src="core/organization/organization-role.js"></script>
+    <script src="core/organization/organization-hierarchy.js"></script>
+    <script src="core/modules/ChurchOS/church-leadership-bridge.js"></script>
+
+    <!-- ChurchOS (Rule 76) — Phase 1: Setup Wizard + Membership. Reuses
+         OrganizationRegistry/CalculationEngine/OutputCenter directly,
+         creates no roles of its own (see CHURCHOS_ENGINE_AUDIT.md for the
+         full, honest status of the 25 requested platform engines). -->
+    <script src="core/plugins/churchOS-core.js"></script>
+
+    <!-- Vendor Registry (core/vendor-registry.js) — real, checkable
+         third-party library status. No vendors are actually loaded
+         anywhere in this deployment yet; this reports that honestly
+         rather than showing an aspirational status. -->
+    <script src="core/platform/vendor-registry.js"></script>
+    <!-- Vendor Loader (core/vendor-loader.js) — real dynamic script
+         injection, real observed success/error signals. -->
+    <script src="core/platform/vendor-loader.js"></script>
+    <!-- Vendor Events (core/vendor-events.js) — thin wrapper over the
+         existing, real PlatformEventBus, not a second pub/sub mechanism. -->
+    <script src="core/vendor-events.js"></script>
+    <!-- Vendor Diagnostics (core/vendor-diagnostics.js) — pure consumer
+         of Registry + Loader, same pattern as PlatformAudit. -->
+    <script src="core/platform/vendor-diagnostics.js"></script>
+    <!-- Vendor Manager (core/vendor-manager.js) — the single real entry
+         point coordinating all of the above. Applications should call
+         this, never the individual vendor coordinators directly. -->
+    <script src="core/vendor-manager.js"></script>
+
+    <!-- Application Visibility Registry (core/platform/application-visibility.js)
+         — single source of truth for which applications/tools exist and who
+         can see them. Reads ServiceRegistry + real self-declared `visibility`
+         metadata; delegates all filtering to IdentityEngine. -->
+    <script src="core/platform/application-visibility.js"></script>
+
+    <!-- Accessibility & Readability Engine (core/platform/accessibility-engine.js)
+         — real WCAG contrast math against actual loaded theme tokens, real
+         same-origin stylesheet scanning for sub-14px font sizes. -->
+    <script src="core/platform/accessibility-engine.js"></script>
+
+    <!-- Content Presentation Engine (core/platform/content-presentation-engine.js)
+         — Phase 1 only, real content CRUD + real Accessibility publish gate.
+         See the file's own header for the full, honest scope of what's
+         deferred (most content categories, holiday templates, animation
+         rendering, placement modes, reports). -->
+    <script src="core/platform/content-presentation-engine.js"></script>
+
+    <!-- Living Engine Integration milestone: LivingThemeEngine, LivingMessageEngine,
+         ModeEngine — these coordinators' backend implementation was already complete;
+         this is only the wiring (script load + Design Studio pages + dashboard +
+         discovery), no new engines created. Order matters: LivingThemeEngine must load
+         before ModeEngine (Mode composes LivingThemeEngine.activateTheme()) and before
+         LivingMessageEngine (reuses LivingThemeEngine.matchesSchedule()). Both real
+         dependencies these files compose — CozyOS.Theme, CozyOS.ServiceRegistry,
+         CozyOS.IdentityEngine — are already loaded above this line. -->
+    <script src="core/ui/living-theme-engine.js"></script>
+    <script src="core/ui/live-imagination-engine.js"></script>
+    <script src="core/living/cozy-living-sync.js"></script>
+    <script src="core/ui/living-message-engine.js"></script>
+    <script src="core/ui/mode-engine.js"></script>
+
+    <!-- Certification (activates existing Certification/Release/Upgrade/
+         Dependency centers in cozy-workspace.js AND Developer Hub's
+         certification tools — same window.CozyOS.Certification instance,
+         every method name verified against both consumers, zero duplicated
+         logic) and Memory (Developer Hub's Memory section + cozy-workspace's
+         own Project-namespace file-registration hook — same window.CozyOS.
+         CozyMemory instance). Both verified compatible; no code changes
+         needed anywhere else. -->
+    <script src="core/modules/certification/cozy-certification.js"></script>
+    <script src="core/registry/certification-registry-bridge.js"></script>
+    <script src="core/engines/files/universal-file-engine.js"></script>
+    <script src="core/engines/collaboration/live-hotspot-engine.js"></script>
+    <script src="core/modules/memory/cozy-memory-engine.js"></script>
+    <script src="core/modules/ChurchOS/church-membership-bridge.js"></script>
+    <script src="core/living/cozy-living-learning.js"></script>
+    <script src="core/living/cozy-language-verification.js"></script>
+    <script src="core/modules/knowledge/knowledge-provenance-engine.js"></script>
+    <script src="core/modules/knowledge/living-compressor.js"></script>
+    <script src="core/modules/learning/universal-learning-pipeline.js"></script>
+    <script src="core/modules/bible/bible-engine.js"></script>
+    <script src="core/living/cozy-living-advisor.js"></script>
+    <script src="core/living/living-runtime.js"></script>
+    <script src="core/living/cozy-auditor.js"></script>
+
+    <!-- DeveloperHub orchestrator — pure orchestration (verified: every
+         method is a one-line delegation to a real coordinator's real API,
+         e.g. fullCertification() literally just calls cert.fullCertification()
+         — no independent business logic, per its own header). Loading it
+         activates every existing window.CozyOS.DeveloperHub call already
+         present in developer-hub.js, with zero code changes there.
+         3 of its 8 optional integrations are already real and verified here
+         (Certification, ServiceRegistry, WorkspaceShell — including
+         WorkspaceShell.getDeveloperQueue(), confirmed to already exist);
+         Builder/UnderstandingEngine/OCR/BugFixer/AIMode will honestly report
+         "not connected" until those files are uploaded. -->
+    <!-- Builder / Understanding Engine toolset (core/modules/builder/) — 10
+         real files found in the full repository export, verified to
+         self-register under EXACTLY the global names developer-hub.js and
+         cozy-developer.js already call directly (window.CozyOS.Builder,
+         .BuilderRules, .BuilderTemplates, .BuilderAI, .UnderstandingEngine,
+         .ArchitectureEngine, .QuestionEngine, .RequirementAnalyzer,
+         .RequirementReader, .ProjectRefactor) — zero code changes needed
+         anywhere; this was simply never loaded before. BuilderRules/
+         BuilderTemplates/BuilderAI loaded first per cozy-builder.js's own
+         header ("required" dependencies). -->
+    <script src="core/modules/builder/builder-rules.js"></script>
+    <script src="core/modules/builder/builder-templates.js"></script>
+    <script src="core/modules/builder/builder-ai.js"></script>
+    <script src="core/modules/builder/architecture-engine.js"></script>
+    <script src="core/modules/builder/design-reasoner.js"></script>
+    <script src="core/modules/builder/runtime/builder-runtime.js"></script>
+    <script src="core/modules/builder/ownership-scanner.js"></script>
+    <script src="core/modules/builder/question-engine.js"></script>
+    <script src="core/modules/builder/requirement-analyzer.js"></script>
+    <script src="core/modules/builder/requirement-reader.js"></script>
+    <script src="core/modules/builder/understanding-engine.js"></script>
+    <!-- Builder Observation Engine (Layer 1: Observe) — composes
+         UnderstandingEngine.analyzeRepository()/analyzeCode() and
+         OwnershipScanner.scan() above (both must load first); optionally
+         composes CozyStorage for cross-milestone manifest persistence if
+         that script is present on the page. Distinct from window.CozyOS.
+         Builder (cozy-builder.js), which generates code — this module
+         only observes and never writes/generates/deploys anything. -->
+    <script src="core/modules/builder/observation-engine.js"></script>
+    <!-- Layer 2 Graph Composer (M372) — composes UnderstandingEngine's
+         per-file facts (both must load first) into Module/Dependency/API/
+         Event/Ownership graphs. Optionally reuses a BuilderObservation
+         manifest for the Ownership Graph if one is passed in at call time;
+         does not require BuilderObservation to load first. Never re-parses
+         source — see the file's own header and docs/builder/reports/
+         layer2-compose-analysis-AA-001.md for why cross-file reasoning
+         lives here and not inside understanding-engine.js. -->
+    <script src="core/modules/builder/layer2-graph-composer.js"></script>
+    <!-- M373 Layer 3 — analysis-engine.js composes Layer2GraphComposer's
+         graphs (plus narrow, deterministic Tier B raw-text heuristics)
+         into evidence-backed findings. Analyzes only; never repairs. -->
+    <script src="core/modules/builder/analysis-engine.js"></script>
+    <!-- M375 Layer 4 — learning-engine.js (window.CozyOS.BuilderLearning)
+         is a read-only aggregator over Layers 1-3, CozyMemory, and the
+         existing window.CozyOS.LearningEngine. Loads after Layer 1-3
+         so their diagnostics are available; never re-parses or
+         re-analyzes anything itself. See docs/builder/compose/
+         M375-compose-report.md for the full contract. -->
+    <script src="core/modules/builder/learning-engine.js"></script>
+    <!-- M376 Layer 5 — evidence-engine.js (window.CozyOS.BuilderEvidence)
+         loads after Layer 4 so BuilderLearning's status is available.
+         Measures accumulated evidence (repair/regression registries,
+         handoff chain) via live same-origin reads; never analyzes code
+         or infers patterns. See docs/builder/compose/
+         M376-compose-report.md for the full contract. -->
+    <script src="core/modules/builder/evidence-engine.js"></script>
+    <script src="core/modules/builder/builder-orchestrator.js"></script>
+    <script src="core/engines/planning/live-planning-engine.js"></script>
+    <script src="core/modules/builder/builder-intelligence-pipeline.js"></script>
+    <script src="core/modules/builder/project-refactor.js"></script>
+    <script src="core/modules/builder/cozy-builder.js"></script>
+
+    <!-- OCR (core/modules/ocr/) — cozy-ocr.js registers window.CozyOS.OCR,
+         exact match for cozy-developer.js's #ocr(). document-router.js
+         registers a separate window.CozyOS.DocumentRouter — not yet
+         directly referenced by developer-hub.js/cozy-developer.js, but
+         real and part of the same domain; loaded for the same reason
+         module-registry.js was loaded before it had an Administrator
+         Workspace consumer. -->
+    <!-- 8 real coordinators found in the full repository export, verified
+         against INTEGRATION_SLOTS's already-expected global names (one real
+         mismatch fixed: translation was pointed at a guessed "LanguageEngine"
+         that doesn't exist; corrected to the real CozyTranslate) —
+         previously honestly reporting "Not Connected," now real. -->
+    <script src="core/modules/notification/cozy-notification.js"></script>
+    <script src="core/modules/storage/cozy-storage.js"></script>
+    <script src="core/modules/sync/cozy-sync.js"></script>
+    <script src="core/modules/automation/cozy-automation.js"></script>
+    <script src="core/modules/analytics/cozy-analytics.js"></script>
+    <script src="core/modules/speech/cozy-speech.js"></script>
+    <!-- Milestone 172 reconciliation: Speech domain owned by Branch B (Platform
+         Expansion) — real script; kept here for the voice-capture/recognition
+         chain immediately below. R040 Phase 1 fix: speech-translation-adapter.js
+         and speech-translation-provider.js were moved to load AFTER
+         cozy-translate.js and cozy-language-pack-registry.js (see below) —
+         a real load-order bug found by audit: both files' functions read
+         window.CozyOS.CozyTranslate lazily at call time, but
+         speech-translation-adapter.js also self-invokes an immediate
+         init() at the bottom of its own IIFE on script load. With the old
+         order (adapter before cozy-translate.js, before
+         speech-translation-provider.js itself), that immediate init() ran
+         while CozyTranslate and SpeechTranslationProviders were both still
+         undefined, so _registerLanguagesOnce()/_registerTranslatorOnce()
+         silently no-op'd on every real page load and the translator was
+         never actually registered with CozyTranslate outside of tests
+         (which `require()` files in the correct order manually). -->
+    <!-- Milestone 178 Gate 2, Phase 1 — repository-verified dormant adapters,
+         activated in dependency-safe order (capture/recognition/processor/
+         language). All resolve CozySpeech/each other lazily at call time,
+         not at load time, so this order is not load-bearing for script
+         execution — kept for readability only. -->
+    <script src="core/modules/speech/adapters/voice-capture-adapter.js"></script>
+    <script src="core/modules/speech/adapters/speech-recognition-adapter.js"></script>
+    <!-- M344 — Living Voice Style Engine: learns/reproduces speaking style; never clones voices -->
+    <script src="core/living-voice-style-engine.js"></script>
+    <script src="core/modules/ChurchOS/church-worship-session.js"></script>
+    <script src="core/modules/ChurchOS/church-knowledge-router.js"></script>
+    <script src="core/modules/speech/adapters/voice-processor-adapter.js"></script>
+    <script src="core/modules/speech/adapters/speech-language-adapter.js"></script>
+    <!-- Milestone 178 Gate 2, Phase 2 -->
+    <script src="core/modules/speech/adapters/speech-session-adapter.js"></script>
+    <script src="core/modules/speech/adapters/speech-command-adapter.js"></script>
+    <script src="core/modules/speech/adapters/voice-settings-adapter.js"></script>
+    <!-- Milestone 178 Gate 2B, Phase 3 — cozy-tts-browser-adapter.js activated
+         only after Change 1 added its missing duplicate-load guard, matching
+         the other 11 adapters. -->
+    <script src="core/modules/speech/adapters/cozy-tts-browser-adapter.js"></script>
+    <script src="core/modules/ChurchOS/bible-interface-module.js"></script>
+    <script src="core/modules/speech/adapters/speech-preview-adapter.js"></script>
+    <script src="core/modules/speech/adapters/speech-capability-adapter.js"></script>
+    <script src="core/modules/speech/adapters/voice-capability-stub.js"></script>
+    <script src="core/modules/speech/adapters/voice-security-bridge.js"></script>
+    <!-- Milestone 356 — CozyOS Voice Framework. Load order is load-bearing:
+         voice-pack-import.js and voice-manager.js first (voice-manager.js
+         becomes CozySpeech's ONE preview backend, honestly superseding
+         cozy-tts-browser-adapter.js's own earlier self-registration —
+         see voice-manager.js's own header for why that's the existing,
+         documented contract and not a race condition); the provider
+         files register themselves with VoiceManager once it exists;
+         voice-settings-panel.js (Settings -> Voice & Speech UI) loads
+         last since it only calls VoiceManager, never owns voice logic
+         itself. -->
+    <script src="core/modules/speech/voice-pack-import.js"></script>
+    <script src="core/modules/speech/voice-manager.js"></script>
+    <script src="core/modules/speech/providers/charles-voice-provider.js"></script>
+    <script src="core/modules/speech/providers/stub-voice-providers.js"></script>
+    <script src="core/modules/speech/voice-settings-panel.js"></script>
+    <!-- Living TTS — composes CozySpeech + VoiceManager into one honest
+         speak() facade for Living experiences (login gate consumes this
+         separately once its own sequence work is complete). Loaded after
+         voice-manager.js and its providers; registration is self-
+         deferring if either isn't ready yet, same pattern as
+         voice-manager.js itself. -->
+    <script src="core/living/living-tts.js"></script>
+    <!-- Milestone 179 Gate 2 — Wake Word Engine (new capability, no prior
+         owner). Loaded after cozy-speech.js and all adapters so
+         CozySpeech.registerAdapter() is available at load time. Does not
+         modify cozy-speech.js (its integration registry is CLOSED). -->
+    <script src="core/engines/wakeword/wake-word-engine.js"></script>
+    <!-- Milestone 180 Gate 2 — Developer Identity & African Knowledge
+         Initiative (new capability, no prior owner). Load order is
+         load-bearing here: cozyai-identity.js assembles and freezes
+         window.CozyOS.DeveloperIdentity from the three parts below, so
+         it must load last. -->
+    <script src="core/identity/developer-profile.js"></script>
+    <script src="core/identity/project-history.js"></script>
+    <script src="core/identity/african-knowledge-initiative.js"></script>
+    <script src="core/identity/cozyai-identity.js"></script>
+    <!-- Milestone 180B Gate 2 — Voice Engine (new capability, no prior
+         owner). Delegates developer-identity questions recognized in
+         speech to window.CozyOS.DeveloperIdentity and speaks the answer
+         via CozySpeech's existing preview/TTS hook. Loaded after
+         cozy-speech.js/adapters (registerAdapter available),
+         platform-event-bus.js, cozy-registry.js (ServiceRegistry), and
+         cozyai-identity.js (DeveloperIdentity assembled) — every
+         dependency it reads at load time already exists above. -->
+    <script src="core/engines/voice/voice-engine.js"></script>
+    <!-- Milestone 180C Gate 2 — Search Engine (new capability, no prior
+         owner). Delegates developer-identity search queries to
+         window.CozyOS.DeveloperIdentity and formats the answer as a
+         search result. Loaded after platform-event-bus.js, cozy-registry.js
+         (ServiceRegistry), and cozyai-identity.js (DeveloperIdentity
+         assembled) — every dependency it reads at load time already
+         exists above. -->
+    <script src="core/engines/search/search-engine.js"></script>
+    <script src="core/modules/translate/cozy-translate.js"></script>
+    <!-- R040 Phase 0/1 audit finding: cozy-language-pack-registry.js (the
+         real, frozen 17-default-language canonical registry,
+         CozyLanguagePacks.DEFAULT_IDENTITIES) was never loaded in this
+         page at all — every "17 languages" claim in this file's own
+         header comments was true of the module in isolation, never true
+         of a real running dashboard. Loaded here, after CozyTranslate and
+         before the speech-translation adapter/provider chain that now
+         derives its seed languages from it (see speech-translation-adapter.js
+         getSeedLanguages() — R040 Phase 1 fix for the 15-vs-17 gap). -->
+    <script src="core/modules/intelligence/language-packs/cozy-language-pack-registry.js"></script>
+    <!-- R040 Phase 1 fix: speech-translation-adapter.js/provider.js moved
+         here (after CozyTranslate + CozyLanguagePacks exist) so their
+         real registration logic — including the adapter's own immediate
+         init() self-invocation at the bottom of its file — actually runs
+         against loaded dependencies instead of silently no-op'ing. See
+         the removed comment above the voice-capture/recognition chain for
+         the full audit finding. -->
+    <script src="core/modules/speech/adapters/speech-translation-adapter.js"></script>
+    <script src="core/modules/speech/adapters/speech-translation-provider.js"></script>
+    <!-- R040 Phase 1 — real NLLB-backed offline translation provider. This
+         file (speech-translation-provider-nllb.js) and its Node CLI
+         verification script (language-packs/shared/NLLB-200-600M-INT8/real_sw_to_16.js)
+         already existed and were already covered by real tests, but
+         neither was ever loaded on this actual page — the live dashboard
+         only ever had the rare experimental browser-native Translator API
+         as a possible provider. Loading the file only makes
+         window.CozyOS.SpeechTranslationNLLBProvider available; it does
+         NOT register a provider or claim the bridge is running (see the
+         inline registration + honest-status check immediately below). -->
+    <script src="core/modules/speech/adapters/speech-translation-provider-nllb.js"></script>
+    <script>
+        // R040 Phase 1 — real, minimal, honest registration of the
+        // nllb-bridge provider on page load. Registering here does NOT
+        // mean the local nllb_http_bridge.py process is actually running
+        // — SpeechTranslationNLLBProvider's own isAvailable()/translate()
+        // re-check /health before ever claiming isReal:true (see that
+        // file's header). This is composition (one register() call
+        // against an existing, already-tested public API), not a new
+        // provider implementation.
+        (function () {
+            try {
+                if (window.CozyOS && window.CozyOS.SpeechTranslationNLLBProvider && window.CozyOS.SpeechTranslationProviders && !window.CozyOS.SpeechTranslationProviders.get("nllb-bridge")) {
+                    window.CozyOS.SpeechTranslationNLLBProvider.register();
+                }
+            } catch (err) {
+                console.error("[R040] nllb-bridge provider registration failed (bridge may simply not be configured on this device):", err && err.message ? err.message : err);
+            }
+        })();
+    </script>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Milestone 173 / Gate 4 — Platform Integration runtime wiring.
+         Order follows repository-verified getDependencies() from Gate 2/3,
+         not an assumed sequence. core/ai.js is not one of the 11 RL-014
+         engines, but is a real, required prerequisite for AI Platform's
+         attach logic. Workflow Runtime is placed before core/ai.js because
+         its one reference to window.CozyOS.AI.platform is a lazy,
+         call-time-only check inside an action handler (call_ai) that already
+         degrades gracefully if unavailable — not a load-order dependency.
+         Integration Layer loads last: it only discovers, never registers.
+
+         CORRECTED FINDING (Browser Runtime Verification), historical:
+         CozyHearing.getDependencies() declared "AudioEngine", but no
+         file assigned window.CozyOS.AudioEngine — audio-manager.js was
+         confirmed to be a different, unrelated ES-module mixer/mic-bus
+         engine. That gap is now closed (Milestone M262):
+         cozy-audio-engine.js is the real, purpose-built AudioEngine
+         implementing exactly the contract CozyHearing's own code
+         calls (registerInputAdapter/startListening/stopListening),
+         verified against CozyHearing's actual source before writing
+         it, and tested end-to-end (CozyHearing.startListening() now
+         genuinely succeeds). Loaded here, immediately before
+         cozy-hearing.js depends on it. -->
+    <script src="core/engines/audio/cozy-audio-engine.js"></script>
+    <script src="core/modules/hearing/cozy-hearing.js"></script>
+    <script src="core/modules/vision/cozy-vision.js"></script>
+    <!-- Milestone M274 - real fix: completes the camera chain.
+         vision-camera-adapter.js and browser-camera-provider.js were
+         both previously unloaded, leaving CozyVision honestly
+         reporting "no active camera" forever (confirmed by both an
+         earlier session's audit and my own re-verification of
+         camera-manager.js's source before adding this). -->
+    <script src="core/modules/vision/vision-camera-adapter.js"></script>
+    <script src="core/engines/camera/browser-camera-provider.js"></script>
+    <script src="core/engines/video/live-video-capture-engine.js"></script>
+    <script src="core/modules/sense/cozy-sense.js"></script>
+    <!-- ChurchOS C002 (Stages 2/4/5) — composes ChurchWorshipSession
+         (already loaded above) and CozySense (just loaded) — no new
+         engine, no new event system. -->
+    <script src="core/modules/ChurchOS/worship-mode-coordinator.js"></script>
+    <!-- ChurchOS C006 — Multi-Branch Coordinator (Bounded Mesh Network).
+         Composes LiveHotspotEngine (already loaded), CozySync,
+         PlatformEventBus. Loaded before the player so its listBranches()
+         is available for the Branches panel. -->
+    <!-- M367 — Provider Manager. Lightweight tracking layer for every
+         CozyOS provider (existing and future) - does not replace any
+         cognitive engine. Loaded early so consumers below can register. -->
+    <script src="core/shell/provider-manager.js"></script>
+    <!-- RP-025-A: real on-device conversational provider — registers
+         into LivingAI's existing "on-device" provider slot and (since
+         ProviderManager is loaded on this page) into ProviderManager
+         for visibility/health. Never auto-activates. -->
+    <script src="core/modules/intelligence/providers/on-device-conversational-provider.js"></script>
+    <!-- RP-027: language + knowledge registries, read defensively (at
+         call time, not load time) by rule-based-conversational-
+         provider.js below — loaded here, before it, for real-world
+         load order, though the provider file itself does not require
+         this exact order (see its own RP-027 EXTENSION header note). -->
+    <script src="core/modules/intelligence/language/cozy-language-registry.js"></script>
+    <script src="core/modules/intelligence/language/cozy-language-templates.js"></script>
+    <script src="core/modules/intelligence/knowledge/cozy-knowledge-registry.js"></script>
+    <script src="core/modules/intelligence/providers/rule-based-conversational-provider.js"></script>
+    <script src="core/modules/ChurchOS/multi-branch-coordinator.js"></script>
+    <!-- ChurchOS C003 — genuine new feature (real camera/mic capture).
+         Loaded after WorshipModeCoordinator so its updated recording
+         check can find window.CozyOS.LiveCaptureEngine when present. -->
+    <script src="core/engines/media/live-capture-engine.js"></script>
+    <!-- ChurchOS C004 — Living Live Worship Player. Composes
+         LiveCaptureEngine/LiveHotspotEngine (real streams),
+         ChurchWorshipSession (real timeline), PlatformEventBus (real
+         scripture-detected event, already wired end-to-end since C002). -->
+    <!-- M368 — ChurchOS Language Badge System. Real, reusable components
+         composing CozyTranslate/SpeechTranslationAdapter/ChurchWorshipSession
+         (all loaded above) for real status. Loaded before its first
+         consumer, the Worship Player. -->
+    <script src="core/living/language-badge.js"></script>
+    <script src="core/modules/ChurchOS/living-worship-player.js"></script>
+    <!-- M367 — Church Intelligence Provider. Real orchestration
+         composing ChurchWorshipSession/MultiBranchCoordinator/
+         LiveCaptureEngine, all already loaded above. Not an LLM. -->
+    <script src="core/modules/ChurchOS/church-intelligence-provider.js"></script>
+    <script src="core/modules/conversation/cozy-conversation.js"></script>
+    <!-- Milestone 362 Stage 1 — Living Direct Communication Engine, Session
+         Management Foundation. Loaded here, immediately after
+         CozyConversation (its real session-lifecycle/transcript
+         dependency), and after IdentityEngine (§839), SessionService
+         (§860), AuthorizationCoordinator (§947), LiveHotspotEngine
+         (§1245), CozyTranslate (§1393), and Firebase/firebase-bootstrap.js
+         (§812, which now includes the real-time subscribeToDocument()
+         addition made this same milestone) are all already present —
+         verified by reading this file's own composition list before
+         placing this tag, not assumed. -->
+    <script src="core/modules/communication/ldce-session-engine.js"></script>
+    <!-- Milestone 362 Stage 2 — Living Direct Communication Engine, Live
+         Media Transport. Loaded immediately after Stage 1's session
+         engine (its real dependency for participant/signaling
+         composition), and after LiveVideoCaptureEngine (§1429, which now
+         includes the getLocalStream() addition made this stage),
+         CameraManager (loaded via browser-camera-provider.js's dynamic
+         import, not a <script> tag itself), and LiveHotspotEngine
+         (§1245, which now includes the track-attachment/observability
+         additions made this stage) — verified already present. -->
+    <script src="core/modules/communication/ldce-media-session-engine.js"></script>
+    <!-- Milestone 362 Stage 3 — LDCE live captions/text translation. Loaded
+         after SpeechRecognitionAdapter (§1313 area), SpeechTranslationAdapter/
+         Provider (§1319-1320), LDCESessionEngine, and CozyConversation. -->
+    <script src="core/modules/communication/ldce-caption-engine.js"></script>
+    <!-- RP-035 Phase C, Checkpoint 6 — ChurchOS's own thin composition
+         boundary over LDCE + CozyTranslate + CozyLanguagePacks. This file
+         already existed, was already tested, and was never actually
+         loaded on this page (R040 Phase 0/1 audit finding). Loaded after
+         LDCESessionEngine, LDCECaptionEngine, CozyTranslate, and
+         CozyLanguagePacks — every dependency it reads at load time. -->
+    <script src="core/modules/ChurchOS/church-live-translation-interaction.js"></script>
+    <!-- R040 Phase 1 — Live Church Language Orchestrator. Single
+         composition point for per-segment ORIGINAL/TRANSLATE routing,
+         LivingTTS playback, and real latency instrumentation across the
+         17-language live church translation feature. Loaded after every
+         engine it composes (LDCESessionEngine, SpeechTranslationAdapter,
+         SpeechTranslationProviders, LivingTTS, CozyLanguagePacks,
+         PlatformEventBus) — see that file's own header for the full
+         ownership audit. -->
+    <script src="core/modules/ChurchOS/live-church-language-orchestrator.js"></script>
+    <!-- Milestone 363 — LDCE Session Reliability & Conversation Sync. -->
+    <script src="core/modules/communication/ldce-reliability-engine.js"></script>
+    <script src="core/modules/interpretation/cozy-interpretation.js"></script>
+    <script src="core/modules/thinking/cozy-thinking.js"></script>
+    <script src="core/modules/reasoning/cozy-reasoning.js"></script>
+    <script src="core/modules/intelligence/cozy-intelligence.js"></script>
+    <!-- M366.3 — real fix: PolicyDecisionEngine (core/modules/policy/
+         policy-decision-engine.js) was never loaded despite being a real,
+         complete module that self-registers as window.CozyOS.
+         PolicyDecisionEngine and being one of CognitiveCoordinator's own
+         real dependencies. Confirmed absent from every entry point
+         (dashboard.html, index.html, login.html, Chalzydashboard.html,
+         the ES-module bridge) before this tag was added - not present in
+         the M262 fix comment above either, so this was missing before
+         M262, not removed by it. Restoring only the load; the module
+         itself is unmodified. -->
+    <!-- Administrative Requests Browser Integration — the real PolicyEngine
+         (core/modules/policy/policy-engine.js) was confirmed, by repo-wide
+         script-tag search, to have zero <script> tags anywhere before this
+         one. It is a documented sibling of PolicyDecisionEngine (directly
+         above), not a substitute — different responsibility, own script
+         tag, logically clustered in this existing policy-domain location.
+         Its own IdentityEngine check is lazy (window.CozyOS.IdentityEngine
+         &&, evaluated at call time), so it carries no hard load-order
+         dependency and is not folded into cozy-admin-workspace.js, whose
+         own header explicitly excludes PolicyEngine/PolicyDecisionEngine
+         from its four-owner scope. -->
+    <script src="core/modules/policy/policy-engine.js"></script>
+    <script src="core/modules/policy/policy-decision-engine.js"></script>
+    <script src="core/modules/automation/cozy-workflow-runtime.js"></script>
+    <!-- Administrative Requests Browser Integration — AdministrativeRequestCoordinator
+         (core/modules/administration/administrative-request-coordinator.js)
+         loads here, after all three of its real dependencies: PolicyEngine
+         (just above), IdentityEngine (line 587), and Cozy Workflow Runtime
+         (immediately above). Matches this repository's established
+         "coordinators/facades load after their dependencies" convention
+         (see cozy-admin-workspace.js at the end of this file). The
+         coordinator's own fail-closed guard already refuses to attach if
+         any of the three is missing — no fallback/partial implementation. -->
+    <script src="core/modules/administration/administrative-request-coordinator.js"></script>
+    <!-- Administrative Requests Browser Integration — the Administrator UI
+         panel for this coordinator. A new, separate, single-responsibility
+         sibling module (matching authentication-settings-module.js /
+         authentication-enrollment-panel.js), not merged into
+         cozy-admin-workspace.js. Loads immediately after the coordinator
+         it composes; lazy init() (does not self-attach to page navigation),
+         matching founder-story-panel.js's own documented convention — a
+         future milestone wires this into Admin Workspace nav. -->
+    <script src="core/modules/administration/administrative-request-panel.js"></script>
+    <!-- Milestone M262 - real fix: CognitiveCoordinator was never loaded
+         despite all 7 of its real dependencies (CozyConversation,
+         CozyInterpretation, CozyThinking, CozyReasoning, CozyIntelligence,
+         CozyMemory, CozySense) already being present. Verified each one
+         individually before adding this tag - this closes a genuine gap,
+         not a fabricated dependency (unlike AudioEngine above, correctly
+         left unwired for the opposite reason). -->
+    <script src="core/modules/cognitive/cognitive-coordinator.js"></script>
+    <!-- M366.3 — registers exactly one real, honest, non-fabricated
+         provider with CozyIntelligence (unmodified). No new AI. -->
+    <script src="core/modules/intelligence/cozy-intelligence-provider.js"></script>
+    <!-- M366.9 — AI Bootstrap. Registers real providers with the
+         previously-unprovisioned CozyInterpretation/CozyThinking/
+         CozyReasoning; reports honest status for the rest. No new AI. -->
+    <script src="core/modules/intelligence/ai-bootstrap.js"></script>
+    <!-- M369 — Universal AI Service. One shared facade for every
+         CozyOS application, composing the same real engines above.
+         No new AI, no duplicate pipeline. -->
+    <script src="core/modules/intelligence/cozy-ai.js"></script>
+    <!-- Milestone J - real fix: cozyos-identity-faq-router.js, cozy-answer-
+         engine.js (Micro-Milestone H), and cozy-advisor.js (Micro-Milestone I)
+         already existed, were real, and were fully covered by real unit +
+         real integration tests, but no page ever loaded them as a script tag
+         - IMPLEMENTED but not RUNTIME_REACHABLE. Every dependency each of
+         them composes (CozyKnowledge, CozyAI.getContext, CozyMemory via
+         CozyAI, founder-story-engine.js's public-story path) is already
+         loaded above on this exact page, in the order these three files
+         expect. No new engine, no duplicate authority - only closes the
+         missing load-tag gap for authorities that already existed and were
+         already tested. -->
+    <script src="core/modules/knowledge/cozyos-identity-faq-router.js"></script>
+    <script src="core/modules/intelligence/answer/cozy-answer-engine.js"></script>
+    <script src="core/modules/intelligence/advisor/cozy-advisor.js"></script>
+    <script src="core/ai.js"></script>
+    <script src="core/ai/cozy-ai-platform.js"></script>
+    <script src="core/modules/integration/cozy-integration-layer.js"></script>
+
+    <script src="core/modules/company/cozy-company.js"></script>
+
+    <script src="core/modules/ocr/cozy-ocr.js"></script>
+    <!-- tesseract-plugin.js registers itself with CozyOS.OCR.registerPlugin()
+         at load time (Rule 48 resolution — see cozy-ocr.js "PROVIDER PLUGINS").
+         Registration succeeds unconditionally; it does not require
+         window.Tesseract to exist yet — that's only checked lazily, inside
+         the plugin's initialize(), on the first real OCR call. The actual
+         Tesseract.js vendor library (core/vendor/tesseract/) is NOT yet
+         installed in this build (no network access to fetch it) — see
+         core/vendor/tesseract/manifest.json. Until it is, isAvailable()
+         honestly reports false and extractText() honestly fails; nothing
+         here fabricates a working OCR provider. -->
+    <script src="core/modules/ocr/plugins/tesseract-plugin.js"></script>
+    <script src="core/modules/ocr/document-router.js"></script>
+
+    <!-- AIMode (core/modules/aimode/cozy-ai-mode.js) — registers
+         window.CozyOS.AIMode, exact match for cozy-developer.js's
+         #aimode(). The last of DeveloperHub's 8 optional integrations. -->
+    <script src="core/modules/aimode/cozy-ai-mode.js"></script>
+
+    <!-- BugFixer (core/modules/bugfixer/cozy-bugfixer.js) — 1071 lines, real
+         and complete, found in the full repository export. Registers as
+         window.CozyOS.BugFixer, verified to match exactly what
+         developer-hub.js and cozy-developer.js already call directly.
+         All three of its optional integrations (Certification,
+         WorkspaceShell, ServiceRegistry) are already loaded above — no
+         further prerequisites needed. -->
+    <script src="core/modules/bugfixer/cozy-bugfixer.js"></script>
+
+    <script src="core/modules/developer/cozy-developer.js"></script>
+
+    <!-- 1. PLATFORM SHELL + DEVELOPER HUB -->
+    <script src="core/shell/cozy-workspace.js" defer></script>
+    <!-- M364.7.1 — Living Floating Assistant (COMPOSED LIVING COMPONENT).
+         Deferred, same as cozy-workspace.js immediately above, so
+         relative document order guarantees WorkspaceShell exists first
+         (deferred scripts execute in document order) - #bindWorkspaceContext()
+         inside this file also has its own bounded retry as a second,
+         defensive safety net, matching this file's own
+         mountWorkspaceWhenReady() convention. -->
+    <script src="core/living/cozy-living-assistant.js" defer></script>
+    <script src="core/modules/developer/developer-hub.js" defer></script>
+    <!-- Milestone 132a: registers window.CozyOS.Modules["authenticator"].
+         Must load after IdentityEngine/AuthCoordinator/AuthorizationCoordinator/
+         AuthFactorRegistry/OtpProvider, all already loaded above. -->
+    <script src="core/modules/Cozy-Authenticator/authenticator.js" defer></script>
+
+    <!-- 2. PLUGGABLE CORE ARCHITECTURE REGISTRIES (preserved, unchanged paths) -->
+    <script src="core/pluginManager.js"></script>
+    <!-- Fixed: these files live at core/plugins/, not plugins/ relative to
+         this page — the original path would 404 in a real browser. -->
+    <!-- MpesaOS sub-engines (core/plugins/) — real, required dependencies
+         of the main engine below (verified: mpesaOS.js's own Deposit/
+         Withdrawal/Till/Paybill actions throw "coordinator is not
+         connected" without these — this was a real, functional gap, not
+         a hypothetical one). Loaded first so they're present when
+         mpesaOS.js's runtime checks look for them. -->
+    <script src="core/plugins/mpesaOS-float.js"></script>
+    <script src="core/plugins/mpesaOS-till.js"></script>
+    <script src="core/plugins/mpesaOS-paybill.js"></script>
+    <script src="core/plugins/mpesaOS-reporting.js"></script>
+    <!-- Payment Provider adapter — real, separate integration point for
+         CozyPaymentProviderEngine, not the core business engine. -->
+    <!-- Real bug fix: mpesa-provider.js (below) is an adapter FOR this
+         engine — added during MpesaOS Unification, but the engine itself
+         was never given a script tag, meaning the adapter registration
+         had nothing real to register into on this page. -->
+    <!-- Real bug fix (M387.5 browser verification): CozyPaymentProviderEngine
+         requires these 6 internal modules loaded first (window.CozyOS.__PaymentProviderInternals.*).
+         Only core/shell/provider-manager.js (an unrelated module) was previously
+         in this page — none of the payment-provider/ internals were, so the
+         engine's dependency guard always threw. Added, no cross-dependencies
+         among these 6 (each independently registers onto __PaymentProviderInternals). -->
+    <script src="core/modules/payment-provider/provider-registry.js"></script>
+    <script src="core/modules/payment-provider/provider-manager.js"></script>
+    <script src="core/modules/payment-provider/health-monitor.js"></script>
+    <script src="core/modules/payment-provider/routing-engine.js"></script>
+    <script src="core/modules/payment-provider/failover-engine.js"></script>
+    <script src="core/modules/payment-provider/capability-engine.js"></script>
+    <script src="core/modules/payment-provider/cozy-payment-provider-engine.js"></script>
+    <script src="core/modules/payment-provider/mpesa-provider.js"></script>
+    <script src="core/plugins/mpesaOS.js"></script>
+    <!-- MpesaOS embeddable End User module (core/modules/MpesaOS/mpesaos.js)
+         — a real, legitimate second UI entry point documented as reusing
+         this same engine with zero duplicated business logic (verified by
+         reading its own header) — not a competing implementation. Was
+         real and complete but never loaded anywhere. -->
+    <script src="core/modules/MpesaOS/mpesaos.js"></script>
+    <script src="core/modules/MpesaOS/mpesa-transaction-workflow.js"></script>
+
+    <!-- ShopOS (Business Applications Unification milestone) — 11 real
+         coordinators, verified genuinely wired together (shopos.js's own
+         REQUIRED_COORDINATORS list, cross-checked against real direct
+         calls in its code) — none were loaded anywhere before this. -->
+    <script src="core/plugins/shopOS-core.js"></script>
+    <script src="core/plugins/shopOS-product.js"></script>
+    <script src="core/plugins/shopOS-inventory.js"></script>
+    <script src="core/plugins/shopOS-sales.js"></script>
+    <script src="core/plugins/shopOS-purchasing.js"></script>
+    <script src="core/plugins/shopOS-payments.js"></script>
+    <script src="core/plugins/shopOS-bookkeeping.js"></script>
+    <script src="core/plugins/shopOS-reconciliation.js"></script>
+    <script src="core/plugins/shopOS-reporting.js"></script>
+    <script src="core/plugins/shopOS-dashboard.js"></script>
+    <script src="core/plugins/shopOS-search.js"></script>
+    <script src="core/modules/ShopOS/shopos.js"></script>
+    <script src="core/plugins/pharmacyOS.js"></script>
+    <!-- Milestone 361 Stage 3 — Founder Story Experience & Living
+         Narration. Loaded here, after CozySpeech/VoiceManager (§1313/
+         1358), CozyTranslate (§1393), LivingSounds (§769), and
+         LivingThemeEngine/CozyOS.Theme (§1228) are all already present,
+         since founder-story-narration.js composes VoiceManager/
+         CozySpeech and founder-story-panel.js composes LivingSounds/
+         CozyOS.Theme. Both access those engines lazily (inside function
+         bodies, never at top-level parse time), so this ordering is a
+         cleanliness/verification convention, not a strict runtime
+         requirement — verified by reading both files before placing
+         this tag, not assumed. -->
+    <script src="core/modules/founder-story/founder-story-narration.js"></script>
+    <!-- Real bug fix (M387.5 browser verification): core/dashboard.js contains
+         a real `import`/`export default` (ES module syntax) but had no
+         type="module", which threw "Cannot use import statement outside a
+         module" and aborted the whole script. type="module" is already an
+         established pattern on this page (see engine-bridge-bootstrap.js below). -->
+    <script type="module" src="core/dashboard.js"></script>
+
+    <!-- Administration Workspace (core/modules/admin/cozy-admin-workspace.js)
+         — Milestone 175B. Read-only orchestration facade only; loaded last
+         among plain scripts so its four verified dependencies (identity-
+         engine.js, cozy-auth.js, core/security/auth-coordinator.js,
+         platform/audit-engine.js) are already registered. Owns no roles,
+         permissions, authentication, authorization, or audit truth. -->
+    <script src="core/modules/admin/cozy-admin-workspace.js"></script>
+
+    <!-- Milestone 141: Engine Integration Bridge. type="module" is standard
+         HTML and coexists with the classic <script> tags above it — no other
+         script tag on this page needs to change. Loads Camera/Audio/
+         Playback/Scene/Media ES-module engines and exposes them under
+         window.CozyOS.*Engine, best-effort per engine (fail closed; a
+         missing/broken engine does not block the rest of the dashboard). -->
+    <script type="module" src="core/bridge/engine-bridge-bootstrap.js"></script>
+
+    <!-- 3. BOOTSTRAP: mount the Workspace Shell once it and its scripts have
+         loaded. Bounded retry (same convention already used elsewhere in
+         CozyOS, e.g. developer-hub.js's own initStandaloneMount) covers
+         defer/script-order timing rather than assuming a fixed load order. -->
+    <script>
+        (function bootWorkspace() {
+            const root = document.getElementById("cozy-workspace-root");
+            function tryMount() {
+                if (window.CozyOS && window.CozyOS.WorkspaceShell && typeof window.CozyOS.WorkspaceShell.mount === "function") {
+                    // Milestone 200A: mount() previously had no error
+                    // surfacing anywhere in this chain — a real exception
+                    // inside it (or the #render() it calls internally)
+                    // would be silently swallowed as an uncaught async
+                    // error, leaving the user stuck on the login screen
+                    // with no visible feedback. This wrapper changes
+                    // nothing architecturally; it only makes a genuine
+                    // failure visible instead of silent.
+                    try {
+                        // Minimal fix: don't resolve the current user's role
+                        // before IdentityEngine has finished restoring users
+                        // (restorePersistedUsers() is async) — mounting early
+                        // makes a genuine admin resolve to role=null and hit
+                        // a false "Access Denied", most visible right after
+                        // signing into a freshly-created account.
+                        const identity = window.CozyOS.IdentityEngine;
+                        const identityReady = (identity && identity.ready && typeof identity.ready.then === "function")
+                            ? identity.ready
+                            : Promise.resolve();
+                        identityReady.catch(() => {}).then(() => window.CozyOS.WorkspaceShell.mount(root));
+                        return true;
+                    } catch (err) {
+                        console.error("[CozyOS] WorkspaceShell.mount() threw:", err);
+                        root.innerHTML = `<div class="cozy-error-mode" style="max-width:480px;margin:10vh auto;padding:24px;font-family:system-ui,sans-serif;border:1px solid rgba(252,165,165,0.3);border-radius:12px;background:#1a1010;color:#fca5a5;">
+                            <h3 style="margin:0 0 8px 0;color:#fff;">CozyOS Workspace failed to load</h3>
+                            <p style="margin:0 0 8px 0;font-size:13px;">${(err && err.message) ? err.message.replace(/</g, "&lt;") : "Unknown error."}</p>
+                            <p style="margin:0;font-size:12px;color:#f87171;">See browser console for the full stack trace.</p>
+                        </div>`;
+                        return true; // stop retrying - a real error was surfaced, not a load-order timing gap
+                    }
+                }
+                return false;
+            }
+            function mountWorkspaceWhenReady() {
+                if (tryMount()) return;
+                let attempts = 0;
+                const intervalId = setInterval(() => {
+                    attempts++;
+                    if (tryMount() || attempts >= 40) clearInterval(intervalId);
+                }, 250);
+            }
+            // SECURITY FIX (Security Boundary milestone) — LoginGate.mountIfNeeded()
+            // only proves the visitor is AUTHENTICATED, not that they are the
+            // platform administrator. Before this fix, any signed-in ordinary
+            // user who reached this file directly (e.g. GitHub Pages serving
+            // dashboard.html as a raw static asset) had the real, live
+            // administrator workspace mounted for them. This is the same real
+            // authorization check Chalzydashboard.html performs — it must be
+            // repeated here because dashboard.html is independently reachable
+            // as a static file and cannot rely on Chalzydashboard.html's gate
+            // having already run. The server/database remains the source of
+            // truth for isPlatformAdmin; this is real client-side enforcement
+            // of that server-issued value, not a substitute for it — see the
+            // static-hosting limitation documented in
+            // SECURITY-BOUNDARY-DEPLOYMENT.md for why a static host cannot be
+            // made to enforce this at the HTTP layer.
+            // PHASE A UPDATE (server-authoritative administrator boundary) —
+            // this used to ask window.CozyOS.IdentityEngine.isPlatformAdmin()/
+            // checkResourcePermission(), which is client-side-only state (see
+            // admin-gate-core.js's header comment for why that is not a
+            // security boundary). dashboard.html is independently reachable
+            // as a static file on hosts that cannot enforce the HTTP-layer
+            // block (see static-boundary-server.js / SECURITY-BOUNDARY-
+            // DEPLOYMENT.md), so this file still needs its own real check —
+            // it now uses the exact same server-authoritative call and
+            // decision logic as Chalzydashboard.html (GET /webauthn/session
+            // + AdminGateCore.decideGateAction), instead of a second,
+            // divergent client-side implementation.
+            async function mountWorkspaceIfAdmin() {
+                const gate = window.CozyOS && window.CozyOS.AdminGateCore;
+                if (!gate) {
+                    window.location.href = "chalzydashboard.html";
+                    return;
+                }
+                let sessionVerdict;
+                try {
+                    const res = await fetch("/webauthn/session", { credentials: "include" });
+                    const body = await res.json().catch(() => ({}));
+                    sessionVerdict = Object.assign({ httpStatus: res.status }, body);
+                } catch (_err) {
+                    sessionVerdict = { httpStatus: 0, authenticated: false };
+                }
+                const decision = gate.decideGateAction(sessionVerdict);
+                if (decision.action !== gate.GATE_ACTION.LOAD_ADMIN_WORKSPACE) {
+                    // Not a server-verified administrator session (unauthenticated,
+                    // denied, or an error verifying) - never mount the
+                    // administrator workspace. Send them through the canonical
+                    // administrator entry, which will show its own real
+                    // Access Denied/login state rather than silently redirecting
+                    // to a generic page (keeps a single, honest denial message).
+                    if (root) root.innerHTML = "";
+                    window.location.href = "chalzydashboard.html";
+                    return;
+                }
+                mountWorkspaceWhenReady();
+            }
+            // Milestone M211F — remove the real, instant emerald launch
+            // screen now that real content (login gate or workspace) is
+            // about to render. Fades out smoothly rather than an abrupt
+            // removal, then fully removes from the DOM after the
+            // transition completes.
+            //
+            // M364.1 fix: this used to run immediately on script parse
+            // (~700ms after page load), completely independent of the
+            // launch sequence's own 8-10s animation (Stages 1-6) defined
+            // in the earlier <script> block — the login card could
+            // appear while the logo/typing/voice/motto sequence was
+            // still supposed to be playing. Real fix, using only the
+            // existing architecture (PlatformEventBus, already loaded at
+            // this point — no new engine): wait for the real
+            // "cozy:launch-sequence-complete" event that block now
+            // emits at its true completion (end of Stage 6, motto
+            // settled). Bounded, honest fallback (12s — safely longer
+            // than the ~8s sequence, covering real voice-playback
+            // variance) proceeds anyway if the event is somehow never
+            // emitted, so a broken signal can never strand the user on
+            // the launch screen forever — the same bounded-retry
+            // philosophy already used by mountWorkspaceWhenReady() just
+            // above. Zero change to any animation timing, visual, or
+            // sound in the sequence itself.
+            function proceedPastLaunchScreen() {
+                const launchScreen = document.getElementById("cozy-launch-screen");
+                if (launchScreen) {
+                    launchScreen.classList.add("cozy-launch-hidden");
+                    setTimeout(() => launchScreen.remove(), 700);
+                }
+                const startupOrchestrator = window.CozyOS && window.CozyOS.StartupOrchestrator;
+                if (startupOrchestrator && typeof startupOrchestrator.restoreDefaultScene === "function") {
+                    startupOrchestrator.restoreDefaultScene();
+                }
+                if (window.CozyOS && window.CozyOS.LoginGate && typeof window.CozyOS.LoginGate.mountIfNeeded === "function") {
+                    window.CozyOS.LoginGate.mountIfNeeded(root, mountWorkspaceIfAdmin);
+                } else {
+                    mountWorkspaceIfAdmin();
+                }
+            }
+
+            const bus = window.CozyOS && window.CozyOS.PlatformEventBus;
+            if (bus && typeof bus.once === "function") {
+                let proceeded = false;
+                const proceedOnce = () => { if (proceeded) return; proceeded = true; proceedPastLaunchScreen(); };
+                bus.once("cozy:launch-sequence-complete", proceedOnce);
+                setTimeout(proceedOnce, 12000); // honest, bounded fallback — never hangs forever if the signal is somehow never emitted
+            } else {
+                // PlatformEventBus genuinely unavailable — honest fallback
+                // to the prior immediate behavior rather than hanging.
+                proceedPastLaunchScreen();
+            }
+        })();
+    </script>
+</body>
+</html>
