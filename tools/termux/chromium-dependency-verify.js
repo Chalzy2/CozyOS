@@ -84,8 +84,26 @@ async function main() {
   console.log(`Discovered executable: ${executablePath}`);
   console.log(`Detected as Android-native: ${isAndroidNative}`);
 
+  // Kept in sync with resolveLaunchOptions()'s Android-native args by hand,
+  // since this script's raw CLI launch (steps 1-3) intentionally happens
+  // BEFORE step 4 requires/loads playwright at all, so it can't just import
+  // the args from there. If you change one, change the other. (CP6.2: added
+  // --single-process — see browser-launch.js header for why --no-zygote
+  // alone does not stop the /proc/self/exe re-exec that breaks under
+  // termux-exec. CP6.3: added --no-proxy-server and
+  // --disable-crash-reporter after --single-process itself surfaced its
+  // own known "Cannot use V8 Proxy resolver in single process mode" error
+  // plus Crashpad process-launch noise — see browser-launch.js header.
+  // CP6.5: --single-process REMOVED — the CP6.4 real-device bisect
+  // reproduced a SIGTRAP from it directly, consistent with documented
+  // Chromium-for-Android behavior that single-process mode isn't
+  // supported at all, not a flag-ordering issue. Bisect steps 01-03
+  // already passed without it, so it was never actually needed for the
+  // renderer to launch on this device. See browser-launch.js header for
+  // the full correction. --no-proxy-server and --disable-crash-reporter
+  // are left as-is, untested in isolation.)
   const flagArgs = isAndroidNative
-    ? ['--headless', '--no-sandbox', '--no-zygote', '--disable-gpu', '--disable-dev-shm-usage', '--in-process-gpu']
+    ? ['--headless', '--no-sandbox', '--no-zygote', '--disable-gpu', '--disable-dev-shm-usage', '--in-process-gpu', '--no-proxy-server', '--disable-crash-reporter']
     : ['--headless', '--no-sandbox', '--disable-gpu'];
 
   // --- Step 1: version ---------------------------------------------------
@@ -113,6 +131,15 @@ async function main() {
     );
   } catch (e) {
     fail(`raw launch/dump-dom failed: ${e.message}`);
+    // CP6.3: report exit signal/code and whether execFileSync's own
+    // timeout fired explicitly, rather than leaving it to be inferred
+    // from message text — a hang (killed by our timeout), a real crash
+    // (SIGSEGV/SIGABRT from Chromium/Crashpad), and a clean nonzero exit
+    // (Chromium ran and refused) are three different findings and need
+    // three different next steps.
+    console.log(`    killed by our timeout: ${e.killed === true}`);
+    console.log(`    signal: ${e.signal || '(none)'}`);
+    console.log(`    exit code: ${e.status === null || e.status === undefined ? '(none — process did not exit normally)' : e.status}`);
     console.log('    (stdout/stderr from the attempt, if any, follow)');
     if (e.stdout) console.log('    stdout:', e.stdout.toString().slice(0, 2000));
     if (e.stderr) console.log('    stderr:', e.stderr.toString().slice(0, 2000));

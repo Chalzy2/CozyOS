@@ -425,6 +425,20 @@
 
                 <p class="cozy-disclosure-note">${assistant && typeof assistant.open === "function" ? "Open the live assistant for a real conversation — it can see what's really available in your CozyOS." : "The live assistant is not connected on this page."}</p>
                 <button type="button" class="cozy-btn" id="cozy-ud-ai-open" ${assistant && typeof assistant.open === "function" ? "" : "disabled"}>Open Cozy AI</button>
+
+                <!-- Living Multimodal Learning (CP12) — smallest real
+                     entry point, added to the existing AI surface
+                     rather than a new top-level nav tab (dashboard-
+                     navigation-core.js's 5-surface order is documented
+                     as mandatory — not edited here). Reuses the same
+                     cozy-btn/cozy-disclosure-note conventions this
+                     surface already uses above. Camera/microphone are
+                     never activated by rendering this button — only by
+                     the user's own Scan/Listen taps inside the panel
+                     LearningPanelUI.open() renders, per its own header. -->
+                <p class="cozy-disclosure-note">${window.CozyOS.LearningPanelUI ? "Point your camera or microphone at something you're learning, and CozyOS can help." : "Living Learn is not connected on this page."}</p>
+                <button type="button" class="cozy-btn" id="cozy-ud-learn-open" ${window.CozyOS.LearningPanelUI ? "" : "disabled"}>Living Learn</button>
+                <div id="cozy-ud-learn-mount"></div>
             `;
 
             host.querySelectorAll("[data-ud-ai-explain]").forEach(btn => {
@@ -441,6 +455,16 @@
             if (openBtn) {
                 openBtn.addEventListener("click", () => {
                     if (assistant && typeof assistant.open === "function") assistant.open(context);
+                });
+            }
+
+            const learnBtn = host.querySelector("#cozy-ud-learn-open");
+            const learnMount = host.querySelector("#cozy-ud-learn-mount");
+            if (learnBtn && learnMount) {
+                learnBtn.addEventListener("click", () => {
+                    const panel = window.CozyOS.LearningPanelUI;
+                    if (!panel || typeof panel.open !== "function") return;
+                    panel.open({ userId: this.#userId, container: learnMount });
                 });
             }
         }

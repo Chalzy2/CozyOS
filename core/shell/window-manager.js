@@ -32,11 +32,26 @@
  *   into floating windows is real, disclosed future work, not
  *   attempted this pass — this milestone builds the platform service
  *   and migrates the two panels that already exist as floating UI.
+ *
+ * TASKBAR ADDITION (additive, no existing method signature/behavior
+ * changed)
+ *   onChange(callback) — subscribes to window state changes (create/
+ *   focus/minimize/restore/maximize/close/setTitle), mirroring the
+ *   existing CozyEnvironment.onChange(apply) subscription pattern
+ *   already used elsewhere in this same file (#wireLivingEnvironment).
+ *   Returns an unsubscribe function. Fires synchronously with a fresh
+ *   getSnapshot() array — never a diff/patch, so a listener never needs
+ *   to reconcile partial state.
+ *   getSnapshot() — real, read-only array of every open window's
+ *   {id, title, icon, minimized, maximized, active}, sourced from this
+ *   class's own existing #windows Map and title/icon already tracked
+ *   per entry — no second window-state store. Built specifically for
+ *   core/shell/taskbar.js, which owns zero window state of its own.
  */
 (function () {
     "use strict";
     window.CozyOS = window.CozyOS || {};
-    const VERSION = "1.0.0";
+    const VERSION = "1.1.0";
     window.CozyOS.Modules = window.CozyOS.Modules || {};
     if (window.CozyOS.Modules["window-manager"]) return;
 
@@ -52,16 +67,53 @@
     }
 
     class CozyWindowManager {
-        #windows = new Map(); // id -> { root, contentHost, state, options }
+        #windows = new Map(); // id -> { root, contentHost, state, options, title, icon }
         #zCounter = 1000;
         #cascadeIndex = 0;
+        #activeId = null;
+        #listeners = new Set(); // Taskbar addition: onChange(callback) subscribers
 
         #bringToFront(id) {
             const entry = this.#windows.get(id);
             if (!entry) return;
             this.#zCounter += 1;
             entry.root.style.zIndex = String(this.#zCounter);
+            this.#activeId = id;
             for (const [otherId, other] of this.#windows) other.root.classList.toggle("cozy-window-active", otherId === id);
+            this.#emitChange();
+        }
+
+        /**
+         * getSnapshot() / onChange() — Taskbar addition.
+         *   Real, additive read model over this class's own #windows Map
+         *   and #activeId — introduces no second window-state store.
+         *   See file header "TASKBAR ADDITION" for the full disclosure.
+         */
+        getSnapshot() {
+            return Array.from(this.#windows.entries()).map(([id, entry]) => ({
+                id,
+                title: entry.title,
+                icon: entry.icon,
+                minimized: !!entry.state.minimized,
+                maximized: !!entry.state.maximized,
+                active: id === this.#activeId
+            }));
+        }
+
+        onChange(callback) {
+            if (typeof callback !== "function") return () => {};
+            this.#listeners.add(callback);
+            return () => { this.#listeners.delete(callback); };
+        }
+
+        #emitChange() {
+            if (!this.#listeners.size) return;
+            const snapshot = this.getSnapshot();
+            for (const cb of this.#listeners) {
+                // One misbehaving listener must not break the window
+                // manager itself or the remaining listeners.
+                try { cb(snapshot); } catch (_err) { /* non-fatal */ }
+            }
         }
 
         #persist(id) {
@@ -130,7 +182,7 @@
             }
             managerRoot.appendChild(root);
 
-            const entry = { root, contentHost, state: initial, options: { draggable, resizable, minimizable, maximizable, closable, pinnable, onClose } };
+            const entry = { root, contentHost, state: initial, options: { draggable, resizable, minimizable, maximizable, closable, pinnable, onClose }, title: title || id, icon };
             this.#windows.set(id, entry);
             this.#applyState(id);
             this.#wireControls(id);
@@ -312,13 +364,14 @@
             if (!entry) return { success: false, reason: `No real window "${id}".` };
             entry.state.minimized = true;
             this.#applyState(id); this.#persist(id);
+            this.#emitChange();
             return { success: true };
         }
         restore(id) {
             const entry = this.#windows.get(id);
             if (!entry) return { success: false, reason: `No real window "${id}".` };
             entry.state.minimized = false; entry.state.maximized = false;
-            this.#applyState(id); this.#persist(id); this.#bringToFront(id);
+            this.#applyState(id); this.#persist(id); this.#bringToFront(id); // #bringToFront already emits the change
             return { success: true };
         }
         maximize(id) {
@@ -327,6 +380,7 @@
             entry.state.maximized = !entry.state.maximized;
             entry.state.minimized = false;
             this.#applyState(id); this.#persist(id);
+            this.#emitChange();
             return { success: true };
         }
         /** toggleFullscreen() — real, honest: native Fullscreen API, feature-detected, never simulated. Same pattern already proven in the Living Worship Player (C004). */
@@ -342,6 +396,8 @@
             if (!entry) return { success: false, reason: `No real window "${id}".` };
             entry.root.remove();
             this.#windows.delete(id);
+            if (this.#activeId === id) this.#activeId = null;
+            this.#emitChange();
             if (typeof entry.options.onClose === "function") { try { entry.options.onClose(); } catch (_err) { /* non-fatal */ } }
             return { success: true };
         }
@@ -351,6 +407,8 @@
             if (!entry) return { success: false, reason: `No real window "${id}".` };
             const el = entry.root.querySelector(".cozy-window-title");
             if (el) el.textContent = text;
+            entry.title = text;
+            this.#emitChange();
             return { success: true };
         }
         isOpen(id) { return this.#windows.has(id); }
@@ -478,6 +536,6 @@
     window.CozyOS.WindowManager = new CozyWindowManager();
     window.CozyOS.Modules["window-manager"] = Object.freeze({
         version: VERSION,
-        description: "CozyOS Window Manager (M366.6, +M389 setBounds/getBounds) — core platform service. Generic create()/minimize()/restore()/maximize()/toggleFullscreen()/close()/setBounds()/getBounds() API, real drag (Pointer Events, no third-party library), real resize (4 corners + 4 edges, real min/max bounds), real z-index arbitration, real position/size/minimized/maximized persistence per window id. No application-specific logic anywhere in this file."
+        description: "CozyOS Window Manager (M366.6, +M389 setBounds/getBounds, +Taskbar addition onChange()/getSnapshot()) — core platform service. Generic create()/minimize()/restore()/maximize()/toggleFullscreen()/close()/setBounds()/getBounds() API, real drag (Pointer Events, no third-party library), real resize (4 corners + 4 edges, real min/max bounds), real z-index arbitration, real position/size/minimized/maximized persistence per window id, real onChange() subscription + getSnapshot() read model for external consumers like the taskbar. No application-specific logic anywhere in this file."
     });
 })();

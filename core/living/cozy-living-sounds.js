@@ -168,6 +168,16 @@
          *   (wind/birds/forest) can each play at a different real
          *   relative level through the SAME category, rather than
          *   requiring a second volume system per layer.
+         *
+         *   Extension (Login Gate audio/visual sync) — the returned
+         *   object now also honestly reports `durationMs`: the real
+         *   HTMLMediaElement.duration (ms) once the browser has decoded
+         *   enough of the actual local file to know it, or null if
+         *   unavailable (NaN/Infinity — e.g. metadata not yet loaded).
+         *   Never estimated/guessed — a caller (launch-sequence.js) uses
+         *   this to time a visual's disappearance against how long the
+         *   real audio actually is, instead of a fixed guess, and must
+         *   itself fall back to a sensible default when this is null.
          */
         async play(eventName, { category = "ui", fadeMs = 0, loop = false, volume = 1 } = {}) {
             if (!this.#enabled) { this.#diagnostics.blocked++; return { success: false, reason: "Living Sounds is currently disabled." }; }
@@ -193,10 +203,38 @@
                     await entry.audioEl.play();
                 }
                 this.#diagnostics.played++;
-                return { success: true };
+                const rawDuration = entry.audioEl.duration;
+                const durationMs = (typeof rawDuration === "number" && isFinite(rawDuration) && rawDuration > 0) ? rawDuration * 1000 : null;
+                return { success: true, durationMs };
             } catch (err) {
                 return { success: false, reason: err.message || "Playback failed.", blockedByAutoplayPolicy: err.name === "NotAllowedError" };
             }
+        }
+
+        /**
+         * onEnded(eventName, callback)
+         *   Extension (Login Gate audio/visual sync) — attaches a
+         *   real, one-time 'ended' listener to the currently registered
+         *   HTMLAudioElement for this event, so a caller can synchronize
+         *   a visual's disappearance with the moment audio ACTUALLY
+         *   finishes playing, rather than a fixed timer guess. Honest
+         *   no-op (returns {attached:false, reason}) if the event isn't
+         *   registered — never fabricates completion. The listener is
+         *   automatically removed after firing once (or is a genuine
+         *   no-op cleanup if the caller never needed it), so repeated
+         *   calls never accumulate stale listeners across playbacks.
+         */
+        onEnded(eventName, callback) {
+            const entry = this.#registry.get(eventName);
+            if (!entry || !entry.audioEl || typeof callback !== "function") {
+                return { attached: false, reason: `No real sound registered for event "${eventName}".` };
+            }
+            const handler = () => {
+                entry.audioEl.removeEventListener("ended", handler);
+                callback();
+            };
+            entry.audioEl.addEventListener("ended", handler);
+            return { attached: true };
         }
 
         /**

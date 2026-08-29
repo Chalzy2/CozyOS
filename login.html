@@ -539,6 +539,9 @@
      exist - matching dashboard.html's own proven-working order. -->
 <script src="core/modules/identity/identity-storage.js"></script>
 <script src="core/modules/identity/identity-engine.js"></script>
+<!-- Owner Voice onboarding rule: pure decision module, no DOM/network.
+     Consumed only by the registration success handler below. -->
+<script src="core/modules/identity/onboarding-voice-core.js"></script>
 <!-- Prompt 6 Step C — delivery-backend-registry.js must load BEFORE
      phone-provider.js: it reads window.CozyOS.DeliveryBackendRegistry
      once, at its own auto-instantiation time, and doesn't re-check for
@@ -1501,6 +1504,38 @@ function revealLoginScreen() {
     try {
       const result = await identity.register({ accountType: "user", firstName, lastName, username, email, phone, password, confirmPassword, acceptTerms });
       if (!result || result.available !== true) { errEl.textContent = (result && result.reason) || "Registration failed."; errEl.style.display = "block"; return; }
+      // Owner Voice onboarding rule: for the very first CozyOS account
+      // ever registered (result.isFirstUser, the same real
+      // this.#users.size===0 signal IdentityEngine.register() itself
+      // uses for its own admin-bootstrap security check — never
+      // re-derived from username/URL/role here), persist Charles
+      // ("Owner Voice") as the onboarding-context voice via the real,
+      // existing VoiceManager.setContextVoice(). This does NOT speak
+      // anything itself — Charles is already the unconditional default
+      // for the "startup" context the upcoming index.html Login Gate
+      // greeting uses, so this call has no audible effect on the
+      // CURRENT redirect (avoiding "Welcome to CozyOS" being heard
+      // twice in a row); it exists so any FUTURE onboarding-context
+      // voice line — anywhere in the app — is already correctly and
+      // permanently bound to the Owner Voice for this specific first
+      // user, per core/modules/identity/onboarding-voice-core.js's
+      // decideOnboardingVoice(). Wrapped so any failure here (module
+      // not loaded, provider not installed) can never block real
+      // registration/login — matching "voice failure must never block
+      // registration."
+      try {
+        const onboardingVoice = window.CozyOS && window.CozyOS.OnboardingVoiceCore;
+        const voiceManager = window.CozyOS && window.CozyOS.VoiceManager;
+        const orchestratorCfg = orchestrator && typeof orchestrator.getConfig === "function" ? orchestrator.getConfig() : null;
+        const soundEnabled = !(orchestratorCfg && orchestratorCfg.audioEnabled === false);
+        if (onboardingVoice && result.isFirstUser === true) {
+          const ownerVoiceAvailable = !voiceManager || !(voiceManager.getProvider("charles") && voiceManager.getProvider("charles").status !== "installed");
+          const decision = onboardingVoice.decideOnboardingVoice({ isFirstUser: result.isFirstUser, soundEnabled, ownerVoiceAvailable });
+          if (decision.useOwnerVoice && voiceManager && typeof voiceManager.setContextVoice === "function") {
+            voiceManager.setContextVoice("onboarding", decision.providerId);
+          }
+        }
+      } catch (_err) { /* honest no-op — never blocks registration */ }
       // Real hand-off: log the freshly registered user straight in via the
       // one real login path, never a second/parallel session creation.
       if (auth && typeof auth.loginWithCredentials === "function") {

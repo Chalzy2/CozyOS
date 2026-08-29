@@ -213,3 +213,51 @@ followed by the milestone handoff it points to (e.g.
 `docs/builder/handoffs/M373.md`) — filed per Builder Rule 54, Continuous
 Development Handoff — is sufficient on its own to resume Builder work
 without reading the full project history.
+
+## Markdown Governance — Active Project-Level Documentation Cap
+
+CozyOS has a maximum of 10 active project-level Markdown documentation
+slots.
+
+Builder Rules (`docs/builder/rules/*.md`) and Builder Knowledge
+(`docs/builder/knowledge/*.md`) are protected and exempt from this cap —
+they remain governed by their own existing cumulative Builder Rules/
+Knowledge lifecycle (Rule 15 and related), never counted against, merged,
+or replaced to satisfy this limit.
+
+Historical/checkpoint/milestone/audit records (`docs/checkpoints/*.md`,
+`docs/history/*.md`, `docs/milestones/*.md`, `docs/audits/*.md`,
+`docs/builder/**` non-rules/non-knowledge historical Builder records, and
+root-level historical PROMPT/PHASE/PATCH/CHECKPOINT-style records) have
+their own separate lifecycle and are exempt from this cap. They are not
+deleted as part of maintaining it.
+
+Module-scoped documentation (a subsystem's own `README.md`, e.g.
+`applications/MpesaOS/README.md`, `core/vendor/tesseract/README.md`,
+`runtime/README.md`, `server/live-relay/README.md`) documents that
+subsystem locally and is exempt from the project-level cap.
+
+The authoritative 10 active project-level slots are:
+
+1. `README.md` — Project Overview
+2. `CHANGELOG.md` — Current/Milestone Changelog
+3. `RELEASES.md` — Release/Hash Ledger
+4. `LATEST.md` — Current Status
+5. `HANDOFF.md` — Handoff
+6. `core/docs/CORE_ARCHITECTURE.md` — Architecture
+7. `core/docs/DEVELOPMENT_RULES.md` — Project Development Rules
+8. `docs/governance/Engineering-Governance-v1.0.md` — Governance (this file)
+9. `docs/governance/OCR-Roadmap.md` — Roadmap
+10. `docs/render-deployment.md` — Deployment
+
+When a new project-level active Markdown document is required and all
+10 slots are already occupied, the appropriate existing non-protected
+slot is updated/replaced in place rather than creating an additional
+active project-level Markdown file. The project-level active
+documentation layer must never grow beyond these 10 slots.
+
+This rule does not authorize merging real content out of one document
+into another merely to manufacture compliance — it governs which
+document a given kind of current information belongs in, and applies
+only when a slot's existing content is genuinely being superseded or
+updated, not as a pretext for content compression.

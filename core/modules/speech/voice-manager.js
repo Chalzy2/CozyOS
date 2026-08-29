@@ -67,6 +67,13 @@
     const STORAGE_KEY = "cozyos.voiceManager.v1";
     const CONTEXTS = Object.freeze([
         "startup", "navigation", "assistant", "notification", "accessibility",
+        // Owner Voice onboarding rule: a distinct context from "startup"
+        // (the pre-authentication Login Gate greeting) so the first-user
+        // post-registration confirmation line can be routed/overridden
+        // independently, without conflating "voice CozyOS greets every
+        // visitor with" and "voice a specific first user's onboarding
+        // used" — see core/modules/identity/onboarding-voice-core.js.
+        "onboarding",
     ]);
 
     const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);

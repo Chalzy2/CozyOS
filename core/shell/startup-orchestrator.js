@@ -96,7 +96,7 @@
         lightingIntensity: 1,          // multiplier on the real time-of-day light glow
         wordmarkAnimation: "typing",   // "typing" | "fade" | "rise" | "fall" | "draw"
         taglineText: "Built for Africa. Ready for the World.",
-        preRevealDelayMs: 500,        // M370 — Authoritative Startup Timing Spec: Stage 1 (0.0-0.5s pure black/green, no login UI) - corrects the earlier M366.2 2000ms value, which predates this spec
+        preRevealDelayMs: 1500,       // M373.1 — CP7 Login Gate resync: Stage 1 (Living Green Opening) is now authoritatively 0.0-1.5s per the current design spec, up from the earlier M370 500ms value.
         audioEnabled: true,
         audioFadeMs: 1500,
         soundsEnabled: true

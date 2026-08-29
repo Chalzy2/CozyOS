@@ -34,13 +34,45 @@
         #active = false;
         #sessionId = null;
         #listeners = { onStart: [], onStop: [], onSpeechStart: [], onSpeechEnd: [], onResult: [], onPartialResult: [], onFinalResult: [], onError: [] };
+        // CP14 (Kiswahili Speech Recognition) additions — real, measured
+        // timing only. Never a claimed/guessed millisecond figure; each
+        // field is null until the real corresponding browser event fires.
+        #timings = { startRequestedAt: null, recognitionStartedAt: null, firstInterimAt: null, firstFinalAt: null };
+        // CP14: distinguishes a caller-requested stop() from the
+        // recognition engine ending on its own (network drop, timeout,
+        // provider-side stop) so consumers can tell "stopped normally"
+        // from "stopped unexpectedly" without any auto-restart logic
+        // (auto-restart is explicitly out of scope — it is the class of
+        // change that can cause infinite restart loops).
+        #stopWasRequested = false;
 
         getVersion() { return VERSION; }
         isReal() { return !!_Api(); }
 
+        /** getLastTimings() — real, measured timestamps (ms, Date.now()) for the most recent start() call. Never a guessed/claimed latency figure; a field stays null until its real event actually fires. */
+        getLastTimings() { return { ...this.#timings }; }
+
         on(eventName, handler) {
             if (!this.#listeners[eventName]) return { success: false, reason: `Unknown event "${eventName}". Never invents events beyond the documented set.` };
             this.#listeners[eventName].push(handler);
+            return { success: true };
+        }
+
+        /**
+         * off(eventName, handler) — CP13 (Kiswahili Hearing Foundation) addition.
+         * Real gap fix: this adapter previously had on() with no matching
+         * removal method anywhere, so every consumer that called on() more
+         * than once (e.g. universal-learning-pipeline.js's learnFromVoice(),
+         * once per captureVoiceForLearning() call) accumulated duplicate
+         * listeners forever — confirmed by inspection, not assumed. Removes
+         * one exact handler reference; never clears a whole event's list
+         * (that would risk removing another consumer's real listener).
+         */
+        off(eventName, handler) {
+            if (!this.#listeners[eventName]) return { success: false, reason: `Unknown event "${eventName}".` };
+            const idx = this.#listeners[eventName].indexOf(handler);
+            if (idx === -1) return { success: false, reason: "Handler not registered for this event." };
+            this.#listeners[eventName].splice(idx, 1);
             return { success: true };
         }
         #fire(eventName, detail) {
@@ -66,26 +98,56 @@
             let bcp47 = config.languageCode || "en-US";
             if (config.languageCode && window.CozyOS.SpeechLanguageAdapter) {
                 const resolved = window.CozyOS.SpeechLanguageAdapter.resolve(config.languageCode);
-                if (!resolved.success) return resolved; // fail closed on unregistered language
+                if (!resolved.success) {
+                    // CP14: fail closed and surface it as a real onError
+                    // event too (previously only the return value carried
+                    // this), so callers listening for onError (the normal
+                    // error-recovery path) actually see an unsupported/
+                    // unregistered language rather than only a caller that
+                    // happens to inspect start()'s return value.
+                    this.#fire("onError", { ...resolved, sessionId: config.sessionId || null, error: "language-not-supported" });
+                    return resolved; // fail closed on unregistered language — never silently substitutes another language
+                }
                 bcp47 = resolved.bcp47;
             }
 
+            this.#timings = { startRequestedAt: Date.now(), recognitionStartedAt: null, firstInterimAt: null, firstFinalAt: null };
+            this.#stopWasRequested = false;
             this.#recognition = new Api();
             this.#recognition.lang = bcp47;
             this.#recognition.continuous = !!config.continuous;
             this.#recognition.interimResults = !!config.interimResults;
             this.#sessionId = config.sessionId || null;
 
-            this.#recognition.onstart = () => { this.#active = true; this.#fire("onStart", { sessionId: this.#sessionId }); };
+            this.#recognition.onstart = () => { this.#active = true; this.#timings.recognitionStartedAt = Date.now(); this.#fire("onStart", { sessionId: this.#sessionId }); };
             this.#recognition.onspeechstart = () => this.#fire("onSpeechStart", { sessionId: this.#sessionId });
             this.#recognition.onspeechend = () => this.#fire("onSpeechEnd", { sessionId: this.#sessionId });
             this.#recognition.onerror = (e) => this.#fire("onError", { sessionId: this.#sessionId, error: e.error || "unknown" });
-            this.#recognition.onend = () => { this.#active = false; this.#fire("onStop", { sessionId: this.#sessionId }); };
+            // CP14: `wasExpectedStop` is real, not guessed — true only when
+            // this adapter's own stop()/cancel() set the flag just before
+            // asking the browser to stop. If the browser's `onend` fires
+            // without that flag set, the recognition session ended on its
+            // own (e.g. network drop, provider-side timeout) — an
+            // unexpected stop, reported honestly rather than silently
+            // treated the same as a normal stop.
+            this.#recognition.onend = () => {
+                this.#active = false;
+                this.#fire("onStop", { sessionId: this.#sessionId, wasExpectedStop: this.#stopWasRequested });
+                this.#stopWasRequested = false;
+            };
             this.#recognition.onresult = (event) => {
                 for (let i = event.resultIndex; i < event.results.length; i++) {
                     const res = event.results[i];
                     const alt = res[0];
-                    const payload = { sessionId: this.#sessionId, transcript: alt.transcript, confidence: typeof alt.confidence === "number" ? alt.confidence : null, isFinal: res.isFinal };
+                    // CP14: never invent a confidence percentage. If the
+                    // real provider did not supply a numeric confidence,
+                    // report "unavailable" explicitly rather than null
+                    // (which could be misread downstream as "0% / low
+                    // confidence" instead of "not supplied").
+                    const confidence = typeof alt.confidence === "number" ? alt.confidence : "unavailable";
+                    const payload = { sessionId: this.#sessionId, transcript: alt.transcript, confidence, isFinal: res.isFinal };
+                    if (this.#timings.firstInterimAt === null && !res.isFinal) this.#timings.firstInterimAt = Date.now();
+                    if (this.#timings.firstFinalAt === null && res.isFinal) this.#timings.firstFinalAt = Date.now();
                     this.#fire("onResult", payload);
                     this.#fire(res.isFinal ? "onFinalResult" : "onPartialResult", payload);
                 }
@@ -103,12 +165,14 @@
 
         stop() {
             if (!this.#recognition) return { success: true, reason: "No active recognition." };
+            this.#stopWasRequested = true;
             try { this.#recognition.stop(); } catch (_err) { /* non-fatal */ }
             return { success: true };
         }
 
         cancel() {
             if (!this.#recognition) return { success: true, reason: "No active recognition." };
+            this.#stopWasRequested = true;
             try { this.#recognition.abort(); } catch (_err) { /* non-fatal */ }
             this.#active = false;
             return { success: true };

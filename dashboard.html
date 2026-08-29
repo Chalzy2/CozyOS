@@ -75,6 +75,15 @@
 <script src="core/living/cozy-living-sounds.js"></script>
 <script src="core/living/cozy-living-audio.js"></script>
 <script src="core/shell/platform-event-bus.js"></script>
+<!-- Living Multimodal Learning increment (CP9/CP10) — Living runtime
+     (window.CozyOS.Living, provides serviceContracts) is dependency-
+     light (lazy getters, checks window.CozyOS[x] at call time, not
+     load time — verified before placing it here) so it only needs to
+     exist somewhere on the page before UniversalLearningPipeline's
+     methods are actually CALLED, not necessarily before that file
+     loads. Placed early/once, real-world-verified via a full-chain vm
+     smoke test before this edit. -->
+<script src="core/living/living-runtime.js"></script>
 <script src="core/modules/speech/cozy-speech.js"></script>
 <script src="core/modules/speech/adapters/cozy-tts-browser-adapter.js"></script>
 <script src="core/modules/speech/providers/charles-voice-provider.js"></script>
@@ -85,7 +94,27 @@
      both real dependencies; registration is self-deferring if either
      isn't ready yet, same pattern as voice-manager.js itself. -->
 <script src="core/living/living-tts.js"></script>
+<!-- CP14 — Kiswahili Speech Recognition. speech-language-adapter.js
+     validates a requested recognition language (e.g. "sw") against
+     CozySpeech's real language registry and resolves its BCP-47 tag.
+     It existed since Milestone 148 but — confirmed by grep before this
+     edit — had no script tag on this page, so speech-recognition-
+     adapter.js's start() was falling back to using the raw language
+     string unvalidated. Loaded after cozy-speech.js (its dependency)
+     and before speech-recognition-adapter.js (its consumer). -->
+<script src="core/modules/speech/adapters/speech-language-adapter.js"></script>
 <script src="core/modules/speech/adapters/speech-recognition-adapter.js"></script>
+<!-- CP13 — Kiswahili Living Hearing Foundation. AudioEngine (real
+     getUserMedia owner) and CozyHearing (real mic permission/lifecycle,
+     consumes AudioEngine) were never actually loaded on this page
+     before this checkpoint — confirmed by grep before this edit, and
+     the direct reason Listen previously bypassed Hearing entirely.
+     living-hearing-session.js composes both plus the
+     SpeechRecognitionAdapter already loaded above; must load after
+     all three. -->
+<script src="core/engines/audio/cozy-audio-engine.js"></script>
+<script src="core/modules/hearing/cozy-hearing.js"></script>
+<script src="core/modules/hearing/living-hearing-session.js"></script>
 <!-- M374 — same critical fix as login.html: these two files were
      never loaded here either. Order matters: identity-storage.js
      before identity-engine.js. -->
@@ -158,6 +187,26 @@
      Answer -> Advisor chain the Living Assistant now uses. No new
      memory engine. -->
 <script src="core/modules/memory/cozy-memory-engine.js"></script>
+<!-- Living Multimodal Learning increment (CP9/CP10) — LivingLanguageVerification
+     (checks window.CozyOS.CozyMemory at call time, not load time) and
+     Camera (a pure, dependency-free coordinator/registry — never
+     drives hardware itself) placed here for logical grouping with the
+     memory engine. UniversalLearningPipeline/MultimodalObservationCore/
+     LearningCameraAdapter follow, in that order (LearningCameraAdapter
+     must load AFTER Camera so its Camera.Adapters.register() call —
+     which runs once, at this file's own load time — actually succeeds
+     rather than silently no-op'ing). Full chain verified with a real
+     vm smoke test (zero exceptions, all six globals present, adapter
+     genuinely registered) before this edit. -->
+<script src="core/living/cozy-language-verification.js"></script>
+<script src="core/modules/camera/cozy-camera.js"></script>
+<script src="core/modules/learning/multimodal-observation-core.js"></script>
+<script src="core/modules/learning/universal-learning-pipeline.js"></script>
+<script src="core/modules/learning/learning-camera-adapter.js"></script>
+<!-- Living Multimodal Learning interaction layer (CP12) —
+     learning-interaction-core.js (pure logic) must load before
+     learning-panel-ui.js, which composes it at open()-call time. -->
+<script src="core/modules/learning/learning-interaction-core.js"></script>
 <!-- RP-027: language + knowledge registries, read defensively (at call
      time, not load time) by rule-based-conversational-provider.js
      below — order relative to the chain above is not load-bearing per
@@ -211,6 +260,7 @@
      real isPlatformAdmin field only - see that file's own header. -->
 <script src="core/shell/dashboard-settings-admin-boundary-core.js"></script>
 <link rel="stylesheet" href="core/shell/user-dashboard.css">
+<script src="core/shell/learning-panel-ui.js"></script>
 <script src="core/shell/user-dashboard.js"></script>
 <script src="core/living/cozy-living-assistant.js"></script>
 <script src="core/shell/startup-orchestrator.js"></script>

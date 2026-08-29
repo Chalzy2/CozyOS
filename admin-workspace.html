@@ -881,6 +881,13 @@
          CozyOS application window. Loaded early so any consumer below
          can register with it. -->
     <script src="core/shell/window-manager.js"></script>
+    <!-- Taskbar capability — real, additive consumer of WindowManager's
+         onChange()/getSnapshot() read model added for this purpose.
+         Loaded immediately after window-manager.js, matching that
+         file's own "loaded early so any consumer below can register
+         with it" convention. Self-mounts its own #cozy-taskbar-root;
+         requires no other markup on this page. -->
+    <script src="core/shell/taskbar.js"></script>
     <script src="core/shell/application-health-monitor.js"></script>
     <script src="core/shell/dashboard-data-provider.js"></script>
 

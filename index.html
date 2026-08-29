@@ -60,6 +60,15 @@
 <script src="core/living/cozy-living-sounds.js"></script>
 <script src="core/living/cozy-living-audio.js"></script>
 <script src="core/shell/platform-event-bus.js"></script>
+<!-- Living Multimodal Learning increment (CP9/CP10) — Living runtime
+     (window.CozyOS.Living, provides serviceContracts) is dependency-
+     light (lazy getters, checks window.CozyOS[x] at call time, not
+     load time — verified before placing it here) so it only needs to
+     exist somewhere on the page before UniversalLearningPipeline's
+     methods are actually CALLED, not necessarily before that file
+     loads. Placed early/once, real-world-verified via a full-chain vm
+     smoke test before this edit. -->
+<script src="core/living/living-runtime.js"></script>
 <script src="core/modules/speech/cozy-speech.js"></script>
 <script src="core/modules/speech/adapters/cozy-tts-browser-adapter.js"></script>
 <script src="core/modules/speech/providers/charles-voice-provider.js"></script>
@@ -70,7 +79,27 @@
      both real dependencies; registration is self-deferring if either
      isn't ready yet, same pattern as voice-manager.js itself. -->
 <script src="core/living/living-tts.js"></script>
+<!-- CP14 — Kiswahili Speech Recognition. speech-language-adapter.js
+     validates a requested recognition language (e.g. "sw") against
+     CozySpeech's real language registry and resolves its BCP-47 tag.
+     It existed since Milestone 148 but — confirmed by grep before this
+     edit — had no script tag on this page, so speech-recognition-
+     adapter.js's start() was falling back to using the raw language
+     string unvalidated. Loaded after cozy-speech.js (its dependency)
+     and before speech-recognition-adapter.js (its consumer). -->
+<script src="core/modules/speech/adapters/speech-language-adapter.js"></script>
 <script src="core/modules/speech/adapters/speech-recognition-adapter.js"></script>
+<!-- CP13 — Kiswahili Living Hearing Foundation. AudioEngine (real
+     getUserMedia owner) and CozyHearing (real mic permission/lifecycle,
+     consumes AudioEngine) were never actually loaded on this page
+     before this checkpoint — confirmed by grep before this edit, and
+     the direct reason Listen previously bypassed Hearing entirely.
+     living-hearing-session.js composes both plus the
+     SpeechRecognitionAdapter already loaded above; must load after
+     all three. -->
+<script src="core/engines/audio/cozy-audio-engine.js"></script>
+<script src="core/modules/hearing/cozy-hearing.js"></script>
+<script src="core/modules/hearing/living-hearing-session.js"></script>
 <!-- M374 — same critical fix as login.html: these two files were
      never loaded here either. Order matters: identity-storage.js
      before identity-engine.js. -->
@@ -143,6 +172,26 @@
      Answer -> Advisor chain the Living Assistant now uses. No new
      memory engine. -->
 <script src="core/modules/memory/cozy-memory-engine.js"></script>
+<!-- Living Multimodal Learning increment (CP9/CP10) — LivingLanguageVerification
+     (checks window.CozyOS.CozyMemory at call time, not load time) and
+     Camera (a pure, dependency-free coordinator/registry — never
+     drives hardware itself) placed here for logical grouping with the
+     memory engine. UniversalLearningPipeline/MultimodalObservationCore/
+     LearningCameraAdapter follow, in that order (LearningCameraAdapter
+     must load AFTER Camera so its Camera.Adapters.register() call —
+     which runs once, at this file's own load time — actually succeeds
+     rather than silently no-op'ing). Full chain verified with a real
+     vm smoke test (zero exceptions, all six globals present, adapter
+     genuinely registered) before this edit. -->
+<script src="core/living/cozy-language-verification.js"></script>
+<script src="core/modules/camera/cozy-camera.js"></script>
+<script src="core/modules/learning/multimodal-observation-core.js"></script>
+<script src="core/modules/learning/universal-learning-pipeline.js"></script>
+<script src="core/modules/learning/learning-camera-adapter.js"></script>
+<!-- Living Multimodal Learning interaction layer (CP12) —
+     learning-interaction-core.js (pure logic) must load before
+     learning-panel-ui.js, which composes it at open()-call time. -->
+<script src="core/modules/learning/learning-interaction-core.js"></script>
 <!-- RP-027: language + knowledge registries, read defensively (at call
      time, not load time) by rule-based-conversational-provider.js
      below — order relative to the chain above is not load-bearing per
@@ -195,7 +244,16 @@
      boundary decision. Composes IdentityEngine.getDashboardConfig()'s
      real isPlatformAdmin field only - see that file's own header. -->
 <script src="core/shell/dashboard-settings-admin-boundary-core.js"></script>
+<!-- Post-login routing repair (offline-first Administrator routing):
+     pure-logic, zero-network module composing IdentityEngine's real
+     getDashboardConfig(userId).isPlatformAdmin as a ROUTING HINT only.
+     The inline script below is its only caller; the actual
+     Administrator security boundary remains admin-gate-core.js +
+     Chalzydashboard.html's own fetch("/webauthn/session"), unchanged.
+     See core/shell/post-login-routing-core.js's own header. -->
+<script src="core/shell/post-login-routing-core.js"></script>
 <link rel="stylesheet" href="core/shell/user-dashboard.css">
+<script src="core/shell/learning-panel-ui.js"></script>
 <script src="core/shell/user-dashboard.js"></script>
 <script src="core/living/cozy-living-assistant.js"></script>
 <script src="core/shell/startup-orchestrator.js"></script>
@@ -270,21 +328,49 @@
       const authenticated = typeof auth.isAuthenticated === "function" && auth.isAuthenticated();
       if (!authenticated) return { authenticated: false };
       const identityResult = typeof auth.getCurrentIdentity === "function" ? auth.getCurrentIdentity() : null;
-      return { authenticated: true, userId: identityResult && identityResult.userId };
+      const userId = identityResult && identityResult.userId;
+      // Post-login routing repair (offline-first): getDashboardConfig()
+      // is the same existing, already-offline-capable, zero-network
+      // in-memory lookup dashboard-settings-admin-boundary-core.js
+      // already trusts for a comparably low-stakes decision. No network
+      // call is made here — see core/shell/post-login-routing-core.js's
+      // header for why this is safe as a ROUTING HINT even though it is
+      // never the actual security boundary for /chalzydashboard.
+      let dashboardConfig = null;
+      if (identity && userId && typeof identity.getDashboardConfig === "function") {
+        try { dashboardConfig = identity.getDashboardConfig(userId); } catch (_err) { /* honest no-op — falls back to USER_DASHBOARD below */ }
+      }
+      return { authenticated: true, userId, dashboardConfig };
     }
 
     function proceedPastSequence(authState) {
-      // Per the explicit routing requirement (M364.2, unchanged): the
-      // public entry never auto-mounts the Administrator Workspace,
-      // authenticated or not, admin or not. M365.0: authenticated
-      // visitors now see the real, composed User Dashboard instead of
-      // the earlier honest placeholder; unauthenticated visitors still
-      // go to the real login.html.
-      if (authState && authState.authenticated) {
-        mountUserDashboard(authState.userId);
-      } else {
-        window.location.href = "login.html";
+      // Post-login routing repair: the destination is now decided by
+      // core/shell/post-login-routing-core.js's pure, unit-tested
+      // decidePostLoginDestination() — never inline boolean logic here.
+      // This is the one place every login method (password/OTP/phone/
+      // Google/passkey/trusted-device) and every returning offline
+      // session already converge on, so no other file needed to change.
+      // A verified-locally platform administrator is sent to
+      // chalzydashboard.html, which independently re-verifies via its
+      // own existing, unchanged, server-authoritative gate
+      // (admin-gate-core.js + fetch("/webauthn/session")) — this file
+      // grants nothing by itself. Everyone else keeps the exact
+      // pre-existing behavior: mount the real User Dashboard inline, or
+      // send unauthenticated visitors to login.html.
+      const routing = window.CozyOS && window.CozyOS.PostLoginRoutingCore;
+      const decision = routing
+        ? routing.decidePostLoginDestination(authState || { authenticated: false })
+        : { destination: (authState && authState.authenticated) ? "USER_DASHBOARD" : "LOGIN" };
+
+      if (decision.destination === "CHALZYDASHBOARD") {
+        window.location.href = "chalzydashboard.html";
+        return;
       }
+      if (decision.destination === "USER_DASHBOARD") {
+        mountUserDashboard(authState.userId);
+        return;
+      }
+      window.location.href = "login.html";
     }
 
     // Real auth check runs in parallel with the visible sequence -

@@ -9,27 +9,28 @@ Do not treat this file as evidence that production is working.
 
 `server/static-boundary-server.js` is a real, always-on Node HTTP server —
 it needs a host that keeps a process running and gives it a writable disk.
-Cloudflare Pages/Pages Functions cannot do either: see
-`docs/webauthn-pages-adapter-known-issue.md` for why `node:sqlite` +
-`node:fs` (used by `server/webauthn-rp/db.js`) do not work on that
-runtime. That is the reason this repository already has a Cloudflare
-Pages Functions adapter (`functions/webauthn/[[path]].js`) that fixes
-*routing* but explicitly documents that it does not, and cannot, fix
-storage.
+Cloudflare Pages/Pages Functions cannot do either, because `node:sqlite` +
+`node:fs` (used by `server/webauthn-rp/db.js`) don't provide real
+persistent storage on that runtime — see `SECURITY-BOUNDARY-DEPLOYMENT.md`,
+which documents this and names "a small always-on Node process (Render,
+Railway, Fly.io, a VPS)" as the option this file implements the Render
+side of.
 
 Cloudflare Pages continues to serve the CozyOS static frontend. Render
 runs only the Node backend (`server/static-boundary-server.js`, which
 mounts `server/webauthn-rp/server.js` unchanged, plus the SQLite-backed
 session/credential store).
 
-**Correction to prior status:** an earlier note in this project claimed
-the Cloudflare Functions adapter had been "rejected and removed." That is
-not accurate — `functions/webauthn/[[path]].js` and
-`functions/_lib/node-http-shim.js` are still present in this repository.
-Nothing in this change deletes them; they're simply not the production
-path per `SECURITY-BOUNDARY-DEPLOYMENT.md`'s own option 2 (real Node host
-+ Cloudflare as proxy), which this render.yaml implements the Render side
-of.
+**Note on repo history:** an earlier draft of this repository had a
+Cloudflare Pages Functions routing adapter at `functions/webauthn/[[path]].js`
+plus `docs/webauthn-pages-adapter-known-issue.md` explaining why it
+couldn't solve storage. Neither exists in this baseline — the `functions/`
+directory has been removed entirely. That's consistent with the Render
+decision (this repo no longer has two partial routing paths to reason
+about), but it means the "Cloudflare Pages Functions was tried and
+explicitly documented as storage-incompatible" paper trail is gone too;
+if that reasoning is ever needed again, it now lives only in
+`SECURITY-BOUNDARY-DEPLOYMENT.md`'s shorter summary and this note.
 
 ## What render.yaml does
 
@@ -47,8 +48,11 @@ of.
 - Health-checks `/` (always 200, unauthenticated), not `/webauthn/session`
   (correctly 401 when logged out — using it as a health check would make
   Render think a healthy, logged-out server is down).
-- Deliberately leaves `COZY_RP_ID` and `COZY_RP_ORIGIN` unset
-  (`sync: false`) — see the next section.
+- Sets `COZY_RP_ID=cozyos.org` and `COZY_RP_ORIGIN=https://cozyos.org` —
+  the production hostname was confirmed reachable and serving the real
+  CozyOS site (fetched directly, got CozyOS-branded HTML back, no
+  redirect to a different host). See `test/deployment/render-yaml.test.js`
+  for the guard that fails loudly if this drifts from that exact value.
 
 ## Remaining manual step: same-origin routing (not implemented here)
 
@@ -93,10 +97,9 @@ Whichever is chosen, the values below must be set to match:
 2. Confirm the disk (`cozyos-webauthn-data`, 1GB, `/var/data`) is
    attached — Blueprints create disks on first deploy, but verify it in
    Dashboard → service → Disks.
-3. Once a production hostname is decided (see above), set `COZY_RP_ID`
-   and `COZY_RP_ORIGIN` in Dashboard → service → Environment (they are
-   `sync: false` in `render.yaml`, so Render will not deploy without them
-   being set at least once manually).
+3. `COZY_RP_ID`/`COZY_RP_ORIGIN` are already set in `render.yaml` to
+   `cozyos.org` / `https://cozyos.org` — no manual entry needed unless the
+   production hostname changes.
 4. If using option 1 above, add the chosen hostname under service →
    Settings → Custom Domains, and follow Render's shown DNS target for
    the Cloudflare CNAME.

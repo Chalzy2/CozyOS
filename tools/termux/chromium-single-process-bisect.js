@@ -34,6 +34,67 @@
  *   ./cozy-chromium-bisect-<timestamp>/step-N-<flags>.log for each step,
  *   plus a summary printed to the console. Send back the summary AND
  *   the full log file for the first step that shows a signal.
+ *
+ * CORRECTION (CP6.4): the first real Termux run of this script stopped
+ * at step 02 (`--no-zygote` added alone) with SIGABRT, and Chromium's
+ * own stderr read `GPU process exited unexpectedly: exit_code=256` /
+ * `GPU process isn't usable. Goodbye.` — not the SIGTRAP the CP6.3
+ * combined-flag run had reported. This is a real but different, narrower
+ * failure: once `--no-zygote` is in effect, launching the GPU child
+ * process goes through the same direct fork/exec path already diagnosed
+ * for the renderer in CP6.1/CP6.2 (see browser-launch.js), and that path
+ * fails the same way under Termux's restricted-exec model. This is a
+ * documented pattern, not unique to CozyOS: a `--type=gpu-process` child
+ * spawning and failing to initialize even under `--in-process-gpu` is
+ * reported independently (magpcss.org/ceforum topic 18982), and a GPU
+ * child-process launch attempt happening at all unless `--disable-gpu`
+ * is present is a long-tracked Chromium headless issue
+ * (issues.chromium.org/issues/40527919).
+ * The step ordering below (one flag added at a time, in CP6.1-CP6.3
+ * introduction order) tested `--no-zygote` on its own, before
+ * `--disable-gpu`/`--in-process-gpu` were ever added — a combination
+ * production code (browser-launch.js's resolveLaunchOptions()) never
+ * actually produces, since it applies every Android-native flag
+ * together in one launch. So step 02's crash was real, but it answered
+ * a question the real launch config never asks. `--no-zygote`,
+ * `--disable-gpu`, and `--in-process-gpu` are now introduced together as
+ * one step, since eliminating the GPU child-process launch has to
+ * happen at the same time zygote-based forking is turned off, not
+ * after — the same reasoning CP6.1/CP6.2 already applied to the
+ * renderer. Nothing was removed: `--no-zygote` is unchanged, still
+ * present, still first. This lets the bisect continue past the
+ * known-explained crash and isolate whichever later flag produces the
+ * SIGTRAP the CP6.3 combined run actually reported.
+ *
+ * CORRECTION (CP6.5): the corrected bisect above found its answer —
+ * steps 00-03 (baseline, --no-sandbox, the merged
+ * --no-zygote/--disable-gpu/--in-process-gpu step, and
+ * --disable-dev-shm-usage) all PASSED with exit 0 and the DOM marker
+ * found, and step 04 (`--single-process` added on top of that already-
+ * passing state) crashed with SIGTRAP. That is a different, more
+ * specific finding than a step-ordering artifact: it means the renderer
+ * already launches and runs JS correctly on this device WITHOUT
+ * --single-process, so the CP6.1/CP6.2 premise that motivated adding it
+ * (that the renderer's own /proc/self/exe re-exec would still fail
+ * under termux-exec even with --no-zygote) did not hold once
+ * --disable-gpu/--in-process-gpu were paired with it. --single-process
+ * itself is also independently documented as unsupported on Chrome/
+ * Chromium for Android (Chromium-dev mailing list: "Chrome for Android
+ * doesn't support single-process mode, and thus is not guaranteed to
+ * work properly in it"), and a SIGTRAP with no other signal matches
+ * that failure mode — release-build CHECK()/NOTREACHED() failures call
+ * base::ImmediateCrash(), which traps rather than segfaulting or
+ * aborting; an independently filed CEF issue reproduces a SIGTRAP tied
+ * specifically to `--single-process` on recent Chromium builds
+ * (chromiumembedded/cef#4067), with its own workaround dropping
+ * --single-process in favor of the same no-zygote/no-sandbox/
+ * in-process-gpu/disable-dev-shm-usage combination already validated by
+ * steps 01-03 here. The `--single-process` step below is removed
+ * accordingly, not reordered — it is not a flag this device's Chromium
+ * build can run at all, in any position. `--no-proxy-server` and
+ * `--disable-crash-reporter` are kept as later steps so the bisect can
+ * confirm they're harmless on their own now that they no longer follow
+ * a crashing step.
  */
 
 const fs = require('node:fs');
@@ -53,19 +114,23 @@ const FIXTURE_HTML = `<!doctype html>
 </script>
 </body></html>`;
 
-// Cumulative flag sets, one flag added per step, in CP6.1→CP6.3 order.
-// Step 0 is the sandboxed-desktop baseline (no Android workaround flags
-// at all) purely as a sanity check of the binary itself.
+// Cumulative flag sets, in CP6.1→CP6.3 order, EXCEPT `--no-zygote` is now
+// paired with `--disable-gpu` and `--in-process-gpu` in one step (CP6.4 —
+// see file header). Eliminating the GPU child-process launch has to
+// happen together with disabling zygote-based forking, not after, or the
+// bisect measures a combination production code never produces. Step 0
+// is the sandboxed-desktop baseline (no Android workaround flags at all)
+// purely as a sanity check of the binary itself.
 const STEPS = [
   { name: '00-baseline-headless-only', add: [] },
   { name: '01-no-sandbox', add: ['--no-sandbox'] },
-  { name: '02-no-zygote', add: ['--no-zygote'] },
-  { name: '03-disable-gpu', add: ['--disable-gpu'] },
-  { name: '04-disable-dev-shm-usage', add: ['--disable-dev-shm-usage'] },
-  { name: '05-in-process-gpu', add: ['--in-process-gpu'] },
-  { name: '06-single-process', add: ['--single-process'] },
-  { name: '07-no-proxy-server', add: ['--no-proxy-server'] },
-  { name: '08-disable-crash-reporter', add: ['--disable-crash-reporter'] },
+  { name: '02-no-zygote-disable-gpu-in-process-gpu', add: ['--no-zygote', '--disable-gpu', '--in-process-gpu'] },
+  { name: '03-disable-dev-shm-usage', add: ['--disable-dev-shm-usage'] },
+  // CP6.5: `--single-process` step removed — see file header correction.
+  // It is not a step this device's Chromium can pass at any position;
+  // steps 00-03 already proved the renderer works without it.
+  { name: '04-no-proxy-server', add: ['--no-proxy-server'] },
+  { name: '05-disable-crash-reporter', add: ['--disable-crash-reporter'] },
 ];
 
 function runStep(executablePath, cumulativeArgs, fixturePath, logDir, step) {

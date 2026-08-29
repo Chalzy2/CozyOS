@@ -408,6 +408,16 @@
          */
         async register({ accountType, firstName, lastName, username, email, phone, password, confirmPassword, acceptTerms, orgId = null, callerUserId = null, ...optional } = {}) {
             if (accountType !== "administrator" && accountType !== "user") return { available: false, reason: 'accountType must be "administrator" or "user".' };
+            // Real, general "is this the very first CozyOS account ever
+            // created" signal — the exact same check the admin-bootstrap
+            // security logic below already relies on, hoisted so other
+            // callers (e.g. the Owner Voice onboarding rule) can use the
+            // identical, authoritative source of truth rather than a
+            // second, possibly-inconsistent check. Computed BEFORE this
+            // user is added to #users, so it answers "was #users empty
+            // when this call started" — never re-derived from URL,
+            // username text, or any client-supplied value.
+            const isFirstUser = this.#users.size === 0;
             // Critical security fix: the public self-registration form
             // let anonymous visitors request accountType:"administrator"
             // and be granted platform-admin. Now only honored when this
@@ -420,7 +430,7 @@
             // self-registration.
             let effectiveAccountType = accountType;
             if (accountType === "administrator") {
-                const isBootstrap = this.#users.size === 0;
+                const isBootstrap = isFirstUser;
                 const callerIsAdmin = callerUserId && typeof this.isPlatformAdmin === "function" && this.isPlatformAdmin(callerUserId);
                 if (!isBootstrap && !callerIsAdmin) effectiveAccountType = "user";
             }
@@ -476,7 +486,7 @@
             if (window.CozyOS.IdentityStorage && typeof window.CozyOS.IdentityStorage.save === "function") {
                 try { await window.CozyOS.IdentityStorage.save("users", user); } catch (_err) { /* honestly non-fatal */ }
             }
-            return { available: true, userId: id, publicId, username, roles };
+            return { available: true, userId: id, publicId, username, roles, isFirstUser };
         }
 
         /**

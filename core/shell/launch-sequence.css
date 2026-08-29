@@ -187,21 +187,33 @@
                animates from tiny (0.05) up past its resting size (1) with
                a slight overshoot/settle, matching the same
                cubic-bezier "premium" easing already used elsewhere in
-               this file (e.g. #cozy-launch-logo.cozy-launch-shrink). */
+               this file (e.g. #cozy-launch-logo.cozy-launch-shrink).
+               CP7 Login Gate resync: the SAME transform transition now
+               also carries a translateY rise (added in the
+               .cozy-above-only-expand rule below) — one unified
+               transition, not a second competing animation, so the
+               grow and rise read as a single continuous movement. */
             transition: transform 4.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 1.1s ease;
             will-change: transform, opacity;
         }
         #cozy-launch-above-only.cozy-above-only-expand {
             opacity: 1;
-            transform: translate(-50%, -50%) scale(1);
+            /* CP7 Login Gate resync: rises toward approximately the
+               upper 3/4 region of the screen (25vh above true center)
+               while growing to full size — grow and rise as one
+               movement, not two separate animations. */
+            transform: translate(-50%, -50%) translateY(-25vh) scale(1);
         }
-        /* Disappearance: begins ~1.2s before the stage's hard 9s cutoff
-           (see computeAboveOnlyPlan() in launch-sequence.js) so the
-           transition genuinely finishes, rather than being clipped, by
-           the point the existing motto is allowed to begin. */
+        /* Disappearance: begins shortly before the stage's real (audio-
+           duration-driven where available, otherwise the fixed 9s
+           fallback) cutoff — see computeAboveOnlyPlan() in
+           launch-sequence.js — so the transition genuinely finishes,
+           rather than being clipped, by the point the existing motto is
+           allowed to begin. Stays at the risen position while fading,
+           so it doesn't visually "fall back down" on its way out. */
         #cozy-launch-above-only.cozy-above-only-fade {
             opacity: 0;
-            transform: translate(-50%, -50%) scale(1.12);
+            transform: translate(-50%, -50%) translateY(-25vh) scale(1.12);
             transition: transform 1.1s cubic-bezier(0.4, 0, 1, 1), opacity 1.1s ease;
         }
         @media (max-width: 480px) {
@@ -210,10 +222,10 @@
         @media (prefers-reduced-motion: reduce) {
             /* Same specificity as the non-reduced-motion rules above
                (element#id[.class]) so this genuinely overrides them
-               rather than losing on cascade order - no scale animation
-               at all when reduced motion is requested, only a plain
-               opacity fade, matching the same pattern already used by
-               #cozy-launch-logo.cozy-reveal and .cozy-typing-cursor
+               rather than losing on cascade order - no scale/rise
+               animation at all when reduced motion is requested, only a
+               plain opacity fade, matching the same pattern already used
+               by #cozy-launch-logo.cozy-reveal and .cozy-typing-cursor
                above for reduced motion. */
             #cozy-launch-above-only,
             #cozy-launch-above-only.cozy-above-only-expand,

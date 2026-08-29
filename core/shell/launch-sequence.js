@@ -25,32 +25,49 @@
  *   rather than guessing with an independent timer.
  */
         (function () {
-            // M370.1 — real, configurable timing. Every duration used
-            // by this sequence lives here, in one place, so future
-            // tuning never requires touching the logic below it.
+            // CP7 Login Gate resync — real, configurable timing. Every
+            // duration used by this sequence lives here, in one place,
+            // so future tuning never requires touching the logic below
+            // it.
+            //
+            // RETIMED to the current authoritative Login Gate spec:
+            //   0.0-1.5s  Living Green Opening   (preRevealDelayMs, in
+            //             startup-orchestrator.js's DEFAULT_CONFIG)
+            //   1.5-3.0s  Logo Reveal            (LOGO_STAGE_MS + GLOW_FADE_MS = 1500)
+            //   3.0-3.8s  COZYOS Typing          (LETTER_STAGE_MS = 800, TITLE_HOLD_MS = 0)
+            //   3.8-13.8s ABOVE ONLY identity    (ABOVE_ONLY_STAGE_MS = 10000, unchanged)
+            //   13.8s+    Motto
+            // TOTAL_DURATION_MS is intentionally left at 30000 and
+            // BACKGROUND_FADE_MS at 2000, both unchanged from M373 — the
+            // existing "however much time remains" hold calculation
+            // further below already absorbs any stage-duration change
+            // automatically; retiming Stages 1-3 here does not require
+            // touching that formula.
             const STARTUP_TIMING = Object.freeze({
-                // M373 — "ABOVE ONLY" insertion: the audited 20s baseline
-                // stays exactly as it was (LOGO/GLOW/LETTER/MOTTO/
-                // BACKGROUND_FADE below are untouched); TOTAL_DURATION_MS
-                // grows by exactly ABOVE_ONLY_STAGE_MS (20000 -> 30000) so
-                // the existing "remaining time" hold calculation later in
-                // this file (STARTUP_TIMING.TOTAL_DURATION_MS - elapsedMs)
-                // automatically absorbs the new stage without any second
-                // timing system.
                 TOTAL_DURATION_MS: 30000,
-                LOGO_STAGE_MS: 3000,
-                GLOW_FADE_MS: 1000,
-                LETTER_STAGE_MS: 3000,
+                LOGO_STAGE_MS: 1000,
+                GLOW_FADE_MS: 500,
+                LETTER_STAGE_MS: 800,
                 MOTTO_STAGE_MS: 1500,
                 BACKGROUND_FADE_MS: 2000,
-                // M373 — ABOVE ONLY stage. Per the authorized spec (§6):
-                // the whole inserted stage is 10s; within it, expansion +
-                // disappearance must be visually complete by the 9s mark,
-                // leaving a clean 1s settle before the existing motto
-                // begins. ABOVE_ONLY_DISAPPEAR_BY_MS is therefore *inside*
-                // ABOVE_ONLY_STAGE_MS, not additional to it.
+                // ABOVE ONLY stage. The whole inserted stage is 10s — the
+                // exact identity extension the authoritative spec calls
+                // for (COZYOS typing complete -> ABOVE ONLY -> Motto),
+                // not a generic hold added anywhere else.
+                // ABOVE_ONLY_DISAPPEAR_BY_MS is the FALLBACK disappear
+                // point used only when the real above-only.m4a duration
+                // can't be measured (audio missing/blocked/muted) — see
+                // computeAboveOnlyPlan()'s real-duration-aware logic
+                // below, which is what actually drives timing whenever
+                // real audio is playing.
                 ABOVE_ONLY_STAGE_MS: 10000,
-                ABOVE_ONLY_DISAPPEAR_BY_MS: 9000
+                ABOVE_ONLY_DISAPPEAR_BY_MS: 9000,
+                // How long before the hard removal cutoff the CSS
+                // fade-out transition should begin, so it genuinely
+                // completes rather than being clipped. Matches the
+                // existing #cozy-launch-above-only.cozy-above-only-fade
+                // CSS transition duration (1.1s).
+                ABOVE_ONLY_FADE_TRANSITION_MS: 1100
             });
             // Records the actual moment this sequence began so the
             // final hold can be calculated as "whatever time remains to
@@ -96,7 +113,12 @@
             // as part of stretching the overall sequence to the approved
             // 18-20s runtime. No change to ordering/logic, only pacing.
             const TITLE_PER_CHAR_MS = STARTUP_TIMING.LETTER_STAGE_MS / TITLE.length; // M370.1 — derived from config (was a separate hardcoded 500)
-            const TITLE_HOLD_MS = 400;
+            // CP7 Login Gate resync — ABOVE ONLY must begin exactly at
+            // the 3.8s mark (end of Stage 3 typing), per the
+            // authoritative timeline. The prior 400ms post-typing hold
+            // is removed so the identity stage begins immediately once
+            // the last letter settles.
+            const TITLE_HOLD_MS = 0;
             // M373 — the inserted "ABOVE ONLY" segment's exact text, per
             // the authorized spec. Lives here alongside TITLE/SLOGAN so
             // every real on-screen string this file ever renders is
@@ -121,7 +143,17 @@
              *   unregistered) and adds a real, brief CSS glow pulse
              *   class to the element being typed into. Never fabricates
              *   a sound if LivingSounds/the event isn't actually loaded.
+             *
+             *   CP7 Login Gate resync — particle response: composes the
+             *   existing window.CozyOS.LivingParticles engine's real
+             *   setGlow() API (the only per-moment intensity control it
+             *   exposes — see that file's own header; there is no
+             *   discrete "burst"/"pulse" method to fabricate one) for a
+             *   brief elevated-glow flicker synced to each letter,
+             *   reverting to the base level shortly after. Honest no-op
+             *   if LivingParticles isn't loaded or is disabled.
              */
+            let letterGlowRevertTimer = null;
             function playLetterEffect(el) {
                 const audioEngine = window.CozyOS && window.CozyOS.LivingAudio;
                 if (audioEngine && typeof audioEngine.play === "function") {
@@ -133,6 +165,14 @@
                     el.classList.remove("cozy-letter-pulse");
                     void el.offsetWidth;
                     el.classList.add("cozy-letter-pulse");
+                }
+                const particles = window.CozyOS && window.CozyOS.LivingParticles;
+                if (particles && typeof particles.setGlow === "function" && (typeof particles.isEnabled !== "function" || particles.isEnabled())) {
+                    try {
+                        if (letterGlowRevertTimer) clearTimeout(letterGlowRevertTimer);
+                        particles.setGlow(1.6);
+                        letterGlowRevertTimer = setTimeout(() => { try { particles.setGlow(1); } catch (_err) { /* honest no-op */ } }, 180);
+                    } catch (_err) { /* honest no-op */ }
                 }
             }
 
@@ -224,40 +264,69 @@
                 return "charles"; // real, documented VoiceManager default even if VoiceManager itself isn't loaded yet
             }
 
+            // Single-Voice Startup Integration — resolved ONCE, here, for
+            // the whole sequence, rather than separately inside each of
+            // the three voice functions below (as it was before). This
+            // is the one thing that makes "the complete introduction is
+            // owned by one selected speaker" actually true: every call
+            // site downstream reads this same constant, never
+            // re-resolving VoiceManager's context per phrase, so a
+            // preference change mid-sequence (which cannot realistically
+            // happen inside one ~30s run anyway, but this removes even
+            // the theoretical possibility) can never split the
+            // narration across two voices.
+            const ACTIVE_VOICE_PROVIDER_ID = currentLaunchVoiceProviderId();
+            // IS_OWNER_VOICE gates whether the existing pre-recorded
+            // LivingSounds clips ("welcome"/"above-only" — real uploaded
+            // .m4a recordings, see startup-orchestrator.js's
+            // loadOfficialSoundPack()) are used at all. Those specific
+            // files are Owner Voice recordings; they are not
+            // re-synthesizable in a different (AI) voice. So when the
+            // resolved voice is NOT "charles", this file must skip them
+            // entirely and route every phrase through CozySpeech/
+            // VoiceManager.speak() with the SAME resolved provider
+            // instead — never playing an Owner Voice recording and an
+            // AI voice line back to back in the same run.
+            const IS_OWNER_VOICE = ACTIVE_VOICE_PROVIDER_ID === "charles";
+
             /**
              * playStartupVoice()
-             *   Real - checks the official Living Voice Pack first
+             *   Real - when the resolved startup voice is Owner Voice
+             *   (Charles), checks the official Living Voice Pack first
              *   (recorded audio via LivingSounds' "welcome" event,
              *   admin-protected and locked - never hard-coded audio in
-             *   this file). Falls back to browser TTS only if no real
-             *   voice pack phrase is registered for "welcome". Resolves
+             *   this file), falling back to browser TTS only if no real
+             *   voice pack phrase is registered. When a DIFFERENT voice
+             *   is resolved (Single-Voice Startup Integration), the
+             *   pre-recorded Owner Voice clip is skipped entirely and
+             *   this goes straight to CozySpeech/VoiceManager with that
+             *   same resolved provider — never mixing the two. Resolves
              *   only after the actual audio genuinely finishes, so the
              *   motto correctly waits for real completion. Resolves
              *   immediately if disabled or nothing is available -
              *   honest no-op, never a fabricated delay.
              *
-             *   M373 fix: now passes context:"welcome" through to
-             *   CozySpeech.previewVoice() -> VoiceManager.speak(). Before
-             *   this fix the call carried no context, so VoiceManager's
-             *   real routing could never match Charles's real, registered
-             *   "welcome" phrase key (core/modules/speech/providers/
-             *   charles-voice-provider.js) and silently fell straight to
-             *   the generic browser voice instead - the exact "silently
-             *   substitute another voice" failure the spec prohibits.
-             *   Also now honors LAUNCH_AUDIO_MUTED - muting suppresses
-             *   this call entirely (resolves immediately) without
-             *   touching the visual sequence around it.
+             *   M373 fix (still true): passes context:"welcome" through
+             *   to CozySpeech.previewVoice() -> VoiceManager.speak() so
+             *   VoiceManager's real routing can match Charles's real,
+             *   registered "welcome" phrase key when Owner Voice falls
+             *   through to TTS. Also honors LAUNCH_AUDIO_MUTED - muting
+             *   suppresses this call entirely (resolves immediately)
+             *   without touching the visual sequence around it.
              */
             async function playStartupVoice() {
                 if (!STARTUP_VOICE_ENABLED || LAUNCH_AUDIO_MUTED) return;
-                const sounds = window.CozyOS && window.CozyOS.LivingSounds;
-                if (sounds && typeof sounds.play === "function") {
-                    const result = await sounds.play("welcome").catch(() => null);
-                    if (result && result.success) return; // real voice pack phrase played - done, no TTS fallback needed
+                if (IS_OWNER_VOICE) {
+                    const sounds = window.CozyOS && window.CozyOS.LivingSounds;
+                    if (sounds && typeof sounds.play === "function") {
+                        const result = await sounds.play("welcome").catch(() => null);
+                        if (result && result.success) return; // real voice pack phrase played - done, no TTS fallback needed
+                    }
                 }
-                // Honest fallback: no real voice pack phrase registered
-                // for this event - use browser TTS if available, rather
-                // than silently playing nothing.
+                // Honest fallback (Owner Voice, no real asset registered)
+                // OR the deliberate Single-Voice path for a non-Owner
+                // resolved voice — either way, the SAME resolved
+                // provider speaks it, never a silently different one.
                 const speech = window.CozyOS && window.CozyOS.CozySpeech;
                 if (!speech || typeof speech.previewVoice !== "function") return; // honest no-op if not loaded yet
                 // M364.1 fix: this used to also speak the motto in the
@@ -265,69 +334,92 @@
                 // several seconds before its own 5-6s fall-in animation
                 // ever played, out of sync. Welcome-only here now;
                 // playMottoVoice() below is the motto's own real, timed cue.
-                try { await speech.previewVoice({ text: "Welcome to CozyOS.", context: "welcome", providerId: currentLaunchVoiceProviderId() }); } catch (_err) { /* honest no-op */ }
+                try { await speech.previewVoice({ text: "Welcome to CozyOS.", context: "welcome", providerId: ACTIVE_VOICE_PROVIDER_ID }); } catch (_err) { /* honest no-op */ }
             }
 
             /**
              * playMottoVoice()
              *   M364.1 addition — real, honest, same pattern as
-             *   playStartupVoice(): checks a real LivingSounds voice-pack
-             *   phrase first ("motto"), falls back to browser TTS only if
-             *   none is registered, resolves immediately (no fabricated
-             *   delay) if neither is available. Timed to accompany the
-             *   motto's fall-in animation (Stage 6, 5.00-6.00s), not
-             *   folded into the earlier welcome line.
+             *   playStartupVoice(): when Owner Voice is the resolved
+             *   startup voice, checks a real LivingSounds voice-pack
+             *   phrase first ("motto"), falling back to browser TTS if
+             *   none is registered. For a non-Owner resolved voice
+             *   (Single-Voice Startup Integration), goes straight to
+             *   CozySpeech with that same provider — Charles's
+             *   recordings are never mixed into another voice's
+             *   narration. Resolves immediately (no fabricated delay) if
+             *   neither is available. Timed to accompany the motto's
+             *   fall-in animation, not folded into the earlier welcome
+             *   line.
              */
             async function playMottoVoice() {
                 if (!STARTUP_VOICE_ENABLED || LAUNCH_AUDIO_MUTED) return;
-                const sounds = window.CozyOS && window.CozyOS.LivingSounds;
-                if (sounds && typeof sounds.play === "function") {
-                    const result = await sounds.play("motto").catch(() => null);
-                    if (result && result.success) return;
+                if (IS_OWNER_VOICE) {
+                    const sounds = window.CozyOS && window.CozyOS.LivingSounds;
+                    if (sounds && typeof sounds.play === "function") {
+                        const result = await sounds.play("motto").catch(() => null);
+                        if (result && result.success) return;
+                    }
                 }
                 const speech = window.CozyOS && window.CozyOS.CozySpeech;
                 if (!speech || typeof speech.previewVoice !== "function") return;
                 // M373: context:"motto" is passed through honestly - Charles
                 // (core/modules/speech/providers/charles-voice-provider.js)
                 // has no real recording registered under that phrase key
-                // today, so this honestly falls through to the browser TTS
-                // fallback (if available) exactly as it did before this
-                // change; the moment a real "motto" recording is added to
-                // Charles's PHRASE_MAP, this same call starts using it with
-                // no further code changes here.
-                try { await speech.previewVoice({ text: SLOGAN, context: "motto", providerId: currentLaunchVoiceProviderId() }); } catch (_err) { /* honest no-op */ }
+                // today, so Owner Voice honestly falls through to the
+                // browser TTS fallback (if available) exactly as before;
+                // the moment a real "motto" recording is added to
+                // Charles's PHRASE_MAP, this same call starts using it
+                // with no further code changes here. For a non-Owner
+                // resolved voice, this is simply that voice's own
+                // synthesis of the same text, same as the other two
+                // phrases — one speaker throughout.
+                try { await speech.previewVoice({ text: SLOGAN, context: "motto", providerId: ACTIVE_VOICE_PROVIDER_ID }); } catch (_err) { /* honest no-op */ }
             }
 
             /**
              * playAboveOnlyVoice()
-             *   M373 addition — same real, honest three-tier pattern as
-             *   playStartupVoice()/playMottoVoice() above: LivingSounds'
-             *   registered "above-only" event first (see core/living/
-             *   cozy-living-sounds.js's REAL_SOUND_EVENTS - now includes
-             *   this event so a real pack can be loaded for it later),
-             *   then CozySpeech/VoiceManager/Charles via context
-             *   "above-only". Charles has no real recording under that
-             *   phrase key today (only "startup"/"welcome" exist - see
-             *   charles-voice-provider.js's own PHRASE_MAP), so this
-             *   honestly resolves to the generic browser TTS fallback (if
-             *   available) or to a genuine { available:false } - never a
-             *   fabricated playback. Honors LAUNCH_AUDIO_MUTED exactly
-             *   like the other two voice functions.
+             *   M373 addition — same real, honest pattern as
+             *   playStartupVoice()/playMottoVoice() above: when Owner
+             *   Voice is the resolved startup voice, tries LivingSounds'
+             *   registered "above-only" event first (the real, uploaded
+             *   recording — see core/living/cozy-living-sounds.js's
+             *   REAL_SOUND_EVENTS), then CozySpeech/VoiceManager via
+             *   context "above-only". For a non-Owner resolved voice
+             *   (Single-Voice Startup Integration), the pre-recorded
+             *   Owner Voice clip is skipped entirely so this phrase is
+             *   spoken by the SAME provider as the other two, never
+             *   mixed. Charles has no real TTS-fallback recording under
+             *   this phrase key today (only "startup"/"welcome" exist -
+             *   see charles-voice-provider.js's own PHRASE_MAP), so the
+             *   Owner Voice TTS-fallback path honestly resolves to the
+             *   generic browser TTS fallback (if available) or to a
+             *   genuine { available:false } - never a fabricated
+             *   playback. Honors LAUNCH_AUDIO_MUTED exactly like the
+             *   other two voice functions.
              */
             async function playAboveOnlyVoice() {
                 if (!STARTUP_VOICE_ENABLED || LAUNCH_AUDIO_MUTED) return { attempted: false, reason: "muted" };
-                const sounds = window.CozyOS && window.CozyOS.LivingSounds;
-                if (sounds && typeof sounds.play === "function") {
-                    const result = await sounds.play("above-only").catch(() => null);
-                    if (result && result.success) return { attempted: true, played: true, via: "living-sounds" };
+                if (IS_OWNER_VOICE) {
+                    const sounds = window.CozyOS && window.CozyOS.LivingSounds;
+                    if (sounds && typeof sounds.play === "function") {
+                        const result = await sounds.play("above-only").catch(() => null);
+                        // CP7 Login Gate resync: real, measured durationMs
+                        // (see cozy-living-sounds.js's play() extension)
+                        // passed straight through so runAboveOnlyStage() can
+                        // synchronize the visual's disappearance with the
+                        // real audio length instead of a fixed guess. null
+                        // if genuinely unavailable — never estimated here.
+                        if (result && result.success) return { attempted: true, played: true, via: "living-sounds", durationMs: result.durationMs || null };
+                    }
                 }
                 const speech = window.CozyOS && window.CozyOS.CozySpeech;
-                if (!speech || typeof speech.previewVoice !== "function") return { attempted: true, played: false, reason: "AUDIO ASSET REQUIRED — IMPLEMENTATION BLOCKED FOR REAL VOICE PLAYBACK: CozySpeech not loaded." };
+                if (!speech || typeof speech.previewVoice !== "function") return { attempted: true, played: false, reason: "AUDIO ASSET REQUIRED — IMPLEMENTATION BLOCKED FOR REAL VOICE PLAYBACK: CozySpeech not loaded.", durationMs: null };
                 try {
-                    const res = await speech.previewVoice({ text: "Above Only", context: "above-only", providerId: currentLaunchVoiceProviderId() });
-                    return { attempted: true, played: !!(res && res.played), reason: res && res.reason };
+                    const res = await speech.previewVoice({ text: "Above Only", context: "above-only", providerId: ACTIVE_VOICE_PROVIDER_ID });
+                    return { attempted: true, played: !!(res && res.played), reason: res && res.reason, durationMs: null };
                 } catch (_err) {
-                    return { attempted: true, played: false, reason: "AUDIO ASSET REQUIRED — IMPLEMENTATION BLOCKED FOR REAL VOICE PLAYBACK" };
+                    return { attempted: true, played: false, reason: "AUDIO ASSET REQUIRED — IMPLEMENTATION BLOCKED FOR REAL VOICE PLAYBACK", durationMs: null };
                 }
             }
 
@@ -362,7 +454,7 @@
             }
 
             /**
-             * computeAboveOnlyPlan(timing)
+             * computeAboveOnlyPlan(timing, audioDurationMs)
              *   M373 — pure, real timing math for the ABOVE ONLY stage,
              *   deliberately extracted as a standalone function (no DOM,
              *   no timers) so it is exactly and directly unit-testable
@@ -371,21 +463,43 @@
              *   sequence. runAboveOnlyStage() below is the only caller in
              *   real use; this function makes zero decisions on its own
              *   beyond the arithmetic itself.
+             *
+             *   CP7 Login Gate resync — audioDurationMs (optional): the
+             *   real, measured duration (ms) of the above-only.m4a
+             *   playback, from LivingSounds.play()'s honest durationMs
+             *   field. When a valid positive number is given, the plan
+             *   is driven by it directly — removeMs/stageCompleteMs
+             *   equal the real audio length, fadeStartMs begins
+             *   ABOVE_ONLY_FADE_TRANSITION_MS before that — so the
+             *   visual and its sound finish together, never leaving the
+             *   visual gone while sound keeps playing (the exact bleed
+             *   the CP7 audit found). Omitted/invalid/NaN falls back to
+             *   the original fixed plan (fadeStartMs=7800, removeMs=9000,
+             *   stageCompleteMs=10000) unchanged — this is what happens
+             *   whenever real audio isn't available (missing file,
+             *   autoplay blocked, muted), so the sequence's overall
+             *   timing/tests remain identical to before in that case. A
+             *   duration wildly larger than the intended stage (a
+             *   corrupt read, or the wrong file registered) also falls
+             *   back rather than being trusted blindly and stalling the
+             *   whole Login Gate.
              */
-            function computeAboveOnlyPlan(timing) {
+            function computeAboveOnlyPlan(timing, audioDurationMs) {
                 const disappearByMs = timing.ABOVE_ONLY_DISAPPEAR_BY_MS;
                 const stageMs = timing.ABOVE_ONLY_STAGE_MS;
-                // Fade begins 1200ms before the hard disappear-by cutoff so
-                // the CSS opacity/scale transition genuinely completes
-                // by disappearByMs, rather than being cut off mid-fade -
-                // floored at 0 so a future, much shorter stage config can
-                // never compute a negative delay.
-                const fadeStartMs = Math.max(0, disappearByMs - 1200);
-                return Object.freeze({
-                    fadeStartMs,
+                const fadeTransitionMs = timing.ABOVE_ONLY_FADE_TRANSITION_MS || 1200;
+                const fallback = Object.freeze({
+                    fadeStartMs: Math.max(0, disappearByMs - 1200),
                     removeMs: disappearByMs,
-                    stageCompleteMs: stageMs
+                    stageCompleteMs: stageMs,
+                    audioDriven: false
                 });
+                if (typeof audioDurationMs !== "number" || !isFinite(audioDurationMs) || audioDurationMs <= 0) return fallback;
+                const SAFETY_CEILING_MS = stageMs + 3000; // guards against one corrupt/implausible duration reading stalling the Login Gate
+                if (audioDurationMs > SAFETY_CEILING_MS) return fallback;
+                const removeMs = Math.round(audioDurationMs);
+                const fadeStartMs = Math.max(0, removeMs - fadeTransitionMs);
+                return Object.freeze({ fadeStartMs, removeMs, stageCompleteMs: removeMs, audioDriven: true });
             }
 
             /**
@@ -403,16 +517,28 @@
              *   #cozy-launch-title/#cozy-launch-slogan color tokens), and
              *   the existing honest voice-call pattern via
              *   playAboveOnlyVoice(). Never touches the Background/
-             *   clouds/birds/particles system - those keep rendering on
-             *   their own independent requestAnimationFrame loop in
-             *   cozy-background.js, entirely unaffected by this DOM
-             *   overlay.
+             *   clouds/birds/particles system's own state directly -
+             *   those keep rendering on their own independent
+             *   requestAnimationFrame loop in cozy-background.js; the
+             *   only real coupling is the existing LivingParticles
+             *   setGlow() call below (the engine's own real, intended
+             *   API for exactly this), never a reassignment of its
+             *   internal state.
+             *
+             *   CP7 Login Gate resync: the visual (CSS transform:
+             *   scale + translateY rise, see launch-sequence.css) starts
+             *   immediately via requestAnimationFrame, exactly as
+             *   before. The audio call is now awaited so its real,
+             *   measured duration (if any) can drive
+             *   computeAboveOnlyPlan()'s fade/remove timers - this adds
+             *   at most a few milliseconds (the time for
+             *   HTMLAudioElement.play()'s own promise to resolve) before
+             *   those timers are scheduled, not a perceptible delay to
+             *   the visual, which has already started animating by then.
              */
             function runAboveOnlyStage(onComplete) {
                 const host = document.getElementById("cozy-launch-screen");
                 if (!host) { if (onComplete) onComplete(); return; }
-
-                const plan = computeAboveOnlyPlan(STARTUP_TIMING);
 
                 const el = document.createElement("div");
                 el.id = "cozy-launch-above-only";
@@ -420,26 +546,62 @@
                 el.textContent = ABOVE_ONLY_TEXT;
                 host.appendChild(el);
 
+                requestAnimationFrame(() => el.classList.add("cozy-above-only-expand"));
+
+                // Particle response: a sustained, gentle glow elevation
+                // for the whole growth window (distinct from the
+                // sharper per-letter typing flicker in
+                // playLetterEffect()), reverted once the stage
+                // completes. Composes the existing LivingParticles
+                // engine's real setGlow() API - the only per-moment
+                // intensity control it exposes (see that file's own
+                // header: no discrete "burst" method exists to
+                // fabricate one). Honest no-op if not loaded/disabled.
+                const particles = window.CozyOS && window.CozyOS.LivingParticles;
+                const particlesActive = !!(particles && typeof particles.setGlow === "function" && (typeof particles.isEnabled !== "function" || particles.isEnabled()));
+                if (particlesActive) {
+                    // A pending per-letter revert-to-resting timer from
+                    // the last typed character (playLetterEffect(),
+                    // above) could otherwise fire a few ms into this
+                    // stage and stomp the elevated glow this stage is
+                    // about to set — cancel it explicitly so ABOVE ONLY's
+                    // own glow state is never overridden by a stray
+                    // leftover typing-effect timer.
+                    if (letterGlowRevertTimer) { clearTimeout(letterGlowRevertTimer); letterGlowRevertTimer = null; }
+                    try { particles.setGlow(1.3); } catch (_err) { /* honest no-op */ }
+                }
+
+                function finishStage(plan) {
+                    const fadeTimer = setTimeout(() => { el.classList.add("cozy-above-only-fade"); }, plan.fadeStartMs);
+                    const removeTimer = setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, plan.removeMs);
+                    setTimeout(() => {
+                        clearTimeout(fadeTimer); clearTimeout(removeTimer);
+                        if (el.parentNode) el.parentNode.removeChild(el); // hard guarantee: gone before the motto stage below ever begins
+                        if (particlesActive) { try { particles.setGlow(1); } catch (_err) { /* honest no-op */ } }
+                        if (onComplete) onComplete();
+                    }, plan.stageCompleteMs);
+                }
+
                 // Voice, synced to this exact visual stage (not the
                 // welcome/motto voice calls, which keep their own
                 // existing timing untouched per the "do not redesign the
-                // existing sequence" instruction).
-                playAboveOnlyVoice();
-
-                requestAnimationFrame(() => el.classList.add("cozy-above-only-expand"));
-
-                const fadeTimer = setTimeout(() => { el.classList.add("cozy-above-only-fade"); }, plan.fadeStartMs);
-                const removeTimer = setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, plan.removeMs);
-                setTimeout(() => {
-                    clearTimeout(fadeTimer); clearTimeout(removeTimer);
-                    if (el.parentNode) el.parentNode.removeChild(el); // hard guarantee: gone before the motto stage below ever begins
-                    if (onComplete) onComplete();
-                }, plan.stageCompleteMs);
+                // existing sequence" instruction). Awaited so its real
+                // duration (if any) can drive finishStage()'s timers;
+                // any failure (missing asset, autoplay block, muted)
+                // still resolves the promise honestly (never rejects),
+                // so finishStage() always runs with at least the fixed
+                // fallback plan - sound failure never stalls the Login
+                // Gate.
+                playAboveOnlyVoice().then((result) => {
+                    finishStage(computeAboveOnlyPlan(STARTUP_TIMING, result && result.durationMs));
+                }).catch(() => {
+                    finishStage(computeAboveOnlyPlan(STARTUP_TIMING));
+                });
             }
 
             setTimeout(() => {
                 // Stage 2 (Logo Reveal): begins after the admin-configured
-                // pre-reveal delay (M351; default 1000ms, replacing the
+                // pre-reveal delay (CP7 Login Gate resync; default 1500ms, replacing the
                 // earlier fixed 1500ms) of Stage 1's pure static green.
                 const logo = document.getElementById("cozy-launch-logo");
                 if (logo) logo.classList.add("cozy-reveal");
@@ -451,21 +613,30 @@
                 const soundsForChime = window.CozyOS && window.CozyOS.LivingSounds;
                 if (soundsForChime && typeof soundsForChime.play === "function") soundsForChime.play("logo-chime", { category: "ui" });
 
-                // M370 Phase 2 — real fix: revealLiveBackground() and
-                // activateLighting() previously fired HERE, at Stage 2
-                // (the moment the logo reveals) — meaning the living
-                // world was fully visible while the wordmark was still
-                // typing and the voice hadn't even begun, confirmed the
-                // exact regression reported ("Background already
-                // visible ↓ Voice" instead of "Voice ↓ Background").
-                // Both calls are moved below to fire only after voice +
-                // motto genuinely complete (see the real hold before
-                // cozy:launch-sequence-complete). Audio cues
-                // (ambience/startup sound) are intentionally left here,
-                // unchanged — the reported issue was specifically about
-                // the VISUAL world appearing too early, not the audio
-                // bed. Neither method itself was modified — only when
-                // they're called.
+                // CP7 Login Gate resync — revealLiveBackground()/
+                // activateLighting() now fire HERE, at Stage 2, instead
+                // of only after voice + motto genuinely complete (their
+                // prior M370 Phase 2 position, see the removed comment
+                // that used to explain that regression fix). The
+                // authoritative Login Gate spec now requires the Living
+                // environment to be visible and continuous underneath
+                // the ENTIRE introduction (Opening → Logo → Typing →
+                // ABOVE ONLY → Motto → Welcome), not only after it
+                // finishes. This is purely a CSS opacity flip on a
+                // canvas that has already been rendering continuously
+                // since applyStartupScene() ran at the very start of
+                // this file (confirmed before making this change) — it
+                // does not stop, restart, recreate, or reload the
+                // background/theme in any way, only makes the
+                // already-running scene visible earlier. Neither method
+                // itself was modified — only when they're called, and
+                // only once, here — the later call site after
+                // voice/motto was removed rather than duplicated.
+                if (orchestrator) {
+                    if (typeof orchestrator.revealLiveBackground === "function") { orchestrator.revealLiveBackground(); backgroundRevealedAt = Date.now(); }
+                    if (typeof orchestrator.activateLighting === "function") orchestrator.activateLighting();
+                }
+
                 if (orchestrator) {
                     // M372 — real, composed audio: reads CozyEnvironment.
                     // getState() (M370.5, unmodified) for real time-of-
@@ -552,20 +723,16 @@
                                     // letters-settle micro-animation.
                                     slogan.classList.add("cozy-motto-settle");
 
-                                    // M370 Phase 2 — real fix: this is
-                                    // now the correct point for the
-                                    // Living Background to appear -
-                                    // after voice AND motto have
-                                    // genuinely finished, matching the
-                                    // required order (Logo -> Letters ->
-                                    // Motto -> Voice -> Living
-                                    // Background -> Login). Neither
-                                    // method was modified - only moved
-                                    // here from Stage 2.
-                                    if (orchestrator) {
-                                        if (typeof orchestrator.revealLiveBackground === "function") { orchestrator.revealLiveBackground(); backgroundRevealedAt = Date.now(); }
-                                        if (typeof orchestrator.activateLighting === "function") orchestrator.activateLighting();
-                                    }
+                                    // CP7 Login Gate resync: revealLiveBackground()/
+                                    // activateLighting() are now called
+                                    // once, earlier, at Stage 2 (see
+                                    // above) — not duplicated here. The
+                                    // Living environment has already
+                                    // been visible and continuous since
+                                    // then; nothing further needs to
+                                    // happen to it at this point in the
+                                    // sequence.
+
 
                                     // M370 — real, dynamic hold duration:
                                     // however much time remains to reach
@@ -691,8 +858,8 @@
                         requestAnimationFrame(() => title.classList.add("cozy-launch-anim-play"));
                         setTimeout(afterTitleRevealed, 900);
                     }
-                }, STARTUP_TIMING.LOGO_STAGE_MS + STARTUP_TIMING.GLOW_FADE_MS); // M370.1 — derived from config (LOGO_STAGE_MS + GLOW_FADE_MS). Was 8000ms (M366.2), sized for the Living Background reveal that used to happen here - M370 moved that reveal to after voice/motto, so this pause no longer needs to cover it.
-            }, cfg.preRevealDelayMs); // M351/M355: admin-configurable (default 500ms), matching the approved 0.00-0.50s pure-green Stage 1
+                }, STARTUP_TIMING.LOGO_STAGE_MS + STARTUP_TIMING.GLOW_FADE_MS); // CP7 Login Gate resync — derived from config (LOGO_STAGE_MS + GLOW_FADE_MS = 1500ms), matching the current authoritative 1.5-3.0s Stage 2 (Logo Reveal).
+            }, cfg.preRevealDelayMs); // CP7 Login Gate resync — admin-configurable (default 1500ms), matching the current authoritative 0.0-1.5s Stage 1 (Living Green Opening)
 
             // M373 — real, minimal Node test seam. `module` only exists
             // under Node/CommonJS (require()'d from the test suite below);
