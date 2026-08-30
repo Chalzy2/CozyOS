@@ -50,6 +50,22 @@
 <script src="core/modules/identity/auth-coordinator.js"></script>
 <script src="core/bootstrap/bootstrap.js"></script>
 <script>
+// Same defensive-only fix index.html and login.html already have (see
+// index.html's own "M366.8 — Emergency Bootstrap Recovery" comment):
+// unregisters any service worker that may already be installed from an
+// earlier deployment, before this page's own gate script runs below.
+// This page was the one place in the codebase missing this call — a
+// stale worker with its own cached copy of index.html could silently
+// intercept this exact navigation and serve that cached page instead,
+// before fetch("/webauthn/session") or any of this file's route
+// branches ever ran. Never registers a new worker (no code anywhere in
+// this repository calls navigator.serviceWorker.register()).
+if (typeof navigator !== "undefined" && navigator.serviceWorker && typeof navigator.serviceWorker.getRegistrations === "function") {
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+    regs.forEach((reg) => reg.unregister());
+  }).catch(() => { /* real, honest no-op */ });
+}
+
 (function () {
   const statusEl = document.getElementById("cozy-admin-gate-status");
   const deniedEl = document.getElementById("cozy-admin-denied");
