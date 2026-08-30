@@ -526,12 +526,6 @@
      and the Living Background genuinely need. login.html's only job is to
      authenticate/register and hand off; it never renders the dashboard. -->
 <script src="core/shell/platform-event-bus.js"></script>
-<!-- C14B return-to fix: pure, exact-match allowlist (see file header)
-     deciding whether a caller-supplied ?return= value is safe to
-     navigate to after a successful login. Loaded early since the
-     inline script's resolvePostLoginDestination() helper needs it
-     before any of the six success handlers below run. -->
-<script src="core/shell/return-destination-core.js"></script>
 <!-- M374 — critical fix: identity-storage.js and otp-provider.js were
      never loaded on this page at all, confirmed by exhaustive search.
      This means IdentityEngine's real persistence (restorePersistedUsers,
@@ -656,30 +650,6 @@ if (typeof navigator !== "undefined" && navigator.serviceWorker && typeof naviga
 }
 
 /**
- * C14B return-to fix: resolvePostLoginDestination() — the ONE place
- * every successful-login handler below decides where to navigate next.
- * Reads ?return= from the URL this page itself was loaded with (set
- * only by chalzydashboard.html's own gate — see that file — never by
- * this page), validates it through the real, exact-match
- * ReturnDestinationCore allowlist (no open redirect: a rejected or
- * missing value ALWAYS falls back to "index.html", the exact same
- * unconditional destination every login method used before this fix
- * existed). Deliberately avoids the URLSearchParams global so this
- * function has no environment dependency beyond plain string/RegExp,
- * matching this file's existing minimal-dependency style.
- */
-function resolvePostLoginDestination() {
-  var search = (window.location && window.location.search) || "";
-  var match = /(?:^\?|[?&])return=([^&]*)/.exec(search);
-  var raw = match ? decodeURIComponent(match[1]) : null;
-  var core = window.CozyOS && window.CozyOS.ReturnDestinationCore;
-  var resolved = (raw && core && typeof core.resolveReturnDestination === "function")
-    ? core.resolveReturnDestination(raw)
-    : null;
-  return resolved || "index.html";
-}
-
-/**
  * M373 — real, confirmed fix: this file previously had NO session
  * restoration logic at all - confirmed by exhaustive search before
  * this was written. A user who checked "Remember Me" and had a
@@ -708,7 +678,7 @@ function resolvePostLoginDestination() {
     try { await auth.restoreSession(); } catch (_err) { /* honest no-op */ }
   }
   if (typeof auth.isAuthenticated === "function" && auth.isAuthenticated()) {
-    window.location.href = resolvePostLoginDestination();
+    window.location.href = "index.html";
   }
 })();
 
@@ -1095,7 +1065,7 @@ function revealLoginScreen() {
 
     // Real, honest hand-off — index.html is the real end-user entry point
     // (M311/M326 bootstrap); login.html never renders an app list itself.
-    window.location.href = resolvePostLoginDestination();
+    window.location.href = "index.html";
   });
 
   // ---- Passkey sign-in (Portion 2c) ---------------------------------
@@ -1168,7 +1138,7 @@ function revealLoginScreen() {
       if (successSounds && typeof successSounds.play === "function") {
         successSounds.play("login-success", { category: "notification" }).catch(() => {});
       }
-      window.location.href = resolvePostLoginDestination();
+      window.location.href = "index.html";
     });
   }
 
@@ -1395,7 +1365,7 @@ function revealLoginScreen() {
       }
       closeModal("cozy-otp-modal");
       cleanup();
-      window.location.href = resolvePostLoginDestination();
+      window.location.href = "index.html";
     };
     function cleanup() {
       submitBtn.removeEventListener("click", onSubmit);
@@ -1488,7 +1458,7 @@ function revealLoginScreen() {
       if (successSounds && typeof successSounds.play === "function") {
         successSounds.play("login-success", { category: "notification" }).catch(() => {});
       }
-      window.location.href = resolvePostLoginDestination();
+      window.location.href = "index.html";
     };
     function cleanup() {
       submitBtn.removeEventListener("click", onSubmit);
@@ -1570,7 +1540,7 @@ function revealLoginScreen() {
       // one real login path, never a second/parallel session creation.
       if (auth && typeof auth.loginWithCredentials === "function") {
         const loginResult = await auth.loginWithCredentials(username, password, { rememberMe: true });
-        if (loginResult && loginResult.available === true) { window.location.href = resolvePostLoginDestination(); return; }
+        if (loginResult && loginResult.available === true) { window.location.href = "index.html"; return; }
       }
       closeModal("cozy-register-modal");
       document.getElementById("cozy-login-username").value = username;
