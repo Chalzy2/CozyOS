@@ -1,0 +1,20 @@
+<!-- ROUTING FIX (RP-ADMIN-ROUTING-SPLIT): this file exists ONLY because
+     GitHub Pages / plain static hosting has no server-side rewriting -
+     a request for "/dashboard" (no extension, no trailing slash) 404s
+     unless a real directory+index.html exists at that path, so this
+     directory's presence is what lets "cozyos.org/dashboard" resolve at
+     all. GitHub Pages' standard behavior for a matching directory is a
+     301 to the trailing-slash form, which then serves this file. It
+     performs a single, immediate redirect to the real, single source of
+     truth (../dashboard.html) rather than duplicating any dashboard
+     markup/logic here - never a second copy. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CozyOS</title>
+<meta http-equiv="refresh" content="0; url=../dashboard.html">
+<script>window.location.replace("../dashboard.html");</script>
+</head>
+<body></body>
+</html>

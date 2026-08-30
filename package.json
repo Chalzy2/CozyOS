@@ -1,0 +1,12 @@
+{
+  "name": "cozyos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CozyOS — root manifest. Added solely to declare the playwright dependency required by server/webauthn-rp and other *-browser.test.js suites; no other npm package is required anywhere in this repository.",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  }
+}

@@ -1,0 +1,6 @@
+# CHANGED-FILE-HASHES-PROMPT10B-MID-2.txt
+# SHA-256 of every file created this slice (STEP B — investigation +
+# regression coverage; no production behavior file was modified).
+
+## NEW FILES
+f327f7836152fb8fb727e1bcfda86adaa322168bd8fb46f6f8524f366a82c6ce  core/modules/security/test/authentication-enrollment-panel.test.js

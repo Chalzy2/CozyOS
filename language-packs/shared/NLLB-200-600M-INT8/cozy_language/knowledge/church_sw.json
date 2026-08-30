@@ -1,0 +1,52 @@
+{
+  "language": "swh_Latn",
+  "domain": "church",
+  "version": "1.0.0",
+
+  "phrases": {
+    "Habari ya leo?": {
+      "meaning": "How are you today?",
+      "type": "greeting"
+    },
+
+    "Bwana Yesu asifiwe": {
+      "meaning": "Praise the Lord Jesus.",
+      "type": "greeting"
+    },
+
+    "Bwana Yesu asifiwe!": {
+      "meaning": "Praise the Lord Jesus!",
+      "type": "greeting"
+    },
+
+    "Mungu awabariki": {
+      "meaning": "God bless you.",
+      "type": "blessing"
+    },
+
+    "Mungu awabariki sana": {
+      "meaning": "May God richly bless you.",
+      "type": "blessing"
+    },
+
+    "Ndugu zangu": {
+      "meaning": "My brethren.",
+      "type": "address"
+    },
+
+    "Karibu katika ibada": {
+      "meaning": "Welcome to the service.",
+      "type": "service"
+    },
+
+    "Karibu katika ibada ya leo": {
+      "meaning": "Welcome to today's service.",
+      "type": "service"
+    },
+
+    "Tunamshukuru Mungu": {
+      "meaning": "We thank God.",
+      "type": "worship"
+    }
+  }
+}

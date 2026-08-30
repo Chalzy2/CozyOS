@@ -1,0 +1,21 @@
+CHANGED-FILE-HASHES-PROMPT7-GOOGLE-MID-1.txt
+CozyOS — Prompt 7 Path B — Google Authentication Trust Adapter
+Generated: 2026-08-21
+
+FILES CREATED (2)
+------------------
+266c8b374f5596c08b2a759e6a6868682ecc3cbd7fe14d9a56260d633bcc52d2  server/auth/google-login-endpoint.js
+a14eb478b14bcc1e93c054be804f2d27d598d9f36d18bed529b37d3d2e9900e2  server/auth/test/google-login-endpoint.test.js
+
+FILES MODIFIED (0)
+-------------------
+none
+
+FILES DELETED (0)
+------------------
+none
+
+PROTECTED FILES — VERIFIED UNCHANGED (hash before == hash after, this session)
+--------------------------------------------------------------------------------
+c795b9f69fc155e08bac69b0c8c0bf7819b835048d16d02f276b8f402ed29bf0  core/modules/founder-story/founder-story-seed.js
+c3f80ef51fee137e0394e201fca81a3213a9fd5c344999fcfbee4522886bcd30  core/shell/cozy-login-gate.js

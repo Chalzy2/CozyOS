@@ -1,0 +1,1737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CozyOS — Sign In</title>
+<!-- M387.5-repair — real regression fix: login.html had no favicon link
+     tags, so every browser issued a default /favicon.ico request that
+     404'd (visible in DevTools console). dashboard.html already links
+     these two real, existing assets; reused verbatim, nothing new. -->
+<link rel="icon" href="assets/branding/favicon-32.png" sizes="32x32">
+<link rel="icon" href="assets/branding/favicon-16.png" sizes="16x16">
+<link rel="shortcut icon" href="assets/branding/favicon-32.png">
+<!-- Reuses the exact same shared launch sequence index.html/dashboard.html
+     already use (core/shell/launch-sequence.css + core/shell/launch-
+     sequence.js, both untouched) so a visitor landing directly on
+     login.html (bookmark/deep link, not routed through index.html)
+     still sees/hears the real logo/COZYOS/welcome-voice/ABOVE ONLY/
+     motto sequence before the sign-in card appears — same single
+     approved sequence, never a second copy of it. -->
+<link rel="stylesheet" href="core/shell/launch-sequence.css">
+<!--
+  M355 — Living Login Experience (spec-reconciled)
+  File Reference: login.html
+
+  HONEST SCOPE
+    This page renders the UI/interaction layer only. Per Rule 14 (Gemini/UI
+    prompts design UI only) and Rule 6 (compose existing engines, never
+    duplicate), everything visual/aural below is a real, existing CozyOS
+    engine already shipped in this repository:
+      - window.CozyOS.Background     (core/ui/cozy-background.js)   — the
+        living nature scene (clouds/birds/trees/wind/particles/lighting).
+      - window.CozyOS.StartupOrchestrator (core/shell/startup-orchestrator.js)
+        — revealLiveBackground()/applyStartupScene()/activateLighting(),
+        composed here exactly as dashboard.html's own launch screen does,
+        so login.html reached directly (bookmark, deep link, redirect
+        target) never shows a flat/blank page behind the card.
+      - window.CozyOS.AuthCoordinator (core/modules/identity/auth-coordinator.js)
+        — loginWithCredentials() (Remember Me is its real rememberMe
+        option), loginWithTrustedDevice(), loginWithBiometrics().
+      - window.CozyOS.IdentityEngine  (core/modules/identity/identity-engine.js)
+        — register() and resetPassword(), called directly for Create
+        Account / Forgot Password (no separate auth engine invented).
+    No "Living Voice"/"Living Particle"/"Living Light" file exists as a
+    literal filename beyond what's cited above (see startup-orchestrator.js's
+    own header) — lighting/particles are part of Background's own canvas;
+    this page does not fabricate a second engine to satisfy the name.
+
+  DISCLOSED GAPS (never faked — shown as real "Coming soon", not dead buttons)
+    - Face / Voice / Passkey / Authenticator / Google / Facebook / Microsoft
+      sign-in: no real provider/engine exists yet in this repository for
+      any of these seven methods. They render, visibly disabled, inside
+      "More sign-in options" so the option is discoverable without lying
+      about it working.
+    - Fingerprint / Trusted Device: real and wired to
+      AuthCoordinator.loginWithBiometrics()/loginWithTrustedDevice() — but
+      those methods are genuinely scoped to Platform-Administrator device
+      recovery (AdminRecoveryPolicy), not general per-user WebAuthn. The
+      dialog is honest about that scope rather than presenting it as a
+      universal biometric login.
+    - Forgot Password: IdentityEngine.resetPassword(username, newPassword)
+      is real, but no email/SMS verification token engine exists yet in
+      this repository, so this flow honestly resets immediately from the
+      username alone (documented on-screen) rather than pretending to have
+      sent a verification email it never sent.
+    - Registration: the spec (Rule 7 / Production Rules) asks for
+      username/email/password only. The real, existing
+      IdentityEngine.register() additionally requires firstName, lastName
+      and a valid phone number to create a genuine account record — those
+      three fields are real requirements of already-shipped code, not
+      invented here, and are kept visually secondary (collapsed under
+      "Complete your profile") rather than removed, so the account this
+      page creates is a real, valid CozyOS account and not a stub.
+-->
+<style>
+  :root {
+    --cozy-emerald: #1B5E20;
+    --cozy-emerald-bright: #2E7D32;
+    --cozy-emerald-deep: #011c15;
+    --cozy-gold: #F9A825;
+    --cozy-gold-bright: #FFCA28;
+    --cozy-glass: rgba(13, 46, 30, 0.55);
+    --cozy-glass-border: rgba(249, 168, 37, 0.35);
+  }
+  html, body { margin: 0; padding: 0; background: transparent; color: #eaf5ee; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; height: 100%; overflow-x: hidden; }
+  /* M366.8 — real, confirmed bug fix: this was previously an opaque
+     var(--cozy-emerald-deep), which sat in front of (stacking-wise)
+     the real Living Background canvas (core/ui/cozy-background.js) -
+     that canvas renders at z-index: -100 by design, specifically so
+     transparent ancestors let it show through (confirmed by that
+     file's own code comment: "Let cozy-theme.css radial gradient shine
+     through"). With an opaque body background, the canvas was fully
+     hidden behind a flat, static color that never changed - even
+     though the canvas itself was correctly self-activating and
+     rendering the whole time. index.html and dashboard.html never had
+     this override and already correctly showed the Living Background;
+     login.html now matches them. */
+  #cozy-login-screen { position: relative; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 24px 16px 48px; box-sizing: border-box; }
+
+  /* Living Background canvas (core/ui/cozy-background.js self-mounts this
+     element, prepended to <body>) — fades in via StartupOrchestrator,
+     never a static image standing in for it. */
+  #cozy-live-bg-canvas { opacity: 0; transition: opacity 2.2s ease; }
+
+  /* Official emblem, top-center, exact asset, never redistorted. */
+  #cozy-login-brand { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; margin: 4vh 0 auto; opacity: 0; transform: translateY(-8px); transition: opacity 1s ease, transform 1s cubic-bezier(0.16,1,0.3,1); }
+  #cozy-login-brand.cozy-brand-visible { opacity: 1; transform: translateY(0); }
+  /* M366.2 — dual-tone glow (tight emerald + soft gold outer), matching
+     the official CozyOS mark; object-fit:contain keeps the supplied
+     logo's real aspect ratio, never stretched. */
+  #cozy-login-emblem { width: 84px; height: 84px; object-fit: contain; filter: drop-shadow(0 0 10px rgba(46, 125, 50, 0.55)) drop-shadow(0 0 20px rgba(249, 168, 37, 0.30)); }
+  /* M364.3: Georgia Bold for brand-family consistency with the main
+     launch sequence's wordmark; modestly larger + more breathing room,
+     kept proportionate to this page's compact card-based layout rather
+     than the full hero sizing used on the launch screen itself. */
+  #cozy-login-wordmark { margin-top: 18px; font-family: Georgia, 'Times New Roman', serif; font-weight: 700; font-size: 28px; letter-spacing: 0.04em; }
+  #cozy-login-wordmark .cozy-w-cozy { color: var(--cozy-emerald-bright); }
+  #cozy-login-wordmark .cozy-w-os { color: var(--cozy-gold); }
+  #cozy-login-motto { margin-top: 10px; margin-bottom: 6px; font-size: 12px; letter-spacing: 0.12em; color: #b9dcc2; text-align: center; min-height: 1.2em; }
+  #cozy-login-motto span { display: inline-block; }
+  #cozy-login-motto .cozy-motto-green { color: #b9dcc2; }
+  #cozy-login-motto .cozy-motto-gold { color: var(--cozy-gold-bright); }
+
+  /* Glass login card — transparent emerald, never white/opaque. */
+  #cozy-login-card {
+    position: relative; z-index: 2; width: 100%; max-width: 380px; padding: 30px 28px 26px; margin-top: 22px;
+    background: var(--cozy-glass); backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border: 1px solid var(--cozy-glass-border); border-radius: 20px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(249,168,37,0.06) inset;
+    opacity: 0; filter: blur(6px); transform: translateY(30px) scale(0.95);
+    --cozy-wind-tilt: 0deg;
+    /* M370.2 — Living Login Card Experience: entrance lengthened from
+       0.9s to 2.5s, now animating opacity + blur + scale + translateY
+       together so the card feels like it's genuinely emerging from the
+       moving background behind it, not just fading in. */
+    transition: opacity 2.5s ease, filter 2.5s ease, transform 2.5s cubic-bezier(0.16,1,0.3,1), box-shadow 1.2s ease, background 3s ease, border-color 3s ease;
+    touch-action: none; will-change: transform;
+  }
+  #cozy-login-card.cozy-login-card-visible { opacity: 1; filter: blur(0); transform: translateY(0) scale(1); }
+  /* M370.3/M370.4 — Cloud Birth Effect + Mist Dissipation: the mist no
+     longer simply fades - it gathers, briefly brightens, then slowly
+     dissolves over a real 2.6s sequence (within the requested 2-3s),
+     reading as blending into the moving clouds rather than an abrupt
+     cut. Placed as the card's own first child so it can use a simple
+     descendant selector below. */
+  #cozy-login-mist {
+    position: absolute; inset: -40px; z-index: -1; pointer-events: none; border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(232,245,233,0.35) 0%, rgba(232,245,233,0.12) 45%, transparent 75%);
+    filter: blur(18px); opacity: 0.9;
+    animation: cozyLoginMistDissipate 2.6s ease-in forwards;
+  }
+  @keyframes cozyLoginMistDissipate {
+    0%   { opacity: 0.7; filter: blur(14px); }
+    25%  { opacity: 1; filter: blur(16px); }
+    100% { opacity: 0; filter: blur(28px); }
+  }
+  /* Soft reflection - a subtle top-edge highlight, real CSS gradient, no image asset. */
+  #cozy-login-card::before {
+    content: ""; position: absolute; inset: 0; border-radius: 20px; pointer-events: none; z-index: 1;
+    background: linear-gradient(160deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 35%);
+    transform: translate(var(--cozy-parallax-x, 0px), var(--cozy-parallax-y, 0px));
+  }
+  /* M370.4 — brief, JS-toggled transition for the reflection layer's
+     return-to-neutral after a drag ends (see endDrag()) - real-time
+     tracking during active drag stays instant (no transition), so this
+     only applies for the short reset window. */
+  #cozy-login-card.cozy-parallax-returning::before { transition: transform 300ms ease; }
+  /* M370.3 — Glass Depth: a slow, subtle moving highlight sweep (GPU-
+     friendly background-position animation on a gradient, not a
+     repaint-heavy filter). Restrained - one soft sweep, nothing busier. */
+  #cozy-login-card::after {
+    content: ""; position: absolute; inset: 0; border-radius: 20px; pointer-events: none; z-index: 1;
+    background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.06) 50%, transparent 60%);
+    background-size: 250% 100%; background-position: 100% 0;
+    animation: cozyLoginCardSweep 12s linear infinite;
+  }
+  @keyframes cozyLoginCardSweep { 0% { background-position: 130% 0; } 100% { background-position: -30% 0; } }
+  /* M370.4 — Breathing Glow: the emerald edge glow slowly, softly
+     breathes (never pulses/flashes) - a real, gentle 10s cycle,
+     separate from the brightness-driven glow so both can coexist
+     (breathing modulates opacity of an added glow layer, brightness
+     sets its base intensity via updateLivingLook()'s box-shadow write). */
+  @keyframes cozyLoginCardBreathe { 0%, 100% { box-shadow: 0 0 18px rgba(76,175,80,0.12); } 50% { box-shadow: 0 0 30px rgba(76,175,80,0.24); } }
+  #cozy-login-card.cozy-login-card-visible::before { animation: cozyLoginCardBreathe 10s ease-in-out infinite; }
+  /* M370.3 — Natural Floating (M370.4: now includes the real,
+     honest wind-tilt custom property alongside each translate step,
+     so both compose in the same transform rather than fighting for
+     priority). */
+  @keyframes cozyLoginCardFloatOrganic {
+    0%   { transform: translate(0, 0) rotate(0deg); }
+    15%  { transform: translate(1px, -5px) rotate(var(--cozy-wind-tilt)); }
+    30%  { transform: translate(1px, -5px) rotate(var(--cozy-wind-tilt)); }
+    45%  { transform: translate(3px, -2px) rotate(var(--cozy-wind-tilt)); }
+    60%  { transform: translate(-2px, 1px) rotate(calc(var(--cozy-wind-tilt) * 0.6)); }
+    75%  { transform: translate(-3px, 3px) rotate(calc(var(--cozy-wind-tilt) * 0.6)); }
+    88%  { transform: translate(-1px, 3px) rotate(0deg); }
+    100% { transform: translate(0, 0) rotate(0deg); }
+  }
+  #cozy-login-card.cozy-login-card-floating { animation: cozyLoginCardFloatOrganic 13s cubic-bezier(0.45,0,0.55,1) infinite; }
+  /* Dragging disables the floating animation and the entrance transition
+     so the card follows the pointer immediately, with no fighting
+     transforms - re-enabled once the drag ends. */
+  #cozy-login-card.cozy-login-card-dragging { animation: none; transition: none; cursor: grabbing; }
+  #cozy-login-card:not(.cozy-login-card-dragging) { cursor: grab; }
+  @media (prefers-reduced-motion: reduce) {
+    #cozy-login-card { transition: opacity 0.4s ease; filter: none; transform: none; }
+    #cozy-login-card.cozy-login-card-floating, #cozy-login-card::after, #cozy-login-card.cozy-login-card-visible::before { animation: none; }
+    #cozy-login-mist { display: none; animation: none; }
+  }
+  #cozy-login-title { font-size: 19px; font-weight: 700; margin: 0 0 2px 0; color: #eaf5ee; }
+  #cozy-login-sub { font-size: 12.5px; color: #8fd39c; margin: 0 0 20px 0; }
+
+  .cozy-login-field { margin-bottom: 14px; position: relative; }
+  .cozy-login-field label { display: block; font-size: 11.5px; color: #9fd6ae; margin-bottom: 6px; letter-spacing: 0.02em; }
+  .cozy-login-field input { width: 100%; box-sizing: border-box; padding: 11px 13px; border-radius: 10px; border: 1px solid rgba(249,168,37,0.18); background: rgba(6, 20, 13, 0.55); color: #eaf5ee; font-size: 14px; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+  .cozy-login-field input:focus { outline: none; border-color: var(--cozy-gold); box-shadow: 0 0 0 3px rgba(249,168,37,0.15); }
+  .cozy-pw-toggle { position: absolute; right: 12px; top: 32px; background: none; border: none; color: #9fd6ae; font-size: 11.5px; cursor: pointer; padding: 4px; }
+  .cozy-pw-toggle:hover { color: var(--cozy-gold-bright); }
+
+  .cozy-login-row { display: flex; align-items: center; justify-content: space-between; margin: 2px 0 18px; font-size: 12.5px; }
+  .cozy-remember { display: flex; align-items: center; gap: 6px; color: #b9dcc2; }
+  .cozy-remember input { accent-color: var(--cozy-gold); }
+  #cozy-forgot-link { color: var(--cozy-gold-bright); text-decoration: none; }
+  #cozy-forgot-link:hover { text-decoration: underline; }
+
+  #cozy-login-submit { width: 100%; padding: 12px; border-radius: 10px; border: none; background: linear-gradient(135deg, var(--cozy-emerald-bright), var(--cozy-emerald)); color: #fff; font-weight: 700; font-size: 14.5px; cursor: pointer; letter-spacing: 0.02em; box-shadow: 0 4px 14px rgba(46,125,50,0.35); transition: filter 0.2s ease, transform 0.15s ease; }
+  #cozy-login-submit:hover:not(:disabled) { filter: brightness(1.08); }
+  #cozy-login-submit:active:not(:disabled) { transform: translateY(1px); }
+  #cozy-login-submit:disabled { opacity: 0.6; cursor: default; }
+
+  #cozy-login-error { color: #ff8a80; font-size: 12.5px; margin-top: 12px; display: none; }
+
+  .cozy-divider { display: flex; align-items: center; gap: 10px; margin: 18px 0 4px; }
+  .cozy-divider::before, .cozy-divider::after { content: ""; flex: 1; height: 1px; background: rgba(249,168,37,0.18); }
+  .cozy-divider span { font-size: 10.5px; color: #7fae8b; }
+
+  #cozy-create-account { width: 100%; margin-top: 10px; padding: 11px; border-radius: 10px; background: transparent; border: 1px solid rgba(249,168,37,0.4); color: var(--cozy-gold-bright); font-weight: 600; font-size: 13.5px; cursor: pointer; }
+  #cozy-create-account:hover { background: rgba(249,168,37,0.08); }
+
+  /* "More sign-in options" — collapsed by default, per spec. */
+  #cozy-more-toggle { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 16px; background: none; border: none; color: #9fd6ae; font-size: 12px; cursor: pointer; padding: 6px; }
+  #cozy-more-toggle:hover { color: var(--cozy-gold-bright); }
+  #cozy-more-arrow { display: inline-block; transition: transform 0.3s cubic-bezier(0.16,1,0.3,1); }
+  #cozy-more-toggle.cozy-more-open #cozy-more-arrow { transform: rotate(180deg); }
+  #cozy-more-panel { max-height: 0; overflow: hidden; transition: max-height 0.4s cubic-bezier(0.16,1,0.3,1), opacity 0.3s ease; opacity: 0; }
+  #cozy-more-panel.cozy-more-open { max-height: 260px; opacity: 1; }
+  #cozy-more-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+  .cozy-more-btn { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 10px 4px; border-radius: 10px; border: 1px solid rgba(249,168,37,0.15); background: rgba(6,20,13,0.4); color: #cdeed5; font-size: 10px; cursor: pointer; }
+  .cozy-more-btn .cozy-icon { font-size: 17px; }
+  .cozy-more-btn:hover:not(:disabled) { border-color: var(--cozy-gold); background: rgba(249,168,37,0.08); }
+  .cozy-more-btn:disabled { opacity: 0.4; cursor: default; }
+  .cozy-more-btn .cozy-soon { display: block; font-size: 8.5px; color: var(--cozy-gold); margin-top: 1px; }
+
+  /* Lightweight modal shell, reused for Forgot Password + Create Account. */
+  .cozy-modal-backdrop { position: fixed; inset: 0; background: rgba(3,10,6,0.55); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 10; padding: 20px; box-sizing: border-box; }
+  .cozy-modal-backdrop.cozy-modal-open { display: flex; }
+  .cozy-modal { width: 100%; max-width: 360px; background: rgba(13,46,30,0.92); border: 1px solid var(--cozy-glass-border); border-radius: 16px; padding: 24px; box-shadow: 0 12px 48px rgba(0,0,0,0.5); }
+  .cozy-modal h2 { margin: 0 0 4px; font-size: 17px; color: var(--cozy-gold-bright); }
+  .cozy-modal p.cozy-modal-note { font-size: 11.5px; color: #9fd6ae; margin: 0 0 16px; line-height: 1.5; }
+  .cozy-modal .cozy-login-field input { font-size: 13.5px; padding: 9px 11px; }
+  .cozy-modal-actions { display: flex; gap: 10px; margin-top: 6px; }
+  .cozy-modal-actions button { flex: 1; padding: 10px; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .cozy-modal-cancel { background: transparent; border: 1px solid rgba(255,255,255,0.15); color: #cdeed5; }
+  .cozy-modal-submit { background: var(--cozy-emerald-bright); border: none; color: #fff; }
+  .cozy-modal-error { color: #ff8a80; font-size: 12px; margin-top: 10px; display: none; }
+  .cozy-modal-success { color: #81C784; font-size: 12px; margin-top: 10px; display: none; }
+  .cozy-modal-collapse { font-size: 11.5px; color: var(--cozy-gold-bright); background: none; border: none; cursor: pointer; padding: 4px 0; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+<!-- Shared launch sequence overlay — identical markup to index.html/
+     dashboard.html, driven entirely by core/shell/launch-sequence.js
+     (loaded, unmodified, below). Sits on top of #cozy-login-screen via
+     its own fixed/z-index:999999 (launch-sequence.css) and is hidden
+     (cozy-launch-hidden) once "cozy:launch-sequence-complete" fires,
+     revealing the sign-in card underneath exactly as before. -->
+<div id="cozy-launch-screen">
+    <img id="cozy-launch-logo" src="assets/branding/cozyoslogo-emblem.png" alt="CozyOS">
+    <h1 id="cozy-launch-title"></h1>
+    <p id="cozy-launch-slogan"></p>
+</div>
+<div id="cozy-login-screen">
+
+  <div id="cozy-login-brand">
+    <img id="cozy-login-emblem" src="assets/branding/cozyoslogo-emblem.png" alt="CozyOS">
+    <div id="cozy-login-wordmark"><span class="cozy-w-cozy">COZY</span><span class="cozy-w-os">OS</span></div>
+    <div id="cozy-login-motto"></div>
+  </div>
+
+  <div id="cozy-login-card">
+    <div id="cozy-login-mist" aria-hidden="true"></div>
+    <h1 id="cozy-login-title">Welcome Back</h1>
+    <p id="cozy-login-sub">Sign in to continue to CozyOS</p>
+
+    <form id="cozy-login-form" autocomplete="on">
+      <div class="cozy-login-field">
+        <label for="cozy-login-username">Username or Email</label>
+        <input id="cozy-login-username" type="text" autocomplete="username" required>
+      </div>
+      <div class="cozy-login-field">
+        <label for="cozy-login-password">Password</label>
+        <input id="cozy-login-password" type="password" autocomplete="current-password" required>
+        <button type="button" class="cozy-pw-toggle" id="cozy-pw-toggle">SHOW</button>
+      </div>
+
+      <div class="cozy-login-row">
+        <label class="cozy-remember"><input type="checkbox" id="cozy-remember-me" checked> Remember Me</label>
+        <a href="#" id="cozy-forgot-link">Forgot Password?</a>
+      </div>
+
+      <button id="cozy-login-submit" type="submit">Sign In</button>
+      <p id="cozy-login-error"></p>
+    </form>
+
+    <!--
+      C15: Administrator Sign-In (Firebase) — hidden by default, exactly
+      the same "no administrator controls on public login" principle
+      that removed the Fingerprint/Trusted-Device tile from public view
+      (see the M364.5 comment further down). This section only becomes
+      visible when this page was reached via chalzydashboard.html's own
+      gate (i.e. a validated ?return=/chalzydashboard or
+      ?return=/chalzydashboard.html is present) — an ordinary visitor
+      who just typed kafexo.com/login.html never sees this. Revealed by
+      script further down, using the same ReturnDestinationCore
+      allowlist already loaded for resolvePostLoginDestination() —
+      no new allowlist, no new parsing.
+    -->
+    <div id="cozy-admin-firebase-section" style="display:none; margin-top:18px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.12);">
+      <p style="font-size:12.5px; opacity:0.75; margin:0 0 10px;">Administrator sign-in</p>
+      <form id="cozy-admin-firebase-form" autocomplete="on">
+        <div class="cozy-login-field">
+          <label for="cozy-admin-firebase-email">Administrator Email</label>
+          <input id="cozy-admin-firebase-email" type="email" autocomplete="username" required>
+        </div>
+        <div class="cozy-login-field">
+          <label for="cozy-admin-firebase-password">Password</label>
+          <input id="cozy-admin-firebase-password" type="password" autocomplete="current-password" required>
+        </div>
+        <button id="cozy-admin-firebase-submit" type="submit">Sign In as Administrator</button>
+        <p id="cozy-admin-firebase-error"></p>
+      </form>
+    </div>
+
+    <div class="cozy-divider"><span>OR</span></div>
+    <button id="cozy-create-account" type="button">Create Account</button>
+
+    <button id="cozy-more-toggle" type="button" aria-expanded="false">
+      More sign-in options <span id="cozy-more-arrow">▾</span>
+    </button>
+    <div id="cozy-more-panel">
+      <div id="cozy-more-grid">
+        <!-- M364.5 walkthrough fix: the Fingerprint option previously
+             here was, by its own disclosed scope (see the removed
+             modal's copy, still real and unchanged in
+             AuthCoordinator.loginWithBiometrics()/loginWithTrustedDevice()),
+             a Platform-Administrator-only recovery path (AdminRecoveryPolicy)
+             — exposing it on this PUBLIC login page directly contradicted
+             the explicit "no administrator controls on public login"
+             requirement (M364.1/M364.2). Removed from public view only;
+             the underlying, real AuthCoordinator methods are untouched
+             and still available for a proper admin-scoped entry point
+             (e.g. Chalzydashboard.html) in a future, separate milestone. -->
+        <button class="cozy-more-btn" disabled type="button"><span class="cozy-icon">🙂</span>Face<span class="cozy-soon">Soon</span></button>
+        <button class="cozy-more-btn" disabled type="button"><span class="cozy-icon">🎙️</span>Voice<span class="cozy-soon">Soon</span></button>
+        <!-- M375 — real fix: Passkey is the one option in this grid backed
+             by a genuine, working provider (WebAuthnProvider — real
+             navigator.credentials, real ECDSA verification), confirmed by
+             repo-wide inventory before this button was enabled. Face,
+             Voice, Google, Facebook, Microsoft remain honestly disabled
+             below — their providers are real, registered interface stubs
+             with no actual verification capability yet (no biometric
+             hardware access, no OAuth backend), so enabling their buttons
+             here would be exactly the fabricated "authenticated: true"
+             this project's own rules forbid. -->
+        <button class="cozy-more-btn" type="button" id="cozy-passkey-btn"><span class="cozy-icon">🔑</span>Passkey</button>
+        <!-- Prompt 10 continuation — real fix: Phone is the second option
+             in this grid backed by a genuine, working chain — real
+             CozyPhoneChallengeService possession-proof protocol (SHA-256
+             checksum + salted PBKDF2 verifier) composed with real
+             PhoneAccountLinkage account state via
+             AuthCoordinator.requestPhoneLoginChallenge()/loginWithPhone().
+             Never claims production SMS delivery: with no real SMS
+             backend registered on DeliveryBackendRegistry (channel
+             "sms"), PhoneAccountLinkage.isPhoneLoginUsable() honestly
+             reports false and this button surfaces that as
+             "requiresSetup", exactly like the Passkey button already
+             does for an unenrolled account — it never fabricates a
+             success. Left enabled (not "Soon") because the underlying
+             capability is real, matching this grid's own existing rule
+             (Passkey, M375) rather than the disabled/stub convention
+             used for Face/Voice/Google/Facebook/Microsoft below. -->
+        <button class="cozy-more-btn" type="button" id="cozy-phone-btn"><span class="cozy-icon">📱</span>Phone</button>
+        <button class="cozy-more-btn" disabled type="button"><span class="cozy-icon">🔐</span>Authenticator<span class="cozy-soon">Soon</span></button>
+        <button class="cozy-more-btn" disabled type="button"><span class="cozy-icon">G</span>Google<span class="cozy-soon">Soon</span></button>
+        <button class="cozy-more-btn" disabled type="button"><span class="cozy-icon">f</span>Facebook<span class="cozy-soon">Soon</span></button>
+        <button class="cozy-more-btn" disabled type="button"><span class="cozy-icon">⊞</span>Microsoft<span class="cozy-soon">Soon</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Forgot Password modal — Phase B (server-authoritative rewiring):
+     now wired directly to the real backend POST /auth/password/forgot
+     and POST /auth/password/reset (server/webauthn-rp/server.js),
+     the same authoritative reset-token lifecycle the WebAuthn/Firebase
+     sessions use. The former client-side CozyPasswordResetService
+     (core/security/password-reset-service.js) is deprecated as of this
+     change — see that file's header — and is no longer loaded on this
+     page. Two real steps in the same modal, no new visual system:
+     Step 1 requests a reset (enumeration-safe: the server always
+     returns the same generic message). Step 2 accepts a real token the
+     account owner actually received and sets the new password via the
+     server, which also revokes all other sessions on success. -->
+<div class="cozy-modal-backdrop" id="cozy-forgot-modal">
+  <div class="cozy-modal">
+    <h2>Reset Password</h2>
+
+    <div id="cozy-forgot-step-request">
+      <p class="cozy-modal-note">Enter your username, email, or phone. No email/SMS delivery provider is configured in this build yet, so a reset link cannot be sent to you automatically — see the note after you request one.</p>
+      <div class="cozy-login-field">
+        <label for="cozy-forgot-username">Username, email, or phone</label>
+        <input id="cozy-forgot-username" type="text" autocomplete="username">
+      </div>
+      <div class="cozy-modal-actions">
+        <button class="cozy-modal-cancel" type="button" id="cozy-forgot-cancel">Cancel</button>
+        <button class="cozy-modal-submit" type="button" id="cozy-forgot-request-submit">Request Reset</button>
+      </div>
+      <p class="cozy-modal-error" id="cozy-forgot-request-error"></p>
+      <p class="cozy-modal-success" id="cozy-forgot-request-success"></p>
+      <p class="cozy-modal-note"><a href="#" id="cozy-forgot-have-token-link">I already have a reset token</a></p>
+    </div>
+
+    <div id="cozy-forgot-step-confirm" style="display:none;">
+      <p class="cozy-modal-note">Enter the reset token and your new password. The token is single-use and expires 15 minutes after it was requested.</p>
+      <div class="cozy-login-field">
+        <label for="cozy-forgot-token">Reset token</label>
+        <input id="cozy-forgot-token" type="text" autocomplete="off">
+      </div>
+      <div class="cozy-login-field">
+        <label for="cozy-forgot-newpass">New Password</label>
+        <input id="cozy-forgot-newpass" type="password" autocomplete="new-password">
+      </div>
+      <div class="cozy-login-field">
+        <label for="cozy-forgot-confirm">Confirm New Password</label>
+        <input id="cozy-forgot-confirm" type="password" autocomplete="new-password">
+      </div>
+      <div class="cozy-modal-actions">
+        <button class="cozy-modal-cancel" type="button" id="cozy-forgot-confirm-cancel">Cancel</button>
+        <button class="cozy-modal-submit" type="button" id="cozy-forgot-submit">Reset</button>
+      </div>
+      <p class="cozy-modal-error" id="cozy-forgot-error"></p>
+      <p class="cozy-modal-success" id="cozy-forgot-success"></p>
+    </div>
+  </div>
+</div>
+
+<!-- M373 — real CozyOS Authenticator second-factor entry, same modal
+     pattern as Reset Password above, no new styling invented. -->
+<div class="cozy-modal-backdrop" id="cozy-otp-modal">
+  <div class="cozy-modal">
+    <h2>Enter Your Authenticator Code</h2>
+    <p class="cozy-modal-note">This account has the CozyOS Authenticator enabled. Enter the 6-digit code from your authenticator, or a recovery code if you don't have access to it.</p>
+    <div class="cozy-login-field">
+      <label for="cozy-otp-code">Authenticator Code or Recovery Code</label>
+      <input id="cozy-otp-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="20">
+    </div>
+    <div class="cozy-modal-actions">
+      <button class="cozy-modal-cancel" type="button" id="cozy-otp-cancel">Cancel</button>
+      <button class="cozy-modal-submit" type="button" id="cozy-otp-submit">Verify</button>
+    </div>
+    <p class="cozy-modal-error" id="cozy-otp-error"></p>
+  </div>
+</div>
+
+<!-- Prompt 10 continuation — real Phone sign-in code entry. Exact same
+     modal/field/button/error markup pattern as #cozy-otp-modal above
+     (no new visual system, no new CSS class) — only the copy and the
+     ids differ, since this is a second, independent code-entry step
+     (phone possession, not TOTP/recovery-code). cozy-phone-status holds
+     the honest, real delivery-state message
+     (NONE/DEV_ONLY/CONFIGURED_UNVERIFIED/LOCALLY_VERIFIED/PRODUCTION_VERIFIED,
+     see DeliveryBackendRegistry) returned by
+     AuthCoordinator.requestPhoneLoginChallenge() — it is set by JS, never
+     a static claim that a real SMS was sent. -->
+<div class="cozy-modal-backdrop" id="cozy-phone-modal">
+  <div class="cozy-modal">
+    <h2>Enter Your Phone Code</h2>
+    <p class="cozy-modal-note" id="cozy-phone-status">Requesting a verification code…</p>
+    <div class="cozy-login-field">
+      <label for="cozy-phone-code">Verification Code</label>
+      <input id="cozy-phone-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10">
+    </div>
+    <div class="cozy-modal-actions">
+      <button class="cozy-modal-cancel" type="button" id="cozy-phone-cancel">Cancel</button>
+      <button class="cozy-modal-submit" type="button" id="cozy-phone-submit">Verify</button>
+    </div>
+    <p class="cozy-modal-error" id="cozy-phone-error"></p>
+  </div>
+</div>
+
+<!-- Create Account modal -->
+<div class="cozy-modal-backdrop" id="cozy-register-modal">
+  <div class="cozy-modal">
+    <h2>Create Account</h2>
+    <p class="cozy-modal-note">Username, email and password are all that's required to sign up.</p>
+    <div class="cozy-login-field">
+      <label for="cozy-reg-username">Username</label>
+      <input id="cozy-reg-username" type="text" autocomplete="username">
+    </div>
+    <div class="cozy-login-field">
+      <label for="cozy-reg-email">Email</label>
+      <input id="cozy-reg-email" type="email" autocomplete="email">
+    </div>
+    <div class="cozy-login-field">
+      <label for="cozy-reg-password">Password</label>
+      <input id="cozy-reg-password" type="password" autocomplete="new-password">
+    </div>
+    <div class="cozy-login-field">
+      <label for="cozy-reg-confirm">Confirm Password</label>
+      <input id="cozy-reg-confirm" type="password" autocomplete="new-password">
+    </div>
+
+    <button class="cozy-modal-collapse" type="button" id="cozy-reg-more-toggle">+ Complete your profile (required to create the account)</button>
+    <div id="cozy-reg-more" style="display:none;">
+      <div class="cozy-login-field">
+        <label for="cozy-reg-first">First Name</label>
+        <input id="cozy-reg-first" type="text" autocomplete="given-name">
+      </div>
+      <div class="cozy-login-field">
+        <label for="cozy-reg-last">Last Name</label>
+        <input id="cozy-reg-last" type="text" autocomplete="family-name">
+      </div>
+      <div class="cozy-login-field">
+        <label for="cozy-reg-phone">Phone</label>
+        <input id="cozy-reg-phone" type="tel" autocomplete="tel">
+      </div>
+      <label class="cozy-remember"><input type="checkbox" id="cozy-reg-terms"> I accept the CozyOS Terms</label>
+    </div>
+
+    <div class="cozy-modal-actions" style="margin-top:14px;">
+      <button class="cozy-modal-cancel" type="button" id="cozy-register-cancel">Cancel</button>
+      <button class="cozy-modal-submit" type="button" id="cozy-register-submit">Create Account</button>
+    </div>
+    <p class="cozy-modal-error" id="cozy-register-error"></p>
+  </div>
+</div>
+
+<!-- M364.5 walkthrough fix: the Platform-Administrator-only biometric/
+     trusted-device recovery modal that lived here was removed from
+     this PUBLIC page for the same reason as its trigger button above -
+     see that comment. Nothing else on this page depended on this
+     markup. -->
+
+<!-- Real, minimal dependency set — only what AuthCoordinator/IdentityEngine
+     and the Living Background genuinely need. login.html's only job is to
+     authenticate/register and hand off; it never renders the dashboard. -->
+<script src="core/shell/platform-event-bus.js"></script>
+<!-- C14B admin-routing fix: pure, exact-match allowlist (see file
+     header) deciding whether a caller-supplied ?return= value is safe
+     to navigate to after a successful login. Loaded early since the
+     inline script's resolvePostLoginDestination() helper needs it
+     before any of the six success handlers below run. -->
+<script src="core/shell/return-destination-core.js"></script>
+<!-- C15: real Firebase Auth SDK access, loaded here so
+     loginWithServerFirebase() (auth-coordinator.js) has
+     window.CozyOS.Firebase.Auth available. Same three files, same
+     load order, already used by admin-workspace.html and
+     dashboard.html — not a new Firebase integration, the existing one
+     extended to this page. Loading these does not itself sign anyone
+     in or establish any session — see Firebase/firebase-auth.js's own
+     header ("no CozyOS session is established by any of these"). -->
+<script src="Firebase/firebase-config.js"></script>
+<script src="Firebase/firebase-app.js"></script>
+<script src="Firebase/firebase-auth.js"></script>
+<!-- M374 — critical fix: identity-storage.js and otp-provider.js were
+     never loaded on this page at all, confirmed by exhaustive search.
+     This means IdentityEngine's real persistence (restorePersistedUsers,
+     M372) and the entire OTP/MFA login gate (M373) have never actually
+     activated here - every prior Node test correctly verified the
+     LOGIC by manually loading these files in the test harness, but
+     never caught that the real HTML page itself doesn't. Fixed here.
+     Order matters: identity-storage.js must load BEFORE
+     identity-engine.js, since IdentityEngine's own .ready promise
+     fires immediately on load and requires IdentityStorage to already
+     exist - matching dashboard.html's own proven-working order. -->
+<script src="core/modules/identity/identity-storage.js"></script>
+<script src="core/modules/identity/identity-engine.js"></script>
+<!-- Owner Voice onboarding rule: pure decision module, no DOM/network.
+     Consumed only by the registration success handler below. -->
+<script src="core/modules/identity/onboarding-voice-core.js"></script>
+<!-- Prompt 6 Step C — delivery-backend-registry.js must load BEFORE
+     phone-provider.js: it reads window.CozyOS.DeliveryBackendRegistry
+     once, at its own auto-instantiation time, and doesn't re-check for
+     it later. (password-reset-service.js formerly loaded here too and
+     had the same ordering requirement — it is deprecated as of Phase B
+     and no longer loaded on this page; see that file's header comment
+     for why it's kept in the repo but not wired in.) -->
+<script src="core/security/delivery-backend-registry.js"></script>
+<script src="core/security/otp-provider.js"></script>
+<!-- M375 — real fix: exhaustive repo search (Prompt 4 inventory) found
+     WebAuthnProvider is a genuine, working Passkey implementation
+     (real navigator.credentials.get()/create(), real ECDSA-P256
+     assertion verification) that dashboard.html already loads for
+     Settings -> Security enrollment, but login.html never loaded it -
+     meaning the real engine existed with no way to actually sign in
+     with it. factor-provider-base.js and auth-factor-registry.js are
+     WebAuthnProvider's real, hard dependencies (it registers itself
+     into the registry on load) - loaded here in the same order
+     dashboard.html already proves works. -->
+<script src="core/security/factor-provider-base.js"></script>
+<script src="core/security/auth-factor-registry.js"></script>
+<script src="core/security/webauthn-provider.js"></script>
+<!-- Prompt 6 Step D — phone-provider.js composes factor-provider-base.js
+     (login-factor half) and delivery-backend-registry.js (recovery-
+     challenge dispatch half, channel "sms"), so it must load after
+     both — matching the real dependency order proven above. -->
+<script src="core/security/phone-provider.js"></script>
+<!-- Prompt 10 continuation — real fix: window.CozyOS.PhoneAccountLinkage
+     was never assigned on THIS page (only dashboard.html loaded this
+     exact five-file chain, per that page's own Prompt 9B comment) —
+     genuinely confirmed missing by direct search of this file before
+     this slice, not assumed. AuthCoordinator's own
+     `window.CozyOS && window.CozyOS.PhoneAccountLinkage` check was
+     correctly failing closed the whole time on this page, never wrongly
+     open. Same real dependency order dashboard.html already proves
+     works: delivery-backend-registry.js (already loaded above, before
+     phone-provider.js) and phone-provider.js are phone-account-linkage.js's
+     real dependencies; phone-linkage-store-adapter.js needs the linkage
+     module's registration hook; phone-linkage-bootstrap.js loaded last
+     since it composes all of the above plus the already-loaded
+     IdentityStorage into the one authoritative production instance. -->
+<script src="core/security/phone-account-linkage.js"></script>
+<script src="core/security/phone-linkage-store-adapter.js"></script>
+<script src="core/security/phone-linkage-bootstrap.js"></script>
+<!-- Prompt 9A — real, dependency-only addition (no visual/markup change):
+     auth-factor-snapshot.js and login-decision-engine.js were genuinely
+     missing from this page (confirmed by exhaustive search — neither
+     script tag existed anywhere in the repository), which meant
+     AuthCoordinator.getLoginDecision() would exist as real code but be
+     unreachable in the actual browser runtime. Loaded after their real
+     dependencies above (auth-factor-registry.js, webauthn-provider.js,
+     phone-provider.js) and before auth-coordinator.js, which is the one
+     caller composing both.
+     Prompt 10 continuation — real UI wiring: the "Phone" tile below now
+     calls AuthCoordinator.requestPhoneLoginChallenge()/loginWithPhone(),
+     which is the getLoginDecision()-composing chain this comment
+     originally said had no caller yet. That gap is now closed for the
+     phone factor specifically; Face/Voice/Google/Facebook/Microsoft
+     remain honestly disabled below since no real provider backs them. -->
+<script src="core/security/auth-factor-snapshot.js"></script>
+<script src="core/security/login-decision-engine.js"></script>
+<!-- M372 — real, confirmed fix: this was missing from both login.html
+     and index.html, the two pages where session restoration ("Remember
+     Me") actually needs to run. AuthCoordinator.restoreSession()
+     requires window.CozyOS.Session to exist (confirmed by reading its
+     source before this was added) - without it, restoration silently
+     failed every single time with "Session not loaded yet," regardless
+     of the pointer being correctly stored. dashboard.html already
+     loads this in the same real position; matched here. -->
+<script src="core/modules/session/cozy-session-service.js"></script>
+<script src="core/modules/identity/auth-coordinator.js"></script>
+<script src="core/ui/cozy-background.js"></script>
+<!-- M370.5 — CozyEnvironment. Single, read-only facade over the Living
+     Background's real state - composes it, never duplicates it. -->
+<script src="core/living/cozy-environment.js"></script>
+<script src="core/ui/live-animation-engine.js"></script>
+<script src="core/living/cozy-living-sounds.js"></script>
+<!-- Voice stack — same real files, same order, as index.html. Previously
+     absent from login.html entirely, so no voice (not Charles, not
+     browser TTS) could ever play here; the shared launch-sequence.js
+     below calls CozySpeech.previewVoice()/LivingSounds.play(), both of
+     which require this chain to already exist. -->
+<script src="core/living/cozy-living-audio.js"></script>
+<script src="core/modules/speech/cozy-speech.js"></script>
+<script src="core/modules/speech/adapters/cozy-tts-browser-adapter.js"></script>
+<script src="core/modules/speech/providers/charles-voice-provider.js"></script>
+<script src="core/modules/speech/voice-manager.js"></script>
+<script src="core/living/living-tts.js"></script>
+<script src="core/modules/speech/adapters/speech-recognition-adapter.js"></script>
+<script src="core/shell/startup-orchestrator.js"></script>
+<!-- The shared launch sequence itself (core/shell/launch-sequence.js) —
+     same file, unmodified, index.html/dashboard.html already run.
+     Requires #cozy-launch-screen (added above) plus
+     StartupOrchestrator/LiveAnimationEngine/CozySpeech/LivingSounds/
+     PlatformEventBus, all now loaded above it in the same proven order. -->
+<script src="core/shell/launch-sequence.js"></script>
+<script>
+// M366.8 — same defensive-only fix as index.html: unregisters any stale
+// service worker from a past deployment before anything else runs.
+// Never registers a new one - confirmed no code anywhere calls
+// navigator.serviceWorker.register().
+if (typeof navigator !== "undefined" && navigator.serviceWorker && typeof navigator.serviceWorker.getRegistrations === "function") {
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+    regs.forEach((reg) => reg.unregister());
+  }).catch(() => { /* real, honest no-op */ });
+}
+
+/**
+ * C14B admin-routing fix: resolvePostLoginDestination() — the ONE
+ * place every successful-login handler below decides where to
+ * navigate next. Reads ?return= from the URL this page itself was
+ * loaded with (set only by chalzydashboard.html's own gate — see that
+ * file — never by this page), validates it through the real,
+ * exact-match ReturnDestinationCore allowlist (no open redirect: a
+ * rejected or missing value ALWAYS falls back to "index.html", the
+ * exact same unconditional destination every login method used before
+ * this fix existed). Deliberately avoids the URLSearchParams global so
+ * this function has no environment dependency beyond plain
+ * string/RegExp, matching this file's existing minimal-dependency
+ * style.
+ */
+function resolvePostLoginDestination() {
+  var search = (window.location && window.location.search) || "";
+  var match = /(?:^\?|[?&])return=([^&]*)/.exec(search);
+  var raw = match ? decodeURIComponent(match[1]) : null;
+  var core = window.CozyOS && window.CozyOS.ReturnDestinationCore;
+  var resolved = (raw && core && typeof core.resolveReturnDestination === "function")
+    ? core.resolveReturnDestination(raw)
+    : null;
+  return resolved || "index.html";
+}
+
+/**
+ * C15: reveal the Administrator Sign-In (Firebase) section only when
+ * this page was reached via a validated return destination — reuses
+ * the exact same parsing/allowlist resolvePostLoginDestination() above
+ * already performs, so "is this an admin-route return visit" is never
+ * answered a second, different way. An ordinary visitor's ?search is
+ * empty or invalid, so this section stays hidden for them, honoring
+ * the same "no administrator controls on public login" principle the
+ * removed Fingerprint/Trusted-Device tile followed (see the M364.5
+ * comment further down this file).
+ */
+(function revealAdminFirebaseSectionIfReturningToProtectedRoute() {
+  var search = (window.location && window.location.search) || "";
+  var match = /(?:^\?|[?&])return=([^&]*)/.exec(search);
+  var raw = match ? decodeURIComponent(match[1]) : null;
+  var core = window.CozyOS && window.CozyOS.ReturnDestinationCore;
+  var validated = (raw && core && typeof core.resolveReturnDestination === "function")
+    ? core.resolveReturnDestination(raw)
+    : null;
+  if (!validated) return;
+  var section = document.getElementById("cozy-admin-firebase-section");
+  if (section) section.style.display = "";
+})();
+
+/**
+ * C15: Administrator Sign-In (Firebase) submit handler. Mirrors the
+ * ordinary password form's own success handling exactly — same
+ * available/error checking shape, same
+ * resolvePostLoginDestination() call on success, same generic error
+ * display on failure. Delegates all real work to
+ * AuthCoordinator.loginWithServerFirebase() (auth-coordinator.js),
+ * which composes the existing Firebase SDK wrapper, the existing
+ * POST /webauthn/firebase/session endpoint, and the existing
+ * #finishServerLogin() bridge — nothing here decides identity or
+ * authorization itself.
+ */
+(function wireAdminFirebaseForm() {
+  var form = document.getElementById("cozy-admin-firebase-form");
+  if (!form) return;
+  form.addEventListener("submit", async function (event) {
+    event.preventDefault();
+    var errorEl = document.getElementById("cozy-admin-firebase-error");
+    var submitBtn = document.getElementById("cozy-admin-firebase-submit");
+    var email = document.getElementById("cozy-admin-firebase-email").value.trim();
+    var password = document.getElementById("cozy-admin-firebase-password").value;
+    if (errorEl) errorEl.textContent = "";
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+      var auth = window.CozyOS && window.CozyOS.AuthCoordinator;
+      if (!auth || typeof auth.loginWithServerFirebase !== "function") {
+        if (errorEl) errorEl.textContent = "Administrator sign-in is not available right now.";
+        return;
+      }
+      var result = await auth.loginWithServerFirebase(email, password);
+      if (!result || result.available !== true) {
+        if (errorEl) errorEl.textContent = (result && result.reason) || "Invalid administrator email or password.";
+        return;
+      }
+      window.location.href = resolvePostLoginDestination();
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  });
+})();
+
+/**
+ * M373 — real, confirmed fix: this file previously had NO session
+ * restoration logic at all - confirmed by exhaustive search before
+ * this was written. A user who checked "Remember Me" and had a
+ * genuinely valid, persisted session pointer would still always see
+ * the login form if they landed directly on login.html, since nothing
+ * here ever checked. Composes the same real AuthCoordinator/
+ * IdentityEngine methods index.html's own resolveAuthState() already
+ * uses - never a second restoration mechanism. Waits (bounded) for
+ * both real engines to exist before attempting, since script load
+ * order isn't otherwise guaranteed here.
+ */
+(async function restoreExistingSession() {
+  const waitFor = (check, attempts = 0) => new Promise((resolve) => {
+    if (check() || attempts >= 40) { resolve(check()); return; }
+    setTimeout(() => resolve(waitFor(check, attempts + 1)), 200);
+  });
+  const ready = await waitFor(() => !!(window.CozyOS && window.CozyOS.AuthCoordinator && window.CozyOS.IdentityEngine));
+  if (!ready) return; // honest no-op - engines never loaded, stay on the login form
+
+  const identity = window.CozyOS.IdentityEngine;
+  if (typeof identity.restorePersistedUsers === "function") {
+    try { await identity.restorePersistedUsers(); } catch (_err) { /* honest no-op */ }
+  }
+  const auth = window.CozyOS.AuthCoordinator;
+  if (typeof auth.restoreSession === "function") {
+    try { await auth.restoreSession(); } catch (_err) { /* honest no-op */ }
+  }
+  if (typeof auth.isAuthenticated === "function" && auth.isAuthenticated()) {
+    window.location.href = resolvePostLoginDestination();
+  }
+})();
+
+function revealLoginScreen() {
+  // Compose the real Living Background + StartupOrchestrator exactly as
+  // dashboard.html's own launch screen does — never a second background
+  // implementation. Idempotent: init() no-ops if the canvas already
+  // exists (e.g. arriving here mid-way through index.html's sequence).
+  const background = window.CozyOS && window.CozyOS.Background;
+  const orchestrator = window.CozyOS && window.CozyOS.StartupOrchestrator;
+  if (background && typeof background.init === "function") background.init();
+  if (orchestrator && typeof orchestrator.applyStartupScene === "function") orchestrator.applyStartupScene();
+
+  // M364.3: real motto text, split-colored and fall-bounce-animated via
+  // the same, single, promoted LiveAnimationEngine.fallBounceText()
+  // method the main launch sequence uses (core/ui/live-animation-
+  // engine.js) — never a second animation implementation, never typed.
+  const MOTTO = "Built for Africa. Ready for the World.";
+  const MOTTO_SPLIT_INDEX = MOTTO.indexOf(". ") >= 0 ? MOTTO.indexOf(". ") + 2 : MOTTO.length;
+
+  requestAnimationFrame(() => {
+    if (orchestrator && typeof orchestrator.revealLiveBackground === "function") {
+      orchestrator.revealLiveBackground();
+    } else {
+      const canvas = document.getElementById("cozy-live-bg-canvas");
+      if (canvas) canvas.style.opacity = "1";
+    }
+    if (orchestrator && typeof orchestrator.activateLighting === "function") orchestrator.activateLighting();
+
+    document.getElementById("cozy-login-brand").classList.add("cozy-brand-visible");
+
+    // M364.4 — Living Audio Completion: register the real, official
+    // sound pack (same call, same engine, as launch-sequence.js — see
+    // that file's own comment; harmless no-op until real .mp3 files
+    // exist under assets/audio/, disclosed in the certification report).
+    if (orchestrator && typeof orchestrator.loadOfficialSoundPack === "function") orchestrator.loadOfficialSoundPack();
+
+    // M364.4: real button-hover cue, composing the existing LivingSounds
+    // registry directly (same real engine cozy-login-gate.js already
+    // uses for its own "notification" cue) — never a second sound path.
+    const sounds = window.CozyOS && window.CozyOS.LivingSounds;
+    if (sounds && typeof sounds.play === "function") {
+      document.querySelectorAll("#cozy-login-submit, #cozy-create-account, #cozy-forgot-link, .cozy-more-btn:not(:disabled)").forEach((btn) => {
+        btn.addEventListener("mouseenter", () => sounds.play("button-hover", { category: "ui" }).then((result) => {
+          if (!result || !result.success) console.warn("[CozyOS Login] button-hover sound did not play:", result && result.reason);
+        }));
+      });
+    }
+
+    const motto = document.getElementById("cozy-login-motto");
+    const engine = window.CozyOS && window.CozyOS.LiveAnimationEngine;
+    if (motto && engine && typeof engine.fallBounceText === "function") {
+      engine.fallBounceText(motto, MOTTO, MOTTO_SPLIT_INDEX, { greenClass: "cozy-motto-green", goldClass: "cozy-motto-gold" });
+    } else if (motto) {
+      // Honest fallback if the engine hasn't loaded for any reason.
+      motto.innerHTML = `<span class="cozy-motto-green">${MOTTO.slice(0, MOTTO_SPLIT_INDEX)}</span><span class="cozy-motto-gold">${MOTTO.slice(MOTTO_SPLIT_INDEX)}</span>`;
+    }
+
+    setTimeout(() => {
+      const card = document.getElementById("cozy-login-card");
+      if (card) {
+        card.classList.add("cozy-login-card-visible");
+        // M364.4 refinement: soft settle cue, fired exactly when the
+        // real CSS transition finishes (transitionend), not guessed via
+        // a second timer - composes the same LivingSounds registry,
+        // "button-hover" reused as the softest existing real UI cue
+        // rather than inventing a new event for this one moment.
+        const onSettled = (evt) => {
+          if (evt.target !== card) return;
+          card.removeEventListener("transitionend", onSettled);
+          if (sounds && typeof sounds.play === "function") {
+            sounds.play("button-hover", { category: "ui", volume: 0.4 }).then((result) => {
+              if (!result || !result.success) console.warn("[CozyOS Login] button-hover sound did not play:", result && result.reason);
+            });
+          }
+          // M370.2 — the floating idle animation only begins once the
+          // real entrance transition has genuinely finished, using this
+          // same real transitionend event - never a guessed delay.
+          card.classList.add("cozy-login-card-floating");
+        };
+        card.addEventListener("transitionend", onSettled);
+        initLoginCardDrag(card);
+      }
+    }, 350);
+
+    /**
+     * initLoginCardDrag(card)
+     *   M370.2 — real, self-contained drag: native Pointer Events
+     *   (mouse/touch/pen unified, same primitive the Window Manager
+     *   itself uses, M366.7 - no third-party drag library, no
+     *   duplicate abstraction). Deliberately NOT WindowManager.create() -
+     *   the login card has no title bar, no resize, no minimize; it's a
+     *   floating card, not a window, same reasoning already applied to
+     *   the Live View Controller (M367.1). Only ever repositions this
+     *   one element - the Living Background canvas underneath is never
+     *   touched, so it keeps animating independently by construction.
+     */
+    function initLoginCardDrag(card) {
+      const EDGE_MARGIN = 20;
+      let dragState = null;
+      let lastTapAt = 0;
+      let hasSwitchedToFixed = false;
+
+      function switchToFixedPositioning() {
+        if (hasSwitchedToFixed) return;
+        hasSwitchedToFixed = true;
+        const rect = card.getBoundingClientRect();
+        card.style.position = "fixed";
+        card.style.left = `${rect.left}px`;
+        card.style.top = `${rect.top}px`;
+        card.style.margin = "0";
+        card.style.right = "auto"; card.style.bottom = "auto";
+      }
+
+      function clampToScreen(x, y) {
+        const rect = card.getBoundingClientRect();
+        const maxX = window.innerWidth - rect.width - EDGE_MARGIN;
+        const maxY = window.innerHeight - rect.height - EDGE_MARGIN;
+        return { x: Math.min(Math.max(EDGE_MARGIN, x), Math.max(EDGE_MARGIN, maxX)), y: Math.min(Math.max(EDGE_MARGIN, y), Math.max(EDGE_MARGIN, maxY)) };
+      }
+
+      function getDefaultPosition() {
+        const rect = card.getBoundingClientRect();
+        // M370.2 — honors this screen's real layout (the card normally
+        // sits low, near the bottom, per #cozy-login-screen's own
+        // justify-content: flex-end) rather than assuming a literal
+        // vertical screen center.
+        return clampToScreen((window.innerWidth - rect.width) / 2, window.innerHeight - rect.height - 48);
+      }
+
+      function animateTo(x, y, durationMs) {
+        card.style.transition = `left ${durationMs}ms ease, top ${durationMs}ms ease`;
+        card.style.left = `${x}px`;
+        card.style.top = `${y}px`;
+        setTimeout(() => { card.style.transition = ""; }, durationMs + 20);
+      }
+
+      function returnToCenter() {
+        const target = getDefaultPosition();
+        animateTo(target.x, target.y, 400);
+      }
+
+      card.addEventListener("pointerdown", (evt) => {
+        if (evt.target.closest("input, button, a, textarea, select")) return; // never hijacks real form interaction
+        switchToFixedPositioning();
+        const rect = card.getBoundingClientRect();
+        dragState = { startX: evt.clientX, startY: evt.clientY, origX: rect.left, origY: rect.top, moved: false };
+        card.setPointerCapture(evt.pointerId);
+        card.classList.add("cozy-login-card-dragging");
+      });
+      const mistEl = card.querySelector("#cozy-login-mist");
+      card.addEventListener("pointermove", (evt) => {
+        if (!dragState) return;
+        const dx = evt.clientX - dragState.startX, dy = evt.clientY - dragState.startY;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragState.moved = true;
+        const clamped = clampToScreen(dragState.origX + dx, dragState.origY + dy);
+        card.style.left = `${clamped.x}px`;
+        card.style.top = `${clamped.y}px`;
+        // M370.4 — Parallax: foreground (card) moves 100% via left/top
+        // above; the mist (a real, separate element) and the reflection
+        // layer (::before, via a CSS custom property) lag slightly
+        // behind at 95%/98% of the same real drag delta, creating a
+        // small depth effect. Values match the spec's own example.
+        if (mistEl) mistEl.style.transform = `translate(${dx * -0.05}px, ${dy * -0.05}px)`;
+        card.style.setProperty("--cozy-parallax-x", `${dx * -0.02}px`);
+        card.style.setProperty("--cozy-parallax-y", `${dy * -0.02}px`);
+      });
+      const endDrag = (evt) => {
+        if (!dragState) return;
+        const wasTap = !dragState.moved;
+        dragState = null;
+        card.classList.remove("cozy-login-card-dragging");
+        card.classList.add("cozy-login-card-floating");
+        // M370.4 — Parallax reset: smoothly returns both lagging layers
+        // to their neutral offset once dragging stops. The reflection
+        // layer is a ::before pseudo-element (not directly stylable
+        // from JS), so a brief class toggle supplies its return
+        // transition instead.
+        if (mistEl) { mistEl.style.transition = "transform 300ms ease"; mistEl.style.transform = "translate(0, 0)"; setTimeout(() => { mistEl.style.transition = ""; }, 320); }
+        card.classList.add("cozy-parallax-returning");
+        card.style.setProperty("--cozy-parallax-x", "0px");
+        card.style.setProperty("--cozy-parallax-y", "0px");
+        setTimeout(() => card.classList.remove("cozy-parallax-returning"), 320);
+        if (wasTap) {
+          const now = Date.now();
+          if (now - lastTapAt < 350) { returnToCenter(); lastTapAt = 0; }
+          else lastTapAt = now;
+        } else {
+          // M370.3 — Magnetic Return: released after a real drag (not a
+          // tap) - if close enough to the default position, smoothly
+          // snap back to it; otherwise honestly leave the card exactly
+          // where the user dropped it.
+          const MAGNETIC_THRESHOLD_PX = 70;
+          const rect = card.getBoundingClientRect();
+          const target = getDefaultPosition();
+          const distance = Math.hypot(rect.left - target.x, rect.top - target.y);
+          if (distance <= MAGNETIC_THRESHOLD_PX) animateTo(target.x, target.y, 500);
+        }
+      };
+      card.addEventListener("pointerup", endDrag);
+      card.addEventListener("pointercancel", endDrag);
+
+      /**
+       * updateLivingLook()
+       *   M370.3/M370.4 — Dynamic Light + Wind Interaction. Composes
+       *   only real, already-public values from the unmodified Living
+       *   Background engine: getTimeOfDay().brightness, lightingIntensity,
+       *   and windStrength (all confirmed public instance properties/
+       *   methods by reading cozy-background.js before writing this).
+       *   No hardcoded colors are introduced beyond the existing
+       *   emerald/gold palette already used throughout this file.
+       *
+       *   HONEST DISCLOSURE — Wind direction: this engine's own real
+       *   cloud-movement code (confirmed by reading it directly) always
+       *   increments cloud.x by a positive speed - clouds only ever
+       *   drift one constant direction in this engine, never
+       *   alternating left/right. So the requested "tilts left when
+       *   clouds drift left, right when they drift right" has no real,
+       *   varying signal to read. What IS real and does genuinely vary
+       *   is windStrength (intensity). This composes that: a tiny,
+       *   constant-direction tilt (matching the one real direction
+       *   clouds move) whose MAGNITUDE scales with real wind intensity -
+       *   never a fabricated alternating direction.
+       *
+       *   Performance: no real "lighting changed" event exists on this
+       *   engine either (confirmed absent by search) - periodic polling
+       *   remains the only available approach, so it stays (unchanged
+       *   from M370.3's 8s interval, still far from per-frame). Added:
+       *   real change-detection so a style write only happens when a
+       *   value has genuinely changed since the last check, not on
+       *   every poll regardless.
+       */
+      /**
+       * applyLivingLook(state)
+       *   M370.5 — real fix: previously read window.CozyOS.Background
+       *   directly and ran its own 8s poll, meaning login.html had its
+       *   own copy of "how do I read the environment." Now composes the
+       *   single, existing CozyEnvironment facade (core/living/cozy-
+       *   environment.js) instead - CozyEnvironment owns the poll (and
+       *   will own the real event too, the moment one exists); this
+       *   file only reacts to whatever state it's given. No environment
+       *   logic is duplicated here anymore.
+       */
+      function applyLivingLook(state) {
+        if (!state || !state.available) return;
+        const brightness = Math.max(0.15, Math.min(1, state.lighting));
+        const wind = typeof state.windStrength === "number" ? state.windStrength : 1;
+
+        const shadowAlpha = (0.35 + (1 - brightness) * 0.25).toFixed(2);
+        const emeraldAlpha = (0.10 + brightness * 0.14).toFixed(2);
+        card.style.boxShadow = `0 8px 40px rgba(0,0,0,${shadowAlpha}), 0 0 0 1px rgba(249,168,37,0.06) inset, 0 0 24px rgba(76,175,80,${emeraldAlpha})`;
+
+        // Glass brightness + border glow scale with the same real value.
+        const glassAlpha = (0.45 + brightness * 0.2).toFixed(2);
+        card.style.background = `rgba(13, 46, 30, ${glassAlpha})`;
+        const borderAlpha = (0.25 + brightness * 0.25).toFixed(2);
+        card.style.borderColor = `rgba(249, 168, 37, ${borderAlpha})`;
+
+        // Wind: tiny, constant-direction tilt (real cloud movement in
+        // this engine is always one direction, confirmed by reading its
+        // source - see cozy-environment.js's own header for the full
+        // disclosure), magnitude scaled by real windStrength, applied as
+        // a CSS custom property so it composes with (doesn't fight) the
+        // organic floating animation's own transform.
+        const tiltDeg = Math.min(1, wind * 0.6).toFixed(2);
+        card.style.setProperty("--cozy-wind-tilt", `${tiltDeg}deg`);
+      }
+
+      const env = window.CozyOS && window.CozyOS.CozyEnvironment;
+      if (env && typeof env.getState === "function") {
+        applyLivingLook(env.getState());
+        if (typeof env.onChange === "function") env.onChange(applyLivingLook);
+      }
+
+      /**
+       * applyLoginSubtitle(state)
+       *   M372 — real, composed subtitle text from CozyEnvironment.
+       *   getState() (no separate time calculation). Honest disclosure:
+       *   this does NOT say "Welcome back, Charles" - no mechanism
+       *   exists anywhere in this repository to recall a previously
+       *   logged-in user's name before authentication happens
+       *   (confirmed by exhaustive search before this was written), so
+       *   only the real, time-based portion is implemented.
+       */
+      function applyLoginSubtitle(state) {
+        const sub = document.getElementById("cozy-login-sub");
+        if (!sub || !state || !state.available) return;
+        const byPeriod = {
+          morning: "Ready for another productive day?",
+          afternoon: "Sign in to continue to CozyOS.",
+          evening: "Welcome back this evening.",
+          night: "Sign in to continue to CozyOS."
+        };
+        sub.textContent = byPeriod[state.timeOfDay] || "Sign in to continue to CozyOS.";
+      }
+      if (env && typeof env.getState === "function") {
+        applyLoginSubtitle(env.getState());
+        if (typeof env.onChange === "function") env.onChange(applyLoginSubtitle);
+      }
+      // Keep the card within bounds if the viewport itself changes
+      // (orientation change / resize) while it's been dragged.
+      window.addEventListener("resize", () => {
+        if (!hasSwitchedToFixed) return;
+        const rect = card.getBoundingClientRect();
+        const clamped = clampToScreen(rect.left, rect.top);
+        card.style.left = `${clamped.x}px`;
+        card.style.top = `${clamped.y}px`;
+      });
+    }
+  });
+
+  // ---- Sign in -------------------------------------------------------
+  const form = document.getElementById("cozy-login-form");
+  const errorEl = document.getElementById("cozy-login-error");
+  const submitBtn = document.getElementById("cozy-login-submit");
+
+  document.getElementById("cozy-pw-toggle").addEventListener("click", () => {
+    const pw = document.getElementById("cozy-login-password");
+    const btn = document.getElementById("cozy-pw-toggle");
+    const showing = pw.type === "text";
+    pw.type = showing ? "password" : "text";
+    btn.textContent = showing ? "SHOW" : "HIDE";
+  });
+
+  form.addEventListener("submit", async (evt) => {
+    evt.preventDefault();
+    errorEl.style.display = "none";
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Signing in…";
+
+    const username = document.getElementById("cozy-login-username").value.trim();
+    const password = document.getElementById("cozy-login-password").value;
+    const rememberMe = document.getElementById("cozy-remember-me").checked;
+
+    const auth = window.CozyOS && window.CozyOS.AuthCoordinator;
+    if (!auth || typeof auth.loginWithServerPassword !== "function") {
+      errorEl.textContent = "CozyOS Identity services failed to load. Please reload the page.";
+      errorEl.style.display = "block";
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Sign In";
+      return;
+    }
+
+    // Phase C — Portion 1: server-authoritative password login.
+    // The browser makes no authentication decision here; it only
+    // relays what POST /auth/login (via AuthCoordinator) reports.
+    let result;
+    try {
+      result = await auth.loginWithServerPassword(username, password, { rememberMe });
+    } catch (err) {
+      result = { available: false, reason: err.message };
+    }
+
+    if (!result || result.available !== true) {
+      errorEl.textContent = (result && result.reason) ? result.reason : "Sign in failed. Check your username and password.";
+      errorEl.style.display = "block";
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Sign In";
+      return;
+    }
+
+    // Phase C §3-4 — real server MFA gate: the server has verified the
+    // password but requires a second factor, and has NOT issued a
+    // session cookie yet. No redirect happens here - showOtpStep()
+    // (below) reveals the real code-entry form; only a genuinely
+    // server-verified TOTP or recovery code (via
+    // completeServerLoginWithOtp()) proceeds past this point.
+    if (result.requiresOtp) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Sign In";
+      showOtpStep({ pendingId: result.pendingId, rememberMe: result.rememberMe, email: username });
+      return;
+    }
+
+    // M364.4: real login-success cue, composing the existing
+    // LivingSounds registry directly — plays (or honestly no-ops today,
+    // no asset yet) immediately before the real hand-off below.
+    const successSounds = window.CozyOS && window.CozyOS.LivingSounds;
+    if (successSounds && typeof successSounds.play === "function") {
+      successSounds.play("login-success", { category: "notification" }).then((result) => {
+        if (!result || !result.success) console.warn("[CozyOS Login] login-success sound did not play:", result && result.reason);
+      });
+    }
+
+    // Real, honest hand-off — index.html is the real end-user entry point
+    // (M311/M326 bootstrap); login.html never renders an app list itself.
+    window.location.href = resolvePostLoginDestination();
+  });
+
+  // ---- Passkey sign-in (Portion 2c) ---------------------------------
+  // Real seam: AuthCoordinator.loginWithServerPasskey() (Portion 2b) —
+  // POST /webauthn/authenticate/begin -> navigator.credentials.get() ->
+  // POST /webauthn/authenticate/complete, with the real server WebAuthn
+  // RP as the sole verification authority — then the same real
+  // session-establishment/Remember-Me pointer persistence path the
+  // password form above already uses. This handler performs no
+  // verification itself, constructs no challenge, and calls no
+  // navigator.credentials.get() directly - it only reads the honest
+  // result the coordinator already produced. Superseded here: the old
+  // client-side loginWithPasskey() (WebAuthnProvider.verify() +
+  // IdentityEngine.loginWithVerifiedPasskey()) is no longer called from
+  // this button; that legacy method remains in auth-coordinator.js
+  // unmodified but is now dead code from login.html's perspective.
+  const passkeyBtn = document.getElementById("cozy-passkey-btn");
+  if (passkeyBtn) {
+    let passkeyLoginInFlight = false;
+    passkeyBtn.addEventListener("click", async () => {
+      if (passkeyLoginInFlight) return; // prevent duplicate submissions while a ceremony is running
+      errorEl.style.display = "none";
+      const email = document.getElementById("cozy-login-username").value.trim();
+      const rememberMe = document.getElementById("cozy-remember-me").checked;
+
+      if (!email) {
+        errorEl.textContent = "Enter your username first, then choose Passkey.";
+        errorEl.style.display = "block";
+        return;
+      }
+
+      const auth = window.CozyOS && window.CozyOS.AuthCoordinator;
+      if (!auth || typeof auth.loginWithServerPasskey !== "function") {
+        errorEl.textContent = "Passkey sign-in services failed to load. Please reload the page.";
+        errorEl.style.display = "block";
+        return;
+      }
+
+      const originalLabel = passkeyBtn.innerHTML;
+      passkeyLoginInFlight = true;
+      passkeyBtn.disabled = true;
+      passkeyBtn.innerHTML = "<span class=\"cozy-icon\">🔑</span>Waiting for passkey…";
+
+      let result;
+      try {
+        // email (not username) — loginWithServerPasskey() resolves the
+        // real server-side credential by email, same as
+        // loginWithServerPassword() above; the login form's single
+        // identifier field is passed through unchanged.
+        result = await auth.loginWithServerPasskey(email, { rememberMe });
+      } catch (err) {
+        result = { available: false, reason: err.message };
+      } finally {
+        passkeyLoginInFlight = false;
+        passkeyBtn.disabled = false;
+        passkeyBtn.innerHTML = originalLabel;
+      }
+
+      if (!result || result.available !== true) {
+        // Honest, state-specific messaging (Rule 19): device-unsupported,
+        // not-yet-enrolled, user-cancelled, and server-rejected outcomes
+        // are all surfaced distinctly via result.reason as the real
+        // coordinator reports them, never collapsed or reinterpreted.
+        errorEl.textContent = (result && result.reason) ? result.reason : "Passkey sign-in failed.";
+        errorEl.style.display = "block";
+        return;
+      }
+
+      const successSounds = window.CozyOS && window.CozyOS.LivingSounds;
+      if (successSounds && typeof successSounds.play === "function") {
+        successSounds.play("login-success", { category: "notification" }).catch(() => {});
+      }
+      window.location.href = resolvePostLoginDestination();
+    });
+  }
+
+  // ---- Phone sign-in (Prompt 10 continuation) -----------------------
+  // Real seam: AuthCoordinator.requestPhoneLoginChallenge()/loginWithPhone()
+  // compose the genuine CozyPhoneChallengeService (real SHA-256 checksum +
+  // salted PBKDF2 verifier) and real PhoneAccountLinkage account state,
+  // then the same real session-establishment/Remember-Me pointer
+  // persistence path every other login method on this page already uses.
+  // This handler performs no verification itself — it only reads the
+  // honest result, exactly like the Passkey handler above.
+  const phoneBtn = document.getElementById("cozy-phone-btn");
+  if (phoneBtn) {
+    phoneBtn.addEventListener("click", async () => {
+      errorEl.style.display = "none";
+      const username = document.getElementById("cozy-login-username").value.trim();
+      const rememberMe = document.getElementById("cozy-remember-me").checked;
+
+      if (!username) {
+        errorEl.textContent = "Enter your username first, then choose Phone.";
+        errorEl.style.display = "block";
+        return;
+      }
+
+      const auth = window.CozyOS && window.CozyOS.AuthCoordinator;
+      if (!auth || typeof auth.requestPhoneLoginChallenge !== "function") {
+        errorEl.textContent = "Phone sign-in services failed to load. Please reload the page.";
+        errorEl.style.display = "block";
+        return;
+      }
+
+      const originalLabel = phoneBtn.innerHTML;
+      phoneBtn.disabled = true;
+      phoneBtn.innerHTML = "<span class=\"cozy-icon\">📱</span>Requesting code…";
+
+      let result;
+      try {
+        result = await auth.requestPhoneLoginChallenge(username);
+      } catch (err) {
+        result = { available: false, reason: err.message };
+      }
+
+      phoneBtn.disabled = false;
+      phoneBtn.innerHTML = originalLabel;
+
+      if (!result || result.available !== true) {
+        // Honest, state-specific messaging (Rule 19), same convention
+        // as the Passkey handler: "not set up" is surfaced distinctly
+        // from a generic failure, never collapsed together.
+        errorEl.textContent = (result && result.reason) ? result.reason : "Phone sign-in is not available for this account.";
+        errorEl.style.display = "block";
+        return;
+      }
+
+      showPhoneCodeStep({ username, rememberMe });
+    });
+  }
+  const moreToggle = document.getElementById("cozy-more-toggle");
+  const morePanel = document.getElementById("cozy-more-panel");
+  moreToggle.addEventListener("click", () => {
+    const open = morePanel.classList.toggle("cozy-more-open");
+    moreToggle.classList.toggle("cozy-more-open", open);
+    moreToggle.setAttribute("aria-expanded", String(open));
+  });
+
+  // ---- Modal plumbing --------------------------------------------------
+  function openModal(id) { document.getElementById(id).classList.add("cozy-modal-open"); }
+  function closeModal(id) { document.getElementById(id).classList.remove("cozy-modal-open"); }
+
+  // ---- Forgot password (Prompt 6 MID-2) -----------------------------
+  // Real two-step flow against window.CozyOS.PasswordResetService
+  // (core/security/password-reset-service.js — SHA-256 lookup checksum
+  // + salted PBKDF2-SHA256 verifier, 15-min expiry, single-use, never
+  // persists the raw token). No admin-style instant reset from a bare
+  // username anymore — that was the disclosed insecurity this replaces.
+  const forgotStepRequest = document.getElementById("cozy-forgot-step-request");
+  const forgotStepConfirm = document.getElementById("cozy-forgot-step-confirm");
+  function showForgotStep(step) {
+    forgotStepRequest.style.display = step === "request" ? "" : "none";
+    forgotStepConfirm.style.display = step === "confirm" ? "" : "none";
+  }
+  document.getElementById("cozy-forgot-link").addEventListener("click", (e) => {
+    e.preventDefault();
+    showForgotStep("request");
+    ["cozy-forgot-username", "cozy-forgot-token", "cozy-forgot-newpass", "cozy-forgot-confirm"].forEach(id => { document.getElementById(id).value = ""; });
+    [document.getElementById("cozy-forgot-request-error"), document.getElementById("cozy-forgot-request-success"),
+     document.getElementById("cozy-forgot-error"), document.getElementById("cozy-forgot-success")].forEach(el => { el.style.display = "none"; });
+    openModal("cozy-forgot-modal");
+  });
+  document.getElementById("cozy-forgot-cancel").addEventListener("click", () => closeModal("cozy-forgot-modal"));
+  document.getElementById("cozy-forgot-confirm-cancel").addEventListener("click", () => closeModal("cozy-forgot-modal"));
+  document.getElementById("cozy-forgot-have-token-link").addEventListener("click", (e) => { e.preventDefault(); showForgotStep("confirm"); });
+
+  // DEV-ONLY console shim removed as of Phase B: password recovery now
+  // goes through the real server-authoritative /auth/password/forgot
+  // endpoint (server/webauthn-rp/server.js), which already returns an
+  // honest generic response and only ever "delivers" through whatever
+  // provider is actually configured server-side (see
+  // GET /auth/providers/status) — there is no client-side delivery path
+  // left to shim.
+
+  document.getElementById("cozy-forgot-request-submit").addEventListener("click", async () => {
+    const errEl = document.getElementById("cozy-forgot-request-error");
+    const okEl = document.getElementById("cozy-forgot-request-success");
+    errEl.style.display = "none"; okEl.style.display = "none";
+    const identifier = document.getElementById("cozy-forgot-username").value.trim();
+    if (!identifier) { errEl.textContent = "Enter your username, email, or phone."; errEl.style.display = "block"; return; }
+    try {
+      const res = await fetch("/auth/password/forgot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email: identifier }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        errEl.textContent = body.error === "rate_limited"
+          ? "Too many requests. Please wait a bit and try again."
+          : "Could not create the recovery request.";
+        errEl.style.display = "block";
+        return;
+      }
+      // The server's own generic, enumeration-safe message — this page
+      // never invents a different one, and never claims delivery
+      // succeeded beyond what the server actually reports.
+      okEl.textContent = body.message || "If that account is eligible, recovery instructions have been sent.";
+      okEl.style.display = "block";
+    } catch (err) {
+      errEl.textContent = "Recovery service unavailable. Please try again later.";
+      errEl.style.display = "block";
+    }
+  });
+
+  document.getElementById("cozy-forgot-submit").addEventListener("click", async () => {
+    const errEl = document.getElementById("cozy-forgot-error");
+    const okEl = document.getElementById("cozy-forgot-success");
+    errEl.style.display = "none"; okEl.style.display = "none";
+    const token = document.getElementById("cozy-forgot-token").value.trim();
+    const pw = document.getElementById("cozy-forgot-newpass").value;
+    const confirm = document.getElementById("cozy-forgot-confirm").value;
+    if (!token || !pw) { errEl.textContent = "Reset token and new password are required."; errEl.style.display = "block"; return; }
+    if (pw !== confirm) { errEl.textContent = "Passwords do not match."; errEl.style.display = "block"; return; }
+    try {
+      const res = await fetch("/auth/password/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ token, newPassword: pw }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const messages = {
+          invalid_reset_token: "That reset token isn't valid. Request a new one.",
+          reset_token_already_used: "That reset token has already been used. Request a new one.",
+          reset_token_expired: "That reset token has expired. Request a new one.",
+          password_too_short: "Choose a password at least 8 characters long.",
+        };
+        errEl.textContent = messages[body.error] || "Reset failed. Check the token and try again.";
+        errEl.style.display = "block";
+        return;
+      }
+      okEl.textContent = "Password reset. All other sessions were signed out. You can sign in now.";
+      okEl.style.display = "block";
+      setTimeout(() => closeModal("cozy-forgot-modal"), 1400);
+    } catch (err) {
+      errEl.textContent = "Reset failed. Please try again later.";
+      errEl.style.display = "block";
+    }
+  });
+
+  /**
+   * showOtpStep({pendingId, rememberMe, email})
+   *   Phase C §3-4 — real server-authoritative second factor step.
+   *   Opens the same real modal pattern used elsewhere on this page.
+   *   Submit composes AuthCoordinator.completeServerLoginWithOtp()
+   *   (real POST /auth/mfa/verify against server-side pending-auth
+   *   state) - the redirect to index.html only happens on genuine
+   *   success, never optimistically. Cancel composes
+   *   abortPendingServerLogin() so no server-side pending state is
+   *   left dangling; there is no client session to tear down since
+   *   the server never issued one at this stage.
+   */
+  function showOtpStep({ pendingId, rememberMe, email }) {
+    document.getElementById("cozy-otp-error").style.display = "none";
+    document.getElementById("cozy-otp-code").value = "";
+    openModal("cozy-otp-modal");
+    setTimeout(() => document.getElementById("cozy-otp-code").focus(), 100);
+
+    const submitBtn = document.getElementById("cozy-otp-submit");
+    const cancelBtn = document.getElementById("cozy-otp-cancel");
+    const errEl = document.getElementById("cozy-otp-error");
+
+    const onCancel = () => {
+      closeModal("cozy-otp-modal");
+      cleanup();
+      const auth = window.CozyOS && window.CozyOS.AuthCoordinator;
+      if (auth && typeof auth.abortPendingServerLogin === "function") {
+        auth.abortPendingServerLogin(pendingId);
+      }
+    };
+    const onSubmit = async () => {
+      errEl.style.display = "none";
+      const code = document.getElementById("cozy-otp-code").value.trim();
+      if (!code) { errEl.textContent = "Enter a code."; errEl.style.display = "block"; return; }
+      submitBtn.disabled = true; submitBtn.textContent = "Verifying...";
+      const auth = window.CozyOS && window.CozyOS.AuthCoordinator;
+      // The single input accepts either a 6-digit authenticator code or
+      // a recovery code (server format: 5 chars - 5 chars, e.g.
+      // XXXXX-XXXXX — see totp.js generateRecoveryCode()). Detect which
+      // one was entered so the correct `method` is sent; the server
+      // itself is still the sole authority on whether it's valid.
+      const method = /^\d{6}$/.test(code) ? "totp" : "recovery";
+      let result;
+      try {
+        result = await auth.completeServerLoginWithOtp(pendingId, code, { rememberMe, method, email });
+      } catch (err) {
+        result = { available: false, reason: err.message };
+      }
+      submitBtn.disabled = false; submitBtn.textContent = "Verify";
+      if (!result || result.available !== true) {
+        errEl.textContent = (result && result.reason) || "Invalid code.";
+        errEl.style.display = "block";
+        return;
+      }
+      closeModal("cozy-otp-modal");
+      cleanup();
+      window.location.href = resolvePostLoginDestination();
+    };
+    function cleanup() {
+      submitBtn.removeEventListener("click", onSubmit);
+      cancelBtn.removeEventListener("click", onCancel);
+    }
+    submitBtn.addEventListener("click", onSubmit);
+    cancelBtn.addEventListener("click", onCancel);
+  }
+
+  /**
+   * phoneDeliveryStatusMessage()
+   *   Prompt 10 continuation — real, honest per-channel status, read
+   *   directly from DeliveryBackendRegistry.getState("sms") (the exact
+   *   same real state vocabulary PhoneAccountLinkage's own
+   *   #smsChannelConfigured() gate already uses — never a second
+   *   interpretation of it). This is the only source of the message
+   *   shown in the modal; it never says "code sent" on its own
+   *   authority — that claim always traces back to a real dispatch
+   *   attempt, and even then only as far as the state below honestly
+   *   supports.
+   */
+  function phoneDeliveryStatusMessage() {
+    const registry = window.CozyOS && window.CozyOS.DeliveryBackendRegistry;
+    if (!registry || typeof registry.getState !== "function") {
+      return "Phone delivery status is unavailable right now.";
+    }
+    let state;
+    try { state = registry.getState("sms"); } catch (_err) { state = { state: "NONE" }; }
+    switch (state && state.state) {
+      case "PRODUCTION_VERIFIED":
+        return "A verification code has been sent by SMS.";
+      case "LOCALLY_VERIFIED":
+        return "A verification code has been issued. SMS delivery has only been locally verified in this environment, not by a production provider.";
+      case "CONFIGURED_UNVERIFIED":
+        return "A verification code has been issued through a configured SMS backend that has not yet been verified as actually delivering messages.";
+      case "DEV_ONLY":
+        return "No production SMS provider is configured. This code was issued through a development-only backend and was NOT sent by real SMS — check the browser console.";
+      case "NONE":
+      default:
+        return "No SMS backend is configured in this environment. A code was issued internally but cannot actually be delivered to your phone.";
+    }
+  }
+
+  /**
+   * showPhoneCodeStep({username, rememberMe})
+   *   Prompt 10 continuation — real second-step Phone sign-in. Exact
+   *   same modal-plumbing shape as showOtpStep() above (open modal,
+   *   focus input, wire submit/cancel, clean up listeners on close) —
+   *   no new interaction pattern invented. The challenge itself was
+   *   already dispatched by the caller's requestPhoneLoginChallenge()
+   *   call (Phone tile handler, above); this step only collects the
+   *   code and composes AuthCoordinator.loginWithPhone() — the redirect
+   *   to index.html only happens on genuine success, never
+   *   optimistically, identical posture to showOtpStep().
+   */
+  function showPhoneCodeStep({ username, rememberMe }) {
+    const statusEl = document.getElementById("cozy-phone-status");
+    const errEl = document.getElementById("cozy-phone-error");
+    errEl.style.display = "none";
+    document.getElementById("cozy-phone-code").value = "";
+    statusEl.textContent = phoneDeliveryStatusMessage();
+    openModal("cozy-phone-modal");
+    setTimeout(() => document.getElementById("cozy-phone-code").focus(), 100);
+
+    const submitBtn = document.getElementById("cozy-phone-submit");
+    const cancelBtn = document.getElementById("cozy-phone-cancel");
+
+    const onCancel = () => { closeModal("cozy-phone-modal"); cleanup(); };
+    const onSubmit = async () => {
+      errEl.style.display = "none";
+      const code = document.getElementById("cozy-phone-code").value.trim();
+      if (!code) { errEl.textContent = "Enter the code."; errEl.style.display = "block"; return; }
+      submitBtn.disabled = true; submitBtn.textContent = "Verifying...";
+      const auth = window.CozyOS && window.CozyOS.AuthCoordinator;
+      let result;
+      try {
+        result = await auth.loginWithPhone(username, code, { rememberMe });
+      } catch (err) {
+        result = { available: false, reason: err.message };
+      }
+      submitBtn.disabled = false; submitBtn.textContent = "Verify";
+      if (!result || result.available !== true) {
+        errEl.textContent = (result && result.reason) || "Invalid or expired code.";
+        errEl.style.display = "block";
+        return;
+      }
+      closeModal("cozy-phone-modal");
+      cleanup();
+      const successSounds = window.CozyOS && window.CozyOS.LivingSounds;
+      if (successSounds && typeof successSounds.play === "function") {
+        successSounds.play("login-success", { category: "notification" }).catch(() => {});
+      }
+      window.location.href = resolvePostLoginDestination();
+    };
+    function cleanup() {
+      submitBtn.removeEventListener("click", onSubmit);
+      cancelBtn.removeEventListener("click", onCancel);
+    }
+    submitBtn.addEventListener("click", onSubmit);
+    cancelBtn.addEventListener("click", onCancel);
+  }
+
+
+  // ---- Create account ------------------------------------------------
+  document.getElementById("cozy-create-account").addEventListener("click", () => openModal("cozy-register-modal"));
+  document.getElementById("cozy-register-cancel").addEventListener("click", () => closeModal("cozy-register-modal"));
+  document.getElementById("cozy-reg-more-toggle").addEventListener("click", () => {
+    const el = document.getElementById("cozy-reg-more");
+    el.style.display = el.style.display === "none" ? "block" : "none";
+  });
+  document.getElementById("cozy-register-submit").addEventListener("click", async () => {
+    const errEl = document.getElementById("cozy-register-error");
+    errEl.style.display = "none";
+    const username = document.getElementById("cozy-reg-username").value.trim();
+    const email = document.getElementById("cozy-reg-email").value.trim();
+    const password = document.getElementById("cozy-reg-password").value;
+    const confirmPassword = document.getElementById("cozy-reg-confirm").value;
+    const firstName = document.getElementById("cozy-reg-first").value.trim();
+    const lastName = document.getElementById("cozy-reg-last").value.trim();
+    const phone = document.getElementById("cozy-reg-phone").value.trim();
+    const acceptTerms = document.getElementById("cozy-reg-terms").checked;
+
+    if (!username || !email || !password) { errEl.textContent = "Username, email and password are required."; errEl.style.display = "block"; return; }
+    if (password !== confirmPassword) { errEl.textContent = "Passwords do not match."; errEl.style.display = "block"; return; }
+    if (!firstName || !lastName || !phone || !acceptTerms) {
+      errEl.textContent = "CozyOS requires first name, last name, phone and accepted terms to create a real account — please expand \"Complete your profile\" above.";
+      errEl.style.display = "block";
+      document.getElementById("cozy-reg-more").style.display = "block";
+      return;
+    }
+
+    const identity = window.CozyOS && window.CozyOS.IdentityEngine;
+    const auth = window.CozyOS && window.CozyOS.AuthCoordinator;
+    if (!identity || typeof identity.register !== "function") { errEl.textContent = "Identity services unavailable."; errEl.style.display = "block"; return; }
+
+    try {
+      const result = await identity.register({ accountType: "user", firstName, lastName, username, email, phone, password, confirmPassword, acceptTerms });
+      if (!result || result.available !== true) { errEl.textContent = (result && result.reason) || "Registration failed."; errEl.style.display = "block"; return; }
+      // Owner Voice onboarding rule: for the very first CozyOS account
+      // ever registered (result.isFirstUser, the same real
+      // this.#users.size===0 signal IdentityEngine.register() itself
+      // uses for its own admin-bootstrap security check — never
+      // re-derived from username/URL/role here), persist Charles
+      // ("Owner Voice") as the onboarding-context voice via the real,
+      // existing VoiceManager.setContextVoice(). This does NOT speak
+      // anything itself — Charles is already the unconditional default
+      // for the "startup" context the upcoming index.html Login Gate
+      // greeting uses, so this call has no audible effect on the
+      // CURRENT redirect (avoiding "Welcome to CozyOS" being heard
+      // twice in a row); it exists so any FUTURE onboarding-context
+      // voice line — anywhere in the app — is already correctly and
+      // permanently bound to the Owner Voice for this specific first
+      // user, per core/modules/identity/onboarding-voice-core.js's
+      // decideOnboardingVoice(). Wrapped so any failure here (module
+      // not loaded, provider not installed) can never block real
+      // registration/login — matching "voice failure must never block
+      // registration."
+      try {
+        const onboardingVoice = window.CozyOS && window.CozyOS.OnboardingVoiceCore;
+        const voiceManager = window.CozyOS && window.CozyOS.VoiceManager;
+        const orchestratorCfg = orchestrator && typeof orchestrator.getConfig === "function" ? orchestrator.getConfig() : null;
+        const soundEnabled = !(orchestratorCfg && orchestratorCfg.audioEnabled === false);
+        if (onboardingVoice && result.isFirstUser === true) {
+          const ownerVoiceAvailable = !voiceManager || !(voiceManager.getProvider("charles") && voiceManager.getProvider("charles").status !== "installed");
+          const decision = onboardingVoice.decideOnboardingVoice({ isFirstUser: result.isFirstUser, soundEnabled, ownerVoiceAvailable });
+          if (decision.useOwnerVoice && voiceManager && typeof voiceManager.setContextVoice === "function") {
+            voiceManager.setContextVoice("onboarding", decision.providerId);
+          }
+        }
+      } catch (_err) { /* honest no-op — never blocks registration */ }
+      // Real hand-off: log the freshly registered user straight in via the
+      // one real login path, never a second/parallel session creation.
+      if (auth && typeof auth.loginWithCredentials === "function") {
+        const loginResult = await auth.loginWithCredentials(username, password, { rememberMe: true });
+        if (loginResult && loginResult.available === true) { window.location.href = resolvePostLoginDestination(); return; }
+      }
+      closeModal("cozy-register-modal");
+      document.getElementById("cozy-login-username").value = username;
+      errorEl.textContent = "Account created — please sign in.";
+      errorEl.style.display = "block";
+    } catch (err) {
+      errEl.textContent = err.message || "Registration failed.";
+      errEl.style.display = "block";
+    }
+  });
+
+  // M364.5 walkthrough fix: the Fingerprint/Trusted-Device click
+  // handlers that lived here were removed along with their markup
+  // above (see that comment) — window.CozyOS.AuthCoordinator's real
+  // loginWithBiometrics()/loginWithTrustedDevice() methods are
+  // themselves untouched and still real; only this page's public
+  // exposure of them was removed.
+}
+
+// Gate revealLoginScreen() behind the real "cozy:launch-sequence-complete"
+// event — same pattern as index.html's proceedOnce(), so a visitor who
+// lands directly on login.html (bookmark/deep link) sees/hears the full
+// logo/COZYOS/welcome-voice/ABOVE ONLY/motto sequence first, exactly as
+// a visitor arriving via index.html does, instead of two different
+// experiences depending on entry point.
+(function () {
+  const launchScreen = document.getElementById("cozy-launch-screen");
+  const bus = window.CozyOS && window.CozyOS.PlatformEventBus;
+  let proceeded = false;
+
+  function proceedOnce() {
+    if (proceeded) return;
+    proceeded = true;
+    if (launchScreen) {
+      launchScreen.classList.add("cozy-launch-hidden");
+      setTimeout(() => { launchScreen.style.display = "none"; }, 650);
+    }
+    revealLoginScreen();
+  }
+
+  if (bus && typeof bus.once === "function") {
+    bus.once("cozy:launch-sequence-complete", proceedOnce);
+    // Honest, bounded fallback — same 10s margin index.html uses for the
+    // same real timeline (STARTUP_TIMING.TOTAL_DURATION_MS = 30000 for
+    // the ABOVE-ONLY-inclusive sequence, generously covered) — never
+    // blocks the sign-in card forever if the event is somehow never
+    // emitted.
+    setTimeout(proceedOnce, 30000);
+  } else {
+    // PlatformEventBus or the shared sequence genuinely failed to load —
+    // honest fallback so a visitor is never stuck behind a launch
+    // screen that will never finish.
+    proceedOnce();
+  }
+})();
+</script>
+</body>
+</html>

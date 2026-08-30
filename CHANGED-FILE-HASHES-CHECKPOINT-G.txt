@@ -1,0 +1,12 @@
+# CHANGED-FILE-HASHES — CHECKPOINT G
+# Baseline: COS-STEP4D-LIVE-UI-PATCH-6.zip (SHA-256 b4a1cdd378d7a90830782cbfd3c0275351b3c1069b5c018adc7c8fabe75f841d)
+# Only these two files differ from that baseline. Confirmed by full recursive
+# diff -rq against a pristine extraction of Patch 6 (see report).
+
+## core/shell/live/ldce-live-media-coordinator.js
+BASELINE (Patch 6):    ec3e39e551dd265e27a7364e6c3656338e53f61a8474d6a696d51e2c0e37c25d
+CHECKPOINT-G (current): c71734302718c7f55efb3656797863d3328a01112875ea3256244db6f9a1fd02
+
+## core/shell/live/tests/ldce-live-media-coordinator.test.js
+BASELINE (Patch 6):    32709b75893a37b16d712bdaa6c910b1161dc6f4fb3e49eff8805641b4b08871
+CHECKPOINT-G (current): c8653db42fea9f42ef35f056eaf8fc77f35327344e7521b04aac0f119bd692c2

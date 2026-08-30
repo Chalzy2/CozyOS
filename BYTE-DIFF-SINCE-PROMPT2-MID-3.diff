@@ -1,0 +1,8 @@
+Only in work: BYTE-DIFF-SINCE-PROMPT2-MID-3.diff
+Only in work/core/modules/intelligence/knowledge/teach/ui: cozy-knowledge-contribution-type-picker-core.js
+Only in work/core/modules/intelligence/knowledge/teach/ui: cozy-knowledge-contribution-type-picker-ui.js
+Files mid3-orig/core/modules/intelligence/knowledge/teach/ui/cozy-teach-cozyai-ui.js and work/core/modules/intelligence/knowledge/teach/ui/cozy-teach-cozyai-ui.js differ
+Files mid3-orig/core/modules/intelligence/knowledge/teach/ui/teach-cozyai-form.html and work/core/modules/intelligence/knowledge/teach/ui/teach-cozyai-form.html differ
+Only in work/core/modules/intelligence/knowledge/teach/ui/tests: cozy-knowledge-contribution-type-picker-core.test.js
+Files mid3-orig/core/modules/intelligence/knowledge/ui/contribution-form.css and work/core/modules/intelligence/knowledge/ui/contribution-form.css differ
+Files mid3-orig/core/shell/user-dashboard.js and work/core/shell/user-dashboard.js differ

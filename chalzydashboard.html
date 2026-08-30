@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CozyOS — Administrator</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #011c15; color: #eaf5ee; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; height: 100%; }
+  #cozy-admin-gate-screen { display: flex; align-items: center; justify-content: center; height: 100vh; text-align: center; padding: 24px; box-sizing: border-box; }
+  #cozy-admin-gate-status { font-size: 14px; color: #9fd6ae; }
+  #cozy-admin-denied { display: none; max-width: 420px; }
+  #cozy-admin-denied h2 { margin: 0 0 8px 0; color: #fff; }
+  #cozy-admin-denied p { font-size: 13px; color: #94a3b8; margin: 0 0 16px 0; }
+  #cozy-admin-denied a { color: #81C784; }
+</style>
+</head>
+<body>
+<div id="cozy-admin-gate-screen">
+  <p id="cozy-admin-gate-status">Verifying administrator access…</p>
+  <div id="cozy-admin-denied">
+    <h2>Access Denied</h2>
+    <p>You do not have administrator access to this workspace.</p>
+    <a href="index.html">Return to CozyOS</a>
+  </div>
+</div>
+
+<!-- Real, minimal dependency set. admin-gate-core.js contains ONLY the
+     decision logic (pure function, unit-tested in
+     core/shell/tests/admin-gate-core.test.js) - it makes no network calls
+     itself. IdentityEngine/AuthCoordinator are still loaded because the
+     administrator workspace itself (mounted via Bootstrap after a PASS
+     verdict) still uses them for UI state - but neither is consulted for
+     the admit/deny decision below. The full administrator workspace is
+     loaded afterward via the existing, real Bootstrap mechanism
+     (core/bootstrap/bootstrap.js), which composes dashboard.html's own
+     real script sequence - never a second, duplicated copy of it
+     maintained here. -->
+<script src="core/shell/platform-event-bus.js"></script>
+<script src="core/shell/admin-gate-core.js"></script>
+<!-- C14B admin-routing fix: pure, exact-match allowlist (see file
+     header) deciding whether this page's own actual pathname
+     (/chalzydashboard or /chalzydashboard.html) is safe to hand to
+     login.html as a return destination. Loaded here, not just in
+     login.html, so this page can re-validate its own pathname before
+     appending it — defense in depth, even though the server only ever
+     serves this file for those two exact paths. -->
+<script src="core/shell/return-destination-core.js"></script>
+<!-- organization-workspace-core.js (pure presentation logic) and
+     organization-workspace.js (its DOM/controller) are loaded
+     unconditionally here, same as admin-gate-core.js above, so
+     window.CozyOS.OrganizationWorkspace is already available by the
+     time loadOrganizationWorkspace()/loadWorkerWorkspace() below check
+     for it - they do real work for ORGANIZATION/WORKER sessions, they
+     are not a "coming soon" placeholder anymore. -->
+<script src="core/shell/organization-workspace-core.js"></script>
+<script src="core/shell/organization-workspace.js"></script>
+<script src="core/modules/identity/identity-engine.js"></script>
+<script src="core/modules/identity/auth-coordinator.js"></script>
+<script src="core/bootstrap/bootstrap.js"></script>
+<script>
+// Same defensive-only fix index.html and login.html already have (see
+// index.html's own "M366.8 — Emergency Bootstrap Recovery" comment):
+// unregisters any service worker that may already be installed from an
+// earlier deployment, before this page's own gate script runs below.
+// This page was the one place in the codebase missing this call — a
+// stale worker with its own cached copy of index.html could silently
+// intercept this exact navigation and serve that cached page instead,
+// before fetch("/webauthn/session") or any of this file's route
+// branches ever ran. Never registers a new worker (no code anywhere in
+// this repository calls navigator.serviceWorker.register()).
+if (typeof navigator !== "undefined" && navigator.serviceWorker && typeof navigator.serviceWorker.getRegistrations === "function") {
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+    regs.forEach((reg) => reg.unregister());
+  }).catch(() => { /* real, honest no-op */ });
+}
+
+(function () {
+  const statusEl = document.getElementById("cozy-admin-gate-status");
+  const deniedEl = document.getElementById("cozy-admin-denied");
+
+  // The ONLY input to the admit/deny decision: a same-origin call to the
+  // real backend (server/webauthn-rp/server.js), which reads
+  // isPlatformAdmin from the server-side sessions/users table. This
+  // fetch carries the browser's cookies (the HttpOnly cozy_admin_session
+  // cookie, if any) automatically via credentials:"include" - no token,
+  // flag, or identity is ever read from localStorage, sessionStorage,
+  // a URL parameter, or client-side IdentityEngine state to make this
+  // decision. If this request fails to reach the server at all (network
+  // error, server down), httpStatus is left undefined, which
+  // AdminGateCore.decideGateAction() treats as GATE_ERROR - fails
+  // closed, never open.
+  async function fetchSessionVerdict() {
+    try {
+      const res = await fetch("/webauthn/session", { credentials: "include" });
+      const body = await res.json().catch(() => ({}));
+      return Object.assign({ httpStatus: res.status }, body);
+    } catch (_err) {
+      // Network/parse failure - deliberately no httpStatus:200 fallback.
+      return { httpStatus: 0, authenticated: false };
+    }
+  }
+
+  async function checkAndProceed() {
+    const gate = window.CozyOS && window.CozyOS.AdminGateCore;
+    if (!gate) {
+      statusEl.textContent = "CozyOS security gate failed to load.";
+      return;
+    }
+
+    const sessionVerdict = await fetchSessionVerdict();
+    const decision = gate.decideGateAction(sessionVerdict);
+
+    // D1 FIX (CHALZYDASHBOARD-ROUTING-DEFECT): route on the exhaustively-
+    // switched resolveWorkspaceRoute() result, not on "anything not
+    // explicitly denied/redirected/errored". The previous code fell
+    // through straight to Bootstrap.start() (the PLATFORM-only
+    // admin-workspace.html loader) for ANY decision that wasn't one of
+    // REDIRECT_TO_LOGIN/ACCESS_DENIED/GATE_ERROR - which incorrectly
+    // included LOAD_ORGANIZATION_WORKSPACE and LOAD_WORKER_WORKSPACE.
+    // resolveWorkspaceRoute() fails closed to ERROR for anything it does
+    // not recognize, so only route.route === "PLATFORM" can ever reach
+    // Bootstrap.start()/admin-workspace.html below.
+    const route = gate.resolveWorkspaceRoute(decision);
+
+    if (route.route === gate.WORKSPACE_ROUTE.LOGIN) {
+      // C14B admin-routing fix: preserve the protected route the
+      // visitor actually requested, so a successful login lands them
+      // back on /chalzydashboard (where this page's own gate
+      // re-verifies them, admin or not) instead of login.html's
+      // ordinary default of index.html — which would otherwise
+      // silently substitute the User Dashboard for a normal user who
+      // explicitly asked for the admin route, and never even give a
+      // genuine admin the chance to pass this page's gate a second
+      // time. Re-validated through the same exact-match allowlist
+      // login.html itself uses — this page's own pathname can only
+      // ever legitimately be one of the two allowed values (server
+      // routing guarantees that), but the check costs nothing and
+      // keeps both sides of this flow consistent.
+      const core = window.CozyOS && window.CozyOS.ReturnDestinationCore;
+      const requestedPath = core && typeof core.resolveReturnDestination === "function"
+        ? core.resolveReturnDestination(window.location.pathname)
+        : null;
+      window.location.href = requestedPath
+        ? "login.html?return=" + encodeURIComponent(requestedPath)
+        : "login.html";
+      return;
+    }
+
+    if (route.route === gate.WORKSPACE_ROUTE.DENIED) {
+      statusEl.style.display = "none";
+      deniedEl.style.display = "block";
+      return;
+    }
+
+    if (route.route === gate.WORKSPACE_ROUTE.ERROR) {
+      statusEl.textContent = "Could not verify workspace access (" + route.reason + "). Please try again.";
+      return;
+    }
+
+    if (route.route === gate.WORKSPACE_ROUTE.PLATFORM) {
+      // The server has verified this session belongs to a platform
+      // administrator. Only this branch may load admin-workspace.html.
+      statusEl.textContent = "Loading administrator workspace…";
+      const result = await window.CozyOS.Bootstrap.start();
+      if (!result.success) {
+        statusEl.textContent = "Failed to load: " + result.reason;
+      }
+      // On success, Bootstrap.start() itself replaces document.body
+      // content with admin-workspace.html's real body and runs its real
+      // script sequence - no further action needed here.
+      return;
+    }
+
+    if (route.route === gate.WORKSPACE_ROUTE.ORGANIZATION) {
+      await loadOrganizationWorkspace();
+      return;
+    }
+
+    if (route.route === gate.WORKSPACE_ROUTE.WORKER) {
+      await loadWorkerWorkspace();
+      return;
+    }
+
+    // Defensive: should be unreachable given resolveWorkspaceRoute()'s
+    // exhaustive switch, but this must fail closed too, never fall
+    // through to a workspace load.
+    statusEl.textContent = "Could not verify workspace access (unrouted). Please try again.";
+  }
+
+  // core/shell/organization-workspace.js now exists and registers
+  // window.CozyOS.OrganizationWorkspace with a real mount() - it serves
+  // BOTH the ORGANIZATION and WORKER gate scopes (there is no separate
+  // worker dashboard; the same workspace adapts its rendered sections
+  // to whatever organization-workspace-core.js's resolveVisibleSections()
+  // authorizes for the real server context). If OrganizationWorkspace
+  // is ever unavailable (e.g. its script failed to load), this falls
+  // back to an honest "verified but UI unavailable" message rather than
+  // silently doing nothing or falling through to the platform workspace.
+  // Same real workspace for both scopes - see comment above. Section
+  // visibility (and therefore whether the rendered surface looks like
+  // an "org admin" workspace or a bare "worker" applications view) is
+  // decided entirely by organization-workspace-core.js against the real
+  // server context, not by which of these two functions was called.
+  async function mountOrganizationOrWorkerWorkspace(label) {
+    statusEl.textContent = "Loading " + label + " workspace…";
+    const workspace = window.CozyOS && window.CozyOS.OrganizationWorkspace;
+    if (workspace && typeof workspace.mount === "function") {
+      const result = await workspace.mount();
+      if (!result || !result.success) {
+        statusEl.textContent = "Failed to load " + label + " workspace" + (result && result.reason ? ": " + result.reason : ".");
+      }
+      return;
+    }
+    statusEl.textContent = (label === "organization" ? "Organization" : "Worker") + " access verified for this session, but the workspace script failed to load. Please refresh.";
+  }
+
+  async function loadOrganizationWorkspace() {
+    return mountOrganizationOrWorkerWorkspace("organization");
+  }
+
+  async function loadWorkerWorkspace() {
+    return mountOrganizationOrWorkerWorkspace("worker");
+  }
+
+  checkAndProceed();
+})();
+</script>
+</body>
+</html>

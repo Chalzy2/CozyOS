@@ -1,0 +1,625 @@
+BYTE-DIFF-SINCE-PREVIOUS-CHECKPOINT.diff
+Since: COS-DASHBOARD-PROMPT7-MID-2 (no server/auth/ directory existed)
+Two new files only; no existing file was modified.
+
+--- /dev/null	2026-08-21 04:28:30.355137849 +0000
++++ server/auth/google-login-endpoint.js	2026-08-21 11:01:52.428175613 +0000
+@@ -0,0 +1,245 @@
++'use strict';
++
++/**
++ * server/auth/google-login-endpoint.js
++ * CozyOS — Google Authentication Trust Adapter
++ * Milestone: Prompt 7 — Path B (minimal Google authentication trust adapter)
++ *
++ * REAL SCOPE DISCLOSURE
++ *   THE GAP THIS CLOSES
++ *   Repo-wide search (Prompt 7 MID-2 -> Google-MID-1) confirmed: the only
++ *   real HTTP server in this repository is
++ *   server/live-relay/live-distribution-signaling-server.js, and that
++ *   server belongs to a SEPARATE trust domain (live-streaming session
++ *   tokens). login.html makes zero fetch() calls to any server endpoint.
++ *   There was no general-purpose server boundary connecting the already-
++ *   real Google/Firebase verification (firebase-identity-issuer.js) and
++ *   account-linkage logic (core/security/google-account-linkage.js) to a
++ *   network caller. This file is that boundary, and nothing else.
++ *
++ *   WHAT THIS FILE COMPOSES (never duplicates)
++ *     - core/security/google-account-linkage.js's CozyGoogleAccountLinkage
++ *       -- already performs real RS256 verification (via
++ *       firebase-identity-issuer.js) AND already-tested account-linkage
++ *       resolution (resolveLoginCandidate). This file does not
++ *       re-implement any of that; it only exposes it over HTTP.
++ *
++ *   WHAT THIS FILE DOES NOT DO
++ *     - Does not verify tokens itself (delegates 100% to
++ *       CozyGoogleAccountLinkage -> verifyFirebaseIdToken).
++ *     - Does not read userId/googleId/role/isAdmin/email/etc. from the
++ *       request body as authoritative. The ONLY input trusted is the
++ *       raw idToken string; every identity fact is derived from its
++ *       cryptographically verified payload.
++ *     - Does not create a CozyOS session itself. It returns a resolved
++ *       userId (or a generic failure) to the caller; session creation
++ *       remains IdentityEngine.loginWithVerifiedGoogle(userId)'s job,
++ *       exactly as identity-engine.js's own header already establishes
++ *       for the browser-local session model this repo uses (see
++ *       identity-assertion.js's own disclosed scope: this repo's
++ *       identity system is LOCAL, not networked multi-party auth).
++ *     - Does not touch or repurpose live-distribution-signaling-server.js.
++ *     - Does not introduce Express/Fastify/etc. Uses Node's built-in
++ *       http, same primitive live-distribution-signaling-server.js
++ *       already uses in this repo.
++ *
++ *   TRUST BOUNDARY / FAIL-CLOSED BEHAVIOR
++ *     Every non-2xx path returns a GENERIC failure body
++ *     ({ success:false, reason:'AUTH_FAILED' }) regardless of WHY
++ *     verification/resolution failed internally (bad signature, unknown
++ *     account, disabled login, etc.) so the endpoint cannot be used to
++ *     enumerate which Google identities are linked to CozyOS accounts.
++ *     The internal, specific reason is available only via the optional
++ *     onAuthEvent(...) hook, for server-side logging — never sent to
++ *     the client.
++ *
++ *   HONEST SCOPE
++ *     SERVER CODE: locally verified (see google-login-endpoint.test.js —
++ *       real loopback HTTP server, real RSA keypair, real RS256 JWT).
++ *     DEPLOYMENT: NOT verified. BROWSER WIRING: NOT built this slice —
++ *       login.html is untouched. INTERNET / PRODUCTION GOOGLE OAUTH:
++ *       NOT verified.
++ */
++
++const http = require('http');
++const { CozyGoogleAccountLinkage } = require('../../core/security/google-account-linkage');
++
++const MAX_BODY_BYTES = 10 * 1024; // generous ceiling for a single-field JSON body; fails closed above this
++const GENERIC_AUTH_FAILURE = { success: false, reason: 'AUTH_FAILED' };
++
++function sendJson(res, statusCode, obj) {
++    const body = JSON.stringify(obj);
++    res.writeHead(statusCode, {
++        'Content-Type': 'application/json; charset=utf-8',
++        'Content-Length': Buffer.byteLength(body),
++        'Cache-Control': 'no-store',
++    });
++    res.end(body);
++}
++
++/**
++ * readJsonBody(req) -> Promise<object>
++ * Fails closed on: oversized body, invalid JSON, non-object payload.
++ * Does not trust Content-Length alone (also enforces a hard byte cap
++ * while streaming, so a caller cannot lie about Content-Length).
++ */
++function readJsonBody(req) {
++    return new Promise((resolve, reject) => {
++        let received = 0;
++        let oversized = false;
++        let settled = false;
++        const chunks = [];
++        req.on('data', (chunk) => {
++            if (oversized) return; // already over the cap; stop buffering, but let the stream drain so the response can still be written
++            received += chunk.length;
++            if (received > MAX_BODY_BYTES) {
++                oversized = true;
++                chunks.length = 0; // release what we'd buffered; we're rejecting regardless of content
++                return;
++            }
++            chunks.push(chunk);
++        });
++        req.on('end', () => {
++            if (settled) return;
++            settled = true;
++            if (oversized) {
++                reject(Object.assign(new Error('Request body too large.'), { code: 'PAYLOAD_TOO_LARGE' }));
++                return;
++            }
++            let parsed;
++            try {
++                parsed = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
++            } catch (_e) {
++                reject(Object.assign(new Error('Malformed JSON body.'), { code: 'BAD_JSON' }));
++                return;
++            }
++            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
++                reject(Object.assign(new Error('Request body must be a JSON object.'), { code: 'BAD_JSON' }));
++                return;
++            }
++            resolve(parsed);
++        });
++        req.on('error', (e) => {
++            if (settled) return;
++            settled = true;
++            reject(e);
++        });
++    });
++}
++
++/**
++ * createGoogleLoginRequestHandler({ linkage, onAuthEvent })
++ *   linkage       REQUIRED. A real CozyGoogleAccountLinkage instance
++ *                 (already composes the real verifier + a real store —
++ *                 see google-account-linkage.js). Never constructed by
++ *                 this file; callers own their own store/projectId.
++ *   onAuthEvent   OPTIONAL. (eventName, detail) => void, for server-side
++ *                 logging only. Never influences the HTTP response.
++ *
++ * Returns a (req, res) handler suitable for http.createServer or for
++ * mounting inside a larger router, matching the request/response
++ * pattern already established by live-distribution-signaling-server.js.
++ */
++function createGoogleLoginRequestHandler({ linkage, onAuthEvent } = {}) {
++    if (!linkage || typeof linkage.resolveLoginCandidate !== 'function') {
++        throw new Error('[google-login-endpoint] A real CozyGoogleAccountLinkage instance (linkage) is required.');
++    }
++    const emit = typeof onAuthEvent === 'function' ? onAuthEvent : () => {};
++
++    return async function handleGoogleLoginRequest(req, res) {
++        if (req.method !== 'POST') {
++            emit('REJECTED', { reason: 'METHOD_NOT_ALLOWED', method: req.method });
++            sendJson(res, 405, GENERIC_AUTH_FAILURE);
++            return;
++        }
++
++        const contentType = String(req.headers['content-type'] || '');
++        if (!contentType.toLowerCase().includes('application/json')) {
++            emit('REJECTED', { reason: 'UNSUPPORTED_CONTENT_TYPE', contentType });
++            sendJson(res, 415, GENERIC_AUTH_FAILURE);
++            return;
++        }
++
++        let body;
++        try {
++            body = await readJsonBody(req);
++        } catch (e) {
++            const status = e.code === 'PAYLOAD_TOO_LARGE' ? 413 : 400;
++            emit('REJECTED', { reason: e.code || 'BAD_JSON' });
++            sendJson(res, status, GENERIC_AUTH_FAILURE);
++            return;
++        }
++
++        // The ONLY field ever read from the client body. Any other
++        // fields (userId, googleId, role, isAdmin, email, ...) present
++        // in `body` are deliberately never accessed anywhere below —
++        // identity is derived exclusively from the verified idToken.
++        const idToken = body.idToken;
++        if (typeof idToken !== 'string' || idToken.length === 0) {
++            emit('REJECTED', { reason: 'MISSING_ID_TOKEN' });
++            sendJson(res, 400, GENERIC_AUTH_FAILURE);
++            return;
++        }
++
++        let result;
++        try {
++            result = await linkage.resolveLoginCandidate(idToken);
++        } catch (e) {
++            emit('ERROR', { reason: 'RESOLVE_THREW', message: e && e.message });
++            sendJson(res, 500, GENERIC_AUTH_FAILURE);
++            return;
++        }
++
++        if (!result || result.available !== true || !result.userId) {
++            // Deliberately generic: collapses GOOGLE_VERIFICATION_FAILED,
++            // NO_LINKED_ACCOUNT, and GOOGLE_LOGIN_DISABLED into one
++            // external response so this endpoint cannot be used to
++            // enumerate which Google identities exist/are linked.
++            emit('REJECTED', { reason: (result && result.reason) || 'UNKNOWN' });
++            sendJson(res, 401, GENERIC_AUTH_FAILURE);
++            return;
++        }
++
++        emit('SUCCESS', { userId: result.userId });
++        sendJson(res, 200, { success: true, userId: result.userId });
++    };
++}
++
++/**
++ * GoogleAuthAdapterServer — thin http.createServer wrapper, isolated
++ * from live-distribution-signaling-server.js entirely (separate
++ * process/port, separate trust domain, per Prompt 7 Path B §4). Only
++ * exists so this adapter can be started/stopped the same way tests
++ * already start/stop the live-relay server (server.listen()/close()).
++ */
++class GoogleAuthAdapterServer {
++    #httpServer;
++
++    constructor({ linkage, onAuthEvent, path = '/auth/google' } = {}) {
++        const handleGoogleLoginRequest = createGoogleLoginRequestHandler({ linkage, onAuthEvent });
++        this.#httpServer = http.createServer((req, res) => {
++            const url = new URL(req.url, 'http://internal');
++            if (url.pathname !== path) {
++                sendJson(res, 404, GENERIC_AUTH_FAILURE);
++                return;
++            }
++            handleGoogleLoginRequest(req, res);
++        });
++    }
++
++    listen(port = 0, host = '127.0.0.1') {
++        return new Promise((resolve) => {
++            this.#httpServer.listen(port, host, () => resolve(this.#httpServer.address()));
++        });
++    }
++
++    close() {
++        return new Promise((resolve) => this.#httpServer.close(() => resolve()));
++    }
++}
++
++module.exports = {
++    createGoogleLoginRequestHandler,
++    GoogleAuthAdapterServer,
++    MAX_BODY_BYTES,
++};
+--- /dev/null	2026-08-21 04:28:30.355137849 +0000
++++ server/auth/test/google-login-endpoint.test.js	2026-08-21 11:01:43.494971871 +0000
+@@ -0,0 +1,370 @@
++'use strict';
++
++/**
++ * server/auth/test/google-login-endpoint.test.js
++ * Prompt 7 — Path B Google Authentication Trust Adapter
++ *
++ * HARNESS DISCLOSURE: real loopback HTTP server (GoogleAuthAdapterServer),
++ * real RSA keypair generated locally with crypto.generateKeyPairSync,
++ * real RS256-signed JWT-shaped tokens signed with the PRIVATE key. The
++ * server's fetchGoogleCerts is injected (via CozyGoogleAccountLinkage's
++ * own constructor option, the exact same seam google-account-linkage.test.js
++ * and firebase-identity-issuer.test.js already use) to return the PUBLIC
++ * key standing in for Google's published cert. No shortcut like
++ * `if (token === 'valid')` exists anywhere in this suite or in the code
++ * under test — every accept/reject path runs the real signature check.
++ *
++ * Run: node --test server/auth/test/google-login-endpoint.test.js
++ */
++
++const test = require('node:test');
++const assert = require('node:assert/strict');
++const crypto = require('crypto');
++const http = require('http');
++
++const { GoogleAuthAdapterServer } = require('../google-login-endpoint');
++const { CozyGoogleAccountLinkage, InMemoryGoogleLinkageStore } = require('../../../core/security/google-account-linkage');
++
++const PROJECT_ID = 'cozycabin-affiliate';
++const KID = 'test-kid-1';
++
++const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
++const PUBLIC_KEY_PEM = publicKey.export({ type: 'spki', format: 'pem' });
++
++function b64url(buf) {
++    return Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
++}
++
++function makeIdToken({
++    uid = 'user-abc',
++    email = 'abc@example.com',
++    iss = `https://securetoken.google.com/${PROJECT_ID}`,
++    aud = PROJECT_ID,
++    now = Math.floor(Date.now() / 1000),
++    exp = now + 3600,
++    iat = now - 1,
++    authTime = now - 1,
++    kid = KID,
++    alg = 'RS256',
++    signingKey = privateKey,
++} = {}) {
++    const header = b64url(JSON.stringify({ alg, kid, typ: 'JWT' }));
++    const payload = b64url(JSON.stringify({
++        iss, aud, sub: uid, user_id: uid, email, exp, iat, auth_time: authTime,
++    }));
++    const signedData = `${header}.${payload}`;
++    const signature = b64url(crypto.sign('RSA-SHA256', Buffer.from(signedData), signingKey));
++    return `${signedData}.${signature}`;
++}
++
++async function fetchGoogleCerts() {
++    return { [KID]: PUBLIC_KEY_PEM };
++}
++
++// Wrong keypair, used to produce a token whose signature will not verify
++// against the real published (fixture) key — proves signature checking
++// is real, not a format/shape check.
++const { privateKey: wrongPrivateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
++
++async function startAdapter({ preLinkedUserId, preLinkedGoogleUid } = {}) {
++    const store = new InMemoryGoogleLinkageStore();
++    const linkage = new CozyGoogleAccountLinkage({ store, projectId: PROJECT_ID, fetchGoogleCerts });
++    const events = [];
++    const server = new GoogleAuthAdapterServer({ linkage, onAuthEvent: (name, detail) => events.push({ name, detail }) });
++    const addr = await server.listen(0, '127.0.0.1');
++    const baseUrl = `http://127.0.0.1:${addr.port}`;
++
++    if (preLinkedUserId && preLinkedGoogleUid) {
++        // Simulate an already-linked account the way linkAccount() would
++        // leave the store, without re-deriving verification for setup.
++        store.setRecord(preLinkedUserId, {
++            googleUid: preLinkedGoogleUid,
++            googleEmail: 'linked@example.com',
++            googleLinked: true,
++            googleLinkedAt: new Date().toISOString(),
++            googleLoginEnabled: true,
++        });
++    }
++
++    return { server, linkage, store, baseUrl, events };
++}
++
++async function postGoogle(baseUrl, body, { rawBody, headers } = {}) {
++    const res = await fetch(`${baseUrl}/auth/google`, {
++        method: 'POST',
++        headers: Object.assign({ 'Content-Type': 'application/json' }, headers),
++        body: rawBody !== undefined ? rawBody : JSON.stringify(body),
++    });
++    let json = null;
++    try { json = await res.json(); } catch (_e) { /* some error paths return no/invalid body on purpose in tests */ }
++    return { status: res.status, body: json };
++}
++
++// ---------------------------------------------------------------------
++// Token verification
++// ---------------------------------------------------------------------
++
++test('valid, verified, linked Google identity resolves to the linked CozyOS userId', async () => {
++    const { server, baseUrl } = await startAdapter({ preLinkedUserId: 'cozy-user-1', preLinkedGoogleUid: 'user-abc' });
++    try {
++        const token = makeIdToken({ uid: 'user-abc' });
++        const { status, body } = await postGoogle(baseUrl, { idToken: token });
++        assert.equal(status, 200);
++        assert.equal(body.success, true);
++        assert.equal(body.userId, 'cozy-user-1');
++    } finally { await server.close(); }
++});
++
++test('malformed token is rejected (generic 401)', async () => {
++    const { server, baseUrl } = await startAdapter();
++    try {
++        const { status, body } = await postGoogle(baseUrl, { idToken: 'not-a-jwt' });
++        assert.equal(status, 401);
++        assert.deepEqual(body, { success: false, reason: 'AUTH_FAILED' });
++    } finally { await server.close(); }
++});
++
++test('invalid signature (wrong signing key) is rejected', async () => {
++    const { server, baseUrl } = await startAdapter({ preLinkedUserId: 'cozy-user-1', preLinkedGoogleUid: 'user-abc' });
++    try {
++        const token = makeIdToken({ uid: 'user-abc', signingKey: wrongPrivateKey });
++        const { status, body } = await postGoogle(baseUrl, { idToken: token });
++        assert.equal(status, 401);
++        assert.equal(body.success, false);
++    } finally { await server.close(); }
++});
++
++test('expired token is rejected', async () => {
++    const { server, baseUrl } = await startAdapter({ preLinkedUserId: 'cozy-user-1', preLinkedGoogleUid: 'user-abc' });
++    try {
++        const now = Math.floor(Date.now() / 1000);
++        const token = makeIdToken({ uid: 'user-abc', exp: now - 10 });
++        const { status } = await postGoogle(baseUrl, { idToken: token });
++        assert.equal(status, 401);
++    } finally { await server.close(); }
++});
++
++test('wrong issuer is rejected', async () => {
++    const { server, baseUrl } = await startAdapter({ preLinkedUserId: 'cozy-user-1', preLinkedGoogleUid: 'user-abc' });
++    try {
++        const token = makeIdToken({ uid: 'user-abc', iss: 'https://securetoken.google.com/some-other-project' });
++        const { status } = await postGoogle(baseUrl, { idToken: token });
++        assert.equal(status, 401);
++    } finally { await server.close(); }
++});
++
++test('wrong audience is rejected', async () => {
++    const { server, baseUrl } = await startAdapter({ preLinkedUserId: 'cozy-user-1', preLinkedGoogleUid: 'user-abc' });
++    try {
++        const token = makeIdToken({ uid: 'user-abc', aud: 'some-other-project' });
++        const { status } = await postGoogle(baseUrl, { idToken: token });
++        assert.equal(status, 401);
++    } finally { await server.close(); }
++});
++
++test('future auth_time is rejected', async () => {
++    const { server, baseUrl } = await startAdapter({ preLinkedUserId: 'cozy-user-1', preLinkedGoogleUid: 'user-abc' });
++    try {
++        const now = Math.floor(Date.now() / 1000);
++        const token = makeIdToken({ uid: 'user-abc', authTime: now + 3600 });
++        const { status } = await postGoogle(baseUrl, { idToken: token });
++        assert.equal(status, 401);
++    } finally { await server.close(); }
++});
++
++// ---------------------------------------------------------------------
++// Identity authority — client cannot dictate identity
++// ---------------------------------------------------------------------
++
++test('client-supplied userId is ignored; resolution still comes from the verified token', async () => {
++    const { server, baseUrl } = await startAdapter({ preLinkedUserId: 'cozy-user-1', preLinkedGoogleUid: 'user-abc' });
++    try {
++        const token = makeIdToken({ uid: 'user-abc' });
++        const { status, body } = await postGoogle(baseUrl, { idToken: token, userId: 'someone-else' });
++        assert.equal(status, 200);
++        assert.equal(body.userId, 'cozy-user-1'); // NOT "someone-else"
++    } finally { await server.close(); }
++});
++
++test('client-supplied googleId is ignored', async () => {
++    const { server, baseUrl } = await startAdapter({ preLinkedUserId: 'cozy-user-1', preLinkedGoogleUid: 'user-abc' });
++    try {
++        const token = makeIdToken({ uid: 'user-abc' });
++        const { status, body } = await postGoogle(baseUrl, { idToken: token, googleId: 'attacker-controlled-uid' });
++        assert.equal(status, 200);
++        assert.equal(body.userId, 'cozy-user-1');
++    } finally { await server.close(); }
++});
++
++test('client-supplied role/isAdmin are ignored (never echoed, never used to authorize)', async () => {
++    const { server, baseUrl } = await startAdapter({ preLinkedUserId: 'cozy-user-1', preLinkedGoogleUid: 'user-abc' });
++    try {
++        const token = makeIdToken({ uid: 'user-abc' });
++        const { status, body } = await postGoogle(baseUrl, { idToken: token, role: 'admin', isAdmin: true });
++        assert.equal(status, 200);
++        assert.equal(Object.prototype.hasOwnProperty.call(body, 'role'), false);
++        assert.equal(Object.prototype.hasOwnProperty.call(body, 'isAdmin'), false);
++    } finally { await server.close(); }
++});
++
++test('the classic attack shape { userId: "victim", googleId: "attacker" } cannot obtain the victim account', async () => {
++    // Attacker has their OWN real, verifiable Google token (uid
++    // "attacker-uid"), which is NOT linked to any CozyOS account.
++    const { server, baseUrl } = await startAdapter({ preLinkedUserId: 'victim-user', preLinkedGoogleUid: 'victim-google-uid' });
++    try {
++        const attackerToken = makeIdToken({ uid: 'attacker-uid' });
++        const { status, body } = await postGoogle(baseUrl, { idToken: attackerToken, userId: 'victim-user', googleId: 'victim-google-uid' });
++        assert.equal(status, 401);
++        assert.equal(body.success, false);
++    } finally { await server.close(); }
++});
++
++// ---------------------------------------------------------------------
++// Account linking / resolution
++// ---------------------------------------------------------------------
++
++test('verified-but-unlinked Google identity is rejected (no auto-account-creation, no email fallback)', async () => {
++    const { server, baseUrl } = await startAdapter();
++    try {
++        const token = makeIdToken({ uid: 'never-linked-uid', email: 'never-linked@example.com' });
++        const { status, body } = await postGoogle(baseUrl, { idToken: token });
++        assert.equal(status, 401);
++        assert.equal(body.success, false);
++    } finally { await server.close(); }
++});
++
++test('a Google identity linked to account A never resolves to account B', async () => {
++    const { server, baseUrl, store } = await startAdapter({ preLinkedUserId: 'account-a', preLinkedGoogleUid: 'shared-looking-uid' });
++    try {
++        // account-b exists in the store but with a DIFFERENT google uid.
++        store.setRecord('account-b', {
++            googleUid: 'account-b-own-uid', googleEmail: 'b@example.com',
++            googleLinked: true, googleLinkedAt: new Date().toISOString(), googleLoginEnabled: true,
++        });
++        const token = makeIdToken({ uid: 'shared-looking-uid' });
++        const { status, body } = await postGoogle(baseUrl, { idToken: token });
++        assert.equal(status, 200);
++        assert.equal(body.userId, 'account-a');
++        assert.notEqual(body.userId, 'account-b');
++    } finally { await server.close(); }
++});
++
++test('googleLoginEnabled:false on an otherwise-linked record is rejected (generic, not distinguishable from unlinked)', async () => {
++    const { server, baseUrl, store } = await startAdapter();
++    try {
++        store.setRecord('disabled-user', {
++            googleUid: 'disabled-uid', googleEmail: 'x@example.com',
++            googleLinked: true, googleLinkedAt: new Date().toISOString(), googleLoginEnabled: false,
++        });
++        const token = makeIdToken({ uid: 'disabled-uid' });
++        const { status, body } = await postGoogle(baseUrl, { idToken: token });
++        assert.equal(status, 401);
++        assert.deepEqual(body, { success: false, reason: 'AUTH_FAILED' });
++    } finally { await server.close(); }
++});
++
++// ---------------------------------------------------------------------
++// Request validation / fail-closed transport handling
++// ---------------------------------------------------------------------
++
++test('missing idToken field is rejected with 400', async () => {
++    const { server, baseUrl } = await startAdapter();
++    try {
++        const { status, body } = await postGoogle(baseUrl, {});
++        assert.equal(status, 400);
++        assert.equal(body.success, false);
++    } finally { await server.close(); }
++});
++
++test('empty-string idToken is rejected', async () => {
++    const { server, baseUrl } = await startAdapter();
++    try {
++        const { status } = await postGoogle(baseUrl, { idToken: '' });
++        assert.equal(status, 400);
++    } finally { await server.close(); }
++});
++
++test('non-string idToken is rejected', async () => {
++    const { server, baseUrl } = await startAdapter();
++    try {
++        const { status } = await postGoogle(baseUrl, { idToken: 12345 });
++        assert.equal(status, 400);
++    } finally { await server.close(); }
++});
++
++test('malformed JSON body is rejected with 400, not a 500 crash', async () => {
++    const { server, baseUrl } = await startAdapter();
++    try {
++        const { status } = await postGoogle(baseUrl, null, { rawBody: '{ this is not json' });
++        assert.equal(status, 400);
++    } finally { await server.close(); }
++});
++
++test('non-object JSON body (array) is rejected', async () => {
++    const { server, baseUrl } = await startAdapter();
++    try {
++        const { status } = await postGoogle(baseUrl, null, { rawBody: '["idToken", "x"]' });
++        assert.equal(status, 400);
++    } finally { await server.close(); }
++});
++
++test('oversized body is rejected with 413 (connection stays usable, not aborted)', async () => {
++    const { server, baseUrl } = await startAdapter();
++    try {
++        const hugeToken = 'a'.repeat(20 * 1024);
++        const { status, body } = await postGoogle(baseUrl, { idToken: hugeToken });
++        assert.equal(status, 413);
++        assert.deepEqual(body, { success: false, reason: 'AUTH_FAILED' });
++    } finally { await server.close(); }
++});
++
++test('wrong content-type is rejected with 415', async () => {
++    const { server, baseUrl } = await startAdapter();
++    try {
++        const { status } = await postGoogle(baseUrl, { idToken: 'x' }, { headers: { 'Content-Type': 'text/plain' } });
++        assert.equal(status, 415);
++    } finally { await server.close(); }
++});
++
++test('unsupported method (GET) is rejected with 405', async () => {
++    const { server, baseUrl } = await startAdapter();
++    try {
++        const res = await fetch(`${baseUrl}/auth/google`, { method: 'GET' });
++        assert.equal(res.status, 405);
++    } finally { await server.close(); }
++});
++
++test('unknown path returns generic 404, not a stack trace or server info', async () => {
++    const { server, baseUrl } = await startAdapter();
++    try {
++        const res = await fetch(`${baseUrl}/not-a-real-path`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
++        assert.equal(res.status, 404);
++    } finally { await server.close(); }
++});
++
++// ---------------------------------------------------------------------
++// Session boundary — this endpoint resolves identity, it does not itself
++// mint a CozyOS session (that remains IdentityEngine's job).
++// ---------------------------------------------------------------------
++
++test('successful response never includes a session token or session-shaped field', async () => {
++    const { server, baseUrl } = await startAdapter({ preLinkedUserId: 'cozy-user-1', preLinkedGoogleUid: 'user-abc' });
++    try {
++        const token = makeIdToken({ uid: 'user-abc' });
++        const { body } = await postGoogle(baseUrl, { idToken: token });
++        assert.equal(Object.prototype.hasOwnProperty.call(body, 'sessionToken'), false);
++        assert.equal(Object.prototype.hasOwnProperty.call(body, 'session'), false);
++        assert.deepEqual(Object.keys(body).sort(), ['success', 'userId']);
++    } finally { await server.close(); }
++});
++
++test('failed verification never leaves a usable record behind and repeated attempts stay rejected', async () => {
++    const { server, baseUrl } = await startAdapter();
++    try {
++        const badToken = makeIdToken({ uid: 'attacker', signingKey: wrongPrivateKey });
++        const first = await postGoogle(baseUrl, { idToken: badToken });
++        const second = await postGoogle(baseUrl, { idToken: badToken });
++        assert.equal(first.status, 401);
++        assert.equal(second.status, 401);
++    } finally { await server.close(); }
++});

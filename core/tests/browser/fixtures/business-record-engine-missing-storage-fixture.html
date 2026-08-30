@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<!--
+  core/tests/browser/fixtures/business-record-engine-missing-storage-fixture.html
+
+  Deliberately identical to business-record-engine-fixture.html EXCEPT it
+  omits the <script src="/core/storage.js"> tag. This is not a fake
+  window object and not addInitScript injection — it is a real browser
+  page that genuinely never loads the real Storage Gateway, so
+  window.CozyStorage is genuinely undefined. Used only to verify that
+  BusinessRecordEngine fails closed (real "Storage Gateway ... is not
+  loaded" reason) rather than substituting any fallback storage.
+-->
+<html>
+<head><meta charset="utf-8"><title>CozyOS BusinessRecordEngine — missing-storage fixture</title></head>
+<body>
+  <script src="/core/shell/platform-event-bus.js"></script>
+  <script src="/core/organization/organization-registry.js"></script>
+  <script src="/core/organization/organization-membership.js"></script>
+  <script src="/core/calculation/formula-registry.js"></script>
+  <script src="/core/calculation/formula-library.js"></script>
+  <script src="/core/calculation/calculation-engine.js"></script>
+  <script src="/core/calculation/business-record-engine.js"></script>
+</body>
+</html>

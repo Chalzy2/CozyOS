@@ -1,0 +1,29 @@
+PHASE 10C-3B4-2 — PROTECTED FILE HASHES
+Recorded BEFORE and confirmed AFTER implementation. All ten files are
+byte-identical to their Phase 10C-3B4-1 hashes — CHANGED: NO for every
+file.
+
+FILE                                                                        SHA-256 (BEFORE)                                                    SHA-256 (AFTER)                                                     CHANGED
+core/modules/cognitive/cognitive-coordinator.js                            5855511b405d50adf05987513faea23ac342c5ed156f5d0042fd5e7eaf5f532e   5855511b405d50adf05987513faea23ac342c5ed156f5d0042fd5e7eaf5f532e   NO
+core/modules/thinking/cozy-thinking.js                                     34a4999b22f66fa38a84b9dbfcc9734d9199666e018edfd0e5d00c2a0e56322c   34a4999b22f66fa38a84b9dbfcc9734d9199666e018edfd0e5d00c2a0e56322c   NO
+core/modules/reasoning/cozy-reasoning.js                                   b119fac288109d14f3b713032ef5f372c7b42041627c7d2ba6dfaf7071398351   b119fac288109d14f3b713032ef5f372c7b42041627c7d2ba6dfaf7071398351   NO
+core/modules/interpretation/cozy-interpretation.js                         88089dda055e87c66f885a4ead0d6ae0a203dcba570642d70422ef16f0c43211   88089dda055e87c66f885a4ead0d6ae0a203dcba570642d70422ef16f0c43211   NO
+core/modules/intelligence/cozy-ai.js                                       51d029474c6efba0273144835ba2f0a8875d95a0b9c10d218ac012d800e804e9   51d029474c6efba0273144835ba2f0a8875d95a0b9c10d218ac012d800e804e9   NO
+core/modules/intelligence/cozy-intelligence.js                             1f428d7da7452d8154a6cbf962f35eef65fc77f8f3bdcb98dbb20b488951b23c   1f428d7da7452d8154a6cbf962f35eef65fc77f8f3bdcb98dbb20b488951b23c   NO
+core/modules/builder/builder-orchestrator.js                               7ab5eb8cc0f606f104ef6592b58d6573bf0637a400da0b84e2eeeec5bbd5f8c0   7ab5eb8cc0f606f104ef6592b58d6573bf0637a400da0b84e2eeeec5bbd5f8c0   NO
+core/living/cozy-living-ai.js                                              bd6033adefc43c3b91295ff4f7ff242319b743cd38e657597832ff6cf9838bb6   bd6033adefc43c3b91295ff4f7ff242319b743cd38e657597832ff6cf9838bb6   NO
+core/modules/intelligence/providers/on-device-conversational-provider.js   9dce2f49e5e408314da8fbf56e5e158ce864945426e0b95bd71706030df43641   9dce2f49e5e408314da8fbf56e5e158ce864945426e0b95bd71706030df43641   NO
+core/modules/intelligence/providers/on-device-cognitive-adapter.js         c79a4f303a75a06b99744d4ab0ff3866f31f03e62479cc3a1b35c419c9b3c533   c79a4f303a75a06b99744d4ab0ff3866f31f03e62479cc3a1b35c419c9b3c533   NO
+
+REASON NO CHANGE WAS MADE: Stage 2's architecture audit (see
+PHASE10C3B42-IMPLEMENTATION-REPORT.md) proved live, via runtime probes
+against the unmodified code, that all four required provider-selection
+cases (default / explicit / invalid / exception) already behave
+correctly. Per the phase's Critical Stop Rule ("If the existing Living
+Engine path is already correct, do not modify production code just to
+create activity"), no production file was touched.
+
+VERIFICATION METHOD: `diff -rq` between the extracted Phase 10C-3B4-1
+checkpoint and this phase's working copy (see PRODUCTION FILES CHANGED
+in the implementation report) confirms the only additions are this
+phase's own new test file and documentation.

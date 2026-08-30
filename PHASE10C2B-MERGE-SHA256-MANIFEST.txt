@@ -1,0 +1,5 @@
+cff6d6c8b89291f881f46337975c2aa0b31446281ba328b218f2bae7650a24c9  core/modules/cognitive/cognitive-coordinator.js
+eacda956d2f5c04d8c7f7f4fa7864299530b73a9ce4509c5e5bd2428a6424550  core/modules/cognitive/tests/phase10c2b-async-provider-boundary.test.js
+88089dda055e87c66f885a4ead0d6ae0a203dcba570642d70422ef16f0c43211  core/modules/interpretation/cozy-interpretation.js
+b119fac288109d14f3b713032ef5f372c7b42041627c7d2ba6dfaf7071398351  core/modules/reasoning/cozy-reasoning.js
+34a4999b22f66fa38a84b9dbfcc9734d9199666e018edfd0e5d00c2a0e56322c  core/modules/thinking/cozy-thinking.js

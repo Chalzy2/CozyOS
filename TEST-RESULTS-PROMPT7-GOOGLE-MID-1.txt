@@ -1,0 +1,74 @@
+TEST-RESULTS-PROMPT7-GOOGLE-MID-1.txt
+Node: v22.22.2
+Generated: 2026-08-21
+
+=== NEW: server/auth/test/google-login-endpoint.test.js ===
+# tests 25
+# suites 0
+# pass 25
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 336.9232
+
+=== DIRECT REGRESSION: core/security/test/*.test.js ===
+--- core/security/test/delivery-backend-registry.test.js ---
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 68.35706
+--- core/security/test/google-account-linkage.test.js ---
+# pass 15
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 167.28093
+--- core/security/test/identity-engine.test.js ---
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 50322.016964
+--- core/security/test/login-decision-engine.test.js ---
+# pass 19
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 67.500323
+--- core/security/test/password-reset-service.test.js ---
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 511.678403
+--- core/security/test/phone-account-linkage.test.js ---
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 308.55619
+--- core/security/test/phone-provider.test.js ---
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 408.077355
+
+=== DIRECT REGRESSION: server/live-relay/test/*.test.js ===
+# tests 132
+# suites 0
+# pass 132
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4177.90084
