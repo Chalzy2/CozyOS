@@ -37,6 +37,14 @@
      maintained here. -->
 <script src="core/shell/platform-event-bus.js"></script>
 <script src="core/shell/admin-gate-core.js"></script>
+<!-- C14B admin-routing fix: pure, exact-match allowlist (see file
+     header) deciding whether this page's own actual pathname
+     (/chalzydashboard or /chalzydashboard.html) is safe to hand to
+     login.html as a return destination. Loaded here, not just in
+     login.html, so this page can re-validate its own pathname before
+     appending it — defense in depth, even though the server only ever
+     serves this file for those two exact paths. -->
+<script src="core/shell/return-destination-core.js"></script>
 <!-- organization-workspace-core.js (pure presentation logic) and
      organization-workspace.js (its DOM/controller) are loaded
      unconditionally here, same as admin-gate-core.js above, so
@@ -115,7 +123,26 @@ if (typeof navigator !== "undefined" && navigator.serviceWorker && typeof naviga
     const route = gate.resolveWorkspaceRoute(decision);
 
     if (route.route === gate.WORKSPACE_ROUTE.LOGIN) {
-      window.location.href = "login.html";
+      // C14B admin-routing fix: preserve the protected route the
+      // visitor actually requested, so a successful login lands them
+      // back on /chalzydashboard (where this page's own gate
+      // re-verifies them, admin or not) instead of login.html's
+      // ordinary default of index.html — which would otherwise
+      // silently substitute the User Dashboard for a normal user who
+      // explicitly asked for the admin route, and never even give a
+      // genuine admin the chance to pass this page's gate a second
+      // time. Re-validated through the same exact-match allowlist
+      // login.html itself uses — this page's own pathname can only
+      // ever legitimately be one of the two allowed values (server
+      // routing guarantees that), but the check costs nothing and
+      // keeps both sides of this flow consistent.
+      const core = window.CozyOS && window.CozyOS.ReturnDestinationCore;
+      const requestedPath = core && typeof core.resolveReturnDestination === "function"
+        ? core.resolveReturnDestination(window.location.pathname)
+        : null;
+      window.location.href = requestedPath
+        ? "login.html?return=" + encodeURIComponent(requestedPath)
+        : "login.html";
       return;
     }
 

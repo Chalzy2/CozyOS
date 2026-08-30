@@ -1,15 +1,15 @@
 /**
  * server/test/chalzydashboard-return-to-integration.test.js
  *
- * C14B return-to fix. Composes the REAL running server (real WebAuthn
- * registration/login, real SQLite, real /webauthn/session), the REAL
- * admin-gate-core.js decision logic, and the REAL
- * return-destination-core.js allowlist together — the same real pieces
- * chalzydashboard.html's and login.html's own <script> tags load,
- * minus an actual browser DOM (see chalzydashboard-gate-integration.
- * test.js's own header for why: no network access to install
- * Playwright in this sandbox). This is the closest feasible proof,
- * short of a real browser, that:
+ * C14B admin-routing fix. Composes the REAL running server (real
+ * WebAuthn registration/login, real SQLite, real /webauthn/session),
+ * the REAL admin-gate-core.js decision logic, and the REAL
+ * return-destination-core.js allowlist together — the same real
+ * pieces chalzydashboard.html's and login.html's own <script> tags
+ * load, minus an actual browser DOM (see chalzydashboard-gate-
+ * integration.test.js's own header for why: no network access to
+ * install Playwright in this sandbox). This is the closest feasible
+ * proof, short of a real browser, that:
  *   1. an unauthenticated visit to /chalzydashboard computes the exact
  *      redirect chalzydashboard.html's script would issue, and
  *   2. that exact query string, fed into login.html's real
@@ -125,7 +125,7 @@ function resolvePostLoginDestination(CozyOS, search) {
   return resolved || 'index.html';
 }
 
-test('unauthenticated /chalzydashboard: real gate computes LOGIN, real redirect preserves the exact requested path', async () => {
+test('1. unauthenticated /chalzydashboard: real gate computes LOGIN, real redirect preserves the exact requested path', async () => {
   await withServer(async ({ base }) => {
     const verdict = await getSession(base, null);
     const CozyOS = loadRealClientModules();
@@ -141,7 +141,7 @@ test('unauthenticated /chalzydashboard: real gate computes LOGIN, real redirect 
   });
 });
 
-test('unauthenticated /chalzydashboard.html: same real flow, .html variant preserved exactly', async () => {
+test('5. unauthenticated /chalzydashboard.html: same real flow, .html variant preserved exactly', async () => {
   await withServer(async ({ base }) => {
     const verdict = await getSession(base, null);
     const CozyOS = loadRealClientModules();
@@ -155,13 +155,13 @@ test('unauthenticated /chalzydashboard.html: same real flow, .html variant prese
   });
 });
 
-test('ordinary login (no return param) is completely unchanged: resolves to index.html', () => {
+test('4. ordinary login from www.kafexo.com (no return param) is completely unchanged: resolves to index.html/User Dashboard', () => {
   const CozyOS = loadRealClientModules();
   assert.equal(resolvePostLoginDestination(CozyOS, ''), 'index.html');
   assert.equal(resolvePostLoginDestination(CozyOS, undefined), 'index.html');
 });
 
-test('real admin session returning via return=/chalzydashboard: gate resolves PLATFORM, never substituted for User Dashboard', async () => {
+test('2. real admin session returning via return=/chalzydashboard: gate resolves PLATFORM -> Administrator Dashboard', async () => {
   await withServer(async ({ base, rp }) => {
     const { cookie } = await registerAndLogin(base, rp, { email: 'return-admin@example.com', admin: true });
     const verdict = await getSession(base, cookie);
@@ -171,7 +171,7 @@ test('real admin session returning via return=/chalzydashboard: gate resolves PL
   });
 });
 
-test('real non-admin session returning via return=/chalzydashboard: gate resolves DENIED, never PLATFORM and never a User Dashboard substitution', async () => {
+test('3. real non-admin session returning via return=/chalzydashboard: gate resolves DENIED, never PLATFORM and never a User Dashboard substitution', async () => {
   await withServer(async ({ base, rp }) => {
     const { cookie } = await registerAndLogin(base, rp, { email: 'return-user@example.com', admin: false });
     const verdict = await getSession(base, cookie);
@@ -182,7 +182,7 @@ test('real non-admin session returning via return=/chalzydashboard: gate resolve
   });
 });
 
-test('attempted open redirect (return=https://evil.example) falls back to index.html, never navigates off-site', () => {
+test('6. attempted open redirect (return=https://evil.example, //evil.example, javascript:, /admin) falls back to index.html, never navigates off-site', () => {
   const CozyOS = loadRealClientModules();
   assert.equal(resolvePostLoginDestination(CozyOS, '?return=https%3A%2F%2Fevil.example'), 'index.html');
   assert.equal(resolvePostLoginDestination(CozyOS, '?return=%2F%2Fevil.example'), 'index.html');
