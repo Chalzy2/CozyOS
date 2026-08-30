@@ -229,6 +229,18 @@ module.exports = { createBoundaryServer, FORBIDDEN_ADMIN_ALIASES, ADMIN_CANONICA
 // Allow `node server/static-boundary-server.js` for local/manual verification.
 if (require.main === module) {
   const siteRoot = path.resolve(__dirname, '..');
+
+  // Real email-delivery wiring (see webauthn-rp/providers/select-email-
+  // provider.js). Previously this entrypoint passed no emailProvider at
+  // all, so createServer()'s own default (UnconfiguredEmailProvider)
+  // silently applied in every real deployment — /auth/password/forgot
+  // always returned its generic success response either way, so the
+  // gap was invisible on the wire. This throws synchronously at boot if
+  // COZY_EMAIL_PROVIDER=smtp is requested but incomplete, rather than
+  // starting in a half-configured state.
+  const { selectEmailProvider } = require('./webauthn-rp/providers/select-email-provider');
+  const emailProvider = selectEmailProvider(process.env);
+
   const server = createBoundaryServer({
     siteRoot,
     dbPath: process.env.COZY_WEBAUTHN_DB || path.join(siteRoot, 'cozy-webauthn.local.sqlite'),
@@ -239,10 +251,14 @@ if (require.main === module) {
     // Firebase/firebase-config.js). Override for local testing against a
     // different project.
     firebaseProjectId: process.env.COZY_FIREBASE_PROJECT_ID || 'cozycabin-affiliate',
+    emailProvider,
   });
   const port = process.env.PORT || 8787;
   server.listen(port, () => {
     console.log(`CozyOS boundary server listening on http://localhost:${port}`);
     console.log('Frontend not yet wired to /webauthn/firebase/session - see file header before deploying.');
+    // Status only — never logs credentials (see SmtpEmailProvider.status()/
+    // UnconfiguredEmailProvider.status()/MockEmailProvider.status()).
+    console.log(`Email delivery provider: ${JSON.stringify(emailProvider.status())}`);
   });
 }
