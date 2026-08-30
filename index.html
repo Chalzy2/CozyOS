@@ -329,6 +329,53 @@
       if (!authenticated) return { authenticated: false };
       const identityResult = typeof auth.getCurrentIdentity === "function" ? auth.getCurrentIdentity() : null;
       const userId = identityResult && identityResult.userId;
+      // C14B IDENTITY-ROUTING FIX: userId here is CozyOS.Session's own
+      // .uid, whose SHAPE depends entirely on which login method
+      // established the session — CozyOS.Session.establishFromIdentity()
+      // (phone/legacy-passkey/legacy-Google) sets uid to IdentityEngine's
+      // own internal id, but CozyOS.Session.establishFromExternalAuth()
+      // (password/passkey server login, via AuthCoordinator's
+      // #finishServerLogin) sets uid to the account's EMAIL instead —
+      // see cozy-session-service.js. IdentityEngine.getDashboardConfig()
+      // looks its argument up in its own #users map, which is keyed by
+      // its internal ids, never by email. Passing an email straight
+      // through therefore always misses, and decidePostLoginDestination()
+      // (correctly, per its own documented fail-closed default) treats
+      // any "unknown userId" as USER_DASHBOARD — this was true for every
+      // real platform administrator authenticated via password or
+      // passkey, regardless of their real is_platform_admin status.
+      //
+      // Fix: resolve the REAL IdentityEngine id before calling
+      // getDashboardConfig(), reusing the two existing, already-tested,
+      // read-only, non-secret IdentityEngine methods — no second
+      // identity system, no new lookup table:
+      //   1. getUser(id) — succeeds unchanged for the id-shaped case
+      //      (phone/legacy-passkey/legacy-Google), so those paths are
+      //      byte-for-byte unaffected by this change.
+      //   2. Only if that misses, findUserIdForRecovery(identifier) —
+      //      the existing username/email/phone -> real id resolver
+      //      already used for password-reset request handling — is
+      //      tried, treating the session's uid as an email.
+      // This is a ROUTING HINT resolution only, same as before: it
+      // decides which id to *ask* getDashboardConfig() about, never
+      // grants isPlatformAdmin itself. If IdentityEngine has no local
+      // user record at all for this email (e.g. an account that only
+      // ever exists in the server's own SQLite table, never registered
+      // through IdentityEngine's own local flow), this still correctly
+      // falls back to USER_DASHBOARD, same fail-closed default as
+      // before — this fix repairs the lookup key, not account
+      // provisioning across the two systems, which remains a separate,
+      // disclosed limitation.
+      let resolvedUserId = userId;
+      if (identity && userId) {
+        const directUser = typeof identity.getUser === "function" ? identity.getUser(userId) : null;
+        if (!directUser && typeof identity.findUserIdForRecovery === "function") {
+          try {
+            const resolved = identity.findUserIdForRecovery(userId);
+            if (resolved && resolved.userId) resolvedUserId = resolved.userId;
+          } catch (_err) { /* honest no-op — resolvedUserId stays as the original, unresolved value */ }
+        }
+      }
       // Post-login routing repair (offline-first): getDashboardConfig()
       // is the same existing, already-offline-capable, zero-network
       // in-memory lookup dashboard-settings-admin-boundary-core.js
@@ -337,9 +384,16 @@
       // header for why this is safe as a ROUTING HINT even though it is
       // never the actual security boundary for /chalzydashboard.
       let dashboardConfig = null;
-      if (identity && userId && typeof identity.getDashboardConfig === "function") {
-        try { dashboardConfig = identity.getDashboardConfig(userId); } catch (_err) { /* honest no-op — falls back to USER_DASHBOARD below */ }
+      if (identity && resolvedUserId && typeof identity.getDashboardConfig === "function") {
+        try { dashboardConfig = identity.getDashboardConfig(resolvedUserId); } catch (_err) { /* honest no-op — falls back to USER_DASHBOARD below */ }
       }
+      // authState.userId is returned UNRESOLVED (the original
+      // CozyOS.Session.uid) deliberately — mountUserDashboard(userId)
+      // and any other consumer of this field keep receiving exactly
+      // what they always have. resolvedUserId exists solely to ask
+      // getDashboardConfig() the right question above; it is not
+      // threaded any further, keeping this fix scoped to the routing
+      // decision only, per the existing architecture.
       return { authenticated: true, userId, dashboardConfig };
     }
 
