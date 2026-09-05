@@ -123,26 +123,36 @@ if (typeof navigator !== "undefined" && navigator.serviceWorker && typeof naviga
     const route = gate.resolveWorkspaceRoute(decision);
 
     if (route.route === gate.WORKSPACE_ROUTE.LOGIN) {
-      // C14B admin-routing fix: preserve the protected route the
-      // visitor actually requested, so a successful login lands them
-      // back on /chalzydashboard (where this page's own gate
-      // re-verifies them, admin or not) instead of login.html's
-      // ordinary default of index.html — which would otherwise
-      // silently substitute the User Dashboard for a normal user who
-      // explicitly asked for the admin route, and never even give a
-      // genuine admin the chance to pass this page's gate a second
-      // time. Re-validated through the same exact-match allowlist
-      // login.html itself uses — this page's own pathname can only
-      // ever legitimately be one of the two allowed values (server
-      // routing guarantees that), but the check costs nothing and
-      // keeps both sides of this flow consistent.
-      const core = window.CozyOS && window.CozyOS.ReturnDestinationCore;
-      const requestedPath = core && typeof core.resolveReturnDestination === "function"
-        ? core.resolveReturnDestination(window.location.pathname)
-        : null;
-      window.location.href = requestedPath
-        ? "login.html?return=" + encodeURIComponent(requestedPath)
-        : "login.html";
+      // REAL FIX (Administrator-only entry restoration): this used to
+      // redirect to login.html — the SHARED, generic "Welcome Back"
+      // page also used by ordinary users — with a ?return= param so a
+      // successful login would eventually bounce back here. That meant
+      // an unauthenticated administrator saw the combined ordinary-user
+      // form (with a small Administrator subsection tucked below it)
+      // instead of the real, existing, dedicated Administrator-only UI
+      // ("SECURED WORKSPACE" / "Administrator Login" / username +
+      // password / Trusted-device / Biometric Sign-In) that
+      // core/shell/cozy-login-gate.js already renders — that dedicated
+      // UI was only ever reachable by visiting admin-workspace.html
+      // directly, bypassing this canonical gate entirely.
+      //
+      // admin-workspace.html already contains the complete real flow
+      // for exactly this case: its own real GET /webauthn/session +
+      // AdminGateCore check, and if that finds no session, it calls the
+      // real, existing LoginGate.mountIfNeeded(root, mountWorkspaceIfAdmin)
+      // — which renders the real dedicated Administrator-only form and,
+      // on any of its four real sign-in mechanisms succeeding
+      // (password, biometric, trusted-device, or the credentials form),
+      // calls mountWorkspaceIfAdmin() again to independently re-verify
+      // server-side before actually mounting the workspace. No new
+      // authentication engine, no new UI, no ?return= param needed —
+      // admin-workspace.html IS the destination once authenticated, so
+      // there is nothing to bounce back to.
+      //
+      // Ordinary users are never sent here: this branch only exists
+      // inside chalzydashboard.html/admin-workspace.html's own gate,
+      // never reachable from index.html's ordinary sign-in flow.
+      window.location.href = "admin-workspace.html";
       return;
     }
 

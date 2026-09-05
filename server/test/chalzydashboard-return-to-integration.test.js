@@ -110,11 +110,15 @@ function loadRealClientModules() {
   return sandbox.window.CozyOS;
 }
 
-// Mirrors chalzydashboard.html's real LOGIN-route branch exactly
-// (same two calls, same order, same fallback) without needing a DOM.
-function computeChalzyRedirect(CozyOS, requestedPath) {
-  const requested = CozyOS.ReturnDestinationCore.resolveReturnDestination(requestedPath);
-  return requested ? 'login.html?return=' + encodeURIComponent(requested) : 'login.html';
+// Mirrors chalzydashboard.html's real LOGIN-route branch exactly.
+// REAL FIX (Administrator-only entry restoration): no longer redirects
+// to the shared, ordinary-user login.html at all — goes straight to
+// admin-workspace.html, which already renders the real, dedicated
+// Administrator-only UI (core/shell/cozy-login-gate.js) when
+// unauthenticated. No ?return= param: admin-workspace.html IS the
+// destination once authenticated, so there is nothing to preserve.
+function computeChalzyRedirect(_CozyOS, _requestedPath) {
+  return 'admin-workspace.html';
 }
 
 // Mirrors login.html's real resolvePostLoginDestination() exactly.
@@ -125,7 +129,7 @@ function resolvePostLoginDestination(CozyOS, search) {
   return resolved || 'index.html';
 }
 
-test('1. unauthenticated /chalzydashboard: real gate computes LOGIN, real redirect preserves the exact requested path', async () => {
+test('1. unauthenticated /chalzydashboard: real gate computes LOGIN, real redirect now goes straight to the dedicated Administrator UI (admin-workspace.html), never login.html', async () => {
   await withServer(async ({ base }) => {
     const verdict = await getSession(base, null);
     const CozyOS = loadRealClientModules();
@@ -134,14 +138,12 @@ test('1. unauthenticated /chalzydashboard: real gate computes LOGIN, real redire
     assert.equal(route.route, CozyOS.AdminGateCore.WORKSPACE_ROUTE.LOGIN);
 
     const redirect = computeChalzyRedirect(CozyOS, '/chalzydashboard');
-    assert.equal(redirect, 'login.html?return=%2Fchalzydashboard');
-
-    const search = '?' + redirect.split('?')[1];
-    assert.equal(resolvePostLoginDestination(CozyOS, search), '/chalzydashboard');
+    assert.equal(redirect, 'admin-workspace.html');
+    assert.doesNotMatch(redirect, /login\.html/, 'must never route an unauthenticated administrator to the shared ordinary-user login page');
   });
 });
 
-test('5. unauthenticated /chalzydashboard.html: same real flow, .html variant preserved exactly', async () => {
+test('5. unauthenticated /chalzydashboard.html: same real flow, .html variant behaves identically', async () => {
   await withServer(async ({ base }) => {
     const verdict = await getSession(base, null);
     const CozyOS = loadRealClientModules();
@@ -149,23 +151,22 @@ test('5. unauthenticated /chalzydashboard.html: same real flow, .html variant pr
     assert.equal(route.route, CozyOS.AdminGateCore.WORKSPACE_ROUTE.LOGIN);
 
     const redirect = computeChalzyRedirect(CozyOS, '/chalzydashboard.html');
-    assert.equal(redirect, 'login.html?return=%2Fchalzydashboard.html');
-    const search = '?' + redirect.split('?')[1];
-    assert.equal(resolvePostLoginDestination(CozyOS, search), '/chalzydashboard.html');
+    assert.equal(redirect, 'admin-workspace.html');
   });
 });
 
-// REAL REGRESSION REPRODUCTION (dashboard-as-admin-entry follow-through):
+// REAL FIX (Administrator-only entry restoration, follow-through):
 // production report was that an unauthenticated visit to /dashboard
-// displayed login.html's plain/ordinary state — Administrator section
-// hidden — instead of the intended Administrator login sequence.
-// return-destination-core.js's ALLOWED_DESTINATIONS had not been updated
-// when /dashboard became a real administrator-entry alias, so
-// resolveReturnDestination('/dashboard') returned null and the ?return=
-// value was silently dropped. These two tests exercise the exact same
-// real code path as tests 1/5 above, just for the /dashboard alias, and
-// would have failed against the pre-fix return-destination-core.js.
-test('7. unauthenticated /dashboard: real gate computes LOGIN, real redirect now preserves /dashboard as the return path (real regression fix)', async () => {
+// (and /chalzydashboard) displayed login.html's combined ordinary-user
+// form (Administrator section as a small subsection below it) instead
+// of the real, existing, dedicated Administrator-only UI
+// (cozy-login-gate.js's "SECURED WORKSPACE" / "Administrator Login"
+// form). Root cause: this redirect used to always target the shared
+// login.html. These four tests prove the real redirect now goes
+// straight to admin-workspace.html — which already contains the
+// complete, real, dedicated Administrator entry flow — for all four
+// canonical Administrator-entry aliases.
+test('7. unauthenticated /dashboard: real gate computes LOGIN, real redirect now goes straight to the dedicated Administrator UI, never login.html (real fix)', async () => {
   await withServer(async ({ base }) => {
     const verdict = await getSession(base, null);
     const CozyOS = loadRealClientModules();
@@ -173,15 +174,12 @@ test('7. unauthenticated /dashboard: real gate computes LOGIN, real redirect now
     assert.equal(route.route, CozyOS.AdminGateCore.WORKSPACE_ROUTE.LOGIN);
 
     const redirect = computeChalzyRedirect(CozyOS, '/dashboard');
-    assert.equal(redirect, 'login.html?return=%2Fdashboard', 'a return value must be preserved so login.html shows its Administrator section');
-    assert.notEqual(redirect, 'login.html', 'must not silently drop the return param the way the pre-fix allowlist did');
-
-    const search = '?' + redirect.split('?')[1];
-    assert.equal(resolvePostLoginDestination(CozyOS, search), '/dashboard');
+    assert.equal(redirect, 'admin-workspace.html', 'must reach the real dedicated Administrator UI, not the shared ordinary-user login.html');
+    assert.doesNotMatch(redirect, /login\.html/);
   });
 });
 
-test('8. unauthenticated /dashboard.html: same real flow, .html variant preserved exactly (real regression fix)', async () => {
+test('8. unauthenticated /dashboard.html: same real flow, .html variant behaves identically (real fix)', async () => {
   await withServer(async ({ base }) => {
     const verdict = await getSession(base, null);
     const CozyOS = loadRealClientModules();
@@ -189,9 +187,7 @@ test('8. unauthenticated /dashboard.html: same real flow, .html variant preserve
     assert.equal(route.route, CozyOS.AdminGateCore.WORKSPACE_ROUTE.LOGIN);
 
     const redirect = computeChalzyRedirect(CozyOS, '/dashboard.html');
-    assert.equal(redirect, 'login.html?return=%2Fdashboard.html');
-    const search = '?' + redirect.split('?')[1];
-    assert.equal(resolvePostLoginDestination(CozyOS, search), '/dashboard.html');
+    assert.equal(redirect, 'admin-workspace.html');
   });
 });
 
