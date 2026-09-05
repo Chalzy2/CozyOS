@@ -1,0 +1,186 @@
+--- core/modules/identity/identity-engine.js	2026-08-21 12:11:32.000000000 +0000
++++ /home/claude/work/core/modules/identity/identity-engine.js	2026-08-21 17:56:38.426392942 +0000
+@@ -45,7 +45,7 @@
+ (function () {
+     "use strict";
+     window.CozyOS = window.CozyOS || {};
+-    const IE_VERSION = "1.4.0-ENTERPRISE"; // Milestone 375: getUserIdByUsername()/loginWithVerifiedPasskey() — real seam connecting the existing WebAuthnProvider (security-key factor) to login.html, following the exact #createRealSession(auditLabel) precedent already proven by login()/completeLoginWithOtp(). Prompt 7: loginWithVerifiedGoogle() — same precedent, for core/security/google-account-linkage.js's real, verified Google login candidates.
++    const IE_VERSION = "1.5.0-ENTERPRISE"; // Milestone 375: getUserIdByUsername()/loginWithVerifiedPasskey() — real seam connecting the existing WebAuthnProvider (security-key factor) to login.html, following the exact #createRealSession(auditLabel) precedent already proven by login()/completeLoginWithOtp(). Prompt 7: loginWithVerifiedGoogle() — same precedent, for core/security/google-account-linkage.js's real, verified Google login candidates. Prompt 9A: getFactorSnapshotContext() — narrow, non-secret (hasPassword boolean, never the real hash) seam feeding AuthFactorSnapshot.buildFactorSnapshot().
+     const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+ 
+     class CozyOSIdentityEngine {
+@@ -1054,6 +1054,34 @@
+         }
+ 
+         /**
++         * getFactorSnapshotContext(userId) — Prompt 9A, real, additive,
++         * read-only. core/security/auth-factor-snapshot.js's
++         * buildFactorSnapshot() needs to know whether a real password
++         * hash exists, and the account's status/registrationMethod/
++         * email/phone, to build an honest per-factor login snapshot —
++         * but must never receive the actual hash/salt bytes to do it.
++         * This is that narrow, non-secret seam: `hasPassword` (a
++         * boolean) stands in for the real hash, and every other field
++         * returned is already non-secret elsewhere in this file
++         * (getUser() already exposes status; register() already
++         * collects email/phone as account-identifying fields the
++         * account owner already knows). Never exposes hash, salt,
++         * roles, or any other credential material. Unknown userId ->
++         * null, same fail-closed shape as getUser().
++         */
++        getFactorSnapshotContext(userId) {
++            const user = this.#users.get(userId);
++            if (!user) return null;
++            return {
++                status: user.status || "active",
++                registrationMethod: user.registrationMethod || null,
++                email: user.email || null,
++                phone: user.phone || null,
++                hasPassword: !!user.hash
++            };
++        }
++
++        /**
+          * findUserIdForRecovery(identifier) — Prompt 6, real, additive,
+          * read-only. A genuine gap: password-reset request needs to
+          * resolve a caller-supplied identifier (username, email, or
+--- core/security/auth-factor-snapshot.js	2026-08-21 12:11:32.000000000 +0000
++++ /home/claude/work/core/security/auth-factor-snapshot.js	2026-08-21 17:56:47.242872399 +0000
+@@ -42,7 +42,7 @@
+ })(typeof window !== "undefined" ? window : globalThis, function (root) {
+     "use strict";
+ 
+-    const FACTOR_SNAPSHOT_VERSION = "1.0.0-ENTERPRISE";
++    const FACTOR_SNAPSHOT_VERSION = "1.1.0-ENTERPRISE"; // Prompt 9A: password.available also accepts user.hasPassword (IdentityEngine.getFactorSnapshotContext()'s non-secret boolean), alongside the original user.hash check — additive, never narrows the original behavior.
+ 
+     function safe(fn, fallback) {
+         try {
+@@ -137,8 +137,13 @@
+         // A password login path exists for this account only when a real
+         // password hash was actually set at registration — never assumed
+         // true for an account that has none (e.g. a future Google-only
+-        // registration path, when one exists).
+-        const password = { available: !!(user && user.hash) };
++        // registration path, when one exists). Prompt 9A: a caller may
++        // supply either the real internal record (`.hash`, e.g. existing
++        // tests / internal callers) or IdentityEngine's non-secret
++        // getFactorSnapshotContext() shape (`.hasPassword` boolean,
++        // never the real hash) — accepting both means AuthCoordinator
++        // never has to move actual hash bytes through this seam.
++        const password = { available: !!(user && (user.hash || user.hasPassword)) };
+ 
+         const recovery = {
+             emailAvailable: !!(user && user.email),
+--- core/modules/identity/auth-coordinator.js	2026-08-21 11:07:04.000000000 +0000
++++ /home/claude/work/core/modules/identity/auth-coordinator.js	2026-08-21 17:57:09.029970025 +0000
+@@ -71,7 +71,7 @@
+     "use strict";
+ 
+     window.CozyOS = window.CozyOS || {};
+-    const COORDINATOR_VERSION = "1.3.0-ENTERPRISE"; // Milestone 375: loginWithPasskey() — connects the real, existing WebAuthnProvider to login.html for ordinary (non-admin) users, distinct from loginWithBiometrics()/loginWithTrustedDevice() which remain the Platform-Administrator-only AdminRecoveryPolicy path
++    const COORDINATOR_VERSION = "1.4.0-ENTERPRISE"; // Milestone 375: loginWithPasskey() — connects the real, existing WebAuthnProvider to login.html for ordinary (non-admin) users, distinct from loginWithBiometrics()/loginWithTrustedDevice() which remain the Platform-Administrator-only AdminRecoveryPolicy path. Prompt 9A: getLoginDecision() — composes AuthFactorSnapshot + LoginDecisionEngine into the real, previously-missing factor-snapshot-drives-login-decision connection; verifies/duplicates nothing itself.
+     const STORAGE_KEY = "cozyos.authCoordinator.session";
+ 
+     function safeLocalStorage() {
+@@ -228,6 +228,80 @@
+         }
+ 
+         /**
++         * getLoginDecision(username, { context = "login" })
++         *   Prompt 9A — the real, previously-missing connection:
++         *   ACCOUNT -> FACTOR SNAPSHOT -> POLICY/DECISION -> PERMITTED
++         *   FACTOR. Composes IdentityEngine's real, non-secret account
++         *   lookups (getUserIdByUsername/getFactorSnapshotContext/
++         *   isPlatformAdmin), core/security/auth-factor-snapshot.js's
++         *   buildFactorSnapshot() (itself composed from the real
++         *   WebAuthnProvider/PhoneAccountLinkage/GoogleAccountLinkage/
++         *   TrustedDeviceManager/AuthFactorRegistry engines — whichever
++         *   of those are actually loaded on the current page; a missing
++         *   one degrades its factor to unavailable, it never throws),
++         *   and core/security/login-decision-engine.js's real
++         *   getLoginDecision(). This method verifies no factor itself,
++         *   duplicates no existing engine, and never lets a client-
++         *   supplied boolean influence the result — every value in the
++         *   returned decision ultimately traces back to a real engine
++         *   call.
++         *
++         *   This method ONLY answers "which factor should this account
++         *   be offered, and in what order" — invoking the actually-
++         *   chosen provider (loginWithPasskey()/loginWithCredentials()/
++         *   loginWithVerifiedGoogle()/completeLoginWithOtp(), all
++         *   already real and unchanged by this method) remains the
++         *   caller's job, same as before this method existed. No UI on
++         *   this page calls this yet (Prompt 9A §12 — decision engine
++         *   wiring only; UI wiring is a later slice).
++         *
++         *   An unresolved username returns the exact same generic,
++         *   non-enumerating shape loginWithPasskey() already uses
++         *   ("Invalid username or password") — this method must never
++         *   become a new way to probe which usernames exist. A resolved
++         *   account that is inactive/locked still reaches
++         *   LoginDecisionEngine's own real "Account is not active."
++         *   reason, matching login()'s existing, already-disclosed
++         *   locked-account behavior elsewhere on this page.
++         */
++        getLoginDecision(username, { context = "login" } = {}) {
++            const rejected = (reason) => ({ status: "REJECTED", reason, primaryFactor: null, usableFactors: [], fallbackAvailable: false, recoveryAvailable: false, userId: null });
++
++            const identity = this.#identity();
++            if (!identity || typeof identity.getUserIdByUsername !== "function" || typeof identity.getFactorSnapshotContext !== "function") {
++                return rejected("IdentityEngine is not loaded — cannot build a login decision. Failing closed.");
++            }
++            const snapshotBuilder = window.CozyOS && window.CozyOS.AuthFactorSnapshot;
++            const decisionEngine = window.CozyOS && window.CozyOS.LoginDecisionEngine;
++            if (!snapshotBuilder || typeof snapshotBuilder.buildFactorSnapshot !== "function" || !decisionEngine || typeof decisionEngine.getLoginDecision !== "function") {
++                return rejected("AuthFactorSnapshot/LoginDecisionEngine are not loaded — failing closed.");
++            }
++
++            const resolved = typeof username === "string" && username ? identity.getUserIdByUsername(username) : null;
++            if (!resolved) return rejected("Invalid username or password.");
++
++            const userContext = identity.getFactorSnapshotContext(resolved.userId);
++            if (!userContext) return rejected("Invalid username or password.");
++
++            const isPlatformAdmin = typeof identity.isPlatformAdmin === "function" ? identity.isPlatformAdmin(resolved.userId) : false;
++
++            const { account, factors } = snapshotBuilder.buildFactorSnapshot({
++                userId: resolved.userId,
++                user: userContext,
++                context,
++                webauthnProvider: window.CozyOS && window.CozyOS.WebAuthnProvider,
++                phoneLinkage: window.CozyOS && window.CozyOS.PhoneAccountLinkage,
++                googleLinkage: window.CozyOS && window.CozyOS.GoogleAccountLinkage,
++                trustedDeviceManager: window.CozyOS && window.CozyOS.TrustedDeviceManager,
++                factorRegistry: window.CozyOS && window.CozyOS.AuthFactorRegistry,
++                isPlatformAdmin
++            });
++
++            const decision = decisionEngine.getLoginDecision({ account, factors, context });
++            return { ...decision, userId: resolved.userId };
++        }
++
++        /**
+          * loginWithPasskey(username)
+          *   Milestone 375 — real, ordinary-user Passkey sign-in. Distinct
+          *   from loginWithTrustedDevice()/loginWithBiometrics() below,
+--- login.html	2026-08-21 11:07:04.000000000 +0000
++++ /home/claude/work/login.html	2026-08-21 17:57:15.932449720 +0000
+@@ -500,6 +500,18 @@
+      challenge dispatch half, channel "sms"), so it must load after
+      both — matching the real dependency order proven above. -->
+ <script src="core/security/phone-provider.js"></script>
++<!-- Prompt 9A — real, dependency-only addition (no visual/markup change):
++     auth-factor-snapshot.js and login-decision-engine.js were genuinely
++     missing from this page (confirmed by exhaustive search — neither
++     script tag existed anywhere in the repository), which meant
++     AuthCoordinator.getLoginDecision() would exist as real code but be
++     unreachable in the actual browser runtime. Loaded after their real
++     dependencies above (auth-factor-registry.js, webauthn-provider.js,
++     phone-provider.js) and before auth-coordinator.js, which is the one
++     caller composing both. No UI on this page calls getLoginDecision()
++     yet — wiring an actual login button to it is a later slice. -->
++<script src="core/security/auth-factor-snapshot.js"></script>
++<script src="core/security/login-decision-engine.js"></script>
+ <!-- M372 — real, confirmed fix: this was missing from both login.html
+      and index.html, the two pages where session restoration ("Remember
+      Me") actually needs to run. AuthCoordinator.restoreSession()

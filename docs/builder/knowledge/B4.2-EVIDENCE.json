@@ -1,0 +1,187 @@
+{
+  "phase": "B4.2",
+  "dependsOn": "B4.1 VERIFIED",
+  "productionCutoverPerformed": false,
+  "productionDataTouched": false,
+  "sections": {
+    "1_databaseConfiguration": {
+      "adapterSelectionLogic": "PASS",
+      "adapterEvidence": "server/webauthn-rp/database-adapter.js createDatabaseAdapter(): databaseUrl->Postgres (throws on failure, no fallback), sqliteDb->SQLite, neither->throws. Verified by direct source read.",
+      "productionEntrypointWiring": "BLOCKED",
+      "productionEntrypointDefect": {
+        "file": "server/static-boundary-server.js",
+        "location": "require.main === module block (actual process entrypoint)",
+        "issue": "Never reads process.env.COZY_DATABASE_URL; never passes databaseUrl to createBoundaryServer(). Setting COZY_DATABASE_URL in deployment has zero effect - process always opens local SQLite.",
+        "contradicts": "The factory function's own comment claims 'databaseUrl is now the single selector... so the whole process agrees on one backend' - true for the factory function's parameters, false for the actual boot code path that calls it.",
+        "verificationMethod": "grep for 'databaseUrl' and 'COZY_DATABASE_URL' within the require.main block; neither present",
+        "recommendedFix": "Add databaseUrl: process.env.COZY_DATABASE_URL to the object passed into createBoundaryServer(...) in the require.main block",
+        "fixApplied": false,
+        "fixApplyReason": "B4.2 scope is evaluation/simulation, not authorized repair"
+      }
+    },
+    "2_postgresSchema": {
+      "status": "PASS",
+      "migrationFiles": ["001_core_schema.sql", "002_firebase_uid.sql", "003_password_auth.sql", "004_totp_mfa.sql", "005_organizations.sql"],
+      "orderingVerified": true,
+      "idempotencyVerified": true,
+      "idempotencyEvidence": "run-migrations.js tracks applied versions in schema_migrations table, skips already-applied files (code-verified); B3 evidence includes passing 'rerunning migrations is idempotent' test against real Neon",
+      "transactionalPerFile": true,
+      "schemaMatchesExpectations": "confirmed via B3 evidence foreign-key and unique-constraint tests"
+    },
+    "3_databaseAdapter": {
+      "status": "PASS",
+      "transactionBehavior": "BEGIN/COMMIT/ROLLBACK with finally-release, verified in source and behaviorally via B3 evidence commit/rollback tests",
+      "nestedTransactionsRejected": true,
+      "connectionPoolLifecycle": "close() calls pool.end(); migration runner client.end() in finally block",
+      "placeholderConversion": "toPositionalPlaceholders, separately exported/tested, B3 evidence test 1 passes",
+      "errorPropagation": "no catch block swallows errors without rethrow or documented failure shape - verified by reading every catch in the file"
+    },
+    "4_authentication": {
+      "passwordAuth": "PASS - B3 evidence",
+      "passkeyWebAuthn": "PASS - B3 evidence",
+      "totpMfa": "PASS - B3 evidence",
+      "recoveryCodes": "UNTESTED - no PostgreSQL-specific recovery-code redemption test found in the 16-test B3 suite or elsewhere",
+      "firebaseConvergence": "PASS - B3 evidence",
+      "sessionLifecycle": "PASS - covered by password/passkey/Firebase B3 evidence tests",
+      "passwordReset": "PASS - B3 evidence (part of 'full password auth + session + reset lifecycle' test)",
+      "concurrentFirebaseIdentityCreation": "PASS - B3 evidence"
+    },
+    "5_organizations": {
+      "creationInviteRolesPermissionsIsolation": "PASS - B3 evidence",
+      "concurrentOrganizationCreation": "PASS - B3 evidence",
+      "sqlitePathRegressionConfirmed": {
+        "organizations.test.js": "11/11 PASS",
+        "organizations-context.test.js": "11/11 PASS",
+        "session-organizations.test.js": "8/8 PASS"
+      }
+    },
+    "6_operationalSafety": {
+      "startupBehavior": "MIXED - adapter-level safe, undermined by section 1 entrypoint defect",
+      "missingDatabaseBehavior": "PASS - createDatabaseAdapter() throws when neither databaseUrl nor sqliteDb provided",
+      "connectionFailureBehavior": "UNTESTED - not live-tested against a deliberately broken connection string this session (no network access); code reading supports documented fail-closed claim",
+      "migrationFailureBehavior": "PASS - transactional per-file, rollback, rethrow with context, verified in source",
+      "transactionFailureBehavior": "PASS - verified in source and by B3 evidence",
+      "noDestructiveAutoMigrationOnStartup": "PASS - run-migrations.js confirmed not called from server.js or static-boundary-server.js; manual CLI action only"
+    },
+    "7_security": {
+      "noCredentialsCommitted": "PASS - re-confirmed, no new findings vs B4.1 hygiene scan",
+      "noConnectionStringsEmbedded": "PASS",
+      "noSecretsInLogs": "PASS - checked every console.log/error in database-adapter.js, run-migrations.js, bootstrap-admin.js; none interpolates databaseUrl",
+      "tlsRequired": "DISCLOSED_GAP - not code-enforced; Pool created with no explicit ssl option, relies entirely on connection string including sslmode=require. Recommend code-level enforcement.",
+      "productionAdminBootstrapExplicit": "PASS - bootstrap-admin.js is CLI-only, never HTTP-reachable, confirmed in rp.js's own comment",
+      "noFailOpenBehavior": "PASS - confirmed across adapter, migration runner, and admin-gate path (audited under B4.1)"
+    },
+    "8_cutoverSimulation": {
+      "current_sqlite": {
+        "http-integration.test.js": "19/19 PASS",
+        "firebase-session-integration.test.js": "10/10 PASS",
+        "mfa-pending-auth.test.js": "13/13 PASS",
+        "organizations-context.test.js": "11/11 PASS",
+        "organizations.test.js": "11/11 PASS",
+        "password-auth-integration.test.js": "19/19 PASS",
+        "session-organizations.test.js": "8/8 PASS",
+        "totp.test.js": "7/7 PASS",
+        "total": "98/98 PASS"
+      },
+      "target_postgres": {
+        "source": "B3-POSTGRES-16OF16-RUNTIME.txt (already closed, not re-run)",
+        "result": "16/16 PASS"
+      },
+      "sharedBusinessLogicVerified": true,
+      "sharedBusinessLogicEvidence": "Both SQLite and Postgres test suites import and exercise the identical RelyingParty/OrganizationRegistry classes from rp.js/organizations.js - only the adapter differs",
+      "productionDataTouched": false
+    },
+    "9_recoveryRollbackPlan": {
+      "documented": true,
+      "selectionMechanism": "COZY_DATABASE_URL env var (currently non-functional per section 1 blocker)",
+      "failureDetection": "synchronous throw/rejection, no silent retry or fallback that could mask failure",
+      "rollbackMechanism": "unset COZY_DATABASE_URL and restart; SQLite file untouched by Postgres work",
+      "dataMigrationConcern": "migrate-sqlite-to-postgres.js not tested against real/representative data in any reviewed evidence - UNTESTED",
+      "requiredBackupsBeforeRealCutover": [
+        "full production SQLite database file, taken immediately before cutover",
+        "pre-cutover deployment configuration with COZY_DATABASE_URL unset",
+        "fresh migrate-sqlite-to-postgres.js export, spot-checked against live SQLite row counts"
+      ]
+    }
+  },
+  "concreteBlockers": [],
+  "concreteBlockersOriginal": [
+    "server/static-boundary-server.js's require.main production entrypoint never read COZY_DATABASE_URL and never passed databaseUrl to createBoundaryServer() - setting the env var in deployment had no effect. FIXED this round, see repair section."
+  ],
+  "disclosedNonBlockingGaps": [
+    "TLS not code-enforced on PostgreSQL connection (relies on connection-string convention) - unchanged by this repair",
+    "Recovery-code redemption not covered by PostgreSQL runtime evidence - unchanged by this repair",
+    "Live query-level connection-failure behavior not tested (boot-level selection now proven; a real failing query's behavior is not) - clarified this round",
+    "migrate-sqlite-to-postgres.js data-carrying migration path not exercised against real/representative data - unchanged by this repair"
+  ],
+  "repair": {
+    "round": 2,
+    "originalDefect": {
+      "file": "server/static-boundary-server.js",
+      "location": "require.main === module block",
+      "issue": "Never read process.env.COZY_DATABASE_URL; never passed databaseUrl to createBoundaryServer()"
+    },
+    "exactRepair": {
+      "changesMade": [
+        "Added const databaseUrl = process.env.COZY_DATABASE_URL; and passed databaseUrl into createBoundaryServer({...}) call",
+        "Added one boot-log line reporting selected backend (PostgreSQL/SQLite) without ever logging the connection string itself"
+      ],
+      "filesModified": ["server/static-boundary-server.js"],
+      "newFallbackLogicIntroduced": false,
+      "existingThrowNotFallbackBehaviorPreserved": true,
+      "secretLoggingIntroduced": false,
+      "verificationMethod": "grep -n databaseUrl server/static-boundary-server.js - confirmed used only in boolean ternary inside log line, never interpolated as a value"
+    },
+    "newRegressionTest": {
+      "path": "server/test/static-boundary-entrypoint-database-selection.test.js",
+      "why": "Only test in checkpoint that spawns static-boundary-server.js as its own child process, necessary because require.main !== module when required by another test - every prior test exercised createBoundaryServer() directly and never ran the actual boot block the defect lived in",
+      "tests": {
+        "COZY_DATABASE_URL unset boots normally against SQLite (regression guard)": "PASS",
+        "COZY_DATABASE_URL set selects PostgreSQL, SQLite file never created": "PASS"
+      },
+      "resultSummary": "2/2 PASS",
+      "correctionDuringDevelopment": "Initially assumed unreachable Postgres URL would fail boot fast; testing revealed node-postgres Pool connects lazily (no socket until first query), so HTTP server does start listening - test was corrected to assert deterministic signals (boot log backend name, SQLite file non-creation) instead of assuming eager connection failure"
+    },
+    "testsRunThisRound": {
+      "server/test/static-boundary-entrypoint-database-selection.test.js": "2/2 PASS (new)",
+      "server/test/static-boundary-firebase.test.js": "3/3 PASS",
+      "server/test/static-boundary-password-auth.test.js": "4/4 PASS",
+      "server/test/chalzydashboard-gate-integration.test.js": "6/6 PASS",
+      "core/modules/identity/test/auth-coordinator.test.js": "26/26 PASS",
+      "server/webauthn-rp/test/organizations.test.js": "11/11 PASS",
+      "server/webauthn-rp/test/http-integration.test.js": "19/19 PASS",
+      "server/webauthn-rp/test/firebase-session-integration.test.js": "10/10 PASS",
+      "server/webauthn-rp/test/mfa-pending-auth.test.js": "13/13 PASS",
+      "server/webauthn-rp/test/organizations-context.test.js": "11/11 PASS",
+      "server/webauthn-rp/test/password-auth-integration.test.js": "19/19 PASS",
+      "server/webauthn-rp/test/session-organizations.test.js": "8/8 PASS",
+      "server/webauthn-rp/test/totp.test.js": "7/7 PASS",
+      "total": "139/139 PASS"
+    },
+    "nodeCheckClean": true,
+    "postgresRuntimeReRun": false,
+    "postgresRuntimeReRunReason": "Still no COZY_DATABASE_URL/network egress in this sandbox; B3 evidence not touched or re-claimed; repair doesn't change adapter/migration logic that suite exercises",
+    "rechecks": {
+      "authentication": "unaffected - 26/26 + full SQLite integration suites pass, no auth code touched",
+      "organizations": "unaffected - 11/11 + related suites pass",
+      "adapterTransactions": "unaffected - database-adapter.js not touched",
+      "migrationBehavior": "unaffected - run-migrations.js not touched",
+      "secretHygiene": "re-scanned changed file - databaseUrl only in boolean ternary, never interpolated as value",
+      "noFailOpenDatabaseBehavior": "confirmed unchanged - createDatabaseAdapter() throw-don't-fallback not modified"
+    },
+    "rollbackProcedure": "Two-line, single-file addition in server/static-boundary-server.js, no schema/data/dependency changes alongside it. Plain code revert of one file. No interaction with database state, migrations, or B3 evidence. Operator who takes no action (doesn't set COZY_DATABASE_URL) sees byte-identical behavior to before this repair.",
+    "postRepairManifest": {
+      "path": "docs/builder/knowledge/POST-B4.2-REPAIR-SHA256-MANIFEST.txt",
+      "fileCount": 1596,
+      "sha256": "0873848bfb47f4cc28d33adb3df8fe78e386f9f57400987455dd89615ed1c71b",
+      "changedFileHashes": {
+        "server/static-boundary-server.js": "052220fb12297010ab6e52b84c3311e619b3461dee31102de31888817bd60ccf",
+        "server/test/static-boundary-entrypoint-database-selection.test.js": "d2dd80034e866d53f212a68a4ed86d490f371cd5e0e1716f7d8e9130f6b28d05"
+      }
+    }
+  },
+  "productionCutoverPerformed": false,
+  "productionDataModified": false,
+  "status": "B4.2 VERIFIED",
+  "reportPath": "docs/builder/knowledge/B4.2-PRODUCTION-DATABASE-CUTOVER-READINESS.md"
+}

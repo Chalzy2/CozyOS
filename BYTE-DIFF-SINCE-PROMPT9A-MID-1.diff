@@ -1,0 +1,99 @@
+--- /tmp/pre9b/dashboard.html	2026-08-21 11:07:04.000000000 +0000
++++ dashboard.html	2026-08-21 18:34:04.590730546 +0000
+@@ -654,6 +654,45 @@
+          IdentityStorage, and IdentityEngine - no new encryption engine. -->
+     <script src="core/security/living-recovery-vault.js"></script>
+     <script src="core/security/auth-policy-engine.js"></script>
++    <!-- Prompt 9B — real bug fix: none of these five files had a
++         script tag on this page (confirmed by direct search), so
++         window.CozyOS.PhoneAccountLinkage was never assigned despite
++         core/modules/identity/auth-coordinator.js already reading it
++         (AuthCoordinator's own `window.CozyOS && ...` check was
++         correctly failing closed the whole time — never wrongly
++         open). Order: phone-provider.js/delivery-backend-registry.js
++         (real dependencies) and phone-account-linkage.js before
++         phone-linkage-store-adapter.js (needs the linkage module's
++         registration hook); phone-linkage-bootstrap.js loaded last
++         since it composes all four plus the already-loaded
++         IdentityStorage into the one authoritative production
++         instance. auth-factor-snapshot.js has never had a script tag
++         either — the same gap — loaded here since AuthCoordinator
++         composes it once these real factor engines exist. There is
++         no equivalent Google linkage wiring here: google-account-linkage.js
++         is a server-side-only Node module (requires
++         server/live-relay/firebase-identity-issuer.js's real
++         certificate-fetch/crypto boundary) and cannot run in this
++         browser page — see phone-linkage-store-adapter.js's header
++         and this milestone's implementation report for the full
++         reasoning. -->
++    <script src="core/security/phone-provider.js"></script>
++    <script src="core/security/delivery-backend-registry.js"></script>
++    <script src="core/security/phone-account-linkage.js"></script>
++    <script src="core/security/phone-linkage-store-adapter.js"></script>
++    <script src="core/security/phone-linkage-bootstrap.js"></script>
++    <script src="core/security/auth-factor-snapshot.js"></script>
++    <!-- Prompt 9B — real, separate pre-existing bug fix, found while
++         verifying AuthCoordinator.getLoginDecision() actually reaches
++         a real decision (Prompt 9B §10/§21): login-decision-engine.js
++         also had no script tag anywhere on this page. Without it,
++         getLoginDecision() was unconditionally returning its own
++         "AuthFactorSnapshot/LoginDecisionEngine are not loaded —
++         failing closed" rejection for every login, regardless of any
++         linkage work — a real, independent gap from the phone/Google
++         linkage gap this milestone targets, disclosed here rather
++         than silently left in place. -->
++    <script src="core/security/login-decision-engine.js"></script>
+     <script src="core/security/recovery-phrase-manager.js"></script>
+     <script src="core/security/recovery-question-manager.js"></script>
+     <script src="core/security/trusted-device-manager.js"></script>
+--- /tmp/pre9b/core/modules/identity/identity-storage.js	2026-08-21 11:07:04.000000000 +0000
++++ core/modules/identity/identity-storage.js	2026-08-21 18:28:21.068720850 +0000
+@@ -39,7 +39,7 @@
+ (function () {
+     "use strict";
+     window.CozyOS = window.CozyOS || {};
+-    const IDENTITY_STORAGE_VERSION = "1.1.0-ENTERPRISE";
++    const IDENTITY_STORAGE_VERSION = "1.2.0-ENTERPRISE";
+     const DB_NAME = "cozyos-identity";
+     // M373 — real, additive extension: bumped from 1 to 2 so the real
+     // onupgradeneeded handler below (unchanged logic, just now also
+@@ -48,8 +48,17 @@
+     // databases already at version 1 upgrade in place - onupgradeneeded
+     // only CREATES stores that don't already exist, never touches the
+     // other 4 real stores.
+-    const DB_VERSION = 9; // Prompt 6 — bumped again for the new "passwordResetTokens" store (real reset-token records: tokenHash, userId, expiresAt, used — never a raw token)
+-    const STORE_NAMES = Object.freeze(["users", "trustedDevices", "recoveryQuestions", "recoveryPhrases", "otpAccounts", "deviceKeys", "vaultItems", "trustScores", "behaviorProfiles", "deviceProfiles", "decisionHistory", "passwordResetTokens"]);
++    // Prompt 9B — bumped from 9 to 10 for the new "phoneLinkages" store
++    // (real, per-user phone-account-linkage records consumed by
++    // core/security/phone-linkage-store-adapter.js; keyPath "id" holds
++    // the userId, following the exact same convention as every other
++    // store here). onupgradeneeded only CREATES stores that don't
++    // already exist yet, so every existing store at version 9 upgrades
++    // in place untouched. There is no "googleLinkages" store here on
++    // purpose — see phone-linkage-store-adapter.js's header for why
++    // Google linkage cannot use this (browser-only IndexedDB) layer.
++    const DB_VERSION = 10;
++    const STORE_NAMES = Object.freeze(["users", "trustedDevices", "recoveryQuestions", "recoveryPhrases", "otpAccounts", "deviceKeys", "vaultItems", "trustScores", "behaviorProfiles", "deviceProfiles", "decisionHistory", "passwordResetTokens", "phoneLinkages"]);
+ 
+     class CozyIdentityStorage {
+         #dbPromise = null;
+--- /tmp/pre9b/core/security/phone-account-linkage.js	2026-08-21 11:07:04.000000000 +0000
++++ core/security/phone-account-linkage.js	2026-08-21 18:31:32.213533180 +0000
+@@ -272,6 +272,17 @@
+         // wiring) before this becomes usable end-to-end; this file never
+         // constructs a store of its own on window.
+         window.CozyOS.PhoneAccountLinkage = window.CozyOS.PhoneAccountLinkage || null;
++        // Prompt 9B — real, minimal fix: as a plain <script> (the
++        // `else { factory(root); }` UMD branch above), this file's
++        // return value was previously discarded, so CozyPhoneAccountLinkage
++        // itself was never reachable from window — only the `|| null`
++        // placeholder two lines up was. This is the smallest additive
++        // registration hook so a real bootstrap composer (e.g.
++        // core/security/phone-linkage-bootstrap.js) can actually
++        // construct the real class; it does not change any existing
++        // behavior for CommonJS/test callers, who already received
++        // the real exports via the `return` statement below.
++        window.CozyOS.PhoneAccountLinkageModule = { CozyPhoneAccountLinkage, InMemoryPhoneLinkageStore, normalizePhone, PHONE_LINKAGE_VERSION };
+     }
+ 
+     return { CozyPhoneAccountLinkage, InMemoryPhoneLinkageStore, normalizePhone, PHONE_LINKAGE_VERSION };

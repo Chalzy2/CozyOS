@@ -1,0 +1,13 @@
+# Phase 10C-3B1 — Protected file hashes
+# These 9 files were the real runtime path audited this phase.
+# All 9 hash-match their Phase 10C-3A checkpoint values exactly.
+# Zero production modification this phase.
+5855511b405d50adf05987513faea23ac342c5ed156f5d0042fd5e7eaf5f532e  core/modules/cognitive/cognitive-coordinator.js
+34a4999b22f66fa38a84b9dbfcc9734d9199666e018edfd0e5d00c2a0e56322c  core/modules/thinking/cozy-thinking.js
+b119fac288109d14f3b713032ef5f372c7b42041627c7d2ba6dfaf7071398351  core/modules/reasoning/cozy-reasoning.js
+88089dda055e87c66f885a4ead0d6ae0a203dcba570642d70422ef16f0c43211  core/modules/interpretation/cozy-interpretation.js
+9dce2f49e5e408314da8fbf56e5e158ce864945426e0b95bd71706030df43641  core/modules/intelligence/providers/on-device-conversational-provider.js
+c79a4f303a75a06b99744d4ab0ff3866f31f03e62479cc3a1b35c419c9b3c533  core/modules/intelligence/providers/on-device-cognitive-adapter.js
+51d029474c6efba0273144835ba2f0a8875d95a0b9c10d218ac012d800e804e9  core/modules/intelligence/cozy-ai.js
+1f428d7da7452d8154a6cbf962f35eef65fc77f8f3bdcb98dbb20b488951b23c  core/modules/intelligence/cozy-intelligence.js
+675796966bfac859d4f8e532631a170a07d463930ae65efefe29a37992f2b737  core/modules/builder/builder-orchestrator.js

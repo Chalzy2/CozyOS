@@ -1,0 +1,292 @@
+{
+  "phase": "B4.3",
+  "round": "repair",
+  "dependsOn": "B4.2 VERIFIED",
+  "baselinePreserved": {
+    "b42CheckpointSha256": "cae43ff326d3e4f76671b70b1fe0559788dd4666e7ee57527a61e35791abca46",
+    "b42CheckpointUntouched": true,
+    "priorB43CheckpointSha256": "d09731dea1d9f746c8b271fa3ca51dfd8dfb1118634806af31e0cb68d269b8a2"
+  },
+  "productionCutoverPerformed": false,
+  "productionDataModified": false,
+  "blocker1_freshPostgresRuntimeEvidence": {
+    "status": "BLOCKED",
+    "attemptedFix": "apt-get install -y postgresql postgresql-contrib",
+    "attemptResult": "apt-cache search resolved (local package index exists) but every package download returned 403 Forbidden - same egress restriction as npm/live Postgres, not a different issue",
+    "otherOptionsChecked": ["psql binary: not present", "pg_ctl: not present", "postgres binary: not present", "docker: not present"],
+    "conclusion": "Genuinely cannot be closed from this environment. Requires execution from Termux against real Neon database.",
+    "exactCommandsForTermux": [
+      "COZY_DATABASE_URL=\"<real Neon connection string>\" node --test server/webauthn-rp/test/postgres-adapter-runtime.test.js",
+      "COZY_DATABASE_URL=\"<real Neon connection string>\" node --test server/webauthn-rp/test/postgres-recovery-code-runtime.test.js"
+    ],
+    "previouslyVerifiedEvidence": "B3-POSTGRES-16OF16-RUNTIME.txt, sha256 271a88b436d9b7088466ab401f59abeb5dcf48443d5a42dc0c236cdd4efa27f7 - not re-run, not re-labeled"
+  },
+  "blocker2_sqliteToPostgresMigration": {
+    "status": "SUBSTANTIVELY_CLOSED_WITHIN_ENVIRONMENT_LIMITS",
+    "codeChange": {
+      "file": "server/webauthn-rp/migrate-sqlite-to-postgres.js",
+      "change": "Added optional createPgClient parameter to migrate(); default behavior (omitted parameter) is byte-for-byte unchanged - require('pg').Client against real databaseUrl",
+      "nodeCheckClean": true
+    },
+    "newTestInfrastructure": [
+      "server/webauthn-rp/test/mock-pg-client.js - in-memory pg.Client stand-in modeled on real schema PKs/FKs",
+      "server/webauthn-rp/test/migrate-sqlite-to-postgres.test.js - disposable SQLite fixture covering all 10 tables"
+    ],
+    "testResults": {
+      "representativeFixtureMigratesCompletely": "PASS",
+      "idsPreserved": "PASS",
+      "relationshipsForeignKeysValid": "PASS",
+      "rowCountsMatch": "PASS",
+      "targetIntegrityChecksPass": "PASS",
+      "refusesNonEmptyTargetWithoutForce": "PASS",
+      "failureRollsBackWithoutPartialState": "PASS - forced failure after 5 tables already inserted in same transaction, confirmed all tables including pre-failure inserts ended at zero rows",
+      "credentialsNotPrinted": "PASS",
+      "suiteResult": "3/3 PASS, executed this session"
+    },
+    "explicitLimitations": [
+      "Mock does not exercise real Postgres SQL dialect acceptance",
+      "Mock does not exercise real type coercion",
+      "Mock does not exercise real network/TLS behavior",
+      "Mock does not exercise real concurrent-access semantics",
+      "Migration readiness against a REAL target remains unverified until run for real"
+    ],
+    "exactCommandForTermux": "node server/webauthn-rp/migrate-sqlite-to-postgres.js --sqlite /path/to/disposable-test.sqlite --database-url \"<real disposable Neon connection string>\""
+  },
+  "blocker3_recoveryCodePostgresCoverage": {
+    "status": "CLOSED",
+    "newFile": "server/webauthn-rp/test/postgres-recovery-code-runtime.test.js",
+    "pattern": "Identical honest skip-when-no-live-db pattern as existing postgres-adapter-runtime.test.js",
+    "realNeonExecution1": {
+      "executedBy": "operator, from Termux, against real Neon PostgreSQL",
+      "result": { "tests": 5, "pass": 4, "fail": 1, "skipped": 0 },
+      "failed": "recovery codes: transactional consistency — redemption failure never leaves a code half-consumed",
+      "failureDetail": "AssertionError: recovery code must be marked used, actual: null, expected: true (line 181)",
+      "rawEvidencePreserved": "docs/builder/knowledge/B4.3-RECOVERY-CODE-RUNTIME.txt"
+    },
+    "diagnosis": {
+      "conclusion": "TEST_BUG_NOT_PRODUCTION_BUG",
+      "rootCause": "Failing query used 'WHERE user_id = ? AND code_hash IS NOT NULL ORDER BY used_at DESC LIMIT 1' - code_hash IS NOT NULL is a no-op (primary key, never null), so it matched all 10 recovery codes (9 with used_at NULL, 1 real), relying entirely on ORDER BY used_at DESC LIMIT 1 to surface the redeemed row",
+      "crossDatabaseNullOrderingDifference": "PostgreSQL default is NULLS FIRST for DESC sort; SQLite default is NULLS LAST for DESC sort - confirmed empirically in this sandbox",
+      "confirmedNotProductionBug": [
+        "rp.js's completePendingAuthWithRecoveryCode() never uses ORDER BY/LIMIT - targets exact code_hash primary key directly",
+        "Test 2 in the same file, using the correct pattern, PASSED against the same real Neon run"
+      ]
+    },
+    "fixApplied": {
+      "file": "server/webauthn-rp/test/postgres-recovery-code-runtime.test.js",
+      "change": "Corrected query to 'WHERE user_id = ? AND used_at IS NOT NULL', removed ORDER BY/LIMIT",
+      "productionCodeChanged": false,
+      "testWeakenedOrDeleted": false
+    },
+    "realNeonExecution2Confirmation": {
+      "executedBy": "operator, from Termux, against real Neon PostgreSQL",
+      "result": { "tests": 5, "pass": 5, "fail": 0, "cancelled": 0, "skipped": 0, "todo": 0, "duration_ms": 76998.682389 },
+      "rawFileSupplied": true,
+      "rawFilePath": "docs/builder/knowledge/B4.3-RECOVERY-CODE-RUNTIME-FIXED.txt",
+      "rawFileSha256": "a8313d461bdd1af796cef5ad700b5592d58abc95f1a0719fa1e3e7560c70a626",
+      "inspectedDirectly": true,
+      "plausibilityChecks": {
+        "connectionTargetIsRealNeonPoolerHostname": "ep-bold-dream-ayj2peo3-pooler.c-5.us-east-2.aws.neon.tech",
+        "sslWarningMatchesRealPgConnectionStringLibraryText": true,
+        "allFiveTestNamesMatchCheckpointFileInOrder": true,
+        "perTestTimingsRealisticAndNonUniform": "12063ms, 19650ms, 15392ms, 14699ms, 14087ms - consistent with real network round-trips, not fabricated",
+        "summaryBlockInternallyConsistent": true
+      },
+      "note": "The hash placeholder from the operator's prior message ('<INSERT HASH FROM sha256sum>') was never filled in; this is the real hash computed directly from the actually-uploaded file."
+    },
+    "status_final": "CLOSED"
+  },
+  "regressionResults": {
+    "nodeCheckAllChangedNewJs": "clean",
+    "focusedMigrationTests": "EXECUTED_NOW - 3/3 PASS",
+    "focusedRecoveryCodePostgresTest": "EXECUTED_NOW_HONEST_SKIP - 0 pass / 5 skip",
+    "b42EntrypointTests": "EXECUTED_NOW - 4/4 PASS, unaffected",
+    "staticBoundaryTests": "EXECUTED_NOW - 13/13 PASS (3+4+6)",
+    "authCoordinatorTests": "EXECUTED_NOW - 26/26 PASS",
+    "completeReachableSqliteRegressionSuite": "EXECUTED_NOW - 98/98 PASS (8 suites)",
+    "existingPostgresAdapterRuntimeTest": "EXECUTED_NOW_HONEST_SKIP - 0 pass / 16 skip, re-confirmed unaffected",
+    "totals": { "pass": 144, "skip": 21, "fail": 0 }
+  },
+  "securityRequirements": {
+    "noEnvFiles": true,
+    "noPrivateKeys": true,
+    "noServiceAccountCredentials": true,
+    "noRealDatabasePasswords": true,
+    "noRealDatabasePasswordsNote": "All credential-shaped strings in new files are fake/local-only (sentinel values, mock-host targets) or documentation placeholders",
+    "noConnectionStringsInLogs": true,
+    "noRecoveryCodesInLogs": true,
+    "noFailOpenDatabaseFallback": true,
+    "noFailOpenDatabaseFallbackNote": "createDatabaseAdapter() and createPgClient's default path unchanged in behavior, only made optionally injectable",
+    "nodeModulesExcludedFromCheckpoint": true
+  },
+  "blocker2_migrationTermuxRunbook": {
+    "status": "TOOLING_AND_RUNBOOK_READY_EXECUTION_PENDING",
+    "newFiles": [
+      "scripts/b4.3/build-migration-test-fixtures.js",
+      "docs/builder/knowledge/B4.3-MIGRATION-TERMUX-RUNBOOK.md"
+    ],
+    "fixtureScriptDetail": {
+      "cleanFixture": "Same representative all-10-tables fixture used in the mock-based test",
+      "brokenFixture": "Identical plus one credential row with a dangling user_id, for real rollback testing",
+      "fkEnforcementNote": "node:sqlite enforces foreign keys by default (confirmed by a real FOREIGN KEY constraint failed error on first attempt) - required a disclosed, temporary PRAGMA foreign_keys = OFF around the single deliberate violation",
+      "verifiedThisSession": "Script syntax-checked and actually run in this sandbox; broken fixture's contents directly inspected to confirm the dangling FK is really present; scratch output files deleted after verification"
+    },
+    "runbookCovers": [
+      "happy-path migration with exact SQL verification queries for IDs/counts/FK validity",
+      "non-empty-target refusal (re-run same command, verify counts unchanged)",
+      "rollback-on-real-failure using the broken fixture against a real Postgres constraint (checks users table ends at 0, not partially committed)",
+      "manual secret-in-output verification step",
+      "exact raw-evidence file naming convention to preserve results"
+    ],
+    "note": "This is executable tooling, not just documentation. Still requires actual execution against real PostgreSQL from Termux - same structural limit as Blockers 1 and 3's Neon dependency."
+  },
+  "invalidUploadAttemptsRejected": [
+    {
+      "claimedFile": "B4.3-MIGRATION-REAL-NEON-RUNTIME.txt",
+      "actualContent": "bash: /data/data/com.termux/files/home/downloads: Is a directory",
+      "actualSize": "65 bytes",
+      "reason": "Shell error from redirecting output into a directory path instead of a file - not test output. Rejected, not used as evidence."
+    },
+    {
+      "claimedFile": "B4_3-RECOVERY-CODE-RUNTIME-FIXED.txt (first upload)",
+      "actualContent": "Could not find 'server/webauthn-rp/test/postgres-recovery-code-runtime.test.js'",
+      "actualSize": "80 bytes",
+      "reason": "Shell/path error, likely from a stale checkpoint or wrong working directory in Termux - not test output. Rejected. Superseded by a correct second upload."
+    }
+  ],
+  "round5_realEvidenceInspection": {
+    "postgresAdapterRuntimeFile": {
+      "path": "docs/builder/knowledge/B4.3-POSTGRES-RUNTIME.txt",
+      "sha256": "47d85bc1d86cd06f2a2de5617b0874fb9ac1760a3a2efb9cb654eb2e6543a23f",
+      "genuineRealOutput": true,
+      "status": "CLOSED",
+      "result": { "tests": 16, "pass": 16, "fail": 0, "cancelled": 0, "skipped": 0, "todo": 0, "duration_ms": 142264.513316 },
+      "plausibilityChecks": {
+        "connectionTargetIsRealNeonPoolerHostname": "ep-bold-dream-ayj2peo3-pooler.c-5.us-east-2.aws.neon.tech (same host seen in the confirmed recovery-code evidence)",
+        "sslWarningMatchesRealPgConnectionStringLibraryText": true,
+        "allSixteenTestNamesMatchCheckpointFileInOrder": true,
+        "perTestTimingsRealisticAndNonUniform": "4721ms to 20467ms - consistent with real network round-trips",
+        "summaryBlockInternallyConsistent": true
+      },
+      "priorAttempt": {
+        "sha256": "1c00fdd3bbc49e56aef7334d0fc908a6c122eb63ea6126f1a37f216b1ca4c2c2",
+        "result": "0 pass / 16 skip - COZY_DATABASE_URL was not set for that run",
+        "supersededByThisResult": true
+      },
+      "closesBlocker": true
+    },
+    "migrationRuntimeFile": {
+      "path": "docs/builder/knowledge/B4.3-MIGRATION-REAL-NEON-RUNTIME.txt",
+      "sha256": "b8fab57e965c208170035263ccfd6a19ebc39a3ffa8f8713bf7695b404396e97",
+      "genuineRealOutput": true,
+      "rawContent": "Source (SQLite): /data/data/com.termux/files/usr/tmp/cozyos-b4.3-migration-fixtures-E5CbhG/clean.sqlite\nTarget (PostgreSQL): (unparseable connection string - not logging it)\nmigrate-sqlite-to-postgres: str.charAt is not a function",
+      "diagnosis": {
+        "conclusion": "REAL_BUG_FOUND_AND_FIXED",
+        "rootCauseChain": [
+          "redactConnectionString()'s own try/catch caught a URL parse failure and printed the safe fallback - databaseUrl was not a valid URL string at this point",
+          "Actual crash traced to node_modules/pg-connection-string/index.js:10 - 'if (str.charAt(0) === \"/\") {' - assumes str is a String",
+          "Traced backward to parseArgs() in migrate-sqlite-to-postgres.js: if the argv token following a flag is missing or looks like another flag, the value defaults to boolean true, not a string",
+          "This triggers whenever a connection string isn't quoted safely in the shell - an unquoted '&' in a Neon URL's query string (e.g. '&channel_binding=require') is bash's background-job operator and silently truncates the argument",
+          "databaseUrl === true (boolean) is truthy, passed every falsy check, reached new pg.Client({connectionString: true}), crashed 3 dependency layers down"
+        ],
+        "confirmedNotProductionSecurityBug": "This is a CLI usability/robustness gap in the migration script's argument handling, not a security defect or data corruption risk",
+        "reproducedDirectly": "Called migrate({ databaseUrl: true, ... }) directly in this session and confirmed it reproduces the exact reported crash before the fix"
+      },
+      "fixApplied": {
+        "file": "server/webauthn-rp/migrate-sqlite-to-postgres.js",
+        "changes": [
+          "migrate() now validates typeof databaseUrl === 'string' before proceeding, throwing a clear actionable error naming the likely cause (unquoted &) and two concrete fixes",
+          "main()'s fallback chain fixed so a malformed boolean CLI flag no longer shadows a correctly-set COZY_DATABASE_URL environment variable"
+        ],
+        "verifiedFixResolvesReproduction": true,
+        "newRegressionTests": [
+          "'a malformed --database-url (parsed as a boolean, not a string) fails with a clear, actionable error instead of a dependency stack trace' - PASS",
+          "'a malformed --database-url flag does not shadow a correctly-set COZY_DATABASE_URL environment variable' - PASS"
+        ],
+        "migrationTestSuiteResult": "5/5 PASS (was 3/3, 2 new)"
+      },
+      "closesBlocker": false,
+      "closesBlockerReason": "Fixing the crash makes the script safer, but the 6 required checks (clean migration, counts, FK validity, refusal, rollback, secret non-logging) were never demonstrated - the run crashed before connecting to PostgreSQL"
+    },
+    "bothFilesSecretScanned": true,
+    "bothFilesSecretScanResult": "Neither file contains a full connection string with credentials",
+    "bothFilesCopiedByteForByteIntoCheckpoint": true
+  },
+  "round6_migrationEvidenceReInspection": {
+    "path": "docs/builder/knowledge/B4.3-MIGRATION-REAL-NEON-RUNTIME.txt",
+    "sha256": "abf4366f1868931d3b02229757aea40130547513cbc6a34c3a64042934c6f13f",
+    "genuineRealOutput": true,
+    "status": "STILL_INCOMPLETE",
+    "priorAttemptSha256": "b8fab57e965c208170035263ccfd6a19ebc39a3ffa8f8713bf7695b404396e97",
+    "priorAttemptOutcome": "Crashed before connecting to Postgres (the CLI arg bug, since fixed)",
+    "thisAttemptOutcome": "The fix worked - real connection succeeded, clean migration completed and verified. But the file ends there.",
+    "sectionsPresent": [
+      "Clean SQLite -> real Neon migration",
+      "All 10 table counts match (explicit per-table sqlite=N postgres=N OK lines, plus 'Verification passed: every table matches the source row count.')"
+    ],
+    "sectionsMissing": [
+      "Non-empty target refusal (re-running the same command against the now-populated target)",
+      "Broken-FK migration attempt against a separate, empty Neon target",
+      "PostgreSQL foreign-key constraint failure message",
+      "Explicit rollback confirmation ('Import failed and was rolled back...')",
+      "Post-rollback verification showing all 10 tables at zero on the second target"
+    ],
+    "noCredentialsExposedConfirmed": true,
+    "noCredentialsExposedDetail": "Only the redacted 'postgresql://host/db' form appears (redactConnectionString working correctly); no password anywhere in the file",
+    "closesBlocker": false,
+    "closesBlockerReason": "File only demonstrates the first of four required migration-runbook steps (happy path). Steps 3 and 4 (non-empty-target refusal and rollback-on-real-FK-failure) were never run or their output was never captured."
+  },
+  "round7_migrationEvidenceFinalInspection": {
+    "path": "docs/builder/knowledge/B4.3-MIGRATION-REAL-NEON-RUNTIME.txt",
+    "sha256": "4074b265543db3dbf1f51ea5b8d882decc486434607a9068e67ce28d290ae572",
+    "genuineRealOutput": true,
+    "status": "CLOSED",
+    "priorAttemptSha256": "abf4366f1868931d3b02229757aea40130547513cbc6a34c3a64042934c6f13f",
+    "priorAttemptOutcome": "Happy path only - stopped after clean migration verification",
+    "requirementsVerified": {
+      "cleanMigration": { "present": true, "note": "Same successful run as prior attempt, all 10 tables migrated and verified matching source counts" },
+      "nonEmptyTargetRefusal": {
+        "present": true,
+        "exactMessage": "Target table \"users\" already has 2 row(s). Refusing to import into a non-empty table without --force. This tool never overwrites production data by accident.",
+        "verifiedAgainstSource": "Matches server/webauthn-rp/migrate-sqlite-to-postgres.js lines 158-159 verbatim, not paraphrased"
+      },
+      "brokenFkMigrationAgainstSeparateEmptyTarget": {
+        "present": true,
+        "evidence": "Different target host used (ep-sweet-art-ayn4nl04-pooler vs ep-bold-dream-ayj2peo3-pooler) confirming a genuinely separate Neon database, plus a fresh fixture-builder invocation (different temp dir suffix IzzmHA vs E5CbhG)"
+      },
+      "postgresqlFkFailure": {
+        "present": true,
+        "exactMessage": "insert or update on table \"credentials\" violates foreign key constraint \"credentials_user_id_fkey\"",
+        "note": "Real Postgres auto-generated constraint name format (<table>_<column>_fkey), consistent with an unnamed FK constraint in the actual schema"
+      },
+      "explicitRollbackConfirmation": {
+        "present": true,
+        "exactMessage": "Import failed and was rolled back (PostgreSQL left unchanged): insert or update on table \"credentials\" violates foreign key constraint \"credentials_user_id_fkey\"",
+        "verifiedAgainstSource": "Matches server/webauthn-rp/migrate-sqlite-to-postgres.js line 185 verbatim, not paraphrased"
+      },
+      "postRollbackVerificationAllTenTablesZero": {
+        "present": true,
+        "exactOutput": "users: 0, credentials: 0, challenges: 0, sessions: 0, password_reset_tokens: 0, mfa_recovery_codes: 0, pending_auth_sessions: 0, organizations: 0, organization_memberships: 0, audit_events: 0, followed by 'ROLLBACK VERIFIED: ALL 10 TABLES EMPTY'"
+      },
+      "noCredentialsExposed": {
+        "present": true,
+        "verificationMethod": "grepped for username:password@ pattern across the entire file - zero matches; every connection string appears only in redacted postgresql://host/db form"
+      }
+    },
+    "transparencyNote": "Two stray, unrelated error blocks appear between the clean migration and the refusal test: a 'Cannot find module pg' error from what appears to be an ad-hoc node script run from ~/downloads via stdin, and a separate ECONNREFUSED to 127.0.0.1:5432. Neither carries the 'migrate-sqlite-to-postgres:' prefix the script's own errors use, so these are leftover debug noise from something else run in the same terminal session, not failures of the migration script itself or the evidence gate. Disclosed for transparency, not treated as a defect or discrepancy.",
+    "minorMethodologyNote": "The non-empty-target refusal test used broken-fk.sqlite as its source (not clean.sqlite) - this does not affect validity, since the refusal check happens at the target-table-row-count stage before any source-file-specific processing occurs.",
+    "closesBlocker": true
+  },
+  "status": "B4.3 VERIFIED",
+  "verifiedDate": "reconciled after round 7 evidence",
+  "allBlockersClosedSummary": {
+    "recoveryCodePostgresCoverage": "CLOSED - real Neon 5/5, evidence a8313d46...",
+    "generalAdapterRuntimeVerification": "CLOSED - real Neon 16/16, evidence 47d85bc1...",
+    "sqliteToPostgresMigration": "CLOSED - full 6-part sequence verified against real Neon, evidence 4074b265..."
+  },
+  "disclosedNonBlockingGapsCarriedForward": [
+    "TLS remains connection-string-controlled by design (sslmode=require/verify-full must be included by the operator), not code-enforced - same disclosed, accepted posture as B4.2. Not re-litigated here since it was never a blocker, only a documented operational requirement."
+  ],
+  "concreteRemainingBlockers": [],
+  "reportPath": "docs/builder/knowledge/B4.3-PRODUCTION-CUTOVER-SIMULATION.md"
+}

@@ -1,0 +1,89 @@
+B4.3-RECOVERY-CODE-RUNTIME.txt
+Raw execution evidence — real Termux run against real Neon PostgreSQL
+Test file executed: server/webauthn-rp/test/postgres-recovery-code-runtime.test.js
+(pre-fix version — the query defect described below was present at the
+time of this run)
+
+Result as reported by the operator:
+
+tests: 5
+pass: 4
+fail: 1
+skipped: 0
+
+Passed:
+- TOTP enrollment generates 10 unique recovery codes stored hashed
+- Valid recovery code authenticates, is consumed, and cannot be reused
+- Invalid recovery code is rejected
+- No raw recovery code appears in thrown errors
+
+Failed:
+- recovery codes: transactional consistency — redemption failure never
+  leaves a code half-consumed
+
+Failure detail:
+postgres-recovery-code-runtime.test.js:181
+AssertionError: recovery code must be marked used
+actual: null
+expected: true
+
+---
+
+DIAGNOSIS (performed against this exact evidence)
+
+Root cause: a defect in the TEST's verification query, not in the
+production recovery-code implementation.
+
+The failing assertion used this query to locate the redeemed recovery
+code's row:
+
+  SELECT used_at FROM mfa_recovery_codes
+  WHERE user_id = ? AND code_hash IS NOT NULL
+  ORDER BY used_at DESC LIMIT 1
+
+`code_hash IS NOT NULL` is a no-op (code_hash is the table's primary key
+and is never null), so this matched all 10 of the user's recovery codes
+— 9 with used_at IS NULL, 1 with a real timestamp — and relied entirely
+on `ORDER BY used_at DESC LIMIT 1` to surface the redeemed one.
+
+PostgreSQL's documented default is NULLS FIRST for a DESC sort (NULL is
+treated as greater than any non-null value). SQLite's default is the
+opposite: NULLS LAST for DESC. This was confirmed empirically in this
+sandbox:
+
+  SQLite ORDER BY v DESC on rows (NULL, 100, NULL) returned
+  [{v:100}, {v:null}, {v:null}] — the non-null value first.
+
+So on SQLite the query accidentally returned the redeemed code's row
+every time (masking the defect); against real PostgreSQL, the same
+query correctly-per-spec returned one of the 9 untouched (used_at IS
+NULL) rows first — producing exactly the observed `actual: null`.
+
+This was confirmed NOT to be a production bug by two independent checks:
+1. The production method (`RelyingParty.completePendingAuthWithRecoveryCode`
+   in server/webauthn-rp/rp.js) never uses ORDER BY/LIMIT to identify
+   the row it updates — it targets the exact `code_hash` (primary key)
+   directly, for both the lookup and the UPDATE. There is no ambiguity
+   for this code path on any database.
+2. Test 2 in the same file ("a valid code authenticates successfully,
+   becomes consumed, and cannot be reused"), which queries with the
+   correct pattern (`WHERE user_id = ? AND used_at IS NOT NULL`, no
+   ORDER BY), PASSED against this same real Neon run — confirming the
+   underlying redemption/consumption behavior is correct in production;
+   only the flawed *second* verification query in test 4 was wrong.
+
+FIX APPLIED
+
+Corrected the query in test 4 to the same, already-proven-correct
+pattern test 2 uses:
+
+  SELECT used_at FROM mfa_recovery_codes
+  WHERE user_id = ? AND used_at IS NOT NULL
+
+No ORDER BY/LIMIT needed — exactly one row is expected to match, and
+this filter is unambiguous regardless of any database's NULL-ordering
+default. No production code was changed. Re-verified via a temporary
+SQLite dry-run (deleted after use, not part of the checkpoint): 5/5 PASS.
+
+This corrected version has not yet been re-executed against real Neon —
+that is the next required step to confirm 5/5 for real.

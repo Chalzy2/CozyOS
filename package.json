@@ -1,0 +1,15 @@
+{
+  "name": "cozyos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CozyOS — root manifest. Declares the playwright dependency required by server/webauthn-rp and other *-browser.test.js suites, and the pg dependency required by server/webauthn-rp/database-adapter.js's PostgreSQLDatabaseAdapter (Phase B1/B2) and the Phase B1 migration/import tooling. No other npm package is required anywhere in this repository.",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  }
+}

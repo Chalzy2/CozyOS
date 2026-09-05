@@ -1,0 +1,114 @@
+Source (SQLite): /data/data/com.termux/files/usr/tmp/cozyos-b4.3-migration-fixtures-E5CbhG/clean.sqlite
+Target (PostgreSQL): postgresql://ep-bold-dream-ayj2peo3-pooler.c-5.us-east-2.aws.neon.tech/neondb
+(node:5747) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  users: 2 row(s) migrated
+  credentials: 1 row(s) migrated
+  challenges: 1 row(s) migrated
+  sessions: 1 row(s) migrated
+  password_reset_tokens: 1 row(s) migrated
+  mfa_recovery_codes: 1 row(s) migrated
+  pending_auth_sessions: 1 row(s) migrated
+  organizations: 1 row(s) migrated
+  organization_memberships: 1 row(s) migrated
+  audit_events: 1 row(s) migrated
+Verifying...
+  users: sqlite=2 postgres=2 OK
+  credentials: sqlite=1 postgres=1 OK
+  challenges: sqlite=1 postgres=1 OK
+  sessions: sqlite=1 postgres=1 OK
+  password_reset_tokens: sqlite=1 postgres=1 OK
+  mfa_recovery_codes: sqlite=1 postgres=1 OK
+  pending_auth_sessions: sqlite=1 postgres=1 OK
+  organizations: sqlite=1 postgres=1 OK
+  organization_memberships: sqlite=1 postgres=1 OK
+  audit_events: sqlite=1 postgres=1 OK
+Verification passed: every table matches the source row count.
+node:internal/modules/cjs/loader:1503
+  throw err;
+  ^
+
+Error: Cannot find module 'pg'
+Require stack:
+- /data/data/com.termux/files/home/downloads/[stdin]
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1500:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1095:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1116:12)
+    at Module._load (node:internal/modules/cjs/loader:1285:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at [stdin]:1:20
+    at runScriptInThisContext (node:internal/vm:219:10) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/data/data/com.termux/files/home/downloads/[stdin]' ]
+}
+
+Node.js v24.17.0
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+Error: connect ECONNREFUSED 127.0.0.1:5432
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1706:16) {
+  errno: -111,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 5432
+}
+
+Node.js v24.17.0
+Source (SQLite): /data/data/com.termux/files/usr/tmp/cozyos-b4.3-migration-fixtures-E5CbhG/broken-fk.sqlite
+Target (PostgreSQL): postgresql://ep-bold-dream-ayj2peo3-pooler.c-5.us-east-2.aws.neon.tech/neondb
+(node:26281) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+migrate-sqlite-to-postgres: Target table "users" already has 2 row(s). Refusing to import into a non-empty table without --force. This tool never overwrites production data by accident.
+Source (SQLite): /data/data/com.termux/files/usr/tmp/cozyos-b4.3-migration-fixtures-IzzmHA/broken-fk.sqlite
+Target (PostgreSQL): postgresql://ep-sweet-art-ayn4nl04-pooler.c-5.us-east-2.aws.neon.tech/neondb
+(node:14017) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  users: 2 row(s) migrated
+migrate-sqlite-to-postgres: Import failed and was rolled back (PostgreSQL left unchanged): insert or update on table "credentials" violates foreign key constraint "credentials_user_id_fkey"
+(node:16630) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+users: 0
+credentials: 0
+challenges: 0
+sessions: 0
+password_reset_tokens: 0
+mfa_recovery_codes: 0
+pending_auth_sessions: 0
+organizations: 0
+organization_memberships: 0
+audit_events: 0
+ROLLBACK VERIFIED: ALL 10 TABLES EMPTY
