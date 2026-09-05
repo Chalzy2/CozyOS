@@ -27,17 +27,119 @@
  *     administrator's email before that person has ever logged in.
  *
  * USAGE
- *   node server/webauthn-rp/bootstrap-admin.js grant  --db <path> --email <email>
- *   node server/webauthn-rp/bootstrap-admin.js revoke --db <path> --email <email>
- *   node server/webauthn-rp/bootstrap-admin.js list   --db <path>
+ *   node server/webauthn-rp/bootstrap-admin.js grant        --db <path> --email <email>
+ *   node server/webauthn-rp/bootstrap-admin.js revoke       --db <path> --email <email>
+ *   node server/webauthn-rp/bootstrap-admin.js set-password --db <path> --email <email>
+ *   node server/webauthn-rp/bootstrap-admin.js list         --db <path>
  *
  *   --db defaults to $COZY_WEBAUTHN_DB, then ./cozy-webauthn.local.sqlite.
+ *
+ * set-password
+ *   Restores/rotates the password of an EXISTING CozyOS account (email
+ *   must already exist — this command never creates a user, unlike
+ *   `grant`). It never accepts the new password as a flag or any other
+ *   argv token: it is always read interactively, twice, with the
+ *   terminal echo disabled the whole time, so the value never appears
+ *   in shell history, `ps`/process-argument listings, or any log this
+ *   script writes. It updates password_hash only — is_platform_admin,
+ *   username, firebase_uid, and every WebAuthn credential row are left
+ *   completely untouched. Intended to be run directly in a trusted
+ *   operator shell (e.g. Render's Shell/CLI) against the real database
+ *   — it is never wired to any HTTP route or application-startup path,
+ *   for the same reason setPlatformAdmin() never is (see file header).
  */
 
 const path = require('node:path');
 const { openDb } = require('./db');
-const { RelyingParty } = require('./rp');
+const { RelyingParty, hashPassword } = require('./rp');
 const { SQLiteDatabaseAdapter } = require('./database-adapter');
+
+// Same minimum-length policy server.js already enforces on
+// /auth/register and /auth/reset-password (see server.js) — this
+// operator path reuses that number rather than inventing a second,
+// possibly-weaker password policy.
+const MIN_PASSWORD_LENGTH = 8;
+
+// ---------------------------------------------------------------------
+// Interactive hidden-password prompt (set-password only).
+//
+// Deliberately hand-rolled instead of pulling in a "hidden input" npm
+// package: package.json's own description says no other npm package is
+// required anywhere in this repository, and the need here is small and
+// security-sensitive enough to want to read every line of it. Raw-mode
+// keystroke capture with the characters never written back to stdout
+// means the password is never echoed to the terminal at all (not even
+// masked with asterisks) — combined with never accepting it as a CLI
+// flag, it cannot end up in shell history, `ps`, or any log line this
+// script prints.
+//
+// Refuses to run non-interactively (no TTY): set-password is meant to
+// be typed by a human at a real prompt, not piped/scripted, so a
+// missing TTY is treated as a hard error rather than silently reading
+// whatever byte stream happens to be on stdin.
+// ---------------------------------------------------------------------
+function readHiddenLine(promptText) {
+  return new Promise((resolve, reject) => {
+    const stdin = process.stdin;
+    if (!stdin.isTTY) {
+      reject(new Error('set_password_requires_interactive_terminal'));
+      return;
+    }
+    process.stdout.write(promptText);
+    let input = '';
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding('utf8');
+
+    function cleanup() {
+      stdin.removeListener('data', onData);
+      stdin.setRawMode(false);
+      stdin.pause();
+    }
+
+    function onData(chunk) {
+      const str = chunk.toString('utf8');
+      for (const ch of str) {
+        if (ch === '\n' || ch === '\r') {
+          cleanup();
+          process.stdout.write('\n');
+          resolve(input);
+          return;
+        }
+        if (ch === '\u0003') { // Ctrl-C — abort, never resolve with a partial password
+          cleanup();
+          process.stdout.write('\n');
+          reject(new Error('set_password_aborted'));
+          return;
+        }
+        if (ch === '\u007f' || ch === '\b') { // backspace/delete
+          input = input.slice(0, -1);
+          continue;
+        }
+        input += ch;
+      }
+    }
+
+    stdin.on('data', onData);
+  });
+}
+
+// Prompts for the new password twice (entry + confirmation) and
+// validates length/match before returning it. `readLine` is injectable
+// so tests can supply a scripted reader without a real TTY — the real
+// CLI path (main()/runPostgres(), below) always uses the real hidden
+// reader, never a fake one.
+async function readNewPasswordInteractively(readLine = readHiddenLine) {
+  const first = await readLine('New password for this account (input hidden): ');
+  if (!first || first.length < MIN_PASSWORD_LENGTH) {
+    throw new Error('password_too_short');
+  }
+  const second = await readLine('Confirm new password: ');
+  if (first !== second) {
+    throw new Error('passwords_do_not_match');
+  }
+  return first;
+}
 
 function parseArgs(argv) {
   const [command, ...rest] = argv;
@@ -95,6 +197,23 @@ async function setUsername(rp, email, username) {
 
 async function list(rp) {
   return rp.db.all('SELECT id, email, username, is_platform_admin, firebase_uid, created_at FROM users ORDER BY created_at ASC', []);
+}
+
+// set-password: the ONLY way an operator resets an EXISTING account's
+// password from a trusted shell. Mirrors setUsername()'s refuse-to-create
+// contract — resolves the account by exact email and never calls
+// getOrCreateUser, so a typo can never conjure a new account. It writes
+// exactly one column: reuses rp.setPassword(), the same
+// hashPassword()/scrypt mechanism registerWithPassword() and the
+// password-reset flow already use (see rp.js) — no second, parallel
+// hashing path is introduced here. Never touches is_platform_admin,
+// username, firebase_uid, or the credentials table.
+async function setPassword(rp, email, readPassword = readNewPasswordInteractively) {
+  const user = await rp.db.get('SELECT * FROM users WHERE email = ?', [email]);
+  if (!user) return null;
+  const newPassword = await readPassword();
+  await rp.setPassword(user.id, newPassword);
+  return rp.getUserById(user.id);
 }
 
 // ---------------------------------------------------------------------
@@ -158,6 +277,22 @@ async function pgSetUsername(client, email, username) {
   return after[0];
 }
 
+// Postgres counterpart of setPassword() above — same refuse-to-create
+// contract (exact-email lookup, no insert on miss), same reused
+// hashPassword() from rp.js (imported at top of this file), writes only
+// password_hash. Takes the already-read plaintext password as an
+// argument (the interactive prompt itself is TTY/readline-based and has
+// no meaningful "sync vs async db" distinction, so it is read once in
+// runPostgres() below rather than duplicating the prompt per backend).
+async function pgSetPassword(client, email, password) {
+  const { rows } = await client.query('SELECT * FROM users WHERE email = $1', [email]);
+  if (!rows[0]) return null;
+  const hash = hashPassword(password);
+  await client.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, rows[0].id]);
+  const { rows: after } = await client.query('SELECT * FROM users WHERE id = $1', [rows[0].id]);
+  return after[0];
+}
+
 async function pgList(client) {
   const { rows } = await client.query(
     'SELECT id, email, username, is_platform_admin, firebase_uid, created_at FROM users ORDER BY created_at ASC'
@@ -192,6 +327,16 @@ async function runPostgres(command, flags, databaseUrl) {
       console.log(flags.username
         ? `Set username '${user.username}' for ${user.email} (user ${user.id}). Password/admin status unchanged.`
         : `Cleared username for ${user.email} (user ${user.id}).`);
+    } else if (command === 'set-password') {
+      const existing = await client.query('SELECT id FROM users WHERE email = $1', [flags.email]);
+      if (!existing.rows[0]) {
+        console.error(`No CozyOS user found for ${flags.email}. This command never creates an account — use 'grant' first if it genuinely does not exist yet.`);
+        process.exitCode = 1;
+        return;
+      }
+      const password = await readNewPasswordInteractively();
+      const user = await pgSetPassword(client, flags.email, password);
+      console.log(`Password updated for ${user.email} (user ${user.id}). Username/admin status/Firebase identity/WebAuthn credentials unchanged.`);
     } else if (command === 'list') {
       const users = await pgList(client);
       if (users.length === 0) {
@@ -210,13 +355,13 @@ async function runPostgres(command, flags, databaseUrl) {
 async function main() {
   const { command, flags } = parseArgs(process.argv.slice(2));
 
-  if (!command || !['grant', 'revoke', 'set-username', 'list'].includes(command)) {
-    console.error('Usage: bootstrap-admin.js <grant|revoke|set-username|list> --db <path> [--email <email>] [--username <username>]');
-    console.error('   or: bootstrap-admin.js <grant|revoke|set-username|list> --database-url <url> [--email <email>] [--username <username>]');
+  if (!command || !['grant', 'revoke', 'set-username', 'set-password', 'list'].includes(command)) {
+    console.error('Usage: bootstrap-admin.js <grant|revoke|set-username|set-password|list> --db <path> [--email <email>] [--username <username>]');
+    console.error('   or: bootstrap-admin.js <grant|revoke|set-username|set-password|list> --database-url <url> [--email <email>] [--username <username>]');
     process.exitCode = 1;
     return;
   }
-  if (['grant', 'revoke', 'set-username'].includes(command) && !flags.email) {
+  if (['grant', 'revoke', 'set-username', 'set-password'].includes(command) && !flags.email) {
     console.error(`Usage: bootstrap-admin.js ${command} --db <path> --email <email>${command === 'set-username' ? ' --username <username>' : ''}`);
     process.exitCode = 1;
     return;
@@ -276,6 +421,14 @@ async function main() {
       console.log(flags.username
         ? `Set username '${user.username}' for ${user.email} (user ${user.id}). Password/admin status unchanged.`
         : `Cleared username for ${user.email} (user ${user.id}).`);
+    } else if (command === 'set-password') {
+      const user = await setPassword(rp, flags.email);
+      if (!user) {
+        console.error(`No CozyOS user found for ${flags.email}. This command never creates an account — use 'grant' first if it genuinely does not exist yet.`);
+        process.exitCode = 1;
+        return;
+      }
+      console.log(`Password updated for ${user.email} (user ${user.id}). Username/admin status/Firebase identity/WebAuthn credentials unchanged.`);
     } else if (command === 'list') {
       const users = await list(rp);
       if (users.length === 0) {
@@ -291,7 +444,12 @@ async function main() {
   }
 }
 
-module.exports = { parseArgs, resolveDbPath, grant, revoke, setUsername, list, pgGetOrCreateUser, pgGrant, pgRevoke, pgSetUsername, pgList, redactForLog: (u) => { try { const x = new URL(u); return `${x.protocol}//${x.hostname}${x.pathname}`; } catch (_e) { return '(unparseable)'; } } };
+module.exports = {
+  parseArgs, resolveDbPath, grant, revoke, setUsername, setPassword, list,
+  pgGetOrCreateUser, pgGrant, pgRevoke, pgSetUsername, pgSetPassword, pgList,
+  readNewPasswordInteractively,
+  redactForLog: (u) => { try { const x = new URL(u); return `${x.protocol}//${x.hostname}${x.pathname}`; } catch (_e) { return '(unparseable)'; } },
+};
 
 if (require.main === module) {
   main().catch((err) => {
