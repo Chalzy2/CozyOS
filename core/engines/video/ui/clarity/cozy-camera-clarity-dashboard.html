@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CozyOS — Camera Clarity</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; background: #f7f7f8; color: #1a1a1a; }
+  * { box-sizing: border-box; }
+  h1 { padding: 16px; margin: 0; font-size: 20px; }
+  .clarity-root { padding: 0 16px 24px; max-width: 100%; overflow-x: hidden; }
+  .clarity-group { background: #fff; border-radius: 8px; padding: 12px; margin-bottom: 12px; max-width: 100%; }
+  .clarity-group h2 { font-size: 14px; margin: 0 0 8px; text-transform: uppercase; color: #555; }
+  .clarity-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; border-bottom: 1px solid #f0f0f0; gap: 8px; flex-wrap: wrap; }
+  .clarity-row span:first-child { word-break: break-all; min-width: 0; }
+  .clarity-status { font-weight: 600; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+  .status-AVAILABLE { background: #d1fae5; color: #065f46; }
+  .status-CAPABILITY_UNAVAILABLE, .status-CAPABILITY_UNKNOWN { background: #fee2e2; color: #991b1b; }
+  .clarity-btn { padding: 6px 14px; border: none; border-radius: 6px; background: #2b6cb0; color: #fff; cursor: pointer; font-size: 13px; margin: 2px; }
+  .clarity-btn:disabled { background: #ccc; cursor: not-allowed; }
+  .clarity-images { display: flex; gap: 12px; flex-wrap: wrap; }
+  .clarity-images img { max-width: 45%; border-radius: 6px; border: 1px solid #eee; }
+  .clarity-result { padding: 8px; background: #f0f4ff; border-radius: 6px; font-size: 12px; margin-top: 8px; word-break: break-word; white-space: pre-wrap; }
+  select.clarity-level { padding: 6px; border-radius: 6px; border: 1px solid #ccc; font-size: 13px; margin: 2px; }
+</style>
+</head>
+<body>
+<h1 class="clarity-title">Camera Clarity</h1>
+<div id="camera-clarity-root" class="clarity-root"></div>
+
+<!-- Real dependency chain: Section 14 capture stack + Clarity engine -->
+<script src="../../../../security/trusted-device-manager.js"></script>
+<script src="../../../../connectivity/cozy-connect.js"></script>
+<script src="../../../collaboration/live-hotspot-engine.js"></script>
+<script src="../../../../collaboration/cozy-share.js"></script>
+<script src="../../../../connectivity/cozy-living-connectivity.js"></script>
+<script src="../../../camera/browser-camera-provider.js"></script>
+<script src="../../live-video-capture-engine.js"></script>
+<script src="../cozy-live-camera-capture-app.js"></script>
+<script src="cozy-camera-clarity-engine.js"></script>
+<script src="../../../../modules/identity/identity-engine.js"></script>
+<script src="../../../../registry/cozy-registry.js"></script>
+
+<script>
+  (function renderCameraClarity() {
+    var root = document.getElementById('camera-clarity-root');
+    var captureApi = window.CozyOS.CozyLiveCameraCaptureApp;
+    var clarityApi = window.CozyOS.CozyCameraClarityEngine;
+
+    if (!captureApi || !clarityApi) {
+      root.textContent = 'CAPABILITY_UNAVAILABLE — capture or clarity engine not loaded.';
+      return;
+    }
+
+    // Capability group
+    var capGroup = document.createElement('div');
+    capGroup.className = 'clarity-group clarity-capability-group';
+    capGroup.innerHTML = '<h2>Clarity Capabilities</h2>';
+    var caps = clarityApi.getCapabilityStatus();
+    Object.keys(caps).forEach(function (key) {
+      var row = document.createElement('div');
+      row.className = 'clarity-row';
+      row.innerHTML = '<span>' + key + '</span><span class="clarity-status status-' + caps[key] + '">' + caps[key] + '</span>';
+      capGroup.appendChild(row);
+    });
+    root.appendChild(capGroup);
+
+    // Preview + capture (reusing Section 14's own controls minimally)
+    var previewGroup = document.createElement('div');
+    previewGroup.className = 'clarity-group clarity-preview-group';
+    previewGroup.innerHTML = '<h2>Capture</h2>';
+    var video = document.createElement('video');
+    video.className = 'clarity-preview-video';
+    video.autoplay = true; video.muted = true;
+    video.style.width = '100%'; video.style.maxWidth = '400px'; video.style.background = '#000';
+    previewGroup.appendChild(video);
+
+    var captureControls = document.createElement('div');
+    captureControls.innerHTML =
+      '<button class="clarity-btn clarity-start-preview">Start Preview</button>' +
+      '<button class="clarity-btn clarity-capture">Capture Photo</button>' +
+      '<select class="clarity-level">' +
+      clarityApi.CLARITY_LEVELS.map(function (l) { return '<option value="' + l + '">' + l + '</option>'; }).join('') +
+      '</select>' +
+      '<button class="clarity-btn clarity-enhance" disabled>Enhance</button>';
+    previewGroup.appendChild(captureControls);
+    root.appendChild(previewGroup);
+
+    var imagesGroup = document.createElement('div');
+    imagesGroup.className = 'clarity-group clarity-images-group';
+    imagesGroup.innerHTML = '<h2>Original vs Enhanced</h2>';
+    var imagesDiv = document.createElement('div');
+    imagesDiv.className = 'clarity-images';
+    imagesGroup.appendChild(imagesDiv);
+    root.appendChild(imagesGroup);
+
+    var resultDiv = document.createElement('div');
+    resultDiv.className = 'clarity-result';
+    root.appendChild(resultDiv);
+
+    var lastCapture = null;
+
+    captureControls.querySelector('.clarity-start-preview').addEventListener('click', async function () {
+      var r = await captureApi.startPreview(video, {});
+      resultDiv.textContent = r.success ? 'Preview started.' : 'Preview failed: ' + r.reason;
+    });
+
+    captureControls.querySelector('.clarity-capture').addEventListener('click', async function () {
+      var r = await captureApi.capturePhoto();
+      if (!r.success) { resultDiv.textContent = 'Capture failed: ' + r.reason; return; }
+      lastCapture = r;
+      captureControls.querySelector('.clarity-enhance').disabled = false;
+      imagesDiv.innerHTML = '<div><div>Original</div><img class="clarity-original-img" src="' + r.dataUrl + '" /></div>';
+      resultDiv.textContent = 'Photo captured. clarityProcessed=' + r.clarityProcessed + ' syncState=' + r.syncState;
+    });
+
+    captureControls.querySelector('.clarity-enhance').addEventListener('click', async function () {
+      if (!lastCapture) return;
+      var level = captureControls.querySelector('.clarity-level').value;
+      var result = await clarityApi.enhance(lastCapture, level);
+      if (result.status !== 'OK') { resultDiv.textContent = 'Enhance failed: ' + (result.reason || result.status); return; }
+
+      var html = '<div><div>Original</div><img class="clarity-original-img" src="' + result.original.dataUrl + '" /></div>';
+      if (result.enhanced) {
+        html += '<div><div>Enhanced (' + level + ')</div><img class="clarity-enhanced-img" src="' + result.enhanced.dataUrl + '" /></div>';
+      }
+      imagesDiv.innerHTML = html;
+
+      resultDiv.textContent = 'clarityProcessed=' + result.clarityProcessed +
+        ' syncState=' + result.syncState +
+        '\nexecutedStages=' + JSON.stringify(result.processing.stages) +
+        '\nreducedStages=' + JSON.stringify(result.processing.reducedStages) +
+        '\nunavailableStages=' + JSON.stringify(result.processing.unavailableStages) +
+        (result.processing.finalGuard ? ('\nfinalGuard=' + result.processing.finalGuard) : '');
+    });
+  })();
+</script>
+</body>
+</html>

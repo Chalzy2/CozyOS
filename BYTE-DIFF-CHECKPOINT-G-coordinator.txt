@@ -1,0 +1,95 @@
+--- pristine/cos-step4d-live-ui-patch-5-audit/core/shell/live/ldce-live-media-coordinator.js	2026-08-21 00:22:14.000000000 +0000
++++ checkpoint-g/cos-step4d-live-ui-checkpoint-g/core/shell/live/ldce-live-media-coordinator.js	2026-08-21 00:52:21.514371180 +0000
+@@ -141,28 +141,50 @@
+             return { success: false, state: 'media-denied', reason: (attachResult && attachResult.reason) || 'Camera/microphone capture failed or was denied.' };
+         }
+ 
+-        const hostState = { acceptedViewerId: null, unsubscribe: null };
++        const hostState = { acceptedViewerId: null, unsubscribeJoined: null, unsubscribeLeft: null };
+         _hostState.set(opts.sessionId, hostState);
+ 
+-        hostState.unsubscribe = ldce.on('participant-joined', (evt) => {
++        function _serviceViewer(viewerId) {
++            hostState.acceptedViewerId = viewerId;
++            ldce.listenForOffer(opts.sessionId, viewerId, uid, async (offerCode) => {
++                const acceptResult = await media.acceptPeerConnection(opts.sessionId, uid, viewerId, offerCode);
++                if (typeof opts.onViewerConnectionResult === 'function') opts.onViewerConnectionResult({ sessionId: opts.sessionId, viewerId, ...acceptResult });
++            });
++        }
++
++        hostState.unsubscribeJoined = ldce.on('participant-joined', (evt) => {
+             if (!evt || evt.sessionId !== opts.sessionId) return;
+             if (evt.userId === uid) return; // the host's own createSession() roster entry — never treated as a viewer
+ 
++            if (hostState.acceptedViewerId && hostState.acceptedViewerId === evt.userId) {
++                // The already-accepted viewer rejoining (e.g. after a Join/Leave/Join cycle) — a
++                // reconnect, not a second viewer. Tear down any stale peer connection for them
++                // first (real disconnectFromPeer(), never reimplemented here), then re-service.
++                media.disconnectFromPeer(opts.sessionId, evt.userId);
++                _serviceViewer(evt.userId);
++                return;
++            }
++
+             if (hostState.acceptedViewerId) {
+                 // One-viewer limit (Part F Section 7) — enforced here only, never by redesigning LDCESessionEngine's roster.
+                 if (typeof opts.onSecondViewerRejected === 'function') opts.onSecondViewerRejected({ sessionId: opts.sessionId, userId: evt.userId });
+                 return;
+             }
+ 
+-            hostState.acceptedViewerId = evt.userId;
+-            const viewerId = evt.userId;
+-
+-            ldce.listenForOffer(opts.sessionId, viewerId, uid, async (offerCode) => {
+-                const acceptResult = await media.acceptPeerConnection(opts.sessionId, uid, viewerId, offerCode);
+-                if (typeof opts.onViewerConnectionResult === 'function') opts.onViewerConnectionResult({ sessionId: opts.sessionId, viewerId, ...acceptResult });
+-            });
++            _serviceViewer(evt.userId);
+         });
+ 
++        // Real LDCESessionEngine "participant-left" (already exists — this file only listens,
++        // it does not add it). Frees the one-viewer slot and tears down the now-stale host-side
++        // peer connection so a different viewer (or the same one rejoining later) is serviced
++        // cleanly instead of leaving a dangling RTCPeerConnection.
++        hostState.unsubscribeLeft = typeof ldce.on === 'function' ? ldce.on('participant-left', (evt) => {
++            if (!evt || evt.sessionId !== opts.sessionId) return;
++            if (!hostState.acceptedViewerId || hostState.acceptedViewerId !== evt.userId) return;
++            media.disconnectFromPeer(opts.sessionId, evt.userId);
++            hostState.acceptedViewerId = null;
++        }) : null;
++
+         return { success: true, state: 'live-media-active', sessionId: opts.sessionId, uid };
+     }
+ 
+@@ -181,7 +203,8 @@
+         const media = _media(root, opts);
+ 
+         const hostState = _hostState.get(opts.sessionId);
+-        if (hostState && typeof hostState.unsubscribe === 'function') hostState.unsubscribe();
++        if (hostState && typeof hostState.unsubscribeJoined === 'function') hostState.unsubscribeJoined();
++        if (hostState && typeof hostState.unsubscribeLeft === 'function') hostState.unsubscribeLeft();
+         _hostState.delete(opts.sessionId);
+ 
+         if (media && uid) media.cleanupSession(opts.sessionId, uid);
+@@ -255,11 +278,22 @@
+         const root = opts._root || (typeof window !== 'undefined' ? window : globalThis);
+         if (!opts.sessionId) return { success: false, reason: 'opts.sessionId is required.' };
+ 
++        const uid = opts._uid !== undefined ? opts._uid : _currentUid(root);
+         const ldce = _ldce(root, opts);
+         const media = _media(root, opts);
+         const session = ldce && ldce.getSession(opts.sessionId);
+         if (media && session && session.hostId) media.disconnectFromPeer(opts.sessionId, session.hostId);
+         if (typeof opts.unsubscribe === 'function') opts.unsubscribe();
++
++        // Real LDCESessionEngine.leaveSession() — already exists, unchanged; this file only
++        // calls it. Without this, the viewer's departure never reaches the session roster, so
++        // the host never sees a "participant-left" and a later rejoin (same or different
++        // viewer) can be serviced incorrectly. Best-effort: a leaveSession() failure here must
++        // never fail the media teardown that already happened above.
++        if (ldce && uid && typeof ldce.leaveSession === 'function') {
++            try { ldce.leaveSession(opts.sessionId, uid); } catch (_err) { /* best-effort — media teardown above already succeeded */ }
++        }
++
+         return { success: true };
+     }
+ 

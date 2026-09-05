@@ -1,0 +1,1395 @@
+=== NEW TESTS: core/security/test/google-account-link-client.test.js ===
+TAP version 13
+# Subtest: issueLinkSession(): real server issues a real, usable token
+ok 1 - issueLinkSession(): real server issues a real, usable token
+  ---
+  duration_ms: 50.574026
+  type: 'test'
+  ...
+# Subtest: issueLinkSession(): missing/empty userId fails closed locally, no request needed
+ok 2 - issueLinkSession(): missing/empty userId fails closed locally, no request needed
+  ---
+  duration_ms: 0.265512
+  type: 'test'
+  ...
+# Subtest: linkGoogleAccountForCurrentUser(): real end-to-end issue+link against a real server
+ok 3 - linkGoogleAccountForCurrentUser(): real end-to-end issue+link against a real server
+  ---
+  duration_ms: 22.444401
+  type: 'test'
+  ...
+# Subtest: linkGoogleAccountForCurrentUser(): the account linked is always the one from the real session, never spoofable via any client-side field
+ok 4 - linkGoogleAccountForCurrentUser(): the account linked is always the one from the real session, never spoofable via any client-side field
+  ---
+  duration_ms: 20.483306
+  type: 'test'
+  ...
+# Subtest: linkGoogleAccount(): a garbage idToken is rejected by the real server, never treated as success
+ok 5 - linkGoogleAccount(): a garbage idToken is rejected by the real server, never treated as success
+  ---
+  duration_ms: 27.749723
+  type: 'test'
+  ...
+# Subtest: linkGoogleAccount(): a session token already consumed by a prior link cannot be replayed
+ok 6 - linkGoogleAccount(): a session token already consumed by a prior link cannot be replayed
+  ---
+  duration_ms: 31.353921
+  type: 'test'
+  ...
+# Subtest: linkGoogleAccountForCurrentUser(): a second account cannot claim an already-linked Google identity
+ok 7 - linkGoogleAccountForCurrentUser(): a second account cannot claim an already-linked Google identity
+  ---
+  duration_ms: 32.046205
+  type: 'test'
+  ...
+# Subtest: issueLinkSession(): no server listening -> honest NETWORK_ERROR, never a fabricated success
+ok 8 - issueLinkSession(): no server listening -> honest NETWORK_ERROR, never a fabricated success
+  ---
+  duration_ms: 0.51623
+  type: 'test'
+  ...
+# Subtest: linkGoogleAccount(): missing token/idToken fails closed locally without a request
+ok 9 - linkGoogleAccount(): missing token/idToken fails closed locally without a request
+  ---
+  duration_ms: 0.260698
+  type: 'test'
+  ...
+# Subtest: linkGoogleAccountForCurrentUser(): reports stage:"ISSUE" when session issuance itself fails
+ok 10 - linkGoogleAccountForCurrentUser(): reports stage:"ISSUE" when session issuance itself fails
+  ---
+  duration_ms: 7.28518
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 328.738525
+
+=== PROMPT10-MID-2 direct regression: account-link-session.test.js + account-link-server.test.js ===
+TAP version 13
+# Subtest: REAL ACCEPTANCE SCENARIO (§29): account A links, restarts, logs in, resolves correctly; account B is rejected
+ok 1 - REAL ACCEPTANCE SCENARIO (§29): account A links, restarts, logs in, resolves correctly; account B is rejected
+  ---
+  duration_ms: 107.571489
+  type: 'test'
+  ...
+# Subtest: missing/garbage session token is rejected, never falls back to trusting a body-supplied userId
+ok 2 - missing/garbage session token is rejected, never falls back to trusting a body-supplied userId
+  ---
+  duration_ms: 14.619243
+  type: 'test'
+  ...
+# Subtest: session issue requires a real userId field
+ok 3 - session issue requires a real userId field
+  ---
+  duration_ms: 9.767157
+  type: 'test'
+  ...
+# Subtest: unknown route returns generic 404, no information leakage
+ok 4 - unknown route returns generic 404, no information leakage
+  ---
+  duration_ms: 14.734446
+  type: 'test'
+  ...
+# Subtest: issue() mints a token, resolve() returns the bound userId
+ok 5 - issue() mints a token, resolve() returns the bound userId
+  ---
+  duration_ms: 2.633531
+  type: 'test'
+  ...
+# Subtest: resolve() never trusts the raw userId string alone — only a genuinely issued token works
+ok 6 - resolve() never trusts the raw userId string alone — only a genuinely issued token works
+  ---
+  duration_ms: 0.799975
+  type: 'test'
+  ...
+# Subtest: expired token resolves to null (fails closed) and is swept on touch
+ok 7 - expired token resolves to null (fails closed) and is swept on touch
+  ---
+  duration_ms: 0.839651
+  type: 'test'
+  ...
+# Subtest: consume:true deletes the token after one use — a captured token cannot be replayed
+ok 8 - consume:true deletes the token after one use — a captured token cannot be replayed
+  ---
+  duration_ms: 0.786373
+  type: 'test'
+  ...
+# Subtest: a token issued for one userId never resolves to a different userId, even after a real restart
+ok 9 - a token issued for one userId never resolves to a different userId, even after a real restart
+  ---
+  duration_ms: 0.789705
+  type: 'test'
+  ...
+# Subtest: two tokens for two different users never collide
+ok 10 - two tokens for two different users never collide
+  ---
+  duration_ms: 0.845922
+  type: 'test'
+  ...
+# Subtest: store: raw token is never persisted to disk, only its hash
+ok 11 - store: raw token is never persisted to disk, only its hash
+  ---
+  duration_ms: 0.608277
+  type: 'test'
+  ...
+# Subtest: store: corrupted backing file fails closed at construction
+ok 12 - store: corrupted backing file fails closed at construction
+  ---
+  duration_ms: 0.659384
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 466.387904
+
+=== Google direct regression: firebase-identity-issuer + google-login-endpoint + google-linkage-store-adapter + google-persistent-linkage-integration ===
+TAP version 13
+# Subtest: construction requires a real filePath
+ok 1 - construction requires a real filePath
+  ---
+  duration_ms: 1.369586
+  type: 'test'
+  ...
+# Subtest: first run creates a valid empty file at the given path
+ok 2 - first run creates a valid empty file at the given path
+  ---
+  duration_ms: 1.171441
+  type: 'test'
+  ...
+# Subtest: unknown user returns null, not a fabricated record
+ok 3 - unknown user returns null, not a fabricated record
+  ---
+  duration_ms: 0.69984
+  type: 'test'
+  ...
+# Subtest: setRecord persists synchronously and survives real adapter destroy/recreate (real reload/restart simulation)
+ok 4 - setRecord persists synchronously and survives real adapter destroy/recreate (real reload/restart simulation)
+  ---
+  duration_ms: 0.670555
+  type: 'test'
+  ...
+# Subtest: findUserIdByGoogleUid finds the real owner and survives adapter recreation
+ok 5 - findUserIdByGoogleUid finds the real owner and survives adapter recreation
+  ---
+  duration_ms: 1.492985
+  type: 'test'
+  ...
+# Subtest: corrupted backing file fails closed at construction (never silently starts empty)
+ok 6 - corrupted backing file fails closed at construction (never silently starts empty)
+  ---
+  duration_ms: 0.46402
+  type: 'test'
+  ...
+# Subtest: backing file that is valid JSON but not an object fails closed
+ok 7 - backing file that is valid JSON but not an object fails closed
+  ---
+  duration_ms: 0.431083
+  type: 'test'
+  ...
+# Subtest: record replacement is reflected immediately and survives reload
+ok 8 - record replacement is reflected immediately and survives reload
+  ---
+  duration_ms: 0.911034
+  type: 'test'
+  ...
+# Subtest: valid, verified, linked Google identity resolves to the linked CozyOS userId
+ok 9 - valid, verified, linked Google identity resolves to the linked CozyOS userId
+  ---
+  duration_ms: 55.761525
+  type: 'test'
+  ...
+# Subtest: malformed token is rejected (generic 401)
+ok 10 - malformed token is rejected (generic 401)
+  ---
+  duration_ms: 38.984144
+  type: 'test'
+  ...
+# Subtest: invalid signature (wrong signing key) is rejected
+ok 11 - invalid signature (wrong signing key) is rejected
+  ---
+  duration_ms: 8.459028
+  type: 'test'
+  ...
+# Subtest: expired token is rejected
+ok 12 - expired token is rejected
+  ---
+  duration_ms: 12.615832
+  type: 'test'
+  ...
+# Subtest: wrong issuer is rejected
+ok 13 - wrong issuer is rejected
+  ---
+  duration_ms: 9.692516
+  type: 'test'
+  ...
+# Subtest: wrong audience is rejected
+ok 14 - wrong audience is rejected
+  ---
+  duration_ms: 15.17824
+  type: 'test'
+  ...
+# Subtest: future auth_time is rejected
+ok 15 - future auth_time is rejected
+  ---
+  duration_ms: 12.276427
+  type: 'test'
+  ...
+# Subtest: client-supplied userId is ignored; resolution still comes from the verified token
+ok 16 - client-supplied userId is ignored; resolution still comes from the verified token
+  ---
+  duration_ms: 13.266602
+  type: 'test'
+  ...
+# Subtest: client-supplied googleId is ignored
+ok 17 - client-supplied googleId is ignored
+  ---
+  duration_ms: 15.643807
+  type: 'test'
+  ...
+# Subtest: client-supplied role/isAdmin are ignored (never echoed, never used to authorize)
+ok 18 - client-supplied role/isAdmin are ignored (never echoed, never used to authorize)
+  ---
+  duration_ms: 10.322306
+  type: 'test'
+  ...
+# Subtest: the classic attack shape { userId: "victim", googleId: "attacker" } cannot obtain the victim account
+ok 19 - the classic attack shape { userId: "victim", googleId: "attacker" } cannot obtain the victim account
+  ---
+  duration_ms: 18.799555
+  type: 'test'
+  ...
+# Subtest: verified-but-unlinked Google identity is rejected (no auto-account-creation, no email fallback)
+ok 20 - verified-but-unlinked Google identity is rejected (no auto-account-creation, no email fallback)
+  ---
+  duration_ms: 8.484543
+  type: 'test'
+  ...
+# Subtest: a Google identity linked to account A never resolves to account B
+ok 21 - a Google identity linked to account A never resolves to account B
+  ---
+  duration_ms: 7.829377
+  type: 'test'
+  ...
+# Subtest: googleLoginEnabled:false on an otherwise-linked record is rejected (generic, not distinguishable from unlinked)
+ok 22 - googleLoginEnabled:false on an otherwise-linked record is rejected (generic, not distinguishable from unlinked)
+  ---
+  duration_ms: 5.45152
+  type: 'test'
+  ...
+# Subtest: missing idToken field is rejected with 400
+ok 23 - missing idToken field is rejected with 400
+  ---
+  duration_ms: 13.420309
+  type: 'test'
+  ...
+# Subtest: empty-string idToken is rejected
+ok 24 - empty-string idToken is rejected
+  ---
+  duration_ms: 9.317768
+  type: 'test'
+  ...
+# Subtest: non-string idToken is rejected
+ok 25 - non-string idToken is rejected
+  ---
+  duration_ms: 3.387377
+  type: 'test'
+  ...
+# Subtest: malformed JSON body is rejected with 400, not a 500 crash
+ok 26 - malformed JSON body is rejected with 400, not a 500 crash
+  ---
+  duration_ms: 3.863004
+  type: 'test'
+  ...
+# Subtest: non-object JSON body (array) is rejected
+ok 27 - non-object JSON body (array) is rejected
+  ---
+  duration_ms: 5.139599
+  type: 'test'
+  ...
+# Subtest: oversized body is rejected with 413 (connection stays usable, not aborted)
+ok 28 - oversized body is rejected with 413 (connection stays usable, not aborted)
+  ---
+  duration_ms: 10.219867
+  type: 'test'
+  ...
+# Subtest: wrong content-type is rejected with 415
+ok 29 - wrong content-type is rejected with 415
+  ---
+  duration_ms: 3.509339
+  type: 'test'
+  ...
+# Subtest: unsupported method (GET) is rejected with 405
+ok 30 - unsupported method (GET) is rejected with 405
+  ---
+  duration_ms: 3.058686
+  type: 'test'
+  ...
+# Subtest: unknown path returns generic 404, not a stack trace or server info
+ok 31 - unknown path returns generic 404, not a stack trace or server info
+  ---
+  duration_ms: 5.05968
+  type: 'test'
+  ...
+# Subtest: successful response never includes a session token or session-shaped field
+ok 32 - successful response never includes a session token or session-shaped field
+  ---
+  duration_ms: 5.764705
+  type: 'test'
+  ...
+# Subtest: failed verification never leaves a usable record behind and repeated attempts stay rejected
+ok 33 - failed verification never leaves a usable record behind and repeated attempts stay rejected
+  ---
+  duration_ms: 5.996637
+  type: 'test'
+  ...
+# Subtest: REAL END-TO-END: link persists to disk, and login resolves correctly after a genuine server stop/restart against the same file
+ok 34 - REAL END-TO-END: link persists to disk, and login resolves correctly after a genuine server stop/restart against the same file
+  ---
+  duration_ms: 59.07989
+  type: 'test'
+  ...
+# Subtest: REAL END-TO-END: cross-account Google UID collision is rejected even after a restart
+ok 35 - REAL END-TO-END: cross-account Google UID collision is rejected even after a restart
+  ---
+  duration_ms: 4.400197
+  type: 'test'
+  ...
+# Subtest: valid identity: a genuinely signed, well-formed ID token verifies and issues an assertion
+ok 36 - valid identity: a genuinely signed, well-formed ID token verifies and issues an assertion
+  ---
+  duration_ms: 4.497266
+  type: 'test'
+  ...
+# Subtest: invalid identity: wrong issuer is rejected
+ok 37 - invalid identity: wrong issuer is rejected
+  ---
+  duration_ms: 0.987977
+  type: 'test'
+  ...
+# Subtest: invalid identity: wrong audience is rejected
+ok 38 - invalid identity: wrong audience is rejected
+  ---
+  duration_ms: 1.188514
+  type: 'test'
+  ...
+# Subtest: missing credentials: no token at all is rejected
+ok 39 - missing credentials: no token at all is rejected
+  ---
+  duration_ms: 0.360523
+  type: 'test'
+  ...
+# Subtest: missing credentials: empty string token is rejected
+ok 40 - missing credentials: empty string token is rejected
+  ---
+  duration_ms: 0.239139
+  type: 'test'
+  ...
+# Subtest: spoofed requester id: a caller cannot claim a different uid by editing the payload without re-signing
+ok 41 - spoofed requester id: a caller cannot claim a different uid by editing the payload without re-signing
+  ---
+  duration_ms: 2.371355
+  type: 'test'
+  ...
+# Subtest: assertion purpose isolation: a signed identity assertion cannot be forged by signing an ID token for the same secret space
+ok 42 - assertion purpose isolation: a signed identity assertion cannot be forged by signing an ID token for the same secret space
+  ---
+  duration_ms: 0.204233
+  type: 'test'
+  ...
+# Subtest: expired identity credential: an expired ID token is rejected
+ok 43 - expired identity credential: an expired ID token is rejected
+  ---
+  duration_ms: 0.957545
+  type: 'test'
+  ...
+# Subtest: tampered identity credential: modified payload with stale signature is rejected
+ok 44 - tampered identity credential: modified payload with stale signature is rejected
+  ---
+  duration_ms: 1.359402
+  type: 'test'
+  ...
+# Subtest: tampered identity credential: unknown key id is rejected (cannot swap in an attacker-controlled key)
+ok 45 - tampered identity credential: unknown key id is rejected (cannot swap in an attacker-controlled key)
+  ---
+  duration_ms: 16.639214
+  type: 'test'
+  ...
+# Subtest: unsupported algorithm (e.g. alg:none) is rejected outright
+ok 46 - unsupported algorithm (e.g. alg:none) is rejected outright
+  ---
+  duration_ms: 0.3183
+  type: 'test'
+  ...
+# Subtest: malformed token (not three dot-separated parts) is rejected
+ok 47 - malformed token (not three dot-separated parts) is rejected
+  ---
+  duration_ms: 0.126327
+  type: 'test'
+  ...
+1..47
+# tests 47
+# suites 0
+# pass 47
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 865.080134
+
+=== core/security/test full suite (115 pre-existing + 10 new = 125) ===
+TAP version 13
+# Subtest: missing userId degrades every per-user factor to unavailable, never throws
+ok 1 - missing userId degrades every per-user factor to unavailable, never throws
+  ---
+  duration_ms: 1.467164
+  type: 'test'
+  ...
+# Subtest: malformed/missing engine dependency fails closed instead of throwing
+ok 2 - malformed/missing engine dependency fails closed instead of throwing
+  ---
+  duration_ms: 0.305678
+  type: 'test'
+  ...
+# Subtest: a caller-supplied boolean never appears in the output directly
+ok 3 - a caller-supplied boolean never appears in the output directly
+  ---
+  duration_ms: 1.16866
+  type: 'test'
+  ...
+# Subtest: enrolled + device-supported passkey composes through from WebAuthnProvider
+ok 4 - enrolled + device-supported passkey composes through from WebAuthnProvider
+  ---
+  duration_ms: 0.359327
+  type: 'test'
+  ...
+# Subtest: phone usable only when linkage reports both verified and loginUsable
+ok 5 - phone usable only when linkage reports both verified and loginUsable
+  ---
+  duration_ms: 0.210835
+  type: 'test'
+  ...
+# Subtest: google linked only when both googleLinked AND googleLoginEnabled are true
+ok 6 - google linked only when both googleLinked AND googleLoginEnabled are true
+  ---
+  duration_ms: 0.226468
+  type: 'test'
+  ...
+# Subtest: google/voice providerReal is read from AuthFactorRegistry, never assumed true
+ok 7 - google/voice providerReal is read from AuthFactorRegistry, never assumed true
+  ---
+  duration_ms: 0.455831
+  type: 'test'
+  ...
+# Subtest: voice.verified is always false regardless of provider reality (no real verification exists)
+ok 8 - voice.verified is always false regardless of provider reality (no real verification exists)
+  ---
+  duration_ms: 0.192795
+  type: 'test'
+  ...
+# Subtest: trustedDevice is only ever populated in admin-recovery context
+ok 9 - trustedDevice is only ever populated in admin-recovery context
+  ---
+  duration_ms: 0.502041
+  type: 'test'
+  ...
+# Subtest: trustedDevice.adminAuthorized is only ever what the caller resolved — this builder never decides admin status
+ok 10 - trustedDevice.adminAuthorized is only ever what the caller resolved — this builder never decides admin status
+  ---
+  duration_ms: 0.431554
+  type: 'test'
+  ...
+# Subtest: password.available reflects whether a real password hash was actually set at registration
+ok 11 - password.available reflects whether a real password hash was actually set at registration
+  ---
+  duration_ms: 0.414147
+  type: 'test'
+  ...
+# Subtest: recovery.emailAvailable/phoneAvailable reflect real account/linkage state, not assumed defaults
+ok 12 - recovery.emailAvailable/phoneAvailable reflect real account/linkage state, not assumed defaults
+  ---
+  duration_ms: 0.28448
+  type: 'test'
+  ...
+# Subtest: registrationMethod is surfaced unchanged for reporting only
+ok 13 - registrationMethod is surfaced unchanged for reporting only
+  ---
+  duration_ms: 0.167007
+  type: 'test'
+  ...
+# Subtest: inactive account status produces account.active:false regardless of factor state
+ok 14 - inactive account status produces account.active:false regardless of factor state
+  ---
+  duration_ms: 0.136565
+  type: 'test'
+  ...
+# Subtest: output is directly consumable by getLoginDecision()
+ok 15 - output is directly consumable by getLoginDecision()
+  ---
+  duration_ms: 1.460177
+  type: 'test'
+  ...
+# Subtest: unknown channel is rejected, real channels are exactly email and sms
+ok 16 - unknown channel is rejected, real channels are exactly email and sms
+  ---
+  duration_ms: 1.551342
+  type: 'test'
+  ...
+# Subtest: dispatch with zero backends is an honest no-op, never fabricated delivery
+ok 17 - dispatch with zero backends is an honest no-op, never fabricated delivery
+  ---
+  duration_ms: 0.70422
+  type: 'test'
+  ...
+# Subtest: a devOnly backend delivers but the channel state never reports past DEV_ONLY
+ok 18 - a devOnly backend delivers but the channel state never reports past DEV_ONLY
+  ---
+  duration_ms: 0.306839
+  type: 'test'
+  ...
+# Subtest: a real (non-devOnly) backend that has not yet delivered reports CONFIGURED_UNVERIFIED
+ok 19 - a real (non-devOnly) backend that has not yet delivered reports CONFIGURED_UNVERIFIED
+  ---
+  duration_ms: 0.293367
+  type: 'test'
+  ...
+# Subtest: a real backend that successfully delivers moves the channel to LOCALLY_VERIFIED, never PRODUCTION_VERIFIED unless the backend says so
+ok 20 - a real backend that successfully delivers moves the channel to LOCALLY_VERIFIED, never PRODUCTION_VERIFIED unless the backend says so
+  ---
+  duration_ms: 1.294642
+  type: 'test'
+  ...
+# Subtest: PRODUCTION_VERIFIED is only ever set when a real backend explicitly proves it
+ok 21 - PRODUCTION_VERIFIED is only ever set when a real backend explicitly proves it
+  ---
+  duration_ms: 0.342942
+  type: 'test'
+  ...
+# Subtest: dispatch tries multiple backends in registration order until one honestly delivers
+ok 22 - dispatch tries multiple backends in registration order until one honestly delivers
+  ---
+  duration_ms: 0.330478
+  type: 'test'
+  ...
+# Subtest: a throwing backend is caught and reported, not propagated, and other backends still get a chance
+ok 23 - a throwing backend is caught and reported, not propagated, and other backends still get a chance
+  ---
+  duration_ms: 0.286034
+  type: 'test'
+  ...
+# Subtest: unregisterBackend genuinely removes a backend; dispatch after removal honestly fails again
+ok 24 - unregisterBackend genuinely removes a backend; dispatch after removal honestly fails again
+  ---
+  duration_ms: 0.457232
+  type: 'test'
+  ...
+# Subtest: listBackends and getHistory report real, non-fabricated state
+ok 25 - listBackends and getHistory report real, non-fabricated state
+  ---
+  duration_ms: 0.664668
+  type: 'test'
+  ...
+# Subtest: issueLinkSession(): real server issues a real, usable token
+ok 26 - issueLinkSession(): real server issues a real, usable token
+  ---
+  duration_ms: 50.405456
+  type: 'test'
+  ...
+# Subtest: issueLinkSession(): missing/empty userId fails closed locally, no request needed
+ok 27 - issueLinkSession(): missing/empty userId fails closed locally, no request needed
+  ---
+  duration_ms: 0.301652
+  type: 'test'
+  ...
+# Subtest: linkGoogleAccountForCurrentUser(): real end-to-end issue+link against a real server
+ok 28 - linkGoogleAccountForCurrentUser(): real end-to-end issue+link against a real server
+  ---
+  duration_ms: 19.706577
+  type: 'test'
+  ...
+# Subtest: linkGoogleAccountForCurrentUser(): the account linked is always the one from the real session, never spoofable via any client-side field
+ok 29 - linkGoogleAccountForCurrentUser(): the account linked is always the one from the real session, never spoofable via any client-side field
+  ---
+  duration_ms: 21.697184
+  type: 'test'
+  ...
+# Subtest: linkGoogleAccount(): a garbage idToken is rejected by the real server, never treated as success
+ok 30 - linkGoogleAccount(): a garbage idToken is rejected by the real server, never treated as success
+  ---
+  duration_ms: 22.184489
+  type: 'test'
+  ...
+# Subtest: linkGoogleAccount(): a session token already consumed by a prior link cannot be replayed
+ok 31 - linkGoogleAccount(): a session token already consumed by a prior link cannot be replayed
+  ---
+  duration_ms: 32.021509
+  type: 'test'
+  ...
+# Subtest: linkGoogleAccountForCurrentUser(): a second account cannot claim an already-linked Google identity
+ok 32 - linkGoogleAccountForCurrentUser(): a second account cannot claim an already-linked Google identity
+  ---
+  duration_ms: 35.764676
+  type: 'test'
+  ...
+# Subtest: issueLinkSession(): no server listening -> honest NETWORK_ERROR, never a fabricated success
+ok 33 - issueLinkSession(): no server listening -> honest NETWORK_ERROR, never a fabricated success
+  ---
+  duration_ms: 0.659643
+  type: 'test'
+  ...
+# Subtest: linkGoogleAccount(): missing token/idToken fails closed locally without a request
+ok 34 - linkGoogleAccount(): missing token/idToken fails closed locally without a request
+  ---
+  duration_ms: 0.567896
+  type: 'test'
+  ...
+# Subtest: linkGoogleAccountForCurrentUser(): reports stage:"ISSUE" when session issuance itself fails
+ok 35 - linkGoogleAccountForCurrentUser(): reports stage:"ISSUE" when session issuance itself fails
+  ---
+  duration_ms: 7.388293
+  type: 'test'
+  ...
+# Subtest: linkAccount: a genuinely signed token links the account for real
+ok 36 - linkAccount: a genuinely signed token links the account for real
+  ---
+  duration_ms: 4.214624
+  type: 'test'
+  ...
+# Subtest: linkAccount: fails closed with no userId (never links anonymously)
+ok 37 - linkAccount: fails closed with no userId (never links anonymously)
+  ---
+  duration_ms: 0.940737
+  type: 'test'
+  ...
+# Subtest: linkAccount: a forged/tampered token never links (real signature check)
+ok 38 - linkAccount: a forged/tampered token never links (real signature check)
+  ---
+  duration_ms: 1.041364
+  type: 'test'
+  ...
+# Subtest: linkAccount: an expired token never links
+ok 39 - linkAccount: an expired token never links
+  ---
+  duration_ms: 2.406983
+  type: 'test'
+  ...
+# Subtest: linkAccount: cross-account reuse of an already-linked Google identity is rejected (fail closed)
+ok 40 - linkAccount: cross-account reuse of an already-linked Google identity is rejected (fail closed)
+  ---
+  duration_ms: 1.628481
+  type: 'test'
+  ...
+# Subtest: linkAccount: the SAME account re-linking the SAME Google identity is allowed (not a takeover)
+ok 41 - linkAccount: the SAME account re-linking the SAME Google identity is allowed (not a takeover)
+  ---
+  duration_ms: 1.407016
+  type: 'test'
+  ...
+# Subtest: security: a client cannot declare itself Google-verified by shape alone — only a real signature check links
+ok 42 - security: a client cannot declare itself Google-verified by shape alone — only a real signature check links
+  ---
+  duration_ms: 0.261595
+  type: 'test'
+  ...
+# Subtest: resolveLoginCandidate: a verified but unlinked Google identity is NOT a login (no email-matching fallback)
+ok 43 - resolveLoginCandidate: a verified but unlinked Google identity is NOT a login (no email-matching fallback)
+  ---
+  duration_ms: 1.025594
+  type: 'test'
+  ...
+# Subtest: resolveLoginCandidate: a linked, real identity resolves to the correct account
+ok 44 - resolveLoginCandidate: a linked, real identity resolves to the correct account
+  ---
+  duration_ms: 1.848773
+  type: 'test'
+  ...
+# Subtest: resolveLoginCandidate: an invalid/forged token never resolves to any account
+ok 45 - resolveLoginCandidate: an invalid/forged token never resolves to any account
+  ---
+  duration_ms: 1.122425
+  type: 'test'
+  ...
+# Subtest: resolveLoginCandidate: unlinking disables login even though the Google identity itself is still valid
+ok 46 - resolveLoginCandidate: unlinking disables login even though the Google identity itself is still valid
+  ---
+  duration_ms: 1.564218
+  type: 'test'
+  ...
+# Subtest: extractEmailFromVerifiedToken: reads the email claim from a well-formed token
+ok 47 - extractEmailFromVerifiedToken: reads the email claim from a well-formed token
+  ---
+  duration_ms: 0.597294
+  type: 'test'
+  ...
+# Subtest: extractEmailFromVerifiedToken: returns null for a malformed token rather than throwing
+ok 48 - extractEmailFromVerifiedToken: returns null for a malformed token rather than throwing
+  ---
+  duration_ms: 0.100338
+  type: 'test'
+  ...
+# Subtest: constructor: throws without a real store adapter
+ok 49 - constructor: throws without a real store adapter
+  ---
+  duration_ms: 0.243654
+  type: 'test'
+  ...
+# Subtest: constructor: throws without a projectId
+ok 50 - constructor: throws without a projectId
+  ---
+  duration_ms: 0.099053
+  type: 'test'
+  ...
+# Subtest: register(): a real user is created and reports available:true with a real userId
+ok 51 - register(): a real user is created and reports available:true with a real userId
+  ---
+  duration_ms: 31.39904
+  type: 'test'
+  ...
+# Subtest: register(): duplicate username is rejected, not silently overwritten
+ok 52 - register(): duplicate username is rejected, not silently overwritten
+  ---
+  duration_ms: 21.471399
+  type: 'test'
+  ...
+# Subtest: getUser(): returns real profile fields and never leaks hash/salt
+ok 53 - getUser(): returns real profile fields and never leaks hash/salt
+  ---
+  duration_ms: 20.425918
+  type: 'test'
+  ...
+# Subtest: getUser(): unknown userId returns null, not a fabricated record
+ok 54 - getUser(): unknown userId returns null, not a fabricated record
+  ---
+  duration_ms: 0.862367
+  type: 'test'
+  ...
+# Subtest: login(): correct password creates a real session
+ok 55 - login(): correct password creates a real session
+  ---
+  duration_ms: 37.963478
+  type: 'test'
+  ...
+# Subtest: login(): wrong password is rejected, not a session
+ok 56 - login(): wrong password is rejected, not a session
+  ---
+  duration_ms: 36.678108
+  type: 'test'
+  ...
+# Subtest: loginWithVerifiedGoogle(): a real, existing user gets a real session, with its own honest audit label
+ok 57 - loginWithVerifiedGoogle(): a real, existing user gets a real session, with its own honest audit label
+  ---
+  duration_ms: 20.292777
+  type: 'test'
+  ...
+# Subtest: loginWithVerifiedGoogle(): fails closed on an unknown/removed userId — never fabricates a session
+ok 58 - loginWithVerifiedGoogle(): fails closed on an unknown/removed userId — never fabricates a session
+  ---
+  duration_ms: 1.126944
+  type: 'test'
+  ...
+# Subtest: loginWithVerifiedGoogle(): does NOT bypass a security lock — the same real lock login() itself respects
+ok 59 - loginWithVerifiedGoogle(): does NOT bypass a security lock — the same real lock login() itself respects
+  ---
+  duration_ms: 106.661434
+  type: 'test'
+  ...
+# Subtest: loginWithVerifiedGoogle(): never confuses accounts — resolves the exact userId given it, not the first/most-recent user
+ok 60 - loginWithVerifiedGoogle(): never confuses accounts — resolves the exact userId given it, not the first/most-recent user
+  ---
+  duration_ms: 50.918298
+  type: 'test'
+  ...
+# Subtest: inactive account is rejected regardless of enrolled factors
+ok 61 - inactive account is rejected regardless of enrolled factors
+  ---
+  duration_ms: 1.799684
+  type: 'test'
+  ...
+# Subtest: missing account context fails closed
+ok 62 - missing account context fails closed
+  ---
+  duration_ms: 1.464431
+  type: 'test'
+  ...
+# Subtest: malformed factors object never grants a STRONG factor — only the independent password fallback survives
+ok 63 - malformed factors object never grants a STRONG factor — only the independent password fallback survives
+  ---
+  duration_ms: 0.342868
+  type: 'test'
+  ...
+# Subtest: no usable factor and no password/recovery -> NO_FACTOR_AVAILABLE
+ok 64 - no usable factor and no password/recovery -> NO_FACTOR_AVAILABLE
+  ---
+  duration_ms: 0.157446
+  type: 'test'
+  ...
+# Subtest: no usable factor but recovery available -> RECOVERY_REQUIRED
+ok 65 - no usable factor but recovery available -> RECOVERY_REQUIRED
+  ---
+  duration_ms: 0.190112
+  type: 'test'
+  ...
+# Subtest: enrolled + device-supported passkey is preferred as the primary factor
+ok 66 - enrolled + device-supported passkey is preferred as the primary factor
+  ---
+  duration_ms: 0.190355
+  type: 'test'
+  ...
+# Subtest: passkey enrolled but device does not support WebAuthn is NOT offered as usable (Prompt 7 §17)
+ok 67 - passkey enrolled but device does not support WebAuthn is NOT offered as usable (Prompt 7 §17)
+  ---
+  duration_ms: 0.17497
+  type: 'test'
+  ...
+# Subtest: registration method never becomes the forced primary factor — email registration + enrolled passkey => passkey primary
+ok 68 - registration method never becomes the forced primary factor — email registration + enrolled passkey => passkey primary
+  ---
+  duration_ms: 0.116247
+  type: 'test'
+  ...
+# Subtest: registration method never becomes the forced primary factor — google registration without a real google backend falls to password
+ok 69 - registration method never becomes the forced primary factor — google registration without a real google backend falls to password
+  ---
+  duration_ms: 0.328521
+  type: 'test'
+  ...
+# Subtest: registration method never becomes the forced primary factor — phone registration without SMS configured falls to password
+ok 70 - registration method never becomes the forced primary factor — phone registration without SMS configured falls to password
+  ---
+  duration_ms: 0.396023
+  type: 'test'
+  ...
+# Subtest: a genuinely usable verified+configured phone factor outranks password
+ok 71 - a genuinely usable verified+configured phone factor outranks password
+  ---
+  duration_ms: 0.18815
+  type: 'test'
+  ...
+# Subtest: phone verified but not loginUsable (e.g. no SMS backend) is not offered
+ok 72 - phone verified but not loginUsable (e.g. no SMS backend) is not offered
+  ---
+  duration_ms: 0.108861
+  type: 'test'
+  ...
+# Subtest: passkey beats phone beats google-account beats voice when all are usable
+ok 73 - passkey beats phone beats google-account beats voice when all are usable
+  ---
+  duration_ms: 0.199905
+  type: 'test'
+  ...
+# Subtest: voice stub (providerReal:false) is never offered even if "verified:true" is claimed
+ok 74 - voice stub (providerReal:false) is never offered even if "verified:true" is claimed
+  ---
+  duration_ms: 0.160373
+  type: 'test'
+  ...
+# Subtest: trusted-device is never offered in an ordinary login context, even if enrolled+adminAuthorized
+ok 75 - trusted-device is never offered in an ordinary login context, even if enrolled+adminAuthorized
+  ---
+  duration_ms: 0.100192
+  type: 'test'
+  ...
+# Subtest: trusted-device only appears for an explicit admin-recovery context, and only when adminAuthorized
+ok 76 - trusted-device only appears for an explicit admin-recovery context, and only when adminAuthorized
+  ---
+  duration_ms: 0.103022
+  type: 'test'
+  ...
+# Subtest: password is only ever primary when it is the sole usable option
+ok 77 - password is only ever primary when it is the sole usable option
+  ---
+  duration_ms: 0.098707
+  type: 'test'
+  ...
+# Subtest: policy can explicitly disable password fallback
+ok 78 - policy can explicitly disable password fallback
+  ---
+  duration_ms: 0.089483
+  type: 'test'
+  ...
+# Subtest: decision is deterministic for identical input
+ok 79 - decision is deterministic for identical input
+  ---
+  duration_ms: 0.101011
+  type: 'test'
+  ...
+# Subtest: requestPasswordReset returns the identical generic response for a real account and a non-existent one (enumeration protection)
+ok 80 - requestPasswordReset returns the identical generic response for a real account and a non-existent one (enumeration protection)
+  ---
+  duration_ms: 30.254121
+  type: 'test'
+  ...
+# Subtest: a freshly issued token is VALID, and confirming it genuinely changes the password
+ok 81 - a freshly issued token is VALID, and confirming it genuinely changes the password
+  ---
+  duration_ms: 53.190382
+  type: 'test'
+  ...
+# (node:1201) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: a used token cannot be replayed (one-time use / replay protection)
+ok 82 - a used token cannot be replayed (one-time use / replay protection)
+  ---
+  duration_ms: 52.888898
+  type: 'test'
+  ...
+# Subtest: an expired token is rejected
+ok 83 - an expired token is rejected
+  ---
+  duration_ms: 54.894302
+  type: 'test'
+  ...
+# Subtest: a malformed/unknown token is rejected as INVALID
+ok 84 - a malformed/unknown token is rejected as INVALID
+  ---
+  duration_ms: 2.452694
+  type: 'test'
+  ...
+# Subtest: requesting a new reset invalidates the previous outstanding token for the same user
+ok 85 - requesting a new reset invalidates the previous outstanding token for the same user
+  ---
+  duration_ms: 71.877272
+  type: 'test'
+  ...
+# Subtest: a token minted for one account can never reset a different account (cross-account rejection)
+ok 86 - a token minted for one account can never reset a different account (cross-account rejection)
+  ---
+  duration_ms: 35.978121
+  type: 'test'
+  ...
+# Subtest: confirming a reset terminates the user's active sessions but leaves other users' sessions untouched
+ok 87 - confirming a reset terminates the user's active sessions but leaves other users' sessions untouched
+  ---
+  duration_ms: 38.377169
+  type: 'test'
+  ...
+# Subtest: a weak new password is rejected without consuming the token
+ok 88 - a weak new password is rejected without consuming the token
+  ---
+  duration_ms: 53.325185
+  type: 'test'
+  ...
+# Subtest: repeated requests for the same identifier are rate-limited after 5 attempts, but the response stays generic
+ok 89 - repeated requests for the same identifier are rate-limited after 5 attempts, but the response stays generic
+  ---
+  duration_ms: 87.966928
+  type: 'test'
+  ...
+# Subtest: tokens survive being restored from persisted storage (IdentityStorage round-trip)
+ok 90 - tokens survive being restored from persisted storage (IdentityStorage round-trip)
+  ---
+  duration_ms: 35.597856
+  type: 'test'
+  ...
+# Subtest: tampering the stored PBKDF2 verifier invalidates the token, proving the verifier is actually checked
+ok 91 - tampering the stored PBKDF2 verifier invalidates the token, proving the verifier is actually checked
+  ---
+  duration_ms: 40.083687
+  type: 'test'
+  ...
+# Subtest: the persisted record stores a real double hash (checksum + salted PBKDF2 verifier), never the raw token
+ok 92 - the persisted record stores a real double hash (checksum + salted PBKDF2 verifier), never the raw token
+  ---
+  duration_ms: 21.181657
+  type: 'test'
+  ...
+# Subtest: normalizePhone collapses equivalent formats to the same identity
+ok 93 - normalizePhone collapses equivalent formats to the same identity
+  ---
+  duration_ms: 1.199094
+  type: 'test'
+  ...
+# Subtest: a fresh confirmLink() with the correct code marks the phone genuinely verified
+ok 94 - a fresh confirmLink() with the correct code marks the phone genuinely verified
+  ---
+  duration_ms: 56.101649
+  type: 'test'
+  ...
+# Subtest: an unverified phone never becomes usable for login or recovery
+ok 95 - an unverified phone never becomes usable for login or recovery
+  ---
+  duration_ms: 0.375036
+  type: 'test'
+  ...
+# Subtest: confirmLink() rejects a wrong code and leaves the account unverified
+ok 96 - confirmLink() rejects a wrong code and leaves the account unverified
+  ---
+  duration_ms: 40.512433
+  type: 'test'
+  ...
+# Subtest: confirmLink() rejects a replayed (already-used) code
+ok 97 - confirmLink() rejects a replayed (already-used) code
+  ---
+  duration_ms: 35.860944
+  type: 'test'
+  ...
+# Subtest: confirmLink() rejects linking a phone already verified on a different account (takeover guard)
+ok 98 - confirmLink() rejects linking a phone already verified on a different account (takeover guard)
+  ---
+  duration_ms: 69.839208
+  type: 'test'
+  ...
+# Subtest: requestLink() and confirmLink() are enumeration-safe (no userId, no phone)
+ok 99 - requestLink() and confirmLink() are enumeration-safe (no userId, no phone)
+  ---
+  duration_ms: 1.51595
+  type: 'test'
+  ...
+# Subtest: a verified phone is only login/recovery-usable when a real SMS backend is actually configured
+ok 100 - a verified phone is only login/recovery-usable when a real SMS backend is actually configured
+  ---
+  duration_ms: 71.439098
+  type: 'test'
+  ...
+# Subtest: a linkage composed with no delivery registry at all fails closed (never usable)
+ok 101 - a linkage composed with no delivery registry at all fails closed (never usable)
+  ---
+  duration_ms: 36.635348
+  type: 'test'
+  ...
+# Subtest: revokePhone() resets all derived state so a stale verified phone can never linger as usable
+ok 102 - revokePhone() resets all derived state so a stale verified phone can never linger as usable
+  ---
+  duration_ms: 43.987873
+  type: 'test'
+  ...
+# Subtest: constructing without a real challengeService or store fails closed at construction time
+ok 103 - constructing without a real challengeService or store fails closed at construction time
+  ---
+  duration_ms: 0.839184
+  type: 'test'
+  ...
+# [PhoneLinkageBootstrap] One or more real dependencies are missing (PhoneChallengeService/IdentityStorage/PhoneLinkageStoreAdapter/PhoneAccountLinkageModule) — window.CozyOS.PhoneAccountLinkage will remain unassigned, and AuthCoordinator will correctly treat phone as unavailable rather than falsely enabling it.
+# Subtest: REAL BROWSER-SHAPED WIRING: phone-linkage-bootstrap.js constructs and assigns window.CozyOS.PhoneAccountLinkage from the real files
+ok 104 - REAL BROWSER-SHAPED WIRING: phone-linkage-bootstrap.js constructs and assigns window.CozyOS.PhoneAccountLinkage from the real files
+  ---
+  duration_ms: 67.098625
+  type: 'test'
+  ...
+# Subtest: REAL BROWSER-SHAPED WIRING: missing a real dependency leaves PhoneAccountLinkage unassigned (fail closed), never a stub
+ok 105 - REAL BROWSER-SHAPED WIRING: missing a real dependency leaves PhoneAccountLinkage unassigned (fail closed), never a stub
+  ---
+  duration_ms: 22.472024
+  type: 'test'
+  ...
+# Subtest: REAL BROWSER-SHAPED WIRING: running the bootstrap script twice never constructs a second instance
+ok 106 - REAL BROWSER-SHAPED WIRING: running the bootstrap script twice never constructs a second instance
+  ---
+  duration_ms: 42.329567
+  type: 'test'
+  ...
+# Subtest: construction requires a real IdentityStorage-shaped dependency
+ok 107 - construction requires a real IdentityStorage-shaped dependency
+  ---
+  duration_ms: 1.158084
+  type: 'test'
+  ...
+# Subtest: every method fails closed (throws) before initialize() resolves
+ok 108 - every method fails closed (throws) before initialize() resolves
+  ---
+  duration_ms: 1.901739
+  type: 'test'
+  ...
+# Subtest: hydration failure never marks the adapter ready — fails closed permanently for this instance
+ok 109 - hydration failure never marks the adapter ready — fails closed permanently for this instance
+  ---
+  duration_ms: 0.488517
+  type: 'test'
+  ...
+# Subtest: setRecord() persists synchronously in-memory and survives adapter destroy/recreate (real reload simulation)
+ok 110 - setRecord() persists synchronously in-memory and survives adapter destroy/recreate (real reload simulation)
+  ---
+  duration_ms: 10.663468
+  type: 'test'
+  ...
+# Subtest: unknown user returns null, not a fabricated record
+ok 111 - unknown user returns null, not a fabricated record
+  ---
+  duration_ms: 0.300111
+  type: 'test'
+  ...
+# [PhoneLinkageStoreAdapter] Persist failed for user user-1: SIMULATED_SAVE_FAILURE — in-memory state remains correct for this session, but this write did not reach IndexedDB.
+# Subtest: findUserIdByVerifiedPhone finds the real owner and survives adapter recreation
+ok 112 - findUserIdByVerifiedPhone finds the real owner and survives adapter recreation
+  ---
+  duration_ms: 10.31883
+  type: 'test'
+  ...
+# Subtest: persistence failure does not corrupt synchronous in-memory state (in-memory remains authoritative for the session)
+ok 113 - persistence failure does not corrupt synchronous in-memory state (in-memory remains authoritative for the session)
+  ---
+  duration_ms: 0.479176
+  type: 'test'
+  ...
+# Subtest: REAL END-TO-END: CozyPhoneAccountLinkage composed with this adapter — cross-account phone collision genuinely rejected
+ok 114 - REAL END-TO-END: CozyPhoneAccountLinkage composed with this adapter — cross-account phone collision genuinely rejected
+  ---
+  duration_ms: 87.506165
+  type: 'test'
+  ...
+# Subtest: requestPhoneChallenge returns the identical generic response for any phone (enumeration-safe shape)
+ok 115 - requestPhoneChallenge returns the identical generic response for any phone (enumeration-safe shape)
+  ---
+  duration_ms: 46.604182
+  type: 'test'
+  ...
+# Subtest: a freshly issued challenge verifies with the correct code
+ok 116 - a freshly issued challenge verifies with the correct code
+  ---
+  duration_ms: 35.624832
+  type: 'test'
+  ...
+# Subtest: wrong code is rejected without revealing the real code
+ok 117 - wrong code is rejected without revealing the real code
+  ---
+  duration_ms: 34.988829
+  type: 'test'
+  ...
+# Subtest: a challenge can only be used once (replay protection)
+ok 118 - a challenge can only be used once (replay protection)
+  ---
+  duration_ms: 34.83001
+  type: 'test'
+  ...
+# Subtest: requesting a new challenge supersedes the previous one for the same phone — the old code no longer works, only the newest one does
+ok 119 - requesting a new challenge supersedes the previous one for the same phone — the old code no longer works, only the newest one does
+  ---
+  duration_ms: 69.797733
+  type: 'test'
+  ...
+# Subtest: a code cannot verify against a different phone number than it was issued for
+ok 120 - a code cannot verify against a different phone number than it was issued for
+  ---
+  duration_ms: 22.040011
+  type: 'test'
+  ...
+# (node:1245) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: too many wrong attempts locks the challenge out (max-attempts protection), even with the correct code afterward
+ok 121 - too many wrong attempts locks the challenge out (max-attempts protection), even with the correct code afterward
+  ---
+  duration_ms: 105.813274
+  type: 'test'
+  ...
+# Subtest: an expired challenge is rejected even with the correct code
+ok 122 - an expired challenge is rejected even with the correct code
+  ---
+  duration_ms: 19.078967
+  type: 'test'
+  ...
+# Subtest: requestPhoneChallenge dispatches through the DeliveryBackendRegistry on channel "sms" when one is composed
+ok 123 - requestPhoneChallenge dispatches through the DeliveryBackendRegistry on channel "sms" when one is composed
+  ---
+  duration_ms: 19.634833
+  type: 'test'
+  ...
+# Subtest: rate limiting kicks in after too many requests for the same phone
+ok 124 - rate limiting kicks in after too many requests for the same phone
+  ---
+  duration_ms: 86.295533
+  type: 'test'
+  ...
+# Subtest: getDiagnosticsReport never claims SMS delivery is verified
+ok 125 - getDiagnosticsReport never claims SMS delivery is verified
+  ---
+  duration_ms: 0.338207
+  type: 'test'
+  ...
+1..125
+# tests 125
+# suites 0
+# pass 125
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 52993.539043
+
+=== identity/organization/platform ===
+TAP version 13
+# Subtest: passkey enrolled + device-supported -> primaryFactor is passkey
+ok 1 - passkey enrolled + device-supported -> primaryFactor is passkey
+  ---
+  duration_ms: 37.613852
+  type: 'test'
+  ...
+# Subtest: no passkey, real verified+usable phone linkage -> primaryFactor is phone
+ok 2 - no passkey, real verified+usable phone linkage -> primaryFactor is phone
+  ---
+  duration_ms: 21.926311
+  type: 'test'
+  ...
+# Subtest: no passkey, no phone linkage loaded -> falls back to password as primary
+ok 3 - no passkey, no phone linkage loaded -> falls back to password as primary
+  ---
+  duration_ms: 20.396826
+  type: 'test'
+  ...
+# Subtest: no strong factor and password unavailable, but a real email exists -> RECOVERY_REQUIRED
+ok 4 - no strong factor and password unavailable, but a real email exists -> RECOVERY_REQUIRED
+  ---
+  duration_ms: 20.342343
+  type: 'test'
+  ...
+# Subtest: WebAuthnProvider reports no credential for this user -> passkey never selected
+ok 5 - WebAuthnProvider reports no credential for this user -> passkey never selected
+  ---
+  duration_ms: 22.974884
+  type: 'test'
+  ...
+# Subtest: phone linkage reports verified:false -> phone never selected even if loginUsable claims true
+ok 6 - phone linkage reports verified:false -> phone never selected even if loginUsable claims true
+  ---
+  duration_ms: 21.958932
+  type: 'test'
+  ...
+# Subtest: this method exposes no parameter through which a caller can inject factor state
+ok 7 - this method exposes no parameter through which a caller can inject factor state
+  ---
+  duration_ms: 24.200093
+  type: 'test'
+  ...
+# Subtest: a non-admin account never receives trusted-device in an ordinary login context, regardless of any input
+ok 8 - a non-admin account never receives trusted-device in an ordinary login context, regardless of any input
+  ---
+  duration_ms: 20.133209
+  type: 'test'
+  ...
+# Subtest: GoogleAccountLinkage not loaded (matches production today) -> google never selected
+ok 9 - GoogleAccountLinkage not loaded (matches production today) -> google never selected
+  ---
+  duration_ms: 20.640976
+  type: 'test'
+  ...
+# Subtest: empty/missing username fails closed with the generic reason, never REJECTED-with-detail
+ok 10 - empty/missing username fails closed with the generic reason, never REJECTED-with-detail
+  ---
+  duration_ms: 2.265836
+  type: 'test'
+  ...
+# Subtest: unknown username fails closed with the same generic reason as a real failed password login
+ok 11 - unknown username fails closed with the same generic reason as a real failed password login
+  ---
+  duration_ms: 2.769235
+  type: 'test'
+  ...
+# Subtest: an inactive/locked account is REJECTED by the real Account-is-not-active rule, even with a real enrolled passkey
+ok 12 - an inactive/locked account is REJECTED by the real Account-is-not-active rule, even with a real enrolled passkey
+  ---
+  duration_ms: 23.159267
+  type: 'test'
+  ...
+# Subtest: AuthFactorSnapshot/LoginDecisionEngine not loaded -> fails closed, never throws
+ok 13 - AuthFactorSnapshot/LoginDecisionEngine not loaded -> fails closed, never throws
+  ---
+  duration_ms: 19.622743
+  type: 'test'
+  ...
+# Subtest: registrationMethod:"email" never forces password to be primary when a real passkey is usable
+ok 14 - registrationMethod:"email" never forces password to be primary when a real passkey is usable
+  ---
+  duration_ms: 20.842314
+  type: 'test'
+  ...
+# organization-branding.test.js
+#   ✓ setBranding() creates a full branding record for a real organization
+#   ✓ getBranding() returns an honest null when no branding exists yet
+#   ✓ getBranding() returns null for a nonexistent orgId rather than throwing
+#   ✓ setBranding() is a real partial merge — updating one field preserves the others
+#   ✓ setBranding() rejects a nonexistent organization
+#   ✓ setBranding() rejects malformed brand colors instead of storing bad values
+#   ✓ watermarkOpacity has a safe default and rejects out-of-range values
+#   ✓ an ordinary organization user (no branding permission) cannot modify branding
+#   ✓ an authorized organization administrator (real assigned role + permission) can modify branding
+#   ✓ a completely unrecognized userId is rejected, not defaulted to allowed
+#   ✓ an arbitrary client-supplied "admin" string does not grant authority
+#   ✓ platform administrator (real IdentityEngine authority) can manage any organization's branding
+#   ✓ holding an application-level role alone does not accidentally grant platform authority
+#   ✓ an organization administrator role scoped to a DIFFERENT organization cannot modify this one's branding
+#   ✓ organization A never receives organization B's branding metadata
+#   ✓ a logo asset owned by a DIFFERENT organization is rejected, not silently accepted
+#   ✓ a logo asset genuinely owned by this organization is accepted
+#   ✓ an asset reference is refused (fail closed) when CozyMedia is not loaded at all
+#   ✓ a nonexistent assetId is refused rather than stored as-is
+#   ✓ an unauthorized/ordinary viewer never receives full address, postal code, or contact details
+#   ✓ an authorized organization member DOES receive the full address and contact details
+#   ✓ dashboard-style consumption does not crash when organization has no branding at all
+#   ✓ dashboard-style consumption does not crash when logo/watermark/location are individually absent
+#   ✓ the same branding engine serves unrelated application-style organizations without hardcoding
+#   ✓ setBranding() with no optional fields at all still produces safe defaults, not a crash
+#   ✓ malformed nested input (non-object identity/address/contact) is sanitized, not thrown
+#   ✓ __proto__ / constructor keys in nested input are stripped, not merged into the record
+# 27 passed, 0 failed
+# Subtest: core/organization/tests/organization-branding.test.js
+ok 2 - core/organization/tests/organization-branding.test.js
+  ---
+  duration_ms: 73.779893
+  type: 'test'
+  ...
+# organization-role-extension.test.js
+#   ✓ a role may declare an applicationId
+#   ✓ omitting applicationId keeps prior behavior — null, not required
+#   ✓ the same real org can hold the same person under two separate application-scoped roles
+#   ✓ listRoles({applicationId}) filters correctly and does not leak across applications
+#   ✓ holding a ChurchOS Pastor role never implies platform admin or ShopOS admin authority (data-level check)
+#   ✓ createRole() accepts a valid restrictions array
+#   ✓ createRole() rejects a malformed restriction the same way it rejects a malformed permission
+#   ✓ evaluateCapability(): an explicit permission with no conflicting restriction is allowed
+#   ✓ evaluateCapability(): a capability neither permitted nor restricted is denied by default
+#   ✓ evaluateCapability(): CONFLICT — explicit restriction wins over an explicit permission for the same capability
+#   ✓ evaluateCapability(): an archived role is denied regardless of its declared permissions
+#   ✓ evaluateCapability(): an unknown roleId is denied, not a crash
+#   ✓ capacity disabled (capacityEnforced default false) — unlimited positions even with a capacity number set
+#   ✓ capacity = 0, enforced — refuses to create even the first position
+#   ✓ capacity = 1, enforced — second position of the same name/org/application is refused
+#   ✓ capacity reached exactly — the Nth position succeeds, the (N+1)th is refused
+#   ✓ capacity exceeded attempt does not silently create a role — Nth+1 position count stays at N
+#   ✓ removing (archiving) a position then adding another succeeds once capacity frees up
+#   ✓ capacity is scoped per applicationId — the same role name in a different application has its own independent count
+#   ✓ createRole() rejects a negative or non-integer capacity
+# 20 passed, 0 failed
+# Subtest: core/organization/tests/organization-role-extension.test.js
+ok 3 - core/organization/tests/organization-role-extension.test.js
+  ---
+  duration_ms: 62.091747
+  type: 'test'
+  ...
+#   ✓ capabilities: end user result includes a capabilities array separate from applications
+#   ✓ capabilities: ChurchOS (audience "all") appears in capabilities, not applications
+#   ✓ capabilities: without ChurchOS loaded, no capability is fabricated
+#   ✓ capabilities: admin dashboard also receives a capabilities field
+#   ✓ capabilities: admin/developer-only platform tools never leak into end-user capabilities
+#   ✓ registry: module-registry.js still only registers genuinely shell-integrated applications (no ChurchOS entry)
+#   ✓ launch path: getRealLaunchPath returns null for a capability with no real entry file (honest "not yet launchable")
+#   ✓ launch path: getRealLaunchPath reads entryPoint from the live ServiceRegistry record (no hardcoded list)
+#   ✓ launch path: getRealLaunchPath returns null for an application registered with no entryPoint (honest, not fabricated)
+#   ✓ launch path: getRealLaunchPath returns null for an id that was never registered at all
+# 10 passed, 0 failed
+# Subtest: core/platform/tests/application-visibility.test.js
+ok 4 - core/platform/tests/application-visibility.test.js
+  ---
+  duration_ms: 409.532444
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 50893.469935
+
+FULL REPO REGRESSION: NOT COMPLETED — not attempted this pass (same documented reason as Prompts 9B/10-MID-1/10-MID-2: exceeds practical time budget at ~155 files; unrelated media/camera/audio suites in this tree fail even at baseline due to missing browser globals, confirmed pre-existing, out of scope for an auth slice).

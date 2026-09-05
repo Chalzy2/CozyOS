@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>CozyOS Fake-Device Browser Harness</title></head>
+<body>
+<script src="/lib/cozy-live-audio-segment-shape.js"></script>
+<script src="/lib/cozy-audio-device-manager.js"></script>
+<script src="/lib/cozy-live-participation-controller.js"></script>
+<script src="/lib/cozy-live-audio-segment-publisher.js"></script>
+<script src="/lib/cozy-live-audio-segment-receiver.js"></script>
+<script src="/lib/cozy-live-remote-relay-transport-provider.js"></script>
+<audio id="playback"></audio>
+<script>
+(function () {
+  "use strict";
+  const log = [];
+  window.__log = log;
+  function record(evt, detail) {
+    log.push({ t: Date.now(), evt, detail: detail === undefined ? null : JSON.parse(JSON.stringify(detail, (k, v) => (v instanceof Uint8Array ? "[bytes:" + v.length + "]" : v))) });
+  }
+  window.__record = record;
+
+  const H = {};
+  window.__harness = H;
+
+  H.state = {};
+
+  H.initRole = function (opts) {
+    // opts: { role: 'publisher'|'viewer', url, token, sessionId, userId }
+    const role = opts.role;
+    const transport = new window.CozyOS.CozyLiveRemoteRelayTransportProvider({
+      url: opts.url,
+      getToken: () => opts.token,
+      onEvent: (type, msg) => {
+        record("transport:" + type, msg);
+        if (H.state.participation) H.state.participation.handleTransportEvent(type, msg);
+        if (H.state.receiver) H.state.receiver.handleTransportEvent(type, msg);
+      },
+    });
+    H.state.transport = transport;
+
+    // Host/publisher must reach an authenticated session presence
+    // BEFORE requestToSpeak() can succeed — see
+    // RemoteRelayTransportProvider.connectAsHost() (STEP 4D dependency
+    // A). Viewers already get their connection from joinViewer(),
+    // called separately by the caller (see H.joinViewer below).
+    if (role === "publisher") {
+      transport.connectAsHost(opts.sessionId, opts.userId);
+    }
+
+    const deviceManager = new window.CozyOS.CozyAudioDeviceManager({});
+    H.state.deviceManager = deviceManager;
+
+    const participation = new window.CozyOS.CozyLiveParticipationController({
+      deviceManager,
+      transportProvider: transport,
+      sessionId: opts.sessionId,
+      userId: opts.userId,
+      onEvent: (evt, detail) => record("participation:" + evt, detail),
+    });
+    H.state.participation = participation;
+
+    if (role === "publisher") {
+      const publisher = new window.CozyOS.CozyLiveAudioSegmentPublisher({
+        transportProvider: transport,
+        sessionId: opts.sessionId,
+        publisherId: opts.userId,
+        getSourceLanguage: () => H.state.sourceLanguage || "en-US",
+        onEvent: (evt, detail) => record("publisher:" + evt, detail),
+      });
+      H.state.publisher = publisher;
+    } else {
+      const receiver = new window.CozyOS.CozyLiveAudioSegmentReceiver({
+        transportProvider: transport,
+        sessionId: opts.sessionId,
+        onEvent: (evt, detail) => {
+          record("receiver:" + evt, detail);
+          if (evt === "chunk-ready") {
+            H.state.bytesReceived = (H.state.bytesReceived || 0) + detail.bytes.length;
+          }
+        },
+      });
+      H.state.receiver = receiver;
+    }
+    return { ok: true, role };
+  };
+
+  H.joinViewer = function (sessionId, viewerId) {
+    return H.state.transport.joinViewer(sessionId, viewerId);
+  };
+
+  H.getDeviceCapabilities = async function () {
+    await H.state.deviceManager.initialize();
+    return H.state.deviceManager.getCapabilities();
+  };
+
+  H.requestMicPermission = async function () {
+    const r = await H.state.deviceManager.requestMicrophonePermission();
+    record("mic:permission-result", r);
+    return r;
+  };
+
+  H.enumerateDevices = async function () {
+    const inputs = await H.state.deviceManager.enumerateInputs();
+    const outputs = await H.state.deviceManager.enumerateOutputs();
+    const r = { success: true, devices: inputs.concat(outputs) };
+    record("mic:enumerate-devices", r);
+    return r;
+  };
+
+  H.requestToSpeak = function () {
+    return H.state.participation.requestToSpeak();
+  };
+
+  H.getParticipationState = function () {
+    return H.state.participation.getState();
+  };
+
+  H.startSpeaking = async function () {
+    const r = await H.state.participation.startSpeaking();
+    record("mic:start-speaking-result", { success: r.success, reason: r.reason });
+    if (r.success) H.state.micStream = r.stream;
+    return { success: r.success, reason: r.reason };
+  };
+
+  H.startPublishing = function () {
+    const r = H.state.publisher.start(H.state.micStream);
+    record("publisher:start-result", r);
+    return r;
+  };
+
+  H.finishPublishing = function () {
+    return H.state.publisher.finish();
+  };
+
+  H.getPublisherMetrics = function () {
+    return H.state.publisher.getMetrics();
+  };
+
+  H.getReceiverMetrics = function () {
+    return Object.assign({}, H.state.receiver.getMetrics(), { bytesReceivedByHarness: H.state.bytesReceived || 0 });
+  };
+
+  H.getReceiverCapabilityReport = function () {
+    return H.state.receiver.getCapabilityReport();
+  };
+
+  H.selfMute = function () { return H.state.participation.selfMute(); };
+  H.selfUnmute = function () { return H.state.participation.selfUnmute(); };
+  H.isSelfMuted = function () { return H.state.participation.isSelfMuted(); };
+
+  H.setVolume = function (level) {
+    const el = document.getElementById("playback");
+    return H.state.deviceManager.setPlaybackVolume(el, level);
+  };
+  H.getVolume = function () {
+    return document.getElementById("playback").volume;
+  };
+
+  H.leave = function () { return H.state.participation.leave(); };
+
+  H.grantSpeakToSelf = function (sessionId, userId) {
+    return H.state.transport.requestSpeak ? null : null; // not used directly; grant sent from server side via wire
+  };
+
+  H.sendRaw = function (type, extra) {
+    // generic escape hatch used for grant-speak / revoke-speak self-targeting tests
+    const rec = H.state.transport;
+    return rec[type] ? rec[type](extra.sessionId, extra.targetUserId) : { success: false, reason: "no such method" };
+  };
+
+  H.getLog = function () { return log; };
+  H.clearLog = function () { log.length = 0; };
+
+  record("harness:ready", { role: "unset" });
+})();
+</script>
+</body>
+</html>

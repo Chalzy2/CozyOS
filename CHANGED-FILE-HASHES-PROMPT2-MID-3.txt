@@ -1,0 +1,3 @@
+323e71fe1760492ee18efdf2cf8c5557bca04e730613bb96ed2226b261fcf2f0  core/platform/application-visibility.js
+69cdd6455be80985cee56e004db3ffd36053fb5d3e8664a118df9c7963650d22  core/shell/user-dashboard.js
+7e1f3762b28c2d1ca0e38c81e067837745e0c783606ffa950d91c78768cd86e2  core/platform/tests/application-visibility.test.js

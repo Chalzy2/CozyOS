@@ -1,0 +1,85 @@
+--- fresh_verify/core/shell/user-dashboard.js	2026-08-21 04:25:34.000000000 +0000
++++ checkpoint_stage2/core/shell/user-dashboard.js	2026-08-21 04:33:36.963810644 +0000
+@@ -405,10 +405,22 @@
+ 
+         /**
+          * #renderSettingsSurface()
+-         *   Real preference surface (Prompt 1 §18) — language via
+-         *   IdentityEngine's own real get/setLanguagePreference(), never
+-         *   a second language store. No fake toggle for a control that
+-         *   doesn't actually exist yet.
++         *   Real preference surface (Prompt 1 §18, Prompt 2 §15-16) —
++         *   language via IdentityEngine's own real get/
++         *   setLanguagePreference(), never a second language store. No
++         *   fake toggle for a control that doesn't actually exist yet.
++         *
++         *   ADMIN BOUNDARY (Prompt 2 §15): the "Administrator Workspace"
++         *   link below is gated on this.#dashboardConfig.isPlatformAdmin
++         *   — a real, server/engine-resolved boolean already fetched in
++         *   render() from IdentityEngine.getDashboardConfig(userId).
++         *   This file never derives admin status from any client-side
++         *   value of its own; it only reads what IdentityEngine already
++         *   decided. The target, dashboard.html, is the real, existing,
++         *   already-mounted Administration Workspace (Milestone 175B,
++         *   core/modules/admin/cozy-admin-workspace.js) — not a new
++         *   page and not a fabricated link. Normal (non-admin) users
++         *   never see this section rendered at all (verified by test).
+          */
+         #renderSettingsSurface() {
+             const host = this.#container.querySelector("#cozy-ud-surface-settings");
+@@ -419,6 +431,10 @@
+             if (identity && typeof identity.getUser === "function") { try { user = identity.getUser(this.#userId); } catch (_err) { user = null; } }
+             const currentLang = identity && typeof identity.getLanguagePreference === "function" ? identity.getLanguagePreference(this.#userId) : null;
+             const languages = languageRegistry && typeof languageRegistry.listLanguages === "function" ? languageRegistry.listLanguages() : [];
++            const adminBoundary = window.CozyOS.DashboardSettingsAdminBoundaryCore;
++            const isPlatformAdmin = adminBoundary && typeof adminBoundary.shouldRenderAdminSettingsSection === "function"
++                ? adminBoundary.shouldRenderAdminSettingsSection(this.#dashboardConfig)
++                : false;
+ 
+             host.innerHTML = `
+                 <h3>Settings</h3>
+@@ -428,12 +444,20 @@
+                 </section>
+                 <section id="cozy-ud-settings-language">
+                     <h4>Language</h4>
++                    <p class="cozy-disclosure-note cozy-ud-settings-boundary-tag">User-customizable</p>
+                     ${languages.length ? `
+                         <select id="cozy-ud-settings-language-select">
+                             ${languages.map(l => `<option value="${escapeHtml(l.code)}" ${l.code === currentLang ? "selected" : ""}>${escapeHtml(l.name || l.code)} ${l.state !== "AVAILABLE" ? "(not yet fully supported)" : ""}</option>`).join("")}
+                         </select>` : `<p class="cozy-disclosure-note">Language registry is not connected right now.</p>`}
+                 </section>
+                 <p class="cozy-disclosure-note">Appearance, accessibility, notifications, privacy, and account controls are not yet wired to real settings sources — nothing fake is shown in their place.</p>
++                ${isPlatformAdmin ? `
++                <section id="cozy-ud-settings-admin">
++                    <h4>Administrator Tools</h4>
++                    <p class="cozy-disclosure-note cozy-ud-settings-boundary-tag">Admin-controlled</p>
++                    <p class="cozy-disclosure-note">Your account has platform-administrator access. Application registration, protected-application removal, and platform-wide navigation changes are handled in the real Administration Workspace — never from this ordinary-user dashboard, and never from a client-supplied role.</p>
++                    <button type="button" class="cozy-btn" id="cozy-ud-open-admin-workspace">Open Administrator Workspace</button>
++                </section>` : ``}
+             `;
+             const select = host.querySelector("#cozy-ud-settings-language-select");
+             if (select) {
+@@ -441,6 +465,10 @@
+                     if (identity && typeof identity.setLanguagePreference === "function") identity.setLanguagePreference(this.#userId, select.value);
+                 });
+             }
++            const adminBtn = host.querySelector("#cozy-ud-open-admin-workspace");
++            if (adminBtn) {
++                adminBtn.addEventListener("click", () => { window.location.href = "dashboard.html"; });
++            }
+         }
+ 
+         #renderApps(visibleApps, dashboardConfig) {
+--- fresh_verify/index.html	2026-08-21 04:25:34.000000000 +0000
++++ checkpoint_stage2/index.html	2026-08-21 04:33:37.067156470 +0000
+@@ -123,6 +123,10 @@
+      before user-dashboard.js, which now composes it for the real
+      Home/Community/AI/Apps/Settings shell. -->
+ <script src="core/shell/dashboard-navigation-core.js"></script>
++<!-- Dashboard Prompt 2 §15: pure-logic admin-only Settings-section
++     boundary decision. Composes IdentityEngine.getDashboardConfig()'s
++     real isPlatformAdmin field only - see that file's own header. -->
++<script src="core/shell/dashboard-settings-admin-boundary-core.js"></script>
+ <link rel="stylesheet" href="core/shell/user-dashboard.css">
+ <script src="core/shell/user-dashboard.js"></script>
+ <script src="core/living/cozy-living-assistant.js"></script>

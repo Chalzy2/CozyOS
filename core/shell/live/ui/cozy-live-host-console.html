@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<!--
+  core/shell/live/ui/cozy-live-host-console.html
+  STEP 4D / LIVE UI ENTRY, Patch #2
+
+  Minimal, single-purpose Go Live surface. Deliberately does not touch
+  cozy-living-live-surface-dashboard.html or CozyLiveSession — see
+  PRODUCTION-SPEC-live-host-console.md and the two prior audit
+  checkpoints for why those stay separate.
+
+  Loads, in order: CozyOS.Session (real identity), LDCESessionEngine,
+  LiveRelayCompositionBridge (unused in mesh-only mode but loaded for
+  API completeness of LiveEntryPoint's module contract),
+  LiveEntryPoint, and this page's own controller.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CozyOS — Go Live</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:#0f1115; color:#e8eaed; margin:0; padding:32px 16px; }
+  .card { max-width:420px; margin:0 auto; background:#1a1d24; border-radius:12px; padding:24px; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  p.sub { color:#9aa0a6; font-size:13px; margin:0 0 20px; }
+  button#go-live-btn { width:100%; padding:14px; font-size:15px; font-weight:600; border:none; border-radius:8px; background:#2e7d32; color:#fff; cursor:pointer; }
+  button#go-live-btn:disabled { background:#3c4043; cursor:not-allowed; }
+  #go-live-status { margin-top:16px; font-size:13px; line-height:1.5; }
+  #go-live-status[data-state="live"] { color:#81c995; }
+  #go-live-status[data-state="error"], #go-live-status[data-state="unauthenticated"], #go-live-status[data-state="unavailable"] { color:#f28b82; }
+  code { background:#000; padding:2px 6px; border-radius:4px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Go Live</h1>
+    <p class="sub">Starts a real CozyOS live session (mesh-only).</p>
+    <button id="go-live-btn" type="button">Go Live</button>
+    <div id="go-live-status" role="status"></div>
+
+    <!-- STEP 4D / LIVE UI, PART F — minimal host media controls. Hidden until Go Live succeeds; camera/mic are never started automatically. -->
+    <div id="host-media-panel" hidden style="margin-top:20px;border-top:1px solid #3c4043;padding-top:16px;">
+      <video id="host-local-preview" autoplay playsinline muted style="width:100%;border-radius:8px;background:#000;"></video>
+      <button id="start-media-btn" type="button" style="width:100%;margin-top:12px;padding:12px;font-size:14px;font-weight:600;border:none;border-radius:8px;background:#1a73e8;color:#fff;cursor:pointer;">Start Camera &amp; Mic</button>
+      <button id="stop-media-btn" type="button" hidden style="width:100%;margin-top:8px;padding:12px;font-size:14px;font-weight:600;border:none;border-radius:8px;background:#3c4043;color:#fff;cursor:pointer;">Stop Media</button>
+      <div id="host-media-status" role="status" style="margin-top:10px;font-size:13px;line-height:1.5;"></div>
+    </div>
+  </div>
+
+  <script src="../../../modules/session/firebase-session-bridge.js"></script>
+  <script src="../../../modules/communication/ldce-session-engine.js"></script>
+  <script src="../../../modules/communication/ldce-media-session-engine.js"></script>
+  <script src="../live-relay-composition-bridge.js"></script>
+  <script src="../live-entry-point.js"></script>
+  <script src="../ldce-live-media-coordinator.js"></script>
+  <script src="cozy-live-host-console-controller.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    var btn = document.getElementById('go-live-btn');
+    var status = document.getElementById('go-live-status');
+    var mediaPanel = document.getElementById('host-media-panel');
+    var localPreview = document.getElementById('host-local-preview');
+    var startMediaBtn = document.getElementById('start-media-btn');
+    var stopMediaBtn = document.getElementById('stop-media-btn');
+    var mediaStatus = document.getElementById('host-media-status');
+    var controller = window.CozyOS.LiveHostConsoleController.createController({});
+    var currentSessionId = null;
+
+    function render(state, text) {
+      status.setAttribute('data-state', state);
+      status.textContent = text;
+    }
+    function renderMedia(state, text) {
+      mediaStatus.setAttribute('data-state', state);
+      mediaStatus.textContent = text;
+    }
+
+    btn.addEventListener('click', function () {
+      btn.disabled = true;
+      render('pending', 'Going live…');
+      controller.handleGoLive().then(function (result) {
+        btn.disabled = false;
+        if (!result.success) {
+          render(result.state, result.reason);
+          return;
+        }
+        render('live', 'Live. Session ID: ' + result.sessionId);
+        currentSessionId = result.sessionId;
+        mediaPanel.hidden = false;
+      }).catch(function (err) {
+        btn.disabled = false;
+        render('error', 'Unexpected error: ' + (err && err.message ? err.message : String(err)));
+      });
+    });
+
+    // Explicit consent only on click — never automatic, never on Go Live itself.
+    startMediaBtn.addEventListener('click', function () {
+      if (!currentSessionId) return;
+      startMediaBtn.disabled = true;
+      renderMedia('pending', 'Requesting camera/microphone…');
+      controller.handleStartMedia(currentSessionId, localPreview, {
+        onSecondViewerRejected: function () {
+          renderMedia('live-media-active', 'Live with one viewer. Additional viewers are not supported in this stage.');
+        },
+        onViewerConnectionResult: function (result) {
+          if (result && result.success) {
+            renderMedia('live-media-active', 'Viewer connected.');
+          } else if (result) {
+            // A failed/dropped negotiation frees the one-viewer slot (coordinator-side fix) —
+            // reflect that honestly here instead of leaving the last "Viewer connected." text up.
+            renderMedia('live-media-active', 'Viewer disconnected. Waiting for a viewer…');
+          }
+        },
+      }).then(function (result) {
+        if (!result.success) {
+          startMediaBtn.disabled = false;
+          renderMedia(result.state, result.reason);
+          return;
+        }
+        startMediaBtn.hidden = true;
+        stopMediaBtn.hidden = false;
+        renderMedia('live-media-active', 'Camera/mic active. Waiting for a viewer…');
+      }).catch(function (err) {
+        startMediaBtn.disabled = false;
+        renderMedia('error', 'Unexpected error: ' + (err && err.message ? err.message : String(err)));
+      });
+    });
+
+    stopMediaBtn.addEventListener('click', function () {
+      if (!currentSessionId) return;
+      controller.handleStopMedia(currentSessionId);
+      startMediaBtn.hidden = false;
+      startMediaBtn.disabled = false;
+      stopMediaBtn.hidden = true;
+      renderMedia('stopped', 'Media stopped.');
+    });
+  })();
+  </script>
+</body>
+</html>

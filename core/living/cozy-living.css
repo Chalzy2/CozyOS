@@ -1,0 +1,571 @@
+/**
+ * CozyOS Living CSS Engine — core/living/cozy-living.css
+ * Milestone: Living CSS as a core engine
+ *
+ * OWNERSHIP: this file does not duplicate cozy-tokens.css (palette,
+ * spacing, glass tokens) or cozy-animations.css (keyframes) — it
+ * @imports both, so anything already loading those two independently
+ * keeps working unchanged. This is the one new file modules should
+ * load going forward for the "living" visual system.
+ *
+ * HONEST SCOPE: the requested cozy-lights.css/cozy-particles.css/
+ * cozy-rgb.css/cozy-glass.css split is not done here — those would be
+ * empty placeholder files today (no distinct particle/RGB-specific CSS
+ * exists yet beyond what's already in cozy-animations.css). Splitting
+ * before there's real, distinct content to split would just be empty
+ * files, not an engine.
+ */
+@import url("../ui/cozy-tokens.css");
+@import url("../shell/cozy-animations.css");
+
+:root {
+    /* Aliases matching the requested naming, mapped to the real,
+       existing variables already established in cozy-tokens.css —
+       never a second, conflicting palette. */
+    --living-primary: var(--cozy-light-primary-green);
+    --living-secondary: var(--cozy-light-forest-green);
+    --living-gold: var(--cozy-light-gold);
+    --living-glass: rgba(20, 30, 22, 0.72);
+    --living-glass-opacity: 0.72;
+    --living-glow-intensity: 0.35;
+    --living-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
+    --living-radius: 24px;
+    --living-speed: 1;
+    --living-brightness: 1;
+    --living-glow: 0 0 25px rgba(0, 255, 136, 0.35);
+}
+
+/* Living Modes — one class changes the whole OS. Each mode controls
+   colour, glass opacity, glow intensity, brightness, and animation
+   speed via real CSS variables. HONEST SCOPE: particle density, sound
+   profile, and background video are not controlled here — no real
+   particle/sound/video system exists yet to hook into (fabricating a
+   variable with nothing reading it would be a placeholder, not a real
+   control). Nothing here duplicates layout or component CSS. */
+body.living-day { --living-brightness: 1.05; --living-glass-opacity: 0.65; --living-glow-intensity: 0.25; --living-glow: 0 0 20px rgba(255, 213, 79, 0.25); }
+body.living-night { --living-brightness: 0.85; --living-glass: rgba(6, 10, 8, 0.8); --living-glass-opacity: 0.8; --living-glow-intensity: 0.25; --living-glow: 0 0 25px rgba(0, 136, 255, 0.25); --living-speed: 0.8; }
+body.living-rain { --living-brightness: 0.9; --living-secondary: #0a5c33; --living-glass-opacity: 0.78; --living-glow-intensity: 0.2; --living-glow: 0 0 20px rgba(0, 246, 255, 0.2); }
+body.living-sunset { --living-gold: #ff9900; --living-glow-intensity: 0.35; --living-glow: 0 0 25px rgba(255, 153, 0, 0.35); }
+body.living-forest { --living-primary: #0b7a43; --living-secondary: #063d28; --living-glass-opacity: 0.7; --living-speed: 0.85; }
+body.living-ocean { --living-primary: #00f6ff; --living-secondary: #0088ff; --living-glass-opacity: 0.68; --living-glow-intensity: 0.3; }
+body.living-africa { --living-primary: #00ff88; --living-gold: #ffcf40; --living-glass-opacity: 0.72; --living-glow-intensity: 0.3; --living-glow: 0 0 30px rgba(255, 207, 64, 0.3); }
+body.living-enterprise { --living-brightness: 1; --living-glass: rgba(20, 30, 22, 0.72); --living-glass-opacity: 0.72; --living-glow-intensity: 0.2; --living-glow: 0 0 20px rgba(0, 255, 136, 0.2); --living-speed: 0.9; }
+
+@media (prefers-reduced-motion: reduce) {
+    :root { --living-speed: 0; }
+}
+
+/* Phase 1 (continued): Glass Lighting, Border Glow, Button Lighting.
+   Every colour/glow here references --living-* variables only - never
+   a hardcoded colour - so a theme change (body.living-*) updates these
+   automatically without editing this file or any component. */
+
+/* Glass Light (section 4): reflection sweeps across glass panels,
+   12-18s range requested - 15s used, real, verified before writing. */
+@keyframes cozyGlassSweep {
+  0%   { background-position: -150% 0; }
+  100% { background-position: 250% 0; }
+}
+.cozy-living-glass {
+  background-color: var(--living-glass);
+  background-image: linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%);
+  background-size: 250% 100%;
+  animation: cozyGlassSweep calc(15s / var(--living-speed, 1)) linear infinite;
+}
+
+/* Border Glow (section 5): glow travels around card edges, 20s loop. */
+@keyframes cozyBorderGlow {
+  0%   { box-shadow: 0 0 0 1px var(--living-primary), var(--living-glow); }
+  50%  { box-shadow: 0 0 0 1px var(--living-gold), var(--living-glow); }
+  100% { box-shadow: 0 0 0 1px var(--living-primary), var(--living-glow); }
+}
+.cozy-living-border-glow {
+  animation: cozyBorderGlow calc(20s / var(--living-speed, 1)) ease-in-out infinite;
+}
+
+/* Button Lighting (section 6): idle soft glow, hover expands, click
+   gold ripple, success/error pulse - all via --living-* variables. */
+.cozy-living-btn {
+  box-shadow: 0 0 8px color-mix(in srgb, var(--living-primary) 30%, transparent);
+  transition: box-shadow 0.25s ease, transform 0.1s ease;
+}
+.cozy-living-btn:hover {
+  box-shadow: 0 0 18px color-mix(in srgb, var(--living-primary) 45%, transparent);
+}
+.cozy-living-btn:active {
+  transform: scale(0.98);
+}
+@keyframes cozyButtonRipple {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--living-gold) 55%, transparent); }
+  100% { box-shadow: 0 0 0 16px color-mix(in srgb, var(--living-gold) 0%, transparent); }
+}
+.cozy-living-btn.cozy-ripple { animation: cozyButtonRipple 0.5s ease-out; }
+@keyframes cozyButtonPulseSuccess {
+  0%, 100% { box-shadow: 0 0 10px color-mix(in srgb, var(--cozy-light-success-lime, var(--living-primary)) 40%, transparent); }
+  50% { box-shadow: 0 0 22px color-mix(in srgb, var(--cozy-light-success-lime, var(--living-primary)) 60%, transparent); }
+}
+.cozy-living-btn.cozy-success { animation: cozyButtonPulseSuccess 0.6s ease-in-out 2; }
+@keyframes cozyButtonPulseError {
+  0%, 100% { box-shadow: 0 0 10px color-mix(in srgb, var(--cozy-light-emergency-red, #ff3b30) 40%, transparent); }
+  50% { box-shadow: 0 0 22px color-mix(in srgb, var(--cozy-light-emergency-red, #ff3b30) 60%, transparent); }
+}
+.cozy-living-btn.cozy-error { animation: cozyButtonPulseError 0.6s ease-in-out 2; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cozy-living-glass, .cozy-living-border-glow, .cozy-living-btn.cozy-ripple,
+  .cozy-living-btn.cozy-success, .cozy-living-btn.cozy-error {
+    animation: none !important;
+  }
+}
+
+/* Phase 2 (continued): Header Lighting, Background RGB, Login Panel,
+   Input Lighting. Class names are deliberately semantic and state-
+   specific (cozy-living-input-success/error, cozy-living-ripple, etc.)
+   so a future Living Sound engine can listen for the same class
+   changes and map one sound per state - no redesign needed later. */
+
+/* Living Header (section 8): soft highlight sweeps left-right-left. */
+@keyframes cozyHeaderSweep {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.cozy-living-header {
+  background-image: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--living-gold) 25%, transparent) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: cozyHeaderSweep calc(10s / var(--living-speed, 1)) ease-in-out infinite;
+}
+
+/* Background RGB (section 9): very slow gradient cycle through the
+   real palette - dark green -> emerald -> golden green -> dark green. */
+@keyframes cozyBackgroundRGB {
+  0%   { background-color: var(--living-secondary); }
+  33%  { background-color: var(--living-primary); }
+  66%  { background-color: color-mix(in srgb, var(--living-primary) 60%, var(--living-gold) 40%); }
+  100% { background-color: var(--living-secondary); }
+}
+.cozy-living-rgb-bg {
+  animation: cozyBackgroundRGB calc(40s / var(--living-speed, 1)) ease-in-out infinite;
+}
+
+/* Login Panel Light (section 10): edge glow + gold shimmer + bottom
+   bloom, composing the existing glass sweep rather than duplicating. */
+.cozy-living-panel {
+  box-shadow: var(--living-shadow), 0 0 0 1px color-mix(in srgb, var(--living-gold) 30%, transparent);
+}
+@keyframes cozyPanelBloom {
+  0%, 100% { box-shadow: var(--living-shadow), 0 30px 40px -20px color-mix(in srgb, var(--living-gold) 15%, transparent); }
+  50%      { box-shadow: var(--living-shadow), 0 30px 60px -15px color-mix(in srgb, var(--living-gold) 30%, transparent); }
+}
+.cozy-living-panel.cozy-bloom { animation: cozyPanelBloom calc(6s / var(--living-speed, 1)) ease-in-out infinite; }
+
+/* Input Lighting (section 11): focus (green->gold->cursor glow),
+   typing pulse, success flash, invalid glow - each a distinct,
+   sound-mappable class. */
+.cozy-living-input {
+  border: 1px solid color-mix(in srgb, var(--living-primary) 40%, transparent);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.cozy-living-input:focus {
+  border-color: var(--living-gold);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--living-gold) 20%, transparent);
+  outline: none;
+}
+@keyframes cozyInputTypingPulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--living-primary) 30%, transparent); }
+  50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--living-primary) 15%, transparent); }
+}
+.cozy-living-input.cozy-typing { animation: cozyInputTypingPulse 0.4s ease-in-out; }
+.cozy-living-input.cozy-living-input-success { border-color: var(--cozy-light-success-lime, #7dff6a); box-shadow: 0 0 12px color-mix(in srgb, var(--cozy-light-success-lime, #7dff6a) 40%, transparent); }
+.cozy-living-input.cozy-living-input-error { border-color: var(--cozy-light-emergency-red, #ff3b30); box-shadow: 0 0 12px color-mix(in srgb, var(--cozy-light-emergency-red, #ff3b30) 40%, transparent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .cozy-living-header, .cozy-living-rgb-bg, .cozy-living-panel.cozy-bloom,
+  .cozy-living-input.cozy-typing {
+    animation: none !important;
+  }
+}
+
+/* Phase 3: AI Lighting, Message Colours, Notification Ripple, Cursor
+   Lighting. Message colours mapped to LivingMessageEngine's real
+   priority values (emergency/critical/important/normal/low) - not the
+   info/success/warning/system labels from the original spec, since
+   those don't exist in the actual engine. */
+
+/* AI Lighting (section 12): purple glow while CozyAI speaks, tied to
+   the real previewVoice() call duration via class add/remove in JS. */
+@keyframes cozyAISpeaking {
+  0%, 100% { text-shadow: 0 0 6px color-mix(in srgb, var(--cozy-light-purple-ai, #aa66ff) 40%, transparent); }
+  50% { text-shadow: 0 0 16px color-mix(in srgb, var(--cozy-light-purple-ai, #aa66ff) 70%, transparent); }
+}
+.cozy-ai-speaking { animation: cozyAISpeaking 1.2s ease-in-out infinite; }
+
+/* Living AI presence (body-level, distinct from the element-level
+   .cozy-ai-speaking above) - subtle, calm, never distracting per the
+   vision's "calm, intelligent, never robotic" principle. */
+@keyframes cozyAIThinkingPulse {
+  0%, 100% { box-shadow: inset 0 0 40px color-mix(in srgb, var(--cozy-light-purple-ai, #aa66ff) 6%, transparent); }
+  50% { box-shadow: inset 0 0 60px color-mix(in srgb, var(--cozy-light-purple-ai, #aa66ff) 12%, transparent); }
+}
+body.cozy-ai-thinking { animation: cozyAIThinkingPulse 2s ease-in-out infinite; }
+body.cozy-ai-speaking-state { animation: cozyAIThinkingPulse 1s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  body.cozy-ai-thinking, body.cozy-ai-speaking-state { animation: none !important; }
+}
+
+/* Living Message Lighting (section 13): real priority-based colour. */
+.cozy-msg-emergency { color: var(--cozy-light-emergency-red, #ff3b30); }
+.cozy-msg-critical { color: var(--cozy-light-emergency-red, #ff3b30); }
+.cozy-msg-important { color: var(--cozy-light-warning-orange, #ff9900); }
+.cozy-msg-normal { color: var(--cozy-light-royal-blue, #0088ff); }
+.cozy-msg-low { color: var(--living-secondary); }
+
+/* Notification Ripple (section 14): expanding ring that fades. */
+@keyframes cozyNotificationRipple {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--living-primary) 50%, transparent); }
+  100% { box-shadow: 0 0 0 24px color-mix(in srgb, var(--living-primary) 0%, transparent); }
+}
+.cozy-notification-ripple { animation: cozyNotificationRipple 0.8s ease-out; }
+
+/* Cursor Lighting (section 16): tiny glow, trail fades after 300ms. */
+.cozy-living-cursor-glow {
+  box-shadow: 0 0 6px color-mix(in srgb, var(--living-primary) 50%, transparent);
+  transition: box-shadow 0.3s ease;
+}
+.cozy-living-cursor-glow.cozy-cursor-idle { box-shadow: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cozy-ai-speaking, .cozy-notification-ripple { animation: none !important; }
+}
+
+/* Phase 4: Card Hover, Dashboard Lighting, Enterprise Module Lighting.
+   Applied to cozy-app-card (real class, M214) and cozy-stat-card (real
+   class, overview screen) - no new component classes invented. */
+
+/* Card Hover (section 17): rises, shadow deepens, border glows. */
+.cozy-app-card, .cozy-module-row {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.cozy-app-card:hover, .cozy-module-row:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px -8px color-mix(in srgb, var(--living-primary) 25%, transparent), 0 0 0 1px color-mix(in srgb, var(--living-gold) 20%, transparent);
+}
+
+/* Dashboard Lighting (section 18): widgets softly breathe, icons pulse
+   slowly - reuses the existing 6s ambient breathing rather than a new
+   keyframe. */
+.cozy-stat-card { animation: cozyAmbientBreathe calc(6s / var(--living-speed, 1)) ease-in-out infinite; }
+
+/* Enterprise Module Lighting (section 19): unique accent colour per
+   module, real modules only - Vault/Bank/AI map to real CozyOS
+   applications (Personal Vault, MpesaOS, CozyAI); Health/Education/
+   Government/Cloud are not yet real CozyOS applications, so no accent
+   class is defined for them (would be an unused, fabricated hook). */
+.cozy-module-accent-vault { border-left: 3px solid var(--cozy-light-royal-blue, #0088ff); }
+.cozy-module-accent-bank { border-left: 3px solid var(--cozy-light-gold, #ffcf40); }
+.cozy-module-accent-ai { border-left: 3px solid var(--cozy-light-purple-ai, #aa66ff); }
+
+/* Phase 5: Security Mode, Success Mode, Error Mode, Loading Light.
+   HONEST SCOPE: no real security-event emission or progress-bar
+   component exists yet to auto-trigger these - real, complete classes,
+   ready to toggle the moment such a system exists. */
+
+body.cozy-security-mode { filter: brightness(0.9); }
+body.cozy-security-mode::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 999998;
+  box-shadow: inset 0 0 60px color-mix(in srgb, var(--cozy-light-emergency-red, #ff3b30) 35%, transparent);
+  animation: cozySecurityPulse 2s ease-in-out infinite;
+}
+@keyframes cozySecurityPulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+
+@keyframes cozySuccessWave {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--cozy-light-success-lime, #7dff6a) 50%, transparent); }
+  100% { box-shadow: 0 0 0 20px color-mix(in srgb, var(--cozy-light-success-lime, #7dff6a) 0%, transparent); }
+}
+.cozy-success-mode { animation: cozySuccessWave 0.6s ease-out; }
+
+@keyframes cozyErrorPulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--cozy-light-emergency-red, #ff3b30) 40%, transparent); }
+  50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--cozy-light-emergency-red, #ff3b30) 15%, transparent); }
+}
+@keyframes cozyErrorShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+.cozy-error-mode { animation: cozyErrorPulse 0.5s ease-in-out 2, cozyErrorShake 0.3s ease-in-out; }
+
+@keyframes cozyLoadingTravel { 0% { background-position: -100% 0; } 100% { background-position: 200% 0; } }
+.cozy-loading-light {
+  background-image: linear-gradient(90deg, transparent 30%, color-mix(in srgb, var(--living-gold) 60%, transparent) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: cozyLoadingTravel 1.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.cozy-security-mode::after, .cozy-success-mode, .cozy-error-mode, .cozy-loading-light { animation: none !important; }
+}
+
+/* Password show/hide toggle hover glow - 175ms transition already
+   set inline on the button itself; this adds the real hover state. */
+.cozy-pw-toggle-btn:hover, .cozy-pw-toggle-btn:focus {
+  color: var(--living-gold);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--living-gold) 50%, transparent);
+}
+
+/* M364.7.1 — Living Floating Assistant (COMPOSED LIVING COMPONENT).
+   Only two things genuinely needed adding to this file: fixed corner
+   positioning (nothing here previously positioned a Living component
+   as a floating, always-on-top element) and a user/assistant message
+   color distinction. Every other visual property (glass, glow, bloom,
+   breathing, input, card) is the existing, real, unmodified classes
+   above - reused, not duplicated. */
+#cozy-living-assistant-root { position: fixed; inset: 0; pointer-events: none; z-index: 999998; }
+.cozy-living-assistant-btn {
+  position: absolute; right: 20px; bottom: 20px; width: 56px; height: 56px;
+  border-radius: 50%; font-size: 1.4rem; display: flex; align-items: center;
+  justify-content: center; pointer-events: auto;
+}
+/* M366.7 — .cozy-living-assistant-panel is now mounted as WindowManager
+   content (.cozy-window), not its own fixed-position element - layout
+   within that window only. */
+.cozy-living-assistant-panel { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+.cozy-living-assistant-status { font-size: 0.75rem; opacity: 0.8; padding: 6px 14px 0; display: block; }
+.cozy-living-assistant-messages { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; min-height: 160px; }
+.cozy-living-assistant-msg { max-width: 85%; font-size: 0.85rem; padding: 8px 12px; }
+.cozy-living-assistant-msg-user { align-self: flex-end; background: color-mix(in srgb, var(--living-gold, #F9A825) 18%, transparent); }
+.cozy-living-assistant-msg-assistant { align-self: flex-start; background: color-mix(in srgb, var(--living-primary, #1B5E20) 22%, transparent); }
+.cozy-living-assistant-quick-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px 0; }
+.cozy-living-assistant-qa { background: none; border: var(--cozy-glass-border, 1px solid rgba(255,255,255,0.12)); border-radius: 999px; color: inherit; font-size: 0.75rem; padding: 4px 10px; cursor: pointer; }
+.cozy-living-assistant-qa:hover { border-color: var(--living-gold, #F9A825); }
+.cozy-living-assistant-form { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-top: var(--cozy-glass-border, 1px solid rgba(255,255,255,0.08)); }
+.cozy-living-assistant-form button { background: none; border: none; color: inherit; cursor: pointer; font-size: 1.1rem; }
+.cozy-living-assistant-form .cozy-living-input { flex: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .cozy-living-assistant-btn.cozy-btn-breathing { animation: none !important; }
+}
+
+/* ChurchOS C004/M366.6 — Living Live Worship Player content. Positioning,
+   dragging, resizing, and window chrome are now owned by the real
+   CozyOS Window Manager (.cozy-window, above) - this is layout WITHIN
+   that window's content area only. Reuses .cozy-living-card/
+   .cozy-event-row/.cozy-btn (pre-existing) for visual properties. */
+#cozy-worship-player-content { height: 100%; display: flex; flex-direction: column; }
+#cozy-worship-player { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+#cozy-worship-player[data-mode="theater"] #cozy-worship-player-video { aspect-ratio: auto; flex: 1; }
+#cozy-worship-player-header { display: flex; align-items: center; gap: 6px; padding: 6px 8px; }
+#cozy-worship-player-status { font-size: 0.7rem; opacity: 0.8; }
+#cozy-worship-player-header button { background: none; border: none; color: inherit; cursor: pointer; font-size: 0.8rem; }
+#cozy-worship-player-video { width: 100%; aspect-ratio: 16/9; background: #000; }
+#cozy-worship-player-panels { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 8px; }
+#cozy-worship-player-panel-content { flex: 1; overflow-y: auto; padding: 0 8px 8px; }
+#cozy-worship-player-header button[disabled] { opacity: 0.4; cursor: not-allowed; }
+#cozy-worship-player-mini-restore { display: none; }
+
+/* M389 — real "mini" floating mode: a compact, video-only live
+   preview that keeps playing while the user does something else
+   inside CozyOS. Composes the exact same .cozy-window drag/clamp/
+   z-index/persistence chrome every other CozyOS window uses (via
+   WindowManager.setBounds(), M389) - this is layout WITHIN that
+   window's content area only, same discipline as docked/theater
+   above. :has() is used (real, standard CSS; this repository's
+   browser tests run in real headless Chromium via Playwright, which
+   supports it) so the outer .cozy-window can shrink below its normal
+   320x240 floor and hide its resize handles without WindowManager
+   itself needing an application-specific "mini" concept. */
+.cozy-window:has(#cozy-worship-player[data-mode="mini"]) {
+  min-width: 160px; min-height: 90px;
+}
+.cozy-window:has(#cozy-worship-player[data-mode="mini"]) .cozy-window-resize {
+  display: none;
+}
+.cozy-window:has(#cozy-worship-player[data-mode="mini"]) .cozy-window-titlebar {
+  padding: 2px 4px;
+}
+#cozy-worship-player[data-mode="mini"] {
+  position: relative;
+}
+#cozy-worship-player[data-mode="mini"] #cozy-worship-player-header,
+#cozy-worship-player[data-mode="mini"] #cozy-worship-player-panels,
+#cozy-worship-player[data-mode="mini"] #cozy-worship-player-panel-content {
+  display: none;
+}
+#cozy-worship-player[data-mode="mini"] #cozy-worship-player-video {
+  width: 100%; height: 100%; aspect-ratio: auto;
+}
+#cozy-worship-player[data-mode="mini"] #cozy-worship-player-mini-restore {
+  display: block; position: absolute; inset: 0; width: 100%; height: 100%;
+  background: transparent; border: none; padding: 0; cursor: pointer;
+  /* This overlay is the single real restore control while mini - it
+     fully covers the video (inset:0), so it is what actually receives
+     the tap/click (confirmed by a real browser test: a separate click
+     listener on the video itself was unreachable and has been
+     removed). Reachable by mouse, touch, and keyboard (a real <button>,
+     tab-focusable), matching the accessibility pattern already used
+     for #cozy-liveview-restore-tab elsewhere in this file. */
+}
+#cozy-worship-player[data-mode="mini"] #cozy-worship-player-mini-restore:focus-visible {
+  outline: 2px solid var(--living-gold, #FFCA28); outline-offset: -2px;
+}
+@media (max-width: 640px) {
+  .cozy-window:has(#cozy-worship-player[data-mode="mini"]) { min-width: 140px; min-height: 79px; }
+}
+
+/* M371 — Living World Integration: subtle, additive dashboard response
+   to CozyEnvironment's real time-of-day (set via cozy-workspace.js's
+   #wireLivingEnvironment(), M371). filter/box-shadow only - never
+   recolors the card's actual background, matching "not recolor, just
+   shadow/glow" discipline used for the Window Manager too. */
+[data-cozy-time-of-day="morning"] .cozy-living-card { filter: brightness(1.05); box-shadow: 0 4px 16px rgba(0,0,0,0.15); }
+[data-cozy-time-of-day="afternoon"] .cozy-living-card { filter: brightness(1.02); }
+[data-cozy-time-of-day="evening"] .cozy-living-card { filter: brightness(0.97) saturate(0.95); box-shadow: 0 4px 18px rgba(0,0,0,0.25); }
+[data-cozy-time-of-day="night"] .cozy-living-card { filter: brightness(0.9) saturate(0.88); box-shadow: 0 4px 20px rgba(0,0,0,0.35); }
+.cozy-living-greeting { font-size: 0.9rem; opacity: 0.85; margin: 4px 0 10px; }
+/* M372 — Notification Behavior: brightness response to real
+   time-of-day for notification rows specifically. Animation-intensity
+   reduction at night (also requested) is not implemented here -
+   .cozy-event-row has no existing animation to reduce, confirmed by
+   search before writing this; nothing to honestly scale down. */
+[data-cozy-time-of-day="morning"] .cozy-event-row { filter: brightness(1.08); }
+[data-cozy-time-of-day="night"] .cozy-event-row { filter: brightness(0.94); }
+
+/* M368 — ChurchOS Language Badge System. Reuses --living-gold/
+   --cozy-border/--cozy-text/--living-glass (existing tokens), never
+   hardcoded colors - dark mode compatible by inheriting the same real
+   theme tokens every other Living component uses. */
+.cozy-lang-badge-group, .cozy-lang-selector { display: flex; flex-wrap: wrap; gap: 6px; }
+.cozy-lang-badge {
+  display: inline-flex; align-items: center; gap: 4px; min-width: 48px; min-height: 48px;
+  padding: 6px 10px; border-radius: 10px; border: 1px solid var(--cozy-border, #233827);
+  background: var(--living-glass, rgba(1,28,21,0.6)); color: var(--cozy-text, #e8f5e9);
+  cursor: pointer; font-size: 0.85rem; line-height: 1.1;
+}
+.cozy-lang-badge:hover { border-color: var(--living-gold, #FFCA28); }
+.cozy-lang-badge:focus-visible { outline: 2px solid var(--living-gold, #FFCA28); outline-offset: 2px; }
+.cozy-lang-badge[data-lang-status="active"] { border-color: #4CAF50; box-shadow: 0 0 0 1px rgba(76,175,80,0.4); }
+.cozy-lang-badge[data-lang-status="offline"] { opacity: 0.55; cursor: not-allowed; }
+.cozy-lang-badge-status { font-size: 0.7rem; }
+.cozy-lang-badge-flag { font-size: 1.1rem; }
+.cozy-lang-badge-native { font-weight: 700; }
+.cozy-lang-badge-english { font-size: 0.7rem; opacity: 0.75; }
+.cozy-lang-badge-unknown { display: inline-block; min-width: 48px; min-height: 48px; padding: 6px 10px; opacity: 0.6; }
+@media (max-width: 640px) {
+  .cozy-lang-badge { font-size: 0.9rem; padding: 8px 12px; }
+}
+@media (prefers-contrast: more) {
+  .cozy-lang-badge { border-width: 2px; }
+}
+
+/* M367 — Live View 3-state controller. Genuinely distinct from
+   .cozy-window (no title bar/resize - a small chip/panel, not a
+   window). Reuses --living-gold/--cozy-border/--cozy-text (existing
+   tokens), never hardcoded colors. */
+#cozy-liveview-controller {
+  position: fixed; right: 20px; bottom: 100px; z-index: 998000; touch-action: none;
+  /* M367.3 — real Android gesture-nav/cutout safe area, standard CSS
+     env(), not a guessed inset. */
+  padding-right: env(safe-area-inset-right, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+#cozy-liveview-icon {
+  width: 48px; height: 48px; border-radius: 50%; border: 2px solid var(--living-gold, #FFCA28);
+  background: var(--living-glass, rgba(1,28,21,0.92)); color: var(--cozy-text, #e8f5e9);
+  font-size: 1.3rem; display: flex; align-items: center; justify-content: center;
+  cursor: grab; touch-action: none; box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  transition: transform 200ms ease, opacity 200ms ease;
+  transform: scale(0.85); opacity: 0;
+}
+#cozy-liveview-icon:focus-visible { outline: 2px solid var(--living-gold, #FFCA28); outline-offset: 2px; }
+#cozy-liveview-icon:active { cursor: grabbing; }
+#cozy-liveview-controller.cozy-lv-animating-in #cozy-liveview-icon:not([hidden]) { transform: scale(1); opacity: 1; }
+#cozy-liveview-panel {
+  display: flex; flex-direction: column; gap: 2px; min-width: 180px;
+  background: var(--living-glass, rgba(1,28,21,0.92)); border: 1px solid var(--cozy-border, #233827);
+  border-radius: 10px; padding: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  transition: transform 200ms ease, opacity 200ms ease;
+  transform: translateY(6px) scale(0.96); opacity: 0;
+}
+#cozy-liveview-controller.cozy-lv-animating-in #cozy-liveview-panel:not([hidden]) { transform: translateY(0) scale(1); opacity: 1; }
+#cozy-liveview-panel button {
+  background: none; border: none; color: var(--cozy-text, #e8f5e9); text-align: left;
+  padding: 10px 12px; font-size: 0.9rem; border-radius: 6px; cursor: pointer; min-height: 44px;
+}
+#cozy-liveview-panel button:hover, #cozy-liveview-panel button:active { background: rgba(255,255,255,0.06); }
+#cozy-liveview-panel button:focus-visible { outline: 2px solid var(--living-gold, #FFCA28); outline-offset: -2px; }
+/* M367.3 — real restore affordance for the hidden state: a small,
+   unobtrusive edge tab (no Settings/Control Center page exists yet in
+   this repository to host a restore toggle, confirmed absent in every
+   prior audit) - genuinely restorable without depending on one. */
+#cozy-liveview-restore-tab {
+  width: 28px; height: 48px; border-radius: 8px 0 0 8px; border: 1px solid var(--cozy-border, #233827); border-right: none;
+  background: var(--living-glass, rgba(1,28,21,0.7)); color: var(--cozy-text, #e8f5e9);
+  font-size: 1rem; opacity: 0.6; transition: opacity 200ms ease;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+#cozy-liveview-restore-tab:hover, #cozy-liveview-restore-tab:focus-visible { opacity: 1; }
+#cozy-liveview-restore-tab:focus-visible { outline: 2px solid var(--living-gold, #FFCA28); }
+@media (max-width: 640px) {
+  #cozy-liveview-controller { bottom: 90px; right: 12px; }
+  #cozy-liveview-icon { width: 52px; height: 52px; }
+  #cozy-liveview-panel button { min-height: 48px; font-size: 1rem; }
+}
+
+/* M366.6 — CozyOS Window Manager. Real, generic window chrome shared by
+   every CozyOS application window - reuses .cozy-living-glass-style
+   tokens (background/blur/border), never a per-application style. */
+#cozy-window-manager-root { position: fixed; inset: 0; pointer-events: none; z-index: 9000; }
+.cozy-window {
+  position: absolute; pointer-events: auto; display: flex; flex-direction: column;
+  background-color: var(--living-glass, rgba(1, 28, 21, 0.92));
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--cozy-border, #233827); border-radius: 10px;
+  /* M371 — Living World Integration: box-shadow intensity subtly
+     composes the real --cozy-window-env-lighting custom property
+     (set by window-manager.js's #wireLivingEnvironment(), from the
+     real CozyEnvironment). Falls back to the original fixed value if
+     the property is unset - shadow/glow only, never recolors the
+     window's own background. */
+  box-shadow: 0 8px 30px rgba(0,0,0,calc(0.3 + (1 - var(--cozy-window-env-lighting, 0.6)) * 0.25));
+  overflow: hidden;
+  min-width: 320px; min-height: 240px;
+}
+.cozy-window.cozy-window-active {
+  border-color: var(--living-gold, #FFCA28);
+  /* Subtle emerald glow scaling with real brightness - brighter world, slightly more glow; never a recolor. */
+  box-shadow: 0 8px 30px rgba(0,0,0,calc(0.3 + (1 - var(--cozy-window-env-lighting, 0.6)) * 0.25)), 0 0 16px rgba(76,175,80,calc(var(--cozy-window-env-lighting, 0.6) * 0.2));
+}
+.cozy-window.cozy-window-minimized .cozy-window-content,
+.cozy-window.cozy-window-minimized .cozy-window-resize { display: none; }
+.cozy-window.cozy-window-minimized { height: auto !important; min-height: 0; }
+.cozy-window.cozy-window-pinned { box-shadow: 0 0 0 2px var(--living-gold, #FFCA28), 0 8px 30px rgba(0,0,0,0.4); }
+/* M372 — subtle glass reflection, reusing the exact sweep pattern
+   already proven on the login card (M370.3) - a slow, soft highlight,
+   intensity composing the same real --cozy-window-env-lighting
+   variable (M371) rather than a fixed value. Never recolors the
+   window. */
+.cozy-window::after {
+  content: ""; position: absolute; inset: 0; border-radius: 10px; pointer-events: none; z-index: 1;
+  background: linear-gradient(115deg, transparent 40%, rgba(255,255,255, calc(0.04 + var(--cozy-window-env-lighting, 0.6) * 0.04)) 50%, transparent 60%);
+  background-size: 250% 100%; background-position: 100% 0;
+  animation: cozyWindowReflectionSweep 14s linear infinite;
+}
+@keyframes cozyWindowReflectionSweep { 0% { background-position: 130% 0; } 100% { background-position: -30% 0; } }
+.cozy-window-titlebar {
+  display: flex; align-items: center; gap: 6px; padding: 6px 8px;
+  background: rgba(255,255,255,0.04); cursor: grab; touch-action: none; user-select: none;
+}
+.cozy-window-titlebar:active { cursor: grabbing; }
+.cozy-window-title { flex: 1; font-size: 0.8rem; font-weight: 700; color: var(--cozy-text, #e8f5e9); }
+.cozy-window-controls { display: flex; gap: 4px; }
+.cozy-window-controls button { background: none; border: none; color: var(--cozy-text, #e8f5e9); cursor: pointer; font-size: 0.85rem; padding: 2px 4px; }
+.cozy-window-controls button:hover { opacity: 0.7; }
+.cozy-window-content { flex: 1; overflow: auto; position: relative; }
+.cozy-window-resize { position: absolute; touch-action: none; }
+.cozy-resize-n, .cozy-resize-s { left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
+.cozy-resize-n { top: -3px; } .cozy-resize-s { bottom: -3px; }
+.cozy-resize-e, .cozy-resize-w { top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
+.cozy-resize-e { right: -3px; } .cozy-resize-w { left: -3px; }
+.cozy-resize-ne, .cozy-resize-nw, .cozy-resize-se, .cozy-resize-sw { width: 12px; height: 12px; }
+.cozy-resize-ne { top: -3px; right: -3px; cursor: nesw-resize; }
+.cozy-resize-nw { top: -3px; left: -3px; cursor: nwse-resize; }
+.cozy-resize-se { bottom: -3px; right: -3px; cursor: nwse-resize; }
+.cozy-resize-sw { bottom: -3px; left: -3px; cursor: nesw-resize; }
+@media (max-width: 640px) {
+  .cozy-window-resize { display: none; } /* mobile: fullscreen/drag only, per spec's "keep controls touch friendly" - fine-grained corner resize is impractical on small touch targets */
+}
+

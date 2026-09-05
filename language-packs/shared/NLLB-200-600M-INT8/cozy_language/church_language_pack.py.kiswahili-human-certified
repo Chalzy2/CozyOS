@@ -1,0 +1,678 @@
+"""
+CozyOS Church Language Pack
+Kiswahili church-context normalization and interpretation.
+"""
+
+CHURCH_PHRASES = {
+    # Greetings
+    "habari ya leo?":
+        "How are you today?",
+
+    "habari za leo?":
+        "How are you today?",
+
+    "habari zenu siku ya leo?":
+        "How are you today?",
+
+    "habar ya leo?":
+        "How are you today?",
+
+    # Christian greetings
+    "bwana yesu asifiwe":
+        "Praise the Lord Jesus!",
+
+    "bwana yesu asifiwe!":
+        "Praise the Lord Jesus!",
+
+    "bwana asifiwe":
+        "Praise the Lord!",
+
+    "bwana asifiwe!":
+        "Praise the Lord!",
+
+    # Blessings
+    "mungu awabariki":
+        "May God bless you.",
+
+    "mungu awabariki sana":
+        "May God richly bless you.",
+
+    # Congregation
+    "ndugu zangu":
+        "My brethren.",
+
+    "karibu katika ibada ya leo":
+        "Welcome to today's service.",
+
+    "karibuni katika ibada ya leo":
+        "Welcome to today's service.",
+
+    "karibuni katika ibada":
+        "Welcome to the service.",
+
+    # Worship
+    "leo tunamshukuru mungu kwa wema wake.":
+        "Today we are grateful to God for His goodness.",
+
+    "amen":
+        "Amen.",
+
+    "haleluya":
+        "Hallelujah!",
+
+    "hallelujah":
+        "Hallelujah!",
+}
+
+
+WORD_CORRECTIONS = {
+    # Common speech-recognition errors
+    "habar": "habari",
+    "zenyu": "zenu",
+    "Kar8buni": "Karibuni",
+
+    # OCR/STT-like number substitutions
+    "kar8buni": "karibuni",
+    "kar8buni": "karibuni",
+
+    # Church vocabulary
+    "kaniani": "kanisani",
+}
+
+
+def normalize_words(text):
+
+    result = text.strip()
+
+    for wrong, right in WORD_CORRECTIONS.items():
+        result = result.replace(wrong, right)
+
+    return result
+
+
+def lookup_phrase(text):
+
+    key = text.strip().lower()
+
+    return CHURCH_PHRASES.get(key)
+
+
+def normalize(text):
+
+    normalized = normalize_words(text)
+
+    # IMPORTANT:
+    # phrase lookup happens AFTER normalization.
+    interpretation = lookup_phrase(normalized)
+
+    return {
+        "original": text,
+        "normalized": normalized,
+        "interpretation": interpretation,
+        "matched": interpretation is not None,
+    }
+
+
+# ============================================================
+# KISWAHILI HUMAN LANGUAGE LAYER
+# ============================================================
+# Human-taught conversational meanings.
+#
+# This layer intentionally sits ABOVE the NLLB fallback.
+# It captures common natural Kiswahili expressions before
+# machine translation is attempted.
+# ============================================================
+
+HUMAN_SW_PHRASES = {
+    # --------------------------------------------------------
+    # GREETINGS
+    # --------------------------------------------------------
+    "habari?": "Hello / How are you?",
+    "habari": "Hello / How are you?",
+    "habari yako?": "How are you?",
+    "habari yako": "How are you?",
+    "habari zenu?": "How are you all?",
+    "habari zenu": "How are you all?",
+    "habari za asubuhi?": "Good morning / How are you this morning?",
+    "habari za asubuhi": "Good morning / How are you this morning?",
+    "habari za mchana?": "Good afternoon / How are you this afternoon?",
+    "habari za mchana": "Good afternoon / How are you this afternoon?",
+    "habari za jioni?": "Good evening / How are you this evening?",
+    "habari za jioni": "Good evening / How are you this evening?",
+    "hujambo?": "Hello / How are you?",
+    "hujambo": "Hello / How are you?",
+    "hamjambo?": "Hello / How are you all?",
+    "hamjambo": "Hello / How are you all?",
+    "mambo?": "Hi / What's up?",
+    "mambo": "Hi / What's up?",
+    "vipi?": "Hi / How are things?",
+    "vipi": "Hi / How are things?",
+
+    # --------------------------------------------------------
+    # NATURAL RESPONSES
+    # --------------------------------------------------------
+    "nzuri": "I'm fine / Good.",
+    "nzuri sana": "I'm very well.",
+    "salama": "I'm fine / All is well.",
+    "niko salama": "I'm fine / I'm safe.",
+    "tuko salama": "We are fine / We are safe.",
+    "poa": "Fine / Cool.",
+    "safi": "Good / Fine.",
+    "shwari": "All is calm / All is well.",
+    "naam": "Yes.",
+    "ndio": "Yes.",
+    "ndiyo": "Yes.",
+    "hapana": "No.",
+    "sawa": "Okay / Alright.",
+    "sawa kabisa": "Absolutely okay / Perfect.",
+    "hakuna shida": "No problem.",
+    "hamna shida": "No problem.",
+    "asante": "Thank you.",
+    "asante sana": "Thank you very much.",
+    "ahsante": "Thank you.",
+    "ahsante sana": "Thank you very much.",
+
+    # --------------------------------------------------------
+    # POLITENESS
+    # --------------------------------------------------------
+    "tafadhali": "Please.",
+    "samahani": "Excuse me / I'm sorry.",
+    "pole": "I'm sorry / Sorry about that.",
+    "pole sana": "I'm very sorry.",
+    "karibu": "Welcome / You're welcome.",
+    "karibuni": "Welcome, everyone / Welcome all.",
+    "shikamoo": "Respectful greeting to an elder.",
+    "marahaba": "Respectful response to 'Shikamoo.'",
+
+    # --------------------------------------------------------
+    # EVERYDAY QUESTIONS
+    # --------------------------------------------------------
+    "uko wapi?": "Where are you?",
+    "uko wapi": "Where are you?",
+    "mko wapi?": "Where are you all?",
+    "mko wapi": "Where are you all?",
+    "unaendeleaje?": "How are you doing?",
+    "unaendeleaje": "How are you doing?",
+    "mnaendeleaje?": "How are you all doing?",
+    "mnaendeleaje": "How are you all doing?",
+    "unafanya nini?": "What are you doing?",
+    "unafanya nini": "What are you doing?",
+    "mnafanya nini?": "What are you all doing?",
+    "mnafanya nini": "What are you all doing?",
+    "umefika?": "Have you arrived?",
+    "umefika?": "Have you arrived?",
+    "umefika": "You have arrived / Have you arrived?",
+    "unaweza kunisaidia?": "Can you help me?",
+    "unaweza kunisaidia": "Can you help me?",
+    "unaweza kusaidia?": "Can you help?",
+    "unaweza kusaidia": "Can you help?",
+    "unakwenda wapi?": "Where are you going?",
+    "unaenda wapi?": "Where are you going?",
+    "umeenda wapi?": "Where did you go?",
+    "uko salama?": "Are you safe?",
+    "uko sawa?": "Are you okay?",
+    "upo sawa?": "Are you okay?",
+
+    # --------------------------------------------------------
+    # BASIC HUMAN CONVERSATION
+    # --------------------------------------------------------
+    "nimeelewa": "I understand.",
+    "sijaelewa": "I don't understand.",
+    "naelewa": "I understand.",
+    "sielemwi": "I don't understand.",
+    "sijui": "I don't know.",
+    "najua": "I know.",
+    "nadhani": "I think.",
+    "naamini": "I believe.",
+    "subiri": "Wait.",
+    "subiri kidogo": "Wait a little.",
+    "ngojea": "Wait.",
+    "ngojea kidogo": "Wait a moment.",
+    "njoo": "Come.",
+    "nenda": "Go.",
+    "kaa": "Stay / Sit.",
+    "endelea": "Continue.",
+    "anza": "Start / Begin.",
+    "acha": "Stop / Leave it.",
+    "tazama": "Look / Watch.",
+    "sikiliza": "Listen.",
+    "sema": "Speak / Say it.",
+    "niambie": "Tell me.",
+    "nirudie": "Repeat that for me.",
+    "usijali": "Don't worry.",
+    "hakuna haja": "There is no need.",
+    "ni sawa": "It's okay.",
+    "sawa tu": "It's okay / It's fine.",
+}
+
+HUMAN_SW_VARIANTS = {
+    # Common informal / speech variants
+    "habari yako": "habari yako?",
+    "habari za leo": "habari za leo?",
+    "habari ya leo": "habari ya leo?",
+    "hujambo": "hujambo?",
+    "hamjambo": "hamjambo?",
+    "mambo": "mambo?",
+    "vipi": "vipi?",
+    "uko wapi": "uko wapi?",
+    "unaendeleaje": "unaendeleaje?",
+    "unafanya nini": "unafanya nini?",
+    "unaweza kunisaidia": "unaweza kunisaidia?",
+}
+
+def interpret_human_kiswahili(text):
+    """
+    Interpret common natural Kiswahili conversation.
+
+    Returns an English interpretation for known human expressions,
+    otherwise None so the normal church/NLLB pipeline can continue.
+    """
+    if not isinstance(text, str):
+        return None
+
+    normalized = normalize_words(text)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    lowered = normalized.lower()
+
+    # Direct human phrase
+    meaning = HUMAN_SW_PHRASES.get(lowered)
+    if meaning is not None:
+        return meaning
+
+    # Known variant -> canonical human phrase
+    canonical = HUMAN_SW_VARIANTS.get(lowered)
+    if canonical is not None:
+        return HUMAN_SW_PHRASES.get(canonical)
+
+    return None
+
+
+# ============================================================
+# DYNAMIC CHURCH SEMANTIC INTERPRETATION
+# ============================================================
+
+import re
+
+
+def interpret_church_sentence(text):
+    """
+    Interprets church phrases that contain variable names,
+    locations, ministries, or organizations.
+
+    Example:
+        Karibuni kanisani Mavueni Newlife Kilifi
+        ->
+        Welcome to our church, Mavueni Newlife Kilifi
+    """
+
+    normalized = normalize_words(text).strip()
+
+    # Normalize whitespace
+    normalized = re.sub(r"\s+", " ", normalized)
+
+    lowered = normalized.lower()
+
+    # --------------------------------------------------------
+    # WELCOME TO OUR CHURCH
+    # --------------------------------------------------------
+    # Standalone church welcome
+    if lowered in ("karibuni kanisani", "karibu kanisani"):
+        return "Welcome to our church."
+
+    prefixes = (
+        "karibuni kanisani ",
+        "karibuni kanisani, ",
+        "karibu kanisani ",
+        "karibu kanisani, ",
+    )
+
+    for prefix in prefixes:
+
+        if lowered.startswith(prefix):
+            names = normalized[len(prefix):].strip()
+
+            if names:
+                return f"Welcome to our church, {names}."
+
+            return "Welcome to our church."
+
+    # --------------------------------------------------------
+    # WELCOME TO THE SERVICE
+    # --------------------------------------------------------
+    if lowered == "karibuni katika ibada":
+        return "Welcome to the service."
+
+    if lowered == "karibuni katika ibada ya leo":
+        return "Welcome to today's service."
+
+    # --------------------------------------------------------
+    # COMMON CHURCH EXPRESSIONS
+    # --------------------------------------------------------
+    if lowered == "habari ya leo?":
+        return "How are you today?"
+
+    if lowered == "habari za leo?":
+        return "How are you today?"
+
+    if lowered == "habari zenu siku ya leo?":
+        return "How are you today?"
+
+    if lowered == "bwana yesu asifiwe!":
+        return "Praise the Lord Jesus!"
+
+    if lowered == "bwana yesu asifiwe":
+        return "Praise the Lord Jesus!"
+
+    if lowered == "bwana asifiwe!":
+        return "Praise the Lord!"
+
+    if lowered == "bwana asifiwe":
+        return "Praise the Lord!"
+
+    if lowered == "mungu awabariki":
+        return "May God bless you."
+
+    if lowered == "mungu awabariki sana":
+        return "May God richly bless you."
+
+    if lowered == "ndugu zangu":
+        return "My brethren."
+
+    if lowered == "leo tunamshukuru mungu kwa wema wake.":
+        return "Today we are grateful to God for His goodness."
+
+    if lowered == "mungu akubariki":
+        return "May God bless you."
+
+    if lowered == "tumsifu mungu":
+        return "Let us praise God."
+
+    if lowered == "tuombe":
+        return "Let us pray."
+
+    return None
+
+# ============================================================
+# HUMAN LAYER 2
+
+# ============================================================
+# HUMAN LAYER 2 — EVERYDAY KISWAHILI
+# Agreement, disagreement, feelings, requests, conversation
+# control, and natural everyday responses.
+# ============================================================
+
+HUMAN_KISWAHILI_LAYER_2 = {
+    # --------------------------------------------------------
+    # AGREEMENT / DISAGREEMENT
+    # --------------------------------------------------------
+    "ndio": "Yes.",
+    "ndiyo": "Yes.",
+    "ndio kabisa": "Yes, absolutely.",
+    "ndiyo kabisa": "Yes, absolutely.",
+    "sawa": "Okay.",
+    "sawa kabisa": "Absolutely / Okay, definitely.",
+    "hapana": "No.",
+    "labda": "Maybe.",
+    "ni kweli": "It's true.",
+    "sio kweli": "That's not true.",
+    "si kweli": "That's not true.",
+    "nakubaliana": "I agree.",
+    "sikubaliani": "I disagree.",
+    "nimekubali": "I agree / I accept.",
+    "sitaki": "I don't want to.",
+    "nataka": "I want to.",
+
+    # --------------------------------------------------------
+    # FEELINGS / CONDITION
+    # --------------------------------------------------------
+    "niko sawa": "I'm okay.",
+    "niko vizuri": "I'm doing well.",
+    "siko sawa": "I'm not okay.",
+    "nimechoka": "I'm tired.",
+    "nina furaha": "I'm happy.",
+    "nina huzuni": "I'm sad.",
+    "nina hasira": "I'm angry.",
+    "ninaogopa": "I'm afraid.",
+    "nina wasiwasi": "I'm worried.",
+    "nimefurahi": "I'm happy / I'm glad.",
+    "nimekasirika": "I'm angry / upset.",
+    "ninaumwa": "I'm sick / I'm feeling unwell.",
+    "nahisi vizuri": "I feel good.",
+    "nahisi vibaya": "I feel bad / unwell.",
+
+    # --------------------------------------------------------
+    # REQUESTS / HELP
+    # --------------------------------------------------------
+    "nisaidie": "Help me.",
+    "naomba msaada": "I need help, please.",
+    "naomba unisaidie": "Please help me.",
+    "tafadhali nisaidie": "Please help me.",
+    "naomba": "Please / I kindly ask.",
+    "naomba tafadhali": "Please.",
+    "nirudie tena": "Repeat that for me.",
+    "sema tena": "Say it again.",
+    "ongea polepole": "Speak slowly.",
+    "zungumza polepole": "Speak slowly.",
+    "nieleze": "Explain it to me.",
+    "niambie zaidi": "Tell me more.",
+    "nisaidie kuelewa": "Help me understand.",
+
+    # --------------------------------------------------------
+    # CONVERSATION CONTROL
+    # --------------------------------------------------------
+    "endelea": "Continue.",
+    "endelea tu": "Just continue.",
+    "acha": "Stop / Leave it.",
+    "acha hivyo": "Leave it like that.",
+    "ngojea": "Wait.",
+    "subiri": "Wait.",
+    "subiri kidogo": "Wait a little.",
+    "rudia": "Repeat.",
+    "rudia tena": "Repeat again.",
+    "nisikilize": "Listen to me.",
+    "nipe muda": "Give me some time.",
+    "tulia": "Calm down.",
+    "usijali": "Don't worry.",
+    "sawa tu": "It's okay / It's fine.",
+    "hakuna shida": "No problem.",
+    "hakuna tatizo": "No problem.",
+    "usijali kabisa": "Don't worry at all.",
+
+    # --------------------------------------------------------
+    # UNDERSTANDING / CONFUSION
+    # --------------------------------------------------------
+    "nimeelewa": "I understand.",
+    "sijaelewa": "I don't understand.",
+    "sielewi": "I don't understand.",
+    "sijui": "I don't know.",
+    "najua": "I know.",
+    "sasa nimeelewa": "Now I understand.",
+    "nimepata": "I understand / I get it.",
+    "sijapata": "I don't understand / I didn't get it.",
+}
+
+def interpret_human_kiswahili_layer_2(text):
+    """
+    Human-style everyday Kiswahili interpretation layer 2.
+
+    Handles common agreement, disagreement, feelings,
+    requests, conversation control, and understanding phrases.
+    """
+    if not isinstance(text, str):
+        return None
+
+    normalized = normalize_words(text).strip()
+    normalized = re.sub(r"\s+", " ", normalized)
+    lowered = normalized.lower()
+
+    # Remove ordinary sentence punctuation for natural input.
+    lookup = lowered.rstrip("?!.,;:")
+
+    return HUMAN_KISWAHILI_LAYER_2.get(lookup)
+
+
+# Extend the main human interpreter without disturbing Layer 1.
+_HUMAN_LAYER_1 = interpret_human_kiswahili
+
+def interpret_human_kiswahili(text):
+    result = _HUMAN_LAYER_1(text)
+    if result is not None:
+        return result
+
+    return interpret_human_kiswahili_layer_2(text)
+
+# ============================================================
+# HUMAN LAYER 3
+
+# ============================================================
+# HUMAN LAYER 3 — KISWAHILI DAILY LIFE
+# Family, relationships, everyday activities, food, money,
+# buying/selling, movement, and directions.
+# ============================================================
+
+HUMAN_KISWAHILI_LAYER_3 = {
+
+    # --------------------------------------------------------
+    # FAMILY / RELATIONSHIPS
+    # --------------------------------------------------------
+    "mama yangu": "My mother.",
+    "baba yangu": "My father.",
+    "dada yangu": "My sister.",
+    "kaka yangu": "My brother.",
+    "ndugu yangu": "My sibling / My relative.",
+    "rafiki yangu": "My friend.",
+    "mume wangu": "My husband.",
+    "mke wangu": "My wife.",
+    "mtoto wangu": "My child.",
+    "watoto wangu": "My children.",
+    "familia yangu": "My family.",
+    "wazazi wangu": "My parents.",
+    "nina familia": "I have a family.",
+    "nina watoto": "I have children.",
+    "niko na familia": "I am with my family.",
+
+    # --------------------------------------------------------
+    # EVERYDAY LIFE
+    # --------------------------------------------------------
+    "nimeamka": "I have woken up.",
+    "ninaamka": "I am waking up.",
+    "ninalala": "I am sleeping / I am going to sleep.",
+    "nimeenda kulala": "I have gone to sleep.",
+    "ninaenda": "I am going.",
+    "nimefika": "I have arrived.",
+    "niko njiani": "I am on the way.",
+    "niko nyumbani": "I am at home.",
+    "niko kazini": "I am at work.",
+    "niko shule": "I am at school.",
+    "ninafanya kazi": "I am working.",
+    "nimeshughulika": "I am busy.",
+    "sina muda": "I don't have time.",
+    "nina muda": "I have time.",
+    "nitarudi": "I will return.",
+    "nitarudi baadaye": "I will return later.",
+    "tutaonana": "See you.",
+    "tutaonana baadaye": "See you later.",
+    "kwaheri": "Goodbye.",
+    "kwa heri": "Goodbye.",
+
+    # --------------------------------------------------------
+    # FOOD / DRINK
+    # --------------------------------------------------------
+    "nina njaa": "I'm hungry.",
+    "nina kiu": "I'm thirsty.",
+    "nimekula": "I have eaten.",
+    "sijakula": "I haven't eaten.",
+    "nakula": "I'm eating.",
+    "ninakunywa": "I'm drinking.",
+    "naomba maji": "Please give me water.",
+    "maji tafadhali": "Water, please.",
+    "chakula kiko tayari": "The food is ready.",
+    "chakula kiko wapi": "Where is the food?",
+    "tupike": "Let's cook.",
+    "twende tukale": "Let's go and eat.",
+    "chakula ni kizuri": "The food is good.",
+    "nimeshiba": "I'm full.",
+    "bado sijashiba": "I'm not full yet.",
+
+    # --------------------------------------------------------
+    # MONEY / BUYING / SELLING
+    # --------------------------------------------------------
+    "bei gani": "How much is it?",
+    "ni bei gani": "How much is it?",
+    "hii ni bei gani": "How much is this?",
+    "hii ni ya bei gani": "How much does this cost?",
+    "ni shilingi ngapi": "How many shillings?",
+    "ina gharama gani": "How much does it cost?",
+    "ni ghali": "It's expensive.",
+    "ni rahisi": "It's cheap / affordable.",
+    "punguza bei": "Lower the price.",
+    "punguza kidogo": "Reduce it a little.",
+    "hiyo ni bei kubwa": "That's a high price.",
+    "hiyo ni bei nzuri": "That's a good price.",
+    "nitanunua": "I will buy it.",
+    "sitaki kununua": "I don't want to buy it.",
+    "nauza": "I am selling.",
+    "unanunza": "You are buying.",
+    "unanunua": "You are buying.",
+    "unaweza kupunguza bei": "Can you lower the price?",
+    "nina pesa": "I have money.",
+    "sina pesa": "I don't have money.",
+    "nitalipa": "I will pay.",
+    "nimelipa": "I have paid.",
+    "lipa kwanza": "Pay first.",
+    "leta chenji": "Bring the change.",
+    "naomba risiti": "Please give me a receipt.",
+
+    # --------------------------------------------------------
+    # MOVEMENT / DIRECTIONS
+    # --------------------------------------------------------
+    "uko wapi": "Where are you?",
+    "upo wapi": "Where are you?",
+    "unaenda wapi": "Where are you going?",
+    "unatoka wapi": "Where are you coming from?",
+    "ninaenda mjini": "I am going to town.",
+    "niko mjini": "I am in town.",
+    "niko hapa": "I am here.",
+    "njoo hapa": "Come here.",
+    "njoo huku": "Come this way.",
+    "enda huko": "Go there.",
+    "fuata njia hii": "Follow this route.",
+    "geuka kushoto": "Turn left.",
+    "geuka kulia": "Turn right.",
+    "enda moja kwa moja": "Go straight.",
+    "uko karibu": "You are nearby.",
+    "uko mbali": "You are far away.",
+    "ni mbali": "It is far.",
+    "ni karibu": "It is near.",
+    "nimepotea": "I am lost.",
+    "naomba unielekeze": "Please show me the way.",
+    "kituo kiko wapi": "Where is the station?",
+}
+
+def interpret_human_kiswahili_layer_3(text):
+    """
+    Human-style everyday Kiswahili interpretation layer 3.
+
+    Covers family, daily life, food, money, commerce,
+    movement, and directions.
+    """
+    if not isinstance(text, str):
+        return None
+
+    normalized = normalize_words(text).strip()
+    normalized = re.sub(r"\s+", " ", normalized)
+    lookup = normalized.lower().rstrip("?!.,;:")
+
+    return HUMAN_KISWAHILI_LAYER_3.get(lookup)
+
+
+# Extend the existing human interpreter with Layer 3.
+_HUMAN_LAYER_2 = interpret_human_kiswahili
+
+def interpret_human_kiswahili(text):
+    result = _HUMAN_LAYER_2(text)
+
+    if result is not None:
+        return result
+
+    return interpret_human_kiswahili_layer_3(text)

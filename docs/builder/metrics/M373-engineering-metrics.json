@@ -1,0 +1,58 @@
+{
+  "generated_by": "Cozy Builder — Rule 55 Continuous Improvement & Version Evolution",
+  "note": "First metrics record filed under Rule 55. Prior milestones (M144-M372) were not retroactively scored under this schema; this file establishes the M373 baseline going forward. Future milestones should append a new dated entry to history[] rather than overwrite this file.",
+  "milestone": "M373",
+  "date": "2026-08-05",
+  "history": [
+    {
+      "milestone": "M373",
+      "date": "2026-08-05",
+      "bugs_found_in_analyzed_repository": 0,
+      "bugs_found_in_builder_own_code": 0,
+      "bugs_fixed": 0,
+      "duplicate_modules_reduced": 0,
+      "duplicate_modules_detected": 5,
+      "architecture_violations_reduced": 0,
+      "circular_dependencies_detected": 19,
+      "syntax_errors_in_new_code": 0,
+      "regression_count": 0,
+      "build_success_rate": 1.0,
+      "validation_success_rate": 1.0,
+      "validation_runs": [
+        { "type": "node_check_syntax", "result": "PASS" },
+        { "type": "node_runtime_harness_synthetic", "files": 2, "injected_defects": 6, "detected_defects": 6, "result": "PASS" },
+        { "type": "node_runtime_harness_full_repository", "files": 484, "elapsed_ms": 456, "findings_emitted": 1548, "errors": 0, "result": "PASS" }
+      ],
+      "builder_analysis_accuracy": null,
+      "builder_analysis_accuracy_note": "No ground-truth-labeled corpus exists yet to score Tier A/B findings against; not fabricated as a number.",
+      "average_repair_confidence": null,
+      "average_repair_confidence_note": "Not applicable this milestone — Layer 3 is analysis-only, per Decision 4; no repairs were performed.",
+      "findings_by_type": {
+        "duplicate-module-candidate": 5,
+        "circular-dependency": 19,
+        "event-no-observed-consumer": 529,
+        "event-no-observed-producer": 16,
+        "broken-interface-candidate": 796,
+        "version-compatibility-issue": 2,
+        "large-complex-module": 45,
+        "security-heuristic:eval-call": 6,
+        "security-heuristic:unsafe-innerhtml": 33,
+        "security-heuristic:inline-event-handler": 5,
+        "security-heuristic:function-constructor": 4,
+        "static-leak-heuristic:unmatched-addeventlistener": 87,
+        "static-leak-heuristic:unmatched-setinterval": 1
+      },
+      "open_registry_entries_at_milestone_end": {
+        "AA": 2,
+        "MD": 2,
+        "DC": 3,
+        "DI": 3,
+        "SF": 4,
+        "PF": 1,
+        "RG": 0
+      },
+      "rules_in_effect": 55,
+      "rules_adopted_this_milestone": ["Rule 54 (final version)", "Rule 55"]
+    }
+  ]
+}

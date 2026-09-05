@@ -1,0 +1,58 @@
+--- /home/claude/p10-verify/core/modules/security/authentication-settings-module.js	2026-08-22 02:57:17.000000000 +0000
++++ core/modules/security/authentication-settings-module.js	2026-08-22 05:25:03.987710777 +0000
+@@ -29,7 +29,7 @@
+ (function () {
+     "use strict";
+     window.CozyOS = window.CozyOS || {};
+-    const MODULE_VERSION = "1.0.0";
++    const MODULE_VERSION = "1.1.0"; // Prompt 10 STEP A: Google Login stub's whatsNeededNext additively discloses the new real google-account-link-client.js building block — no status/enrollment fields changed.
+ 
+     window.CozyOS.Modules = window.CozyOS.Modules || {};
+     if (window.CozyOS.Modules["authentication-settings"] && window.CozyOS.Modules["authentication-settings"].version) return;
+@@ -306,7 +306,26 @@
+     function buildFingerprintFactor() { return buildStubFactor({ id: "fingerprint", label: "Fingerprint", registryName: "fingerprint", globalName: "FingerprintProvider", ownerModule: "core/security/fingerprint-provider.js", backendKind: "fingerprint-hardware" }); }
+     function buildFaceFactor() { return buildStubFactor({ id: "face", label: "Face Authentication", registryName: "face", globalName: "FaceProvider", ownerModule: "core/security/face-provider.js", backendKind: "face-recognition" }); }
+     function buildVoiceAuthFactor() { return buildStubFactor({ id: "voice-auth", label: "Voice Authentication", registryName: "voice", globalName: "VoiceProvider", ownerModule: "core/security/voice-provider.js", backendKind: "voice-recognition" }); }
+-    function buildGoogleLoginFactor() { return buildStubFactor({ id: "google-login", label: "Google Login", registryName: "google-account", globalName: "GoogleAccountProvider", ownerModule: "core/security/google-account-provider.js", backendKind: "OAuth" }); }
++    function buildGoogleLoginFactor() {
++        const stub = buildStubFactor({ id: "google-login", label: "Google Login", registryName: "google-account", globalName: "GoogleAccountProvider", ownerModule: "core/security/google-account-provider.js", backendKind: "OAuth" });
++        // Prompt 10 STEP A — real, additive disclosure only (no status
++        // flip, no fabricated enrollment). A real, tested browser->server
++        // client (core/security/google-account-link-client.js) now exists
++        // and can genuinely call the real server/auth/account-link-server.js
++        // boundary (POST /auth/session/issue + /auth/google/link — both
++        // real, both covered by real HTTP-server tests). What is still
++        // genuinely missing, confirmed by repository search this
++        // milestone: (1) any "Link Google" click surface anywhere in this
++        // UI to call it from, and (2) a real Google Identity Services SDK
++        // + configured OAuth client ID to obtain an actual Google ID
++        // token in the browser. Neither is built here — building either
++        // now would mean adding new login UI or fabricating a sign-in
++        // flow, both out of scope for this slice.
++        if (stub && typeof stub === "object") {
++            stub.whatsNeededNext = `${stub.whatsNeededNext} A real browser->server client now exists (core/security/google-account-link-client.js, 10/10 tests against a real HTTP server) — still needed: (a) a "Link Google" UI click surface to call it, (b) the real Google Identity Services SDK + a configured OAuth client ID to obtain a genuine ID token in-browser.`;
++        }
++        return stub;
++    }
+ 
+     /**
+      * buildMicrosoftLoginFactor() (Step 4)
+--- /home/claude/p10-verify/dashboard.html	2026-08-22 02:57:17.000000000 +0000
++++ dashboard.html	2026-08-22 05:25:15.706450222 +0000
+@@ -768,6 +768,16 @@
+     <script src="core/security/face-provider.js"></script>
+     <script src="core/security/voice-provider.js"></script>
+     <script src="core/security/google-account-provider.js"></script>
++    <!-- Prompt 10 STEP A: google-account-link-client.js — real, additive
++         browser-side client for server/auth/account-link-server.js's
++         two real HTTP routes (/auth/session/issue, /auth/google/link).
++         Independent of AuthFactorRegistry (calls a server, not a local
++         provider) — loaded here purely so it is reachable on this page
++         at all (same "no dead code" principle as the M357 fix above),
++         not because authentication-settings-module.js calls it yet (it
++         doesn't — see that file's buildGoogleLoginFactor() comment).
++         No click handler anywhere on this page calls it this slice. -->
++    <script src="core/security/google-account-link-client.js"></script>
+     <!-- Milestone 358: persistent authentication enrollment lifecycle/metadata store.
+          Loads after AuthFactorRegistry and all real providers so factor-name
+          validation (isKnownFactor) has real data to check against. -->

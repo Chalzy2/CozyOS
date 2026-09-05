@@ -1,0 +1,22 @@
+--- a/core/modules/identity/identity-engine.js
++++ b/core/modules/identity/identity-engine.js
+@@ register() user record construction
+             const user = {
+                 id, publicId, username: this.#escapeHtml(username), firstName: this.#escapeHtml(firstName), lastName: this.#escapeHtml(lastName),
+                 email: this.#escapeHtml(email), phone: this.#escapeHtml(phone), orgId, roles, status: "active",
++                // Prompt 8 §5 — real, additive field describing ONLY how
++                // this account was originally established, never which
++                // factor it must use forever (see login-decision-engine.js
++                // and AuthFactorSnapshot, which treat this as
++                // reporting-only). register() always collects
++                // email+phone+password today, so "email" is the honest
++                // value for every account created through this path; a
++                // future Google-only or phone-only registration path
++                // would set this to "google"/"phone" at its own creation
++                // point instead of here.
++                registrationMethod: "email",
+                 salt: Array.from(salt), hash, createdAt: new Date().toISOString(), delegates: [], failedAttempts: 0, lockedUntil: null,
+
+NEW FILES (no diff — additive):
+  core/security/auth-factor-snapshot.js
+  core/security/test/auth-factor-snapshot.test.js

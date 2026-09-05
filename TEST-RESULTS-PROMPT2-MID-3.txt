@@ -1,0 +1,65 @@
+=== NEW TEST: core/platform/tests/application-visibility.test.js ===
+  ✓ capabilities: end user result includes a capabilities array separate from applications
+  ✓ capabilities: ChurchOS (audience "all") appears in capabilities, not applications
+  ✓ capabilities: without ChurchOS loaded, no capability is fabricated
+  ✓ capabilities: admin dashboard also receives a capabilities field
+  ✓ capabilities: admin/developer-only platform tools never leak into end-user capabilities
+  ✓ registry: module-registry.js still only registers genuinely shell-integrated applications (no ChurchOS entry)
+  ✓ launch path: getRealLaunchPath returns null for a capability with no real entry file (honest "not yet launchable")
+
+7 passed, 0 failed
+=== REGRESSION: core/shell/tests/dashboard-navigation-core.test.js ===
+  ✓ navigation: exactly five surfaces exist
+  ✓ navigation: Home exists
+  ✓ navigation: Community exists
+  ✓ navigation: AI exists
+  ✓ navigation: Apps exists
+  ✓ navigation: Settings exists
+  ✓ navigation: exact required order, Community immediately after Home
+  ✓ navigation: fails the test if Community is moved away from immediately after Home
+  ✓ navigation: default active surface is home
+  ✓ navigation: Home -> Community -> AI -> Apps -> Settings -> Home
+  ✓ navigation: only the current destination is ever active (no dual-active state)
+  ✓ navigation: switching to a non-existent surface is refused, not silently accepted
+  ✓ navigation: onChange listener fires with active/previous on real switch
+  ✓ identity: real user language preference is consumed, not hardcoded
+  ✓ language: an unregistered/NOT_READY requested language honestly falls back
+  ✓ language: English fallback is real and reachable (registry's own English-first order)
+  ✓ language: with no CozyLanguageRegistry loaded, honestly reports unavailable rather than fabricating a code
+  ✓ apps: AI context application list is consulted from real registry+visibility, not hardcoded
+  ✓ apps: an unregistered/unassigned fake app is never presented as available
+  ✓ AI: context is a structured object, not free-text/DOM scraping
+  ✓ AI: context never includes private identity fields (no roles/companyId/orgId leak)
+  ✓ AI: with no real knowledge pipeline loaded, honestly reports disconnected rather than claiming Community integration
+  ✓ Community: real knowledge pipeline entry point is connected when loaded
+  ✓ Community: candidate/verified state is read from the real pipeline, never fabricated by this file
+  ✓ AI: communityStateSummary is available and aggregate-only when the real summary module is loaded
+  ✓ AI: communityStateSummary honestly reports unavailable when DashboardCommunitySummaryCore is not loaded
+  ✓ AI: communityStateSummary honestly reports unavailable when no knowledge pipeline is loaded at all
+  ✓ Administrator authority: this file exposes no registry-mutating call
+  ✓ Administrator authority: normal (non-admin) user context never implies platform-admin capability
+
+29 passed, 0 failed
+=== REGRESSION: core/shell/tests/dashboard-community-summary-core.test.js ===
+  ✓ summary: with zero records, every bucket is a real empty array, not omitted
+  ✓ summary: a freshly submitted CANDIDATE lands in Pending Review, never Community Verified
+  ✓ summary: a rejected record lands in Rejected via the real reject() path
+  ✓ summary: a disputed record lands in Needs Correction, never Community Verified
+  ✓ summary: falls back to raw reviewState honestly when CozyKnowledgeReview is not loaded (never crashes, never fabricates)
+  ✓ summary: myContributions is always honestly reported as unavailable, never a fabricated filtered list
+  ✓ summary: counts always match bucket array lengths (no drift between the two)
+  ✓ summary: never mutates the input records array or its objects
+
+8 passed, 0 failed
+=== REGRESSION: core/shell/tests/dashboard-settings-admin-boundary-core.test.js ===
+  ✓ boundary: null/undefined config is refused, not treated as admin
+  ✓ boundary: a real, unavailable dashboardConfig is refused
+  ✓ boundary: a real "user"-type dashboardConfig is refused
+  ✓ boundary: a real "developer"-type dashboardConfig is refused (developer is not admin)
+  ✓ boundary: a real "admin"-type dashboardConfig is accepted (this repository's public IdentityEngine API exposes no direct "grant platform-admin" call this test could drive end-to-end — this object is shaped identically to IdentityEngine.getDashboardConfig()'s own real admin-branch return value per that method's source, not fabricated behavior)
+  ✓ boundary: FAIL-CLOSED — isPlatformAdmin as a truthy non-boolean string is refused, not coerced
+  ✓ boundary: FAIL-CLOSED — dashboardType label alone (without the boolean also true) never grants access
+  ✓ boundary: FAIL-CLOSED — a client-supplied bare role field is never inspected or trusted
+  ✓ boundary: an ordinary real user (via the real engine, end-to-end) never gets the admin section
+
+9 passed, 0 failed

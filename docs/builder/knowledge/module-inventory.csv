@@ -1,0 +1,282 @@
+path,layer,version,global,milestone_introduced,purpose_snippet
+cozyos.js,,1.0.0-ENTERPRISE,,,
+modules/quarry/quarry-contants.js,"Application (shared reference data, no logic)",,,,
+modules/live/cozy-live.js,,1.2.0-ENTERPRISE,,,
+Firebase/firebase-config.js,,1.0.0,,146,
+Firebase/firebase-session.js,,1.0.0,,146,
+Firebase/firebase-provider.js,,1.0.0,,146,
+Firebase/firebase-auth.js,,1.0.0,,146,
+Firebase/firebase-firestore.js,,1.1.0,,"146 (base), 362 Stage 1 (real-time listener addition)",
+Firebase/firebase-storage.js,,1.0.0,,146,
+Firebase/firebase-bootstrap.js,,1.0.0,,146,
+Firebase/firebase-app.js,,1.0.0,,146,
+core/vendor-events.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"A thin, real wrapper over the existing, real `PlatformEventBus` — not a second pub/sub mechanism. Every vendor lifecycle transition emits a real event through the same bus every ot"
+core/living-voice-style-engine.js,,1.0.0-ENTERPRISE,,,
+core/vendor-manager.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"The single, real entry point for the whole platform's vendor interactions. Applications should call VendorManager, never VendorLoader/VendorRegistry/VendorDiagnostics directly — th"
+core/modules/module-registry.js,Business Domain — Plugin (PluginManager-registered),1.0.0-ENTERPRISE,,,"The Single Source of Truth for CozyOS application discovery. Decouples an application's id (e.g. ""shopos"") from its actual folder/file structure, theme, dashboard type, and permiss"
+core/modules/ocrstudio/ocr-document.js,,1.0.0-PRODUCTION,,,"Stores and exposes OCR document descriptors. Never performs OCR, extracts text, edits documents, parses PDFs, preprocesses images, creates OCR results, or executes recognition."
+core/modules/ocrstudio/ocr-image.js,,1.0.0-PRODUCTION,,,"Provides deterministic, pure-pixel image preprocessing operations (geometric transforms, matrix filters, tonal adjustments, statistics, and export) for OCR Studio, operating"
+core/modules/ocrstudio/Ocr-register.js,,1.0.0-PRODUCTION,,,"Stores immutable, generic registration descriptors for the OCR Studio subsystem without performing OCR recognition, execution, or interpretation of any registered payload."
+core/modules/ocrstudio/ocr-engine.js,,1.0.0-PRODUCTION,,,"Orchestrates OCR requests between certified OCR Studio modules using their frozen public APIs. It is NOT an OCR recognizer, image processor, parser, translator, report generator, o"
+core/modules/ocrstudio/ocr-result.js,,1.0.0-PRODUCTION,,,"Stores and exposes OCR result descriptors produced by certified OCR engines. Never performs OCR, extracts text, edits recognition output, recalculates confidence, translates,"
+core/modules/ocrstudio/ocr-language.js,,1.0.0-ENTERPRISE-FROZEN,,,"Be the single central source of truth for OCR language metadata and configuration. Every OCR engine (Tesseract, PaddleOCR, EasyOCR, Google Vision, Azure OCR, future engines)"
+core/modules/ocrstudio/exporter.js,,1.0.0-PRODUCTION,,,"Serialize OCR history into exportable formats (JSON, TEXT). Nothing else."
+core/modules/ocrstudio/orc-runner.js,,1.0.0-PRODUCTION,,,"OCRRunner is responsible only for coordinating certified OCR execution requests using the frozen public APIs of OCRRegistry, OCRDocument, OCRResult, and OCREngine. It is the execut"
+core/modules/ocrstudio/ocr-cli.js,,1.0.0-PRODUCTION,,,Provide a command interface that validates OCR Studio commands and delegates them to frozen OCR Studio public APIs. This module never performs OCR itself.
+core/modules/ocrstudio/ocr-history.js,,1.0.0-PRODUCTION,,,Store and expose immutable OCR history records produced by external OCR execution modules. Nothing else.
+core/modules/identity/platform-identity-bridge.js,Core / Platform Service — Identity & Access,1.0.0-ENTERPRISE-M216,,,
+core/modules/identity/admin-recovery-policy.js,Core / Platform Coordinator — Identity & Access,1.0.0-ENTERPRISE,,176C,
+core/modules/identity/cozy-identity.js,,1.0.0-ENTERPRISE,,,
+core/modules/identity/identity-storage.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"A real, generic, reusable persistence layer over IndexedDB — not IdentityEngine-specific, so any coordinator needing durable browser-local storage can compose it rather than each i"
+core/modules/identity/identity-engine.js,Core / Platform Service — Identity & Access,1.0.0-ENTERPRISE,,,"Real, local-first identity: PBKDF2 password hashing (Web Crypto, never plaintext), session tokens, roles/permissions, organization isolation, delegation, temporary access, audit lo"
+core/modules/identity/auth-coordinator.js,Core / Platform Coordinator — Identity & Access,1.0.0-ENTERPRISE,,120,
+core/modules/customer/cozy-customer.js,"Core / Business Domain — Customer Registry (QuarryOS, reusable platform-wide)",1.0.0-ENTERPRISE,,,"The single source of truth for every customer who purchases products or services. Quotations, Orders, Invoices, Deliveries, Payments, and Reports are all expected to reference cust"
+core/modules/aimode/cozy-ai-mode.js,Core / Code Generation — AI Provider Gateway,1.0.0-ENTERPRISE,,,"The single, platform-wide source of truth for which AI mode is currently active, and the one gateway any coordinator (CozyBuilder, CozyBugFixer, future ones) goes through if it wan"
+core/modules/ShopOS/shopos.js,,1.0.0-ENTERPRISE,,,
+core/modules/admin/cozy-admin-workspace.js,Core / Orchestration Facade — Milestone 175B,1.0.0-ENTERPRISE,window.CozyOS.AdminWorkspace,,- administrator workspace bootstrap (dependency presence check) - unified administrative view (getPlatformSummary) - administrative diagnostics (getWorkspaceHealth)
+core/modules/duplicate-detection/duplicate-detection.js,Shared Platform Coordinator,1.0.0-ENTERPRISE,,,
+core/modules/planning/planning-engine.js,Core / Code Generation — Planning & Recommendation Engine,1.0.0-ENTERPRISE,,,
+core/modules/document-understanding/document-understanding.js,Shared Platform Coordinator,1.0.0-ENTERPRISE,,,
+core/modules/reasoning/cozy-reasoning.js,,1.0.0-ENTERPRISE,,170 — Cozy Reasoning Engine Platform,
+core/modules/innovation/innovation-engine.js,Core / Code Generation — Innovation Engine,1.0.0-ENTERPRISE,,,
+core/modules/goals/cozy-goals-engine.js,Platform Service (PluginManager-registered),1.0.0-ENTERPRISE,,,
+core/modules/ChurchOS/living-worship-player.js,,,,ChurchOS C004,
+core/modules/ChurchOS/multi-branch-coordinator.js,,,,"ChurchOS C006 (Option A, approved)",
+core/modules/ChurchOS/worship-mode-coordinator.js,,,,"ChurchOS C002, Stages 2/4/5",
+core/modules/ChurchOS/church-intelligence-provider.js,,,,M367 — Provider Ecosystem Expansion,
+core/modules/marketplace/cozy-marketplace-engine.js,Platform Service (PluginManager-registered),1.0.0-ENTERPRISE,,,
+core/modules/payment-provider/cozy-payment-provider-engine.js,Platform Service (PluginManager-registered),1.0.0-ENTERPRISE,,,Applications never communicate directly with a payment provider — everything goes through this engine. This file is a pure delegation façade over six internal modules (Provider Reg
+core/modules/research/cozy-research-engine.js,Core / Code Generation — Research Engine,1.0.0-ENTERPRISE,,,"Ingests documents (text, code, text-based PDFs, screenshots) into a real, queryable Knowledge Base, and tags entries with engineering principles using a deterministic keyword heuri"
+core/modules/notification/cozy-notification.js,Kernel / Core Service Coordination,1.0.1-ENTERPRISE,,,
+core/modules/automation/cozy-automation.js,Kernel / Core Service Coordination,1.0.4-ENTERPRISE,,,
+core/modules/accessibility/cozy-accessibility.js,Kernel / Core Service Coordination,1.0.2-ENTERPRISE,,,
+core/modules/developer/cozy-developer.js,Core / Orchestration — Developer Hub,1.0.0-ENTERPRISE,,,"Pure orchestration. Every method here aggregates or delegates to a real coordinator's real public API — CozyBuilder, UnderstandingEngine, CozyOCR, CozyCertification, CozyBugFixer, "
+core/modules/developer/developer-hub.js,Core / Orchestration — Developer Hub UI,1.0.1-ENTERPRISE,,,
+core/modules/policy/policy-engine.js,Core / Platform Service — Policy & Governance,1.0.0-ENTERPRISE,,,"Real, versioned policy/governance registry: company rules, SOPs, approval workflows, compliance checklists — with a real enforcement hook other engines (Certification, Builder) can"
+core/modules/policy/policy-decision-engine.js,,1.0.0-ENTERPRISE,,153 — Cozy Policy Engine Platform,
+core/modules/certification/cozy-certification.js,Core / Quality Assurance & Enterprise Certification Authority,1.0.0-ENTERPRISE,,,
+core/modules/certification/certification-dashboard.js,UI / Orchestration layer over the Certification Coordinator,1.0.0-ENTERPRISE,,,
+core/modules/intelligence/cozy-ai.js,,,,M369 — Universal AI Learning & Conversation Platform,
+core/modules/intelligence/ai-bootstrap.js,,,,M366.9 — AI Provider Registration & Intelligence Framework Completion,
+core/modules/intelligence/cozy-intelligence.js,,1.0.0-ENTERPRISE,,168 — Cozy Intelligence Engine Platform,
+core/modules/intelligence/cozy-intelligence-provider.js,,,,M366.3 — Restore Living Intelligence Registration,
+core/modules/emergency/cozy-emergency.js,Kernel / Core Service Coordination,1.1.0-ENTERPRISE,,,
+core/modules/media/cozy-media.js,,1.0.0-ENTERPRISE,,,
+core/modules/integration/cozy-integration-layer.js,Platform Service (PluginManager-registered),1.0.0-ENTERPRISE,,,"Coordinates the certified engines (Identity, Company, Vault, Payment Provider, and — where present — Document Engine / Storage Provider) without moving ownership or duplicating any"
+core/modules/translate/cozy-translate.js,Kernel / Core Service Coordination,2.2.0-ENTERPRISE-FROZEN,,,
+core/modules/vault/cozy-vault-engine.js,Platform Service (PluginManager-registered),1.0.0-ENTERPRISE,,,"Every engine that needs an API key, certificate, encryption key, token, or credential requests it through this façade — never storing it internally. This file is a pure delegation "
+core/modules/sense/cozy-sense.js,,1.0.0-ENTERPRISE,,169 — Cozy Sense Engine Platform,
+core/modules/bugfixer/cozy-bugfixer.js,Core / Code Generation — Repair Engine,1.0.0-ENTERPRISE,,,"Repairs CozyOS source files — the smallest safe fix for a known, mechanically-fixable certification finding, never a full rewrite. Every repair is backed by a real backup, a hash-p"
+core/modules/speech/voice-manager.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,356 — CozyOS Voice Framework,
+core/modules/speech/voice-pack-import.js,Core / Platform Foundation — Voice Provider,1.0.0-ENTERPRISE,,356 — CozyOS Voice Framework,
+core/modules/speech/voice-settings-panel.js,Application Module (loadModule() contract — getDashboard/init),1.0.0-ENTERPRISE,,356 — CozyOS Voice Framework,
+core/modules/speech/providers/charles-voice-provider.js,Core / Platform Foundation — Voice Provider,1.0.0-ENTERPRISE,,356 — CozyOS Voice Framework,
+core/modules/speech/providers/stub-voice-providers.js,Core / Platform Foundation — Voice Provider,1.0.0-ENTERPRISE,,356 — CozyOS Voice Framework,
+core/modules/speech/adapters/voice-capability-stub.js,,1.0.0-ENTERPRISE,,147 (reframed) — Speech Platform Adapter,
+core/modules/speech/adapters/speech-capability-adapter.js,,1.0.0-ENTERPRISE,,148 — Speech Recognition Provider Integration,
+core/modules/speech/adapters/speech-language-adapter.js,,1.0.0-ENTERPRISE,,148 — Speech Recognition Provider Integration,
+core/modules/speech/adapters/cozy-tts-browser-adapter.js,Core / Platform Foundation — Speech Adapter,1.0.0-ENTERPRISE,,,
+core/modules/speech/adapters/speech-preview-adapter.js,,1.0.0-ENTERPRISE,,148 — Speech Recognition Provider Integration,
+core/modules/speech/adapters/voice-capture-adapter.js,,1.0.0-ENTERPRISE,,147 (reframed) — Speech Platform Adapter,
+core/modules/speech/adapters/speech-translation-provider.js,Core / Speech Adapter,1.0.0-ENTERPRISE,,150,
+core/modules/speech/adapters/speech-recognition-adapter.js,,1.0.0-ENTERPRISE,,148 — Speech Recognition Provider Integration,
+core/modules/speech/adapters/speech-session-adapter.js,,1.0.0-ENTERPRISE,,148 — Speech Recognition Provider Integration,
+core/modules/speech/adapters/voice-processor-adapter.js,,1.0.0-ENTERPRISE,,147 (reframed) — Speech Platform Adapter,
+core/modules/speech/adapters/voice-security-bridge.js,,1.0.0-ENTERPRISE,,147 (reframed) — Speech Platform Adapter,
+core/modules/speech/adapters/speech-command-adapter.js,,1.0.0-ENTERPRISE,,148 — Speech Recognition Provider Integration,
+core/modules/speech/adapters/speech-translation-adapter.js,Core / Speech Adapter,1.1.0-ENTERPRISE,,150 (revised — see 1.0.0→1.1.0 note below),
+core/modules/speech/adapters/voice-settings-adapter.js,,1.0.0-ENTERPRISE,,147 (reframed) — Speech Platform Adapter,
+core/modules/founder-story/founder-story-narration.js,Core / Platform Module — Founder Story Experience,1.0.0-ENTERPRISE,,"361 — Founder Story Experience & Living Narration, Stage 3",
+core/modules/founder-story/founder-story-seed.js,Core / Platform Module — Bootstrap Data,1.0.0-ENTERPRISE,,"361 — Founder Story Vault (Foundation), Stage 1",
+core/modules/founder-story/founder-story-panel.js,Application / Dashboard Panel,2.0.0-ENTERPRISE,,"361 — Founder Story Vault (Foundation), Stage 1 → Stage 3",
+core/modules/founder-story/founder-story-engine.js,Core / Platform Module — Data & Authorization Layer,1.0.0-ENTERPRISE,,"361 — Founder Story Vault (Foundation), Stage 1",
+core/modules/MpesaOS/mpesaos.js,"Application UI (renders only inside #cozy-app-root, or",1.0.0-ENTERPRISE,,,
+core/modules/session/firebase-session-bridge.js,,1.0.0,,,
+core/modules/session/cozy-session-service.js,Platform Service (PluginManager-registered),1.0.0-ENTERPRISE,,,
+core/modules/session/cozy-session-workspace.js,Core / Orchestration Facade — Milestone 176B,1.0.0-ENTERPRISE,window.CozyOS.SessionWorkspace,,- session workspace bootstrap (dependency presence check) - unified session summary (getSessionSummary) - aggregated session + device diagnostics (getWorkspaceHealth)
+core/modules/storage/cozy-storage.js,Core Infrastructure / Storage Coordination Kernel,1.0.0-ENTERPRISE,,,
+core/modules/company/cozy-company.js,Core / Multi-Tenant Foundation,1.0.0-ENTERPRISE,,,"The single source of truth for organization/company profile data across every CozyOS application — profile, branches, departments, branding, contact info, financial/business settin"
+core/modules/builder/builder-rules.js,Core / Code Generation — Rules & Standards,1.0.0-ENTERPRISE,,,"A pure rules-and-conventions library — no business logic, no file generation, no build orchestration. Every other CozyBuilder file reads from this one to know what ""Enterprise-qual"
+core/modules/builder/cozy-builder.js,Core / Code Generation — Build Orchestration,1.0.0-ENTERPRISE,,,"Coordinates a build: takes a developer request or an explicit build spec, asks BuilderAI for a plan (if needed), asks BuilderTemplates to generate real file content, and returns a "
+core/modules/builder/requirement-reader.js,Core / Code Generation — Enterprise Requirement Reader,1.0.0-ENTERPRISE,,,"Turns an uploaded file into a structured, editable Requirement Summary — the module identity, public interface, internal structure, dependencies, existing quality features, and dev"
+core/modules/builder/architecture-engine.js,Core / Code Generation — Architecture Engine,1.0.0-ENTERPRISE,,,"Converts a RequirementAnalyzer analysis into a real, structured Architecture Blueprint: module list, folder structure, data model, integration points — deterministic rules, never f"
+core/modules/builder/understanding-engine.js,Core / Code Generation — Requirement Understanding,1.1.0-ENTERPRISE,,M372,"Turns raw input (plain text, source code, text-based PDFs, screenshots, uploaded projects) into a structured Understanding — application type, detected features/entities, requireme"
+core/modules/builder/layer2-graph-composer.js,Core / Builder — Architectural Understanding (Layer 2: cross-file),1.0.0-ENTERPRISE,,M372,"Composes UnderstandingEngine + OwnershipScanner + BuilderObservation into Module/Dependency/API/Event/Ownership graphs; builds only what verified signals support"
+core/modules/builder/project-refactor.js,Core / Code Generation — Refactor & Split,1.0.0-ENTERPRISE,,,"Real, deterministic, text-based refactoring of existing HTML/CSS/JS projects: splitting a single file into separate files, merging separate files back into one distributable HTML f"
+core/modules/builder/question-engine.js,Core / Code Generation — AI Question Engine,1.0.0-ENTERPRISE,,,"Turns RequirementAnalyzer's real gap-detection output into concrete clarifying questions, and accepts answers in whatever format the developer already has them in (typed text, or p"
+core/modules/builder/builder-ai.js,Core / Code Generation — Build Planning,1.0.0-ENTERPRISE,,,"Turns a developer's plain-language request (""Build Customer Management Coordinator"") into a structured build plan — module name, entities, fields, events, dependencies, folder — th"
+core/modules/builder/requirement-analyzer.js,Core / Code Generation — Requirement Analyzer,1.0.0-ENTERPRISE,,,Converts an unstructured description into a structured requirement record and a real Requirements Book — the layer between Research Engine and the (not-yet-built) AI Question Engin
+core/modules/builder/builder-templates.js,Core / Code Generation — Reusable Templates,1.0.0-ENTERPRISE,,,"Generates real, complete CozyOS source file content as strings — coordinators, CRUD entities, HTML dashboards, CSS, application manifests. Every template reads its conventions from"
+core/modules/sync/cozy-sync.js,Kernel / Core Service Coordination,1.0.2-ENTERPRISE,,,
+core/modules/teststudio/test-suite.js,Core Infrastructure / Suite Loader,1.0.0-PRODUCTION,,,
+core/modules/teststudio/test-snapshot.js,,1.0.0-PRODUCTION,,,"Store immutable snapshot records produced by external snapshot generators without comparing, generating, or validating snapshot content."
+core/modules/teststudio/test-benchmark.js,,1.0.0-PRODUCTION,,,Store and expose immutable benchmark records produced by certified benchmark runners without calculating benchmark results itself.
+core/modules/teststudio/test-environment.js,,1.0.0-PRODUCTION,,,"Registers, stores, and exposes immutable execution environment descriptors for Test Studio without executing or modifying tests."
+core/modules/teststudio/test-package.js,,1.0.0-PRODUCTION,,,"Stores immutable Test Studio package manifests supplied by external producers without loading, installing, validating, executing, resolving, or publishing packages."
+core/modules/teststudio/test-assert.js,Core Infrastructure / Assertion Engine,1.0.0-PRODUCTION,,,
+core/modules/teststudio/test-registry.js,Core Infrastructure / Test Architecture Registry Services,1.0.2-PRODUCTION,,,
+core/modules/teststudio/test-scheduler.js,,1.0.0-PRODUCTION,,,Schedules certified test execution requests without executing tests itself.
+core/modules/teststudio/test-coverage.js,,1.0.0-PRODUCTION,,,Stores and exposes immutable test coverage records produced by external tools without calculating coverage itself.
+core/modules/teststudio/test-fixture.js,,1.0.0-PRODUCTION,,,"Stores immutable test fixture descriptors supplied by external producers without creating, loading, executing, validating, or modifying fixture data."
+core/modules/teststudio/test-mock.js,,1.0.0-PRODUCTION,,,"Stores immutable mock descriptors supplied by external producers without creating, executing, injecting, validating, or interpreting mock behavior."
+core/modules/teststudio/test-runner.js,Core Infrastructure / Test Execution Services,1.0.0-PRODUCTION,,,
+core/modules/power/cozy-power-grid.js,Core / Business Domain — Power Management,1.0.0-ENTERPRISE,,,"A unified software coordinator for power management during churches, conferences, schools, hospitals, emergency camps, and outdoor events. Tracks power sources (grid, battery bank,"
+core/modules/communication/ldce-session-engine.js,Core / Platform Module — Shared Platform Service (not app-owned),1.0.0-ENTERPRISE,,"362 — Living Direct Communication Engine, Stage 1",
+core/modules/communication/ldce-media-session-engine.js,Core / Platform Module — Shared Platform Service (not app-owned),1.0.0-ENTERPRISE,,"362 — Living Direct Communication Engine, Stage 2",
+core/modules/communication/ldce-caption-engine.js,Core / Platform Module — Shared Platform Service,1.0.0-ENTERPRISE,,"362 — Living Direct Communication Engine, Stage 3",
+core/modules/communication/ldce-reliability-engine.js,,,,363 — LDCE Communication Experience Hardening,
+core/modules/cognitive/cognitive-coordinator.js,,1.0.0-ENTERPRISE,,195 — Cognitive Orchestration & Integration,
+core/modules/thinking/cozy-thinking.js,,1.0.0-ENTERPRISE,,167 — Cozy Thinking Engine Platform,
+core/modules/conversation/cozy-conversation.js,,1.0.0-ENTERPRISE,,164 — Cozy Conversation Intelligence Engine,
+core/modules/hearing/sound-event-engine.js,Core / Platform Foundation — Event Management Engine,1.0.0-ENTERPRISE,,159 — Sound Event Engine Platform,
+core/modules/hearing/cozy-hearing.js,Core / Platform Service — Sound Understanding,1.0.0-ENTERPRISE,,157 — Cozy Hearing Engine,
+core/modules/hearing/providers/provider-adapter-base.js,Core / Platform Foundation — Provider Template,1.0.0-ENTERPRISE,,158 — Sound Classification Provider Platform,
+core/modules/hearing/providers/browser-signal-provider.js,Core / Platform Foundation — Classifier Provider,1.0.0-ENTERPRISE,,158 — Sound Classification Provider Platform,
+core/modules/deployment/deployment-manager.js,Core / Platform Service — Deployment Manager,2.1.0-ENTERPRISE,,,"Real deployment queue, retry, and release history — orchestration only. Every actual deployment action is delegated to a DeploymentProvider implementing a common 8-method interface"
+core/modules/payment-channel/cozy-payment-channel-engine.js,Platform Service (PluginManager-registered),1.0.0-ENTERPRISE,,,"Real, application-agnostic payment-channel tagging and aggregation. Fixes a genuine, current gap: MpesaOS's ledger records transaction type* (Deposit/Withdrawal/Till Payment/etc.) "
+core/modules/camera/cozy-camera.js,,1.0.0-ENTERPRISE-FROZEN,,,
+core/modules/personal-vault/personal-vault.js,,2.0.0,,,
+core/modules/ocr/cozy-ocr.js,Core / Code Generation — Optical Character Recognition,1.1.0-ENTERPRISE,,,"Extracts real text from images and scanned/image-based PDF pages. Backed by Tesseract.js (an optional CDN script, loaded the same way jsPDF/pdf.js are elsewhere in CozyOS) — this f"
+core/modules/ocr/document-router.js,,"""1.1.0"",",,,
+core/modules/domain/domain-expert-framework.js,Core / Code Generation — Domain Expert Framework,1.0.0-ENTERPRISE,,,"Real, curated domain knowledge packs (keyword checklists) that extend RequirementAnalyzer's generic Gap Detector with domain- specific requirements — Church, Quarry, Power today; a"
+core/modules/leaning/learning-engine.js,Core / Code Generation — Learning Engine,1.0.0-ENTERPRISE,,,"A thin, real coordinator — NOT a new storage system. ""Learning"" already happens in UnderstandingEngine (Knowledge Review Queue, Enterprise Pattern Library) and CozyMemory (Builder "
+core/modules/language/language-engine.js,Core / Platform Service — Language Engine,1.0.0-ENTERPRISE,,,"Real, key-based UI-string translation (menus, buttons, forms, notifications, reports, receipts, invoices, errors, help text, dashboard labels) with English as default and fallback "
+core/modules/security/authentication-enrollment-history.js,Application / Settings Panel,1.0.0-ENTERPRISE,,360 (Authentication Factor Management & Secure Enrollment) — Stage 3,
+core/modules/security/authentication-security-dashboard.js,Application / Settings Panel,1.0.0-ENTERPRISE,,360 (Authentication Factor Management & Secure Enrollment) — Stage 3,
+core/modules/security/security-insights-panel.js,Application / Settings Panel,1.0.0-ENTERPRISE,,360 (Authentication Factor Management & Secure Enrollment) — Stage 4,
+core/modules/security/authentication-analytics.js,Data / Analytics Engine,1.0.0-ENTERPRISE,,360 (Authentication Factor Management & Secure Enrollment) — Stage 4,
+core/modules/security/authentication-enrollment-panel.js,Application / Settings Panel,1.0.0-ENTERPRISE,,359 (Authentication Enrollment UI Enhancement),
+core/modules/security/authentication-factor-management-panel.js,Application / Settings Panel,1.0.0-ENTERPRISE,,360 (Authentication Factor Management & Secure Enrollment) — Stage 2,
+core/modules/security/authentication-settings-module.js,Application / Settings Panel,1.0.0-ENTERPRISE,,357 (Step 1 — Framework + Passkey template),
+core/modules/documents/cozy-document-engine.js,Platform Service (PluginManager-registered),1.0.0-ENTERPRISE,,,"Promotes CozyOCR from ""OCR + receipt parsing"" into the shared document platform every CozyOS application uses — one place to scan, classify, validate, and (once real backends exist"
+core/modules/documents/cozy-document-storage-provider.js,Platform Service (PluginManager-registered),1.0.0-ENTERPRISE,,,"Persists, indexes, retrieves, and manages the lifecycle of documents created by CozyOS applications. This is NOT a second Document Engine — it extends the existing one by registeri"
+core/modules/analytics/cozy-analytics.js,Kernel / Core Service Coordination,1.0.2-ENTERPRISE,,,
+core/modules/interpretation/cozy-interpretation.js,,1.0.0-ENTERPRISE,,166 — Cozy Interpretation Engine Platform,
+core/modules/memory/cozy-memory-engine.js,Core / Platform Service — Memory & Knowledge Engine,1.0.0-ENTERPRISE,,,"A namespaced, versioned, searchable knowledge store used across the Cozy ecosystem — distinct from any single engine's own local state. Builder Memory, Research Memory, Language Me"
+core/modules/memory/cozy-memory-lifecycle.js,,1.0.0-ENTERPRISE,,152 — Cozy Memory Engine Platform,
+core/identity/project-history.js,,1.0.0-ENTERPRISE,,180 — Developer Identity & African Knowledge Initiative,
+core/identity/african-knowledge-initiative.js,,1.0.0-ENTERPRISE,,180 — Developer Identity & African Knowledge Initiative,
+core/identity/developer-profile.js,,1.0.0-ENTERPRISE,,180 — Developer Identity & African Knowledge Initiative,
+core/identity/cozyai-identity.js,,1.0.0-ENTERPRISE,,180 — Developer Identity & African Knowledge Initiative,
+core/ui/login-experience-orchestrator.js,,1.0.0-ENTERPRISE,,M210 — Login Experience Orchestrator,
+core/ui/live-animation-engine.js,,1.0.0-ENTERPRISE,,M206 — Live Animation Engine (scoped extension),
+core/ui/module-dashboard.js,Core / Platform Foundation — Shared UI Component,1.0.0-ENTERPRISE,,,"One real, reusable dashboard renderer every CozyOS module (ChurchOS, WholesaleOS, ShopOS, HospitalOS, SchoolOS, QuarryOS, etc.) can call with its own real config, producing the sam"
+core/ui/mode-engine.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/ui/living-theme-engine.js,Core / Platform Foundation — Shared Platform Service,1.1.0-ENTERPRISE,,,
+core/ui/living-message-engine.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"Message registry, categories, scheduling, priority, rotation, org-scoped permissions, history, and basic analytics counters. Does NOT render anything to the DOM — see the honest sc"
+core/platform/accessibility-engine.js,Core / Platform Foundation — Shared Platform Service,1.1.0-ENTERPRISE,,,"Real, automated checking against the CozyOS Universal UI Readability & Accessibility Standard (Constitution Addendum, Rule 44): minimum font sizes, and real WCAG contrast-ratio mat"
+core/platform/manifest-registry.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,Level 3 of the four-level Discovery model (see cozy-discovery.js header): Level 1 — Runtime   : what is loaded right now Level 2 — Registry  : what has been registered (ServiceRegi
+core/platform/reference-integrity-engine.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"The proactive layer this project's own history showed was missing: checking that every real `<script>`, `<link rel=""stylesheet"">`, and `<img>` tag on the current page actually reso"
+core/platform/application-visibility.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"Single source of truth for ""what applications exist, and which ones can this specific user see."" Neither the Administrator Workspace nor the End User Workspace should hardcode an a"
+core/platform/platform-operations.js,Core / Platform Foundation — Shared Platform Service,1.2.0-ENTERPRISE,,,"The execution layer: Discovery finds, Audit explains, Operations fixes. This engine is an ORCHESTRATOR, not an emulator — it may only expose operations that delegate to a verified,"
+core/platform/health-engine.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,Assigns the per-file health badge (🟢 Healthy / 🟡 Warning / 🔴 Broken / ⚪ Not Loaded) purely by reading Usage Engine's classification and Dependency Engine's missing/circular reports
+core/platform/usage-engine.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"Answers ""is this file actually used?"" — not just ""does it exist?"" — using File Registry's `loaded` flag (real: set by Discovery cross- referencing live ServiceRegistry/ModuleRegist"
+core/platform/content-presentation-engine.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"Owns scheduled content items (announcements, greetings, educational/ religious/business content, holiday campaigns) shown across CozyOS applications. Does NOT own themes/fonts/colo"
+core/platform/file-registry.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"The single store of per-file metadata records — what Discovery finds, this holds. Nothing here decides discovery, health, usage, or dependency logic itself (Rule 1 — Single Respons"
+core/platform/dependency-engine.js,Core / Platform Foundation — Shared Platform Service,1.1.0-ENTERPRISE,,,"Builds a dependency graph from window.CozyOS.FileRegistry. For a file with a Level 3 manifest (record.declaredDependencies !== null), those self-declared ids are authoritative and "
+core/platform/platform-resource-manager.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"Manages ownership, allocation, tracking, and release of shared platform resources. It does NOT discover (reuses PlatformDiscovery/FileRegistry), does NOT execute operations (reuses"
+core/platform/audit-engine.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"Answers diagnostic questions (""why isn't Builder opening?"", ""which dependency failed?"", ""which application is orphaned?"") by correlating the REAL outputs of the engines that alread"
+core/platform/vendor-loader.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"Real, dynamic `<script>` injection for vendor libraries, with genuine success/error tracking — this is what makes `VendorRegistry`'s ""Error"" state a real, observed outcome rather t"
+core/platform/vendor-registry.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"Real, checkable status for every third-party library CozyOS intends to use — never a fabricated ""loaded"" claim. Reuses the same real Manifest-vs-Runtime pattern already proven in `"
+core/platform/vendor-diagnostics.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"Pure consumer of VendorRegistry and VendorLoader — discovers nothing itself, checks nothing itself, matches the exact same ""pure consumer/correlation"" pattern already established f"
+core/engines/voice/voice-engine.js,,1.0.0-ENTERPRISE,,"180B — Developer Identity Voice Integration (new capability,",
+core/engines/search/search-engine.js,,1.1.0-ENTERPRISE,,"180C — Developer Identity Search Integration (new capability,",
+core/engines/media/live-capture-engine.js,,,,"ChurchOS C003 (genuine NEW FEATURE, per explicit scope)",
+core/engines/media/recording-export-engine.js,,"'1.0.0',",,,
+core/engines/wakeword/wake-word-engine.js,,1.0.0-ENTERPRISE,,"179 — Wake Word Engine (new capability, no existing owner)",
+core/shell/platform-event-bus.js,Core / Shared Shell Service — Cross-Platform Communication,1.0.0-ENTERPRISE,,,
+core/shell/cozy-admin-recovery-wizard.js,Core / Shell UI,1.0.0-ENTERPRISE,,130,
+core/shell/user-dashboard.js,,,,365.0,
+core/shell/provider-manager.js,,,,M367 — Provider Ecosystem Expansion,
+core/shell/startup-orchestrator.js,,,,M351 — Living Startup Completion (reconciled onto M354),
+core/shell/cozy-login-gate.js,Core / Shell UI,1.0.0-ENTERPRISE,,121,
+core/shell/window-manager.js,,,,M366.6 — Platform Requirement (applies to all CozyOS applications),
+core/shell/platform-discovery.js,Core / Shared Shell Service — Platform-Wide Discovery,2.1.0-ENTERPRISE,,,
+core/shell/module-loading-manager.js,Core / Shared Shell Service — Application Load Lifecycle,1.0.0-ENTERPRISE,,,
+core/shell/launch-sequence.js,,,,364.3 — Startup/Login Sequencing Correction,
+core/shell/cozy-workspace.js,Shell / Enterprise Orchestration & Visualization,3.1.1-ENTERPRISE-CONTROL-CENTER,,,
+core/connectivity/updateManager.js,,"(rollbackVersion !== undefined && rollbackVersion !== null) ? rollbackVersion : null,",,,
+core/living/cozy-environment.js,,,,M370.5 — Living World Synchronization,
+core/living/cozy-living-assistant.js,Living Ecosystem — Composed Living Component,1.0.0-ENTERPRISE,,364.7.1,
+core/living/language-badge.js,,,,M368,
+core/output/output-storage.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"Real localStorage persistence for OutputCenter's artifacts — the same real pattern already proven in Developer Hub's own Output Center (Rule 54): text content stored as-is, Uint8Ar"
+core/output/output-export.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,Real ZIP export for one or more real artifacts. `createZipStore()` below is copied verbatim from Developer Hub's own implementation — not reimplemented — because that exact functio
+core/output/output-collections.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"Real, plural collection membership — an artifact can genuinely belong to more than one collection at once without being moved out of its real category (the same corrected design fr"
+core/output/output-inbox.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"A real, single arrival point every application calls instead of `OutputCenter.publish()` directly — `OutputInbox.receive(...)` logs the raw arrival (application, timestamp, whether"
+core/output/output-history.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"Real, per-artifact audit trail — the ""Audit History"" field in the requested metadata schema. Reuses the existing, real `PlatformEventBus` (same pattern already proven in `VendorEve"
+core/output/output-center.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"The single, real, platform-wide artifact store — promoted out of Developer Hub, where it previously lived as a private field on `CozyDeveloperHubUI` and was reachable by nothing el"
+core/output/output-events.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,"134 (restored — genuinely missing file, not a stub)","A thin, real wrapper over the existing, real `PlatformEventBus` — not a second pub/sub mechanism. Mirrors the same pattern already proven in `core/vendor-events.js`. Every real Out"
+core/registry/cozy-registry.js,Core / Platform Foundation — Application & Coordinator Catalog,1.0.0-ENTERPRISE,,,"A single, metadata-only catalog of what applications and coordinators exist on this CozyOS install, and how to find/launch/display them. This is the piece that lets the Workspace S"
+core/collaboration/cozy-share.js,,,,"M366.4 — Device Collaboration Session Manager, Roles,",
+core/calculation/calculation-certification.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"Real certification of a registered formula against exactly the six checks requested — every one of them actually executed, not assumed: 1. Formula identifier exists — real registry"
+core/calculation/formula-library.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/calculation/calculation-engine.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"The single, real entry point every CozyOS application should call instead of implementing its own formulas — `calculate(formulaId, inputs)`. Coordinates `FormulaRegistry`/`Calculat"
+core/calculation/dependency-events.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/calculation/dependency-certification.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"Real dependency-integrity certification for one formula or the whole graph — missing references, circular dependencies, deprecated references, self-references, duplicate declaratio"
+core/calculation/formula-registry.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"The single, real place formula identifiers (e.g. ""Business.VAT"", ""School.GPA"") resolve to an actual function plus real metadata — required inputs, version, pack name. Every applica"
+core/calculation/dependency-graph.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"Real graph construction and traversal, reading exclusively from the real, explicit `dependsOn` metadata every formula registration already carries — this file never parses JavaScri"
+core/calculation/formula-library-church.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/calculation/dependency-history.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"Real, bounded audit trail of dependency changes per formula — dependency added/removed, deprecation, replacement. Written to by `DependencyEvents.emit()` when a real event carries "
+core/calculation/dependency-engine.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"The single, real entry point for understanding how formulas relate to each other. This engine does not perform calculations — `CalculationEngine` already owns that — it owns depend"
+core/calculation/calculation-history.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"Real, optional recording of every calculation — formula used, real inputs, real result, calling application/user/organization, real timestamp. ""Optional"" is genuine: `calculation-e"
+core/calculation/packs/conversions.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/calculation/packs/construction.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/calculation/packs/education.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/calculation/packs/healthcare.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/calculation/packs/manufacturing.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/calculation/packs/statistics.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"Foundational, general-purpose statistics — Mean, Median, Mode, Percentage, WeightedScore. These are the real building blocks the Education pack (GPA, class ranking) is built on, ma"
+core/calculation/packs/finance.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/calculation/packs/engineering.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/calculation/packs/payroll.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/calculation/packs/inventory.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/calculation/packs/accounting.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/calculation/packs/agriculture.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/calculation/packs/logistics.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/organization/organization-role.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/organization/organization-hierarchy.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"Real validation of the organization's real reporting structure — circular reporting detection, vacant position reporting, hierarchy tree assembly. Pure consumer of `OrganizationRol"
+core/organization/organization-registry.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/plugins/shopOS-search.js,Business Domain — Plugin (PluginManager-registered),1.0.0-ENTERPRISE,,,
+core/plugins/mpesaOS-engine.js,"Business Domain — Plugin (PluginManager-registered, not a window.CozyOS.<X> coordinator)",2.1.0-ENTERPRISE,,,
+core/plugins/shopOS-reconciliation.js,Business Domain — Plugin (PluginManager-registered),1.0.0-ENTERPRISE,,,
+core/plugins/shopOS-sales.js,Business Domain — Plugin (PluginManager-registered),1.0.0-ENTERPRISE,,,
+core/plugins/wholesaleOS-customer.js,Business Domain — Plugin (PluginManager-registered),1.0.0-ENTERPRISE,,,"Customer identity, contact, and relationship data only — profile, contacts, credit limit, notes, follow-up reminders, preferred products, delivery locations. Matches the requested "
+core/plugins/shopOS-purchasing.js,Business Domain — Plugin (PluginManager-registered),1.0.0-ENTERPRISE,,,
+core/plugins/mpesaOS-float.js,Business Domain — Plugin (PluginManager-registered),1.0.0-ENTERPRISE,,,"Real agent float balance tracking — current float, float purchases, float adjustments, float reconciliation, and full float history — per (companyId, branchId). This is genuinely M"
+core/plugins/mpesaOS.js,"Business Domain — Plugin (PluginManager-registered, not a window.CozyOS.<X> coordinator)",2.1.0-ENTERPRISE,,,
+core/plugins/wholesaleOS-debt.js,Business Domain — Plugin (PluginManager-registered),1.0.0-ENTERPRISE,,,"Real debt tracking only: amount, due date, installments, payment history, balance, customer promises, reminder schedule, partial payments. References customers by `customerId` via "
+core/plugins/shopOS-dashboard.js,Business Domain — Plugin (PluginManager-registered),1.0.0-ENTERPRISE,,,
+core/plugins/shopOS-product.js,Business Domain — Plugin (PluginManager-registered),1.0.0-ENTERPRISE,,,
+core/plugins/shopOS-core.js,"Business Domain — Plugin (PluginManager-registered, not a window.CozyOS.<X> coordinator)",1.0.0-ENTERPRISE,,,
+core/plugins/shopOS-payments.js,Business Domain — Plugin (PluginManager-registered),1.0.0-ENTERPRISE,,,
+core/plugins/wholesaleOS-core.js,Business Domain — Plugin (PluginManager-registered),1.0.0-ENTERPRISE,,,
+core/plugins/mpesaOS-reporting.js,Business Domain — Plugin (PluginManager-registered),1.0.0-ENTERPRISE,,,"Real business reports for MpesaOS: daily transaction totals, float movement, commission earned, till performance, paybill collections, agent activity. Every figure here is computed"
+core/plugins/shopOS-reporting.js,Business Domain — Plugin (PluginManager-registered),1.0.0-ENTERPRISE,,,
+core/plugins/mpesaOS-paybill.js,Business Domain — Plugin (PluginManager-registered),1.0.0-ENTERPRISE,,,"Real paybill number management — registration, business mapping, status, and collections. The genuine distinguishing feature from Till (mpesaOS-till.js) is the account number: payb"
+core/plugins/shopOS-bookkeeping.js,Business Domain — Plugin (PluginManager-registered),1.0.0-ENTERPRISE,,,
+core/plugins/mpesaOS-till.js,Business Domain — Plugin (PluginManager-registered),1.0.0-ENTERPRISE,,,"Real ""Buy Goods"" till number management — registration, merchant assignment, status (active/suspended/closed), and the accumulated balance from till payments until the merchant wit"
+core/plugins/churchOS-core.js,Business Domain — Plugin (PluginManager-registered),1.0.0-ENTERPRISE,,,
+core/plugins/shopOS-inventory.js,Business Domain — Plugin (PluginManager-registered),1.0.0-ENTERPRISE,,,
+core/context/cozy-context-engine.js,Core / Shared Shell Service — Application Context & Personality,1.0.0-ENTERPRISE,,,"Per the CozyOS Universal Architecture Directive (Section 12): every application has a ""personality"" — welcome messages, daily content, reminders, widgets — that changes the CONTENT"
+core/security/dev-access-service.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"A temporary, explicitly-disclosed development convenience — Production access continues to require a real, verified `CozyOS.Auth` administrator session with no exception. Developme"
+core/security/recovery-phrase-manager.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/security/session-manager.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/security/cozy-auth.js,Core / Platform Foundation — Shared Platform Service,1.1.0-ENTERPRISE,,,
+core/security/auth-factor-registry.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"The single, real source of truth for ""which authentication factors exist and what can currently verify them."" `AuthPolicyEngine` asks this registry ""do you have a provider for X"" r"
+core/security/voice-provider.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/security/fingerprint-provider.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/security/qr-renderer.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,132a,
+core/security/authentication-enrollment-store.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,358 (Persistent Authentication Enrollment),"The single, real source of truth for ""has this user enrolled this authentication factor, when, on which device, is it currently enabled, and when was it last used"" — the enrollment"
+core/security/webauthn-provider.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,130,
+core/security/recovery-question-manager.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/security/emergency-recovery-code-manager.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,130,
+core/security/auth-coordinator.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,window.CozyOS.AuthorizationCoordinator,,"The one, real entry point callers (Developer Hub, and any future caller needing step-up authorization) should use instead of talking to `CozyOS.Auth`, `AuthPolicyEngine`, and `Auth"
+core/security/face-capture-module.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,145 — Face Backend Integration,
+core/security/auth-policy-engine.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"Separates ""which authentication factors are required for a given operation"" (a real, configurable policy) from ""how a factor is verified"" (a real, pluggable provider). This file ow"
+core/security/factor-provider-base.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"The single, real, shared implementation every authentication factor provider (Face, Fingerprint, Voice, Google Account) composes, instead of each file hand-duplicating the same reg"
+core/security/recovery-key-manager.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,130,
+core/security/face-provider.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/security/google-account-provider.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,
+core/security/trusted-device-manager.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,,"Real device registration, trust tracking, and lifecycle management — 30-day trust period, 10-minute auto-lock on inactivity, device removal/replacement/loss, and a real, bounded de"
+core/security/otp-provider.js,Core / Platform Foundation — Shared Platform Service,1.0.0-ENTERPRISE,,132a,
+core/modules/builder/analysis-engine.js,Core / Builder — Architectural Understanding (Layer 3: analysis),1.0.0-ENTERPRISE,AnalysisEngine,M373,"Consumes Layer2GraphComposer graphs (Tier A) plus deterministic raw-text security/static-leak heuristics (Tier B) to emit evidence-backed findings; analyzes only, never repairs"
+core/modules/intelligence/knowledge/cozy-knowledge-ingestion.js,Core / Intelligence — Community/Document Knowledge Ingestion,1.0.0,CozyKnowledgeIngestion,RP-029-A,"Document/website/community-submission knowledge ingestion pipeline (SOURCE -> EXTRACTION -> LANGUAGE ID -> SEGMENTATION -> PROVENANCE -> CANDIDATE). No network fetch, no audio/video/speech capability."

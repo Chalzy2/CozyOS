@@ -1,0 +1,90 @@
+{
+  "knowledge_graph_version": "1",
+  "generated_by": "Cozy Builder Observation Engine \u2014 Layer 1",
+  "nodes": [
+    {
+      "module": "AuthCoordinator",
+      "path": "core/modules/identity/auth-coordinator.js",
+      "role": "Authentication orchestrator (login sequence composition only)",
+      "uses": [
+        "IdentityEngine",
+        "AdminRecoveryPolicy",
+        "CozyOS.Session",
+        "CozyOS.Auth"
+      ],
+      "used_by": [
+        "login.html",
+        "index.html",
+        "dashboard.html",
+        "cozy-login-gate.js"
+      ],
+      "introduced": "M120",
+      "updated": [
+        "M125a (Remember Me added)",
+        "M176A (alias-fallback removed)",
+        "M200D (method-name bug fixed)",
+        "M352 (loginWithBiometrics added)",
+        "M372 (session-service wiring + retry logic)"
+      ],
+      "latest_observation": "M372: root-cause session-restoration fix confirmed consistent across login.html, index.html, and this file. No residual defect found in this flow as of this observation pass.",
+      "confidence": 0.99,
+      "evidence_type": "direct source read"
+    },
+    {
+      "module": "AuthorizationCoordinator",
+      "path": "core/security/auth-coordinator.js",
+      "role": "Authorization / step-up policy decisions for already-authenticated sessions",
+      "uses": [
+        "CozyOS.Auth",
+        "AuthPolicyEngine",
+        "AuthFactorRegistry"
+      ],
+      "used_by": [
+        "Developer Hub (per header)"
+      ],
+      "introduced": "unknown (pre-M132a)",
+      "updated": [
+        "M132a (ownership/global-name clarified)",
+        "M177 (factor inventory/health passthroughs)"
+      ],
+      "latest_observation": "Distinct global (AuthorizationCoordinator) from AuthCoordinator by deliberate design; filename collision risk flagged for human review, not a functional bug.",
+      "confidence": 0.9,
+      "evidence_type": "direct source read"
+    },
+    {
+      "module": "Kernel",
+      "path": "core/kernel.js (+ bootstrap.js, compatibility.js, diagnostics.js, lifecycle.js)",
+      "role": "Documented as the platform entry point beneath Shared Engines",
+      "uses": [
+        "Bootstrap",
+        "Compatibility",
+        "Diagnostics"
+      ],
+      "used_by": [],
+      "introduced": "unknown",
+      "updated": [],
+      "latest_observation": "Confirmed orphaned \u2014 no <script> include found in login.html/index.html/dashboard.html. Written in ES-module syntax, inconsistent with the rest of the IIFE-based codebase. Header claims self-certification (26/26) despite being unreferenced.",
+      "confidence": 0.95,
+      "evidence_type": "direct source read + grep across all HTML entrypoints"
+    },
+    {
+      "module": "PluginManager",
+      "path": "core/pluginManager.js",
+      "role": "Plugin lifecycle, crash isolation, health monitoring for 23 registered plugins",
+      "uses": [],
+      "used_by": [
+        "ShopOS plugins",
+        "MpesaOS plugins",
+        "WholesaleOS plugins",
+        "ChurchOS/HospitalOS/PharmacyOS"
+      ],
+      "introduced": "v1.1 (pre-existing), hardened v1.2 this pass's snapshot",
+      "updated": [
+        "Production Hardening Freeze: crash isolation, execution queue, permission allowlist"
+      ],
+      "latest_observation": "No defects found; notably more mature (telemetry, isolation) than most other subsystems observed.",
+      "confidence": 0.85,
+      "evidence_type": "direct source read"
+    }
+  ]
+}

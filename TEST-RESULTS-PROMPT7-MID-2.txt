@@ -1,0 +1,97 @@
+CozyOS — Prompt 7 MID-2 — Test Results
+Run: 2026-08-21T10:42:28Z
+Node: v22.22.2
+
+=== core/security/test/ (all files, individually — node --test on the whole dir errors on an unrelated MODULE_NOT_FOUND path issue, each file below is genuinely run standalone) ===
+
+--- core/security/test/delivery-backend-registry.test.js ---
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 38.74115
+
+--- core/security/test/google-account-linkage.test.js ---
+# tests 15
+# suites 0
+# pass 15
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 48.683809
+
+--- core/security/test/identity-engine.test.js ---
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 50312.834494
+
+--- core/security/test/login-decision-engine.test.js ---
+# tests 19
+# suites 0
+# pass 19
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 25.079139
+
+--- core/security/test/password-reset-service.test.js ---
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 606.317829
+
+--- core/security/test/phone-account-linkage.test.js ---
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 352.222257
+
+--- core/security/test/phone-provider.test.js ---
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 486.061671
+
+=== server/live-relay/test/ (composed by google-account-linkage.js; unmodified; re-run to confirm no regression) ===
+
+--- server/live-relay/test/firebase-identity-issuer.test.js ---
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 89.110503
+
+--- server/live-relay/test/live-distribution-signaling-server.test.js ---
+# tests 23
+# suites 0
+# pass 23
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1331.65295

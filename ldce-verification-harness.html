@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<!--
+  CozyOS — LDCE Browser Runtime Verification Harness
+  File Reference: ldce-verification-harness.html (repository root)
+  Milestone: 364 — Browser Runtime Verification
+
+  PURPOSE
+    A real, working test page — not a mock — that loads the actual
+    CozyOS engines in the exact dependency order dashboard.html uses,
+    and exposes one button per M364 checklist item so a human tester
+    with a real browser, camera, and microphone can exercise the real
+    LDCE stack end-to-end. This file performs NO verification itself —
+    it is the harness a human uses to perform the verification that
+    this sandboxed, browser-less environment cannot perform.
+
+  HOW TO USE
+    1. Serve this repository over HTTPS or localhost (getUserMedia and
+       getDisplayMedia both require a secure context — a real, standard
+       browser restriction, not a CozyOS limitation).
+    2. Open this page in two separate browser windows/devices, using
+       two different userIds (fields below).
+    3. Follow M364-Browser-Verification-Protocol.md step by step,
+       clicking the matching button for each numbered step and
+       recording the real result shown in the Log panel.
+
+  This file is intentionally plain (no Glass UI styling) — it is an
+  internal QA tool, not a user-facing CozyOS experience.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CozyOS LDCE — Browser Verification Harness</title>
+<style>
+  body { font-family: monospace; background:#111; color:#ddd; margin:0; padding:16px; }
+  h1 { color:#4fd1a5; font-size:16px; }
+  h2 { color:#e0b64f; font-size:13px; margin-top:24px; border-bottom:1px solid #333; padding-bottom:4px; }
+  section { margin-bottom:12px; }
+  button { background:#1b5e20; color:#fff; border:none; padding:6px 10px; margin:2px; cursor:pointer; font-family:monospace; font-size:12px; }
+  button:hover { background:#2e7d32; }
+  input, select { background:#222; color:#ddd; border:1px solid #444; padding:4px; margin:2px; font-family:monospace; }
+  #log { background:#000; color:#8f8; padding:10px; height:260px; overflow-y:auto; white-space:pre-wrap; font-size:11px; border:1px solid #333; }
+  video { width:220px; height:160px; background:#000; border:1px solid #444; margin:4px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .status { font-size:11px; opacity:.8; }
+</style>
+</head>
+<body>
+<h1>CozyOS — LDCE Browser Runtime Verification Harness (M364)</h1>
+<p class="status">Follow M364-Browser-Verification-Protocol.md. Each button below performs one real, actual call — nothing here is simulated.</p>
+
+<section class="row">
+  <label>My userId: <input id="myUserId" value="tester-1"></label>
+  <label>Peer userId: <input id="peerUserId" value="tester-2"></label>
+  <label>Session type:
+    <select id="sessionType"><option>phone-call</option><option>meeting</option><option>classroom</option><option>consultation</option></select>
+  </label>
+</section>
+
+<h2>1–2. Session &amp; Two-Device Join</h2>
+<div class="row">
+  <button onclick="H.createSession()">Create Session (host)</button>
+  <button onclick="H.inviteAndJoin()">Invite + Join (as peer)</button>
+  <span class="status" id="sessionIdLabel"></span>
+</div>
+
+<h2>3. Live Audio/Video Attach + WebRTC Connect</h2>
+<div class="row">
+  <video id="localVideo" autoplay muted playsinline></video>
+  <video id="remoteVideo" autoplay playsinline></video>
+</div>
+<div class="row">
+  <button onclick="H.attachLocalMedia()">Attach Local Camera+Mic</button>
+  <button onclick="H.connectToPeer()">Connect To Peer (initiator)</button>
+  <button onclick="H.acceptFromPeer()">Accept Incoming Offer (answerer)</button>
+</div>
+
+<h2>4. Live Captions</h2>
+<div class="row">
+  <button onclick="H.startCaptions()">Start Captioning (my speech)</button>
+  <button onclick="H.stopCaptions()">Stop Captioning</button>
+  <span class="status" id="captionAvailability"></span>
+</div>
+
+<h2>5. Participant Language Switching</h2>
+<div class="row">
+  <label>New language: <input id="newLang" value="sw" style="width:40px"></label>
+  <button onclick="H.switchLanguage()">Switch My Language</button>
+</div>
+
+<h2>6. Disconnect / Reconnect</h2>
+<div class="row">
+  <button onclick="H.disconnectPeer()">Disconnect From Peer</button>
+  <button onclick="H.reconnectPeer()">Reconnect To Peer</button>
+</div>
+
+<h2>7. Network Quality</h2>
+<div class="row">
+  <button onclick="H.checkNetworkQuality()">Get Session Network Quality</button>
+</div>
+
+<h2>8. Screen Sharing</h2>
+<div class="row">
+  <button onclick="H.grantScreenShare()">Grant Myself Screen-Share (host)</button>
+  <button onclick="H.startScreenShare()">Start Screen Share</button>
+</div>
+
+<h2>9. Transcript Persistence + Recovery</h2>
+<div class="row">
+  <button onclick="H.persistTranscript()">Persist Transcript</button>
+  <button onclick="H.recoverTranscript()">Recover Transcript (simulate reload)</button>
+</div>
+
+<h2>ICE Servers (M364 addition)</h2>
+<div class="row">
+  <button onclick="H.showIceServers()">Show Current ICE Servers</button>
+</div>
+
+<h2>Log</h2>
+<div id="log"></div>
+
+<!-- Real engine scripts, exact dependency order from dashboard.html -->
+<script src="Firebase/firebase-config.js"></script>
+<script src="Firebase/firebase-app.js"></script>
+<script src="Firebase/firebase-auth.js"></script>
+<script src="Firebase/firebase-firestore.js"></script>
+<script src="Firebase/firebase-storage.js"></script>
+<script src="Firebase/firebase-provider.js"></script>
+<script src="Firebase/firebase-session.js"></script>
+<script src="Firebase/firebase-bootstrap.js"></script>
+<script src="core/modules/identity/identity-engine.js"></script>
+<script src="core/modules/session/cozy-session-service.js"></script>
+<script src="core/security/auth-coordinator.js"></script>
+<script src="core/engines/collaboration/live-hotspot-engine.js"></script>
+<script src="core/modules/speech/cozy-speech.js"></script>
+<script src="core/modules/speech/adapters/speech-translation-adapter.js"></script>
+<script src="core/modules/speech/adapters/speech-translation-provider.js"></script>
+<script src="core/modules/speech/adapters/speech-recognition-adapter.js"></script>
+<script src="core/modules/speech/voice-manager.js"></script>
+<script src="core/modules/translate/cozy-translate.js"></script>
+<script src="core/engines/camera/browser-camera-provider.js"></script>
+<script src="core/engines/video/live-video-capture-engine.js"></script>
+<script src="core/modules/conversation/cozy-conversation.js"></script>
+<script src="core/modules/communication/ldce-session-engine.js"></script>
+<script src="core/modules/communication/ldce-media-session-engine.js"></script>
+<script src="core/modules/communication/ldce-caption-engine.js"></script>
+<script src="core/modules/communication/ldce-reliability-engine.js"></script>
+<script type="module" src="core/bridge/engine-bridge-bootstrap.js"></script>
+
+<script>
+"use strict";
+function log(msg, data) {
+  const el = document.getElementById("log");
+  const line = `[${new Date().toLocaleTimeString()}] ${msg}` + (data !== undefined ? " " + JSON.stringify(data) : "");
+  el.textContent += line + "\n";
+  el.scrollTop = el.scrollHeight;
+  console.log(line);
+}
+
+const H = {
+  sessionId: null,
+
+  createSession() {
+    const hostId = document.getElementById("myUserId").value;
+    const type = document.getElementById("sessionType").value;
+    const result = window.CozyOS.LDCESessionEngine.createSession(hostId, { type });
+    this.sessionId = result.sessionId;
+    document.getElementById("sessionIdLabel").textContent = "sessionId: " + result.sessionId;
+    log("createSession", result);
+  },
+
+  inviteAndJoin() {
+    const hostId = document.getElementById("myUserId").value;
+    const peerId = document.getElementById("peerUserId").value;
+    const ldce = window.CozyOS.LDCESessionEngine;
+    const invite = ldce.inviteParticipant(this.sessionId, hostId, peerId, { role: "participant" });
+    log("inviteParticipant", invite);
+    const join = ldce.joinSession(this.sessionId, peerId, { language: "en" });
+    log("joinSession (peer)", join);
+  },
+
+  async attachLocalMedia() {
+    const myUserId = document.getElementById("myUserId").value;
+    const videoEl = document.getElementById("localVideo");
+    const result = await window.CozyOS.LDCEMediaSessionEngine.attachLocalMedia(this.sessionId, myUserId, videoEl);
+    log("attachLocalMedia", result);
+  },
+
+  async connectToPeer() {
+    const myUserId = document.getElementById("myUserId").value;
+    const peerId = document.getElementById("peerUserId").value;
+    const result = await window.CozyOS.LDCEMediaSessionEngine.connectToPeer(this.sessionId, myUserId, peerId);
+    log("connectToPeer", result);
+    window.CozyOS.LDCEMediaSessionEngine.on("remote-track", ({ streams }) => {
+      document.getElementById("remoteVideo").srcObject = streams[0];
+      log("remote-track received", { streamId: streams[0].id });
+    });
+  },
+
+  async acceptFromPeer() {
+    const myUserId = document.getElementById("myUserId").value;
+    const peerId = document.getElementById("peerUserId").value;
+    const offerCode = prompt("Paste the offerCode logged on the initiator's side:");
+    const result = await window.CozyOS.LDCEMediaSessionEngine.acceptPeerConnection(this.sessionId, myUserId, peerId, offerCode);
+    log("acceptPeerConnection", result);
+  },
+
+  async startCaptions() {
+    const myUserId = document.getElementById("myUserId").value;
+    const cap = window.CozyOS.LDCECaptionEngine;
+    document.getElementById("captionAvailability").textContent = JSON.stringify(cap.getCaptionAvailability());
+    cap.on("caption-final", (d) => log("caption-final", d));
+    cap.on("caption-translated", (d) => log("caption-translated", d));
+    const result = await cap.startCaptioning(this.sessionId, myUserId, { sourceLanguage: "en" });
+    log("startCaptioning", result);
+  },
+  stopCaptions() {
+    const myUserId = document.getElementById("myUserId").value;
+    log("stopCaptioning", window.CozyOS.LDCECaptionEngine.stopCaptioning(this.sessionId, myUserId));
+  },
+
+  switchLanguage() {
+    const myUserId = document.getElementById("myUserId").value;
+    const newLang = document.getElementById("newLang").value;
+    log("setParticipantLanguage", window.CozyOS.LDCESessionEngine.setParticipantLanguage(this.sessionId, myUserId, newLang));
+  },
+
+  disconnectPeer() {
+    const peerId = document.getElementById("peerUserId").value;
+    log("disconnectFromPeer", window.CozyOS.LDCEMediaSessionEngine.disconnectFromPeer(this.sessionId, peerId));
+  },
+  async reconnectPeer() {
+    const myUserId = document.getElementById("myUserId").value;
+    const peerId = document.getElementById("peerUserId").value;
+    log("reconnectToPeer", await window.CozyOS.LDCEReliabilityEngine.reconnectToPeer(this.sessionId, myUserId, peerId));
+  },
+
+  checkNetworkQuality() {
+    const myUserId = document.getElementById("myUserId").value;
+    log("getSessionNetworkQuality", window.CozyOS.LDCEReliabilityEngine.getSessionNetworkQuality(this.sessionId, myUserId));
+  },
+
+  grantScreenShare() {
+    const myUserId = document.getElementById("myUserId").value;
+    log("grantScreenSharePermission", window.CozyOS.LDCEMediaSessionEngine.grantScreenSharePermission(this.sessionId, myUserId, myUserId));
+  },
+  async startScreenShare() {
+    const myUserId = document.getElementById("myUserId").value;
+    const result = await window.CozyOS.LDCEMediaSessionEngine.startScreenShare(this.sessionId, myUserId);
+    log("startScreenShare", { success: result.success, reason: result.reason });
+    if (result.success) document.getElementById("localVideo").srcObject = result.stream;
+  },
+
+  async persistTranscript() {
+    log("persistTranscript", await window.CozyOS.LDCEReliabilityEngine.persistTranscript(this.sessionId));
+  },
+  async recoverTranscript() {
+    log("recoverTranscript", await window.CozyOS.LDCEReliabilityEngine.recoverTranscript(this.sessionId));
+  },
+
+  showIceServers() {
+    log("getIceServers", window.CozyOS.LiveHotspotEngine.getIceServers());
+  }
+};
+log("Harness loaded. Open the browser console for full object output alongside this log.");
+</script>
+</body>
+</html>
