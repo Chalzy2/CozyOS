@@ -1,0 +1,51 @@
+WorkspaceShell Platform-Admin Handoff Fix — Changed/Added File Hashes
+======================================================================
+
+SCOPE: Server-authoritative platform-admin handoff fix for
+core/shell/cozy-workspace.js's #resolveCurrentUserRole(userId).
+
+ROOT CAUSE: admin-workspace.html -> /webauthn/session ->
+AdminGateCore.decideGateAction() -> correctly recognizes
+isPlatformAdmin:true -> Session.establishFromExternalAuth() preserves
+roles:["platform-admin"] -> WorkspaceShell.mount() ->
+#resolveCurrentUserRole(userId) unconditionally asked the local
+window.CozyOS.IdentityEngine.getDashboardConfig(userId), which honestly
+returns { available: false } for a server-provisioned administrator
+(e.g. "Chalzcozy") with no local IdentityEngine user record -> role
+became null -> Administration nav filtered out -> shell fell back to
+"applications" -> #hasPermission("applications:view") -> false -> Access
+Denied.
+
+FIX: #resolveCurrentUserRole(userId) now reads
+window.CozyOS.Session.current() first. For a session established via
+establishFromExternalAuth() (snapshot.source === "external"), the
+already-verified `roles` array on that snapshot is the sole authority
+for admin/developer status -- local IdentityEngine is never consulted
+for that branch. Native ("identity"-source) sessions are unaffected --
+still resolved via the exact same, unmodified
+IdentityEngine.getDashboardConfig() path as before. Mirrors the existing
+source-based pattern already established in
+core/security/cozy-auth.js's #handleSessionStarted(). Not a second
+authorization engine. AdminGateCore, IdentityEngine, and every other
+file are unmodified.
+
+PRODUCTION FILE MODIFIED (exactly one):
+  core/shell/cozy-workspace.js
+    - Function changed: #resolveCurrentUserRole(userId)
+    - Nothing else in this 5,817-line file was touched (confirmed by
+      full diff against the pre-fix checkpoint).
+
+TEST FILE ADDED (exactly one):
+  core/shell/tests/workspace-shell-platform-admin-handoff.test.js
+    - 7 tests, all passing. Proves: external platform-admin session
+      with no local IdentityEngine record resolves to admin with no
+      Access Denied; external session without admin role never becomes
+      admin; native identity-source resolution is unchanged
+      byte-for-byte; a local/poisoned IdentityEngine cannot manufacture
+      platform-admin status for an external session; server
+      isPlatformAdmin:false (roles: []) cannot be overridden by local
+      state; ordinary-user permission denial/allowance is preserved.
+
+SHA-256 (of the files as they exist in this checkpoint):
+5a05498c9b459335140f3e92e85912ff08b979f0988209625c157ab8fd5caeb2  core/shell/cozy-workspace.js
+0e6e17eff06589e03216ab4e0e93da30c1e6aca969583cf2884c264ce3156bcc  core/shell/tests/workspace-shell-platform-admin-handoff.test.js

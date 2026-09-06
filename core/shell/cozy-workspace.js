@@ -4777,8 +4777,65 @@
             return null;
         }
 
-        /** #resolveCurrentUserRole(userId) — reuses IdentityEngine's own real getDashboardConfig(); never a second role system. */
+        /**
+         * #resolveCurrentUserRole(userId) — reuses IdentityEngine's own real
+         *   getDashboardConfig() for native ("identity"-source) sessions;
+         *   never a second role system for those.
+         *
+         *   PLATFORM-ADMIN HANDOFF FIX (server-authoritative): a session
+         *   established via Session.establishFromExternalAuth() (source:
+         *   "external" — Firebase/WebAuthn admin login, trusted-device or
+         *   biometric Admin Recovery, device-restore) already carries its
+         *   own real, server-verified `roles` array on the Session
+         *   snapshot itself (see cozy-session-service.js). That array is
+         *   the one honestly reported by AdminGateCore's caller after
+         *   /webauthn/session confirms isPlatformAdmin — it is NOT
+         *   something IdentityEngine can or should re-derive, because a
+         *   server-provisioned platform administrator has no local
+         *   IdentityEngine user record to look up (getDashboardConfig()
+         *   correctly, honestly returns `available:false` for an unknown
+         *   userId — that is not a bug in IdentityEngine, it just isn't
+         *   the authority for an externally-authenticated identity).
+         *   Before this fix, the code below unconditionally called
+         *   IdentityEngine.getDashboardConfig(userId) regardless of
+         *   session source, silently downgrading a verified external
+         *   platform-admin session back to "no role" and, from there,
+         *   into the ordinary-employee permission path.
+         *
+         *   This mirrors the exact same source-based pattern already
+         *   established in core/security/cozy-auth.js's
+         *   #handleSessionStarted() (the one other real place in this
+         *   codebase that turns a Session snapshot into an admin/developer
+         *   verdict) — reused here rather than re-invented, and is not a
+         *   second authorization engine: it reads the same Session
+         *   snapshot, the same roles array, the same "external" vs
+         *   "identity" source distinction.
+         *
+         *   Security notes:
+         *     - Only Session.current().roles is trusted for "external"
+         *       sessions — never window.CozyOS.IdentityEngine.isPlatformAdmin()
+         *       or any other client-local state, and never anything on
+         *       `window` outside the Session snapshot.
+         *     - A local IdentityEngine user cannot manufacture this: the
+         *       "external" branch never consults IdentityEngine at all,
+         *       and native ("identity"-source) sessions still go through
+         *       the unmodified getDashboardConfig()/isPlatformAdmin() path
+         *       below exactly as before.
+         *     - If the server-verified session's roles array does not
+         *       contain "platform-admin"/"administrator" (or "developer"),
+         *       this honestly returns null — an external session with no
+         *       admin role is never upgraded, and never falls through to
+         *       the IdentityEngine branch as a second chance.
+         */
         #resolveCurrentUserRole(userId) {
+            const session = window.CozyOS && window.CozyOS.Session;
+            const snapshot = session && typeof session.current === "function" ? session.current() : null;
+            if (snapshot && snapshot.source === "external") {
+                const roles = Array.isArray(snapshot.roles) ? snapshot.roles : [];
+                if (roles.includes("platform-admin") || roles.includes("administrator")) return "admin";
+                if (roles.includes("developer")) return "developer";
+                return null;
+            }
             const identity = window.CozyOS && window.CozyOS.IdentityEngine;
             if (!identity || !userId || typeof identity.getDashboardConfig !== "function") return null;
             try {
