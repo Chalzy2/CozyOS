@@ -65,7 +65,14 @@
     if (window.CozyOS.Modules["authentication-factor-management-panel"] && window.CozyOS.Modules["authentication-factor-management-panel"].version) return;
 
     let rootEl = null;
-    let pendingConfirm = null; // {factorName, action, deviceId} awaiting a second confirm click
+    let pendingConfirm = null;
+    // Domain 2 (Security & Sign-in discovery) — real, in-memory-only
+    // pending state for a TOTP enrollment that has a server-issued
+    // secret but has not yet been confirmed with a code. See
+    // authentication-enrollment-panel.js's own pendingOtpEnrollments for
+    // the identical rationale — never persisted, never marks the factor
+    // enrolled until a real completeServerTotpEnrollment() success.
+    const pendingOtpEnrollments = new Map(); // userId -> { secretBase32, otpauthUri }
 
     /** getCurrentUserId() — real, same canonical pointer M359's panel uses. Never invents an identity. */
     function getCurrentUserId() {
@@ -80,9 +87,32 @@
     }
 
     // ---- Passkey (security-key) ----------------------------------------------------
+    // Domain-1 fix (Security & Sign-in discovery, Phase 1A): this panel
+    // previously called ONLY the legacy client-side
+    // WebAuthnProvider.registerCredential() here, which never talks to
+    // the real server RP (server/webauthn-rp/rp.js). That let an
+    // administrator "enroll" a passkey that AuthEnrollmentStore reported
+    // as enrolled/enabled while the real server-authoritative login path
+    // (AuthCoordinator.loginWithServerPasskey(), the one login.html
+    // actually calls) would never recognize it — a duplicate-authority /
+    // security-theater gap matching the one authentication-
+    // enrollment-panel.js (M359) already closed for its own Enroll
+    // button. This brings passkeyEnroll() to the same, already-tested
+    // pattern: prefer AuthCoordinator.registerServerPasskey() (real
+    // navigator.credentials.create() ceremony against the real server
+    // RP), and fall back to the legacy provider only if the coordinator
+    // truly isn't loaded, so this panel still degrades honestly on an
+    // older page rather than throwing. No new engine, no new storage —
+    // reuses the exact server enroll endpoints
+    // (POST /webauthn/passkeys/enroll/begin|complete), which the server
+    // itself gates on "any authenticated session", not admin-only, so
+    // this fix does not change who is *allowed* to enroll — it changes
+    // which authority the enrollment actually reaches.
     function buildPasskeyCard(userId) {
         const store = window.CozyOS.AuthEnrollmentStore;
         const provider = window.CozyOS.WebAuthnProvider;
+        const coordinator = window.CozyOS.AuthCoordinator;
+        const hasServerPath = !!coordinator && typeof coordinator.registerServerPasskey === "function";
         const record = store ? store.getEnrollment(userId, "security-key") : null;
         const hasCred = provider && typeof provider.hasCredential === "function" ? provider.hasCredential(userId) : false;
         const info = hasCred && typeof provider.getCredentialInfo === "function" ? provider.getCredentialInfo(userId) : null;
@@ -91,16 +121,24 @@
             enrolled: !!record, enabled: record ? record.enabled : null,
             enrolledAt: record ? record.enrolledAt : null, lastUsedAt: record ? record.lastUsedAt : null,
             nickname: info ? info.nickname : null,
-            canEnroll: !record && !!provider && typeof provider.registerCredential === "function",
+            canEnroll: !record && (hasServerPath || (!!provider && typeof provider.registerCredential === "function")),
             canRename: !!record && hasCred && !!provider && typeof provider.renameCredential === "function",
-            enrollUnavailableReason: !provider ? "WebAuthnProvider is not loaded." : null,
+            enrollUnavailableReason: (!hasServerPath && !provider) ? "Neither AuthCoordinator.registerServerPasskey() nor the legacy WebAuthnProvider is loaded." : null,
         };
     }
 
     async function passkeyEnroll(userId) {
-        const provider = window.CozyOS.WebAuthnProvider;
         const store = window.CozyOS.AuthEnrollmentStore;
-        if (!provider || typeof provider.registerCredential !== "function") return { success: false, reason: "WebAuthnProvider is not loaded." };
+        const coordinator = window.CozyOS.AuthCoordinator;
+        if (coordinator && typeof coordinator.registerServerPasskey === "function") {
+            const result = await coordinator.registerServerPasskey();
+            if (!result || result.available !== true) {
+                return { success: false, reason: (result && result.reason) || "Passkey registration failed." };
+            }
+            return store.enroll(userId, "security-key", { meta: { credentialId: result.credentialId, nickname: result.nickname, source: "server" } });
+        }
+        const provider = window.CozyOS.WebAuthnProvider;
+        if (!provider || typeof provider.registerCredential !== "function") return { success: false, reason: "Neither AuthCoordinator.registerServerPasskey() nor the legacy WebAuthnProvider is loaded." };
         const real = await provider.registerCredential(userId, { displayName: userId });
         if (!real.success) return real;
         return store.enroll(userId, "security-key", { meta: null });
@@ -125,30 +163,92 @@
         const record = store ? store.getEnrollment(userId, "otp") : null;
         const accountId = record && record.meta ? record.meta.accountId : null;
         const account = accountId && provider && typeof provider.getAccount === "function" ? provider.getAccount(accountId) : null;
+        const pending = pendingOtpEnrollments.get(userId);
         return {
             factorName: "otp", label: "Authenticator App (TOTP)", kind: "single",
             enrolled: !!record, enabled: record ? record.enabled : null,
             enrolledAt: record ? record.enrolledAt : null, lastUsedAt: record ? record.lastUsedAt : null,
             accountId, accountName: account ? account.accountName : null, issuer: account ? account.issuer : null,
-            canEnroll: !record && !!provider && typeof provider.enrollAccount === "function",
+            canEnroll: !record && !pending,
+            pendingVerification: pending ? { secretBase32: pending.secretBase32, otpauthUri: pending.otpauthUri } : null,
             canRename: false,
             renameUnavailableReason: "No real rename/update path exists on OtpProvider (frozen; this milestone's approval covered TrustedDeviceManager and WebAuthnProvider only). Disclosed rather than faked.",
-            enrollUnavailableReason: !provider ? "OtpProvider is not loaded." : null,
+            enrollUnavailableReason: (!record && !pending) ? null : null,
         };
     }
+    // Domain 2 (Security & Sign-in discovery) — real, two-step,
+    // server-authoritative TOTP enrollment. Prefers
+    // AuthCoordinator.beginServerTotpEnrollment() (the same server real
+    // login-time MFA already trusts) over the legacy, client-only
+    // OtpProvider, which never talks to that server at all. Falls back
+    // to OtpProvider only when the server honestly reports no session
+    // exists (requiresAuth:true) — same rule as passkeyEnroll() above.
+    // Unlike Passkey's one-shot ceremony, a real server success here
+    // does NOT enroll immediately: it stashes the server-issued secret
+    // in pendingOtpEnrollments and returns pending:true. Only
+    // otpConfirm() below, after a real completeServerTotpEnrollment()
+    // success, calls AuthEnrollmentStore.enroll().
     async function otpEnroll(userId) {
-        const provider = window.CozyOS.OtpProvider;
         const store = window.CozyOS.AuthEnrollmentStore;
-        if (!provider || typeof provider.enrollAccount !== "function") return { success: false, reason: "OtpProvider is not loaded." };
+        const coordinator = window.CozyOS.AuthCoordinator;
+        if (coordinator && typeof coordinator.beginServerTotpEnrollment === "function") {
+            const begin = await coordinator.beginServerTotpEnrollment();
+            if (begin && begin.available === true) {
+                pendingOtpEnrollments.set(userId, { secretBase32: begin.secretBase32, otpauthUri: begin.otpauthUri });
+                return { success: true, pending: true, secretBase32: begin.secretBase32, otpauthUri: begin.otpauthUri };
+            }
+            if (!begin || !begin.requiresAuth) {
+                return { success: false, reason: (begin && begin.reason) || "Authenticator app setup failed." };
+            }
+            // requiresAuth:true -> no server session for this identity -> honest fallback below.
+        }
+        const provider = window.CozyOS.OtpProvider;
+        if (!provider || typeof provider.enrollAccount !== "function") return { success: false, reason: "Neither AuthCoordinator.beginServerTotpEnrollment() nor the legacy OtpProvider is loaded." };
         const real = provider.enrollAccount({ issuer: "CozyOS", accountName: userId });
         if (!real.success) return real;
-        const stored = store.enroll(userId, "otp", { meta: { accountId: real.accountId } });
+        const stored = store.enroll(userId, "otp", { meta: { accountId: real.accountId, source: "legacy" } });
         return { ...stored, otpauthUri: real.otpauthUri, secretBase32: real.secretBase32 };
+    }
+    /**
+     * otpConfirm(userId, code)
+     *   Real server confirmation — submits the code to
+     *   AuthCoordinator.completeServerTotpEnrollment(), never verified
+     *   locally. Only a real server success calls
+     *   AuthEnrollmentStore.enroll(); a real rejection (invalid code,
+     *   expired, etc.) is relayed honestly and the pending secret is
+     *   deliberately kept so the person can retry without a brand-new
+     *   secret.
+     */
+    async function otpConfirm(userId, code) {
+        const store = window.CozyOS.AuthEnrollmentStore;
+        const coordinator = window.CozyOS.AuthCoordinator;
+        const pending = pendingOtpEnrollments.get(userId);
+        if (!pending) return { success: false, reason: "No pending authenticator app setup to confirm." };
+        if (!coordinator || typeof coordinator.completeServerTotpEnrollment !== "function") return { success: false, reason: "AuthCoordinator.completeServerTotpEnrollment() is not loaded." };
+        const result = await coordinator.completeServerTotpEnrollment(code);
+        if (!result || result.available !== true) return { success: false, reason: (result && result.reason) || "Authenticator app confirmation failed." };
+        pendingOtpEnrollments.delete(userId);
+        return store.enroll(userId, "otp", { meta: { recoveryCodes: result.recoveryCodes || null, source: "server" } });
+    }
+    function otpCancelPending(userId) {
+        pendingOtpEnrollments.delete(userId);
+        return { success: true };
     }
     async function otpRemove(userId) {
         const store = window.CozyOS.AuthEnrollmentStore;
         const provider = window.CozyOS.OtpProvider;
         const record = store ? store.getEnrollment(userId, "otp") : null;
+        // A server-sourced enrollment has real server-side state
+        // (totp_enabled=1) that only the server can honestly clear —
+        // never just delete the local record and call it "disabled".
+        if (record && record.meta && record.meta.source === "server") {
+            const coordinator = window.CozyOS.AuthCoordinator;
+            if (!coordinator || typeof coordinator.disableServerTotp !== "function") return { success: false, reason: "AuthCoordinator.disableServerTotp() is not loaded." };
+            const result = await coordinator.disableServerTotp();
+            if (result.available !== true) return { success: false, reason: result.reason || "Could not disable the authenticator app." };
+            const storeResult = store.removeEnrollment(userId, "otp");
+            return { success: storeResult.success, reason: storeResult.success ? null : storeResult.reason };
+        }
         const accountId = record && record.meta ? record.meta.accountId : null;
         const removed = accountId && provider && typeof provider.removeAccount === "function" ? provider.removeAccount(accountId) : { success: false, reason: "No enrolled OTP account to remove." };
         const storeResult = store ? store.removeEnrollment(userId, "otp") : { success: false };
@@ -199,6 +299,10 @@
     function renderSingleCard(card) {
         const actions = [];
         if (card.canEnroll) actions.push(btn(card.factorName, "enroll", "Enroll"));
+        if (card.pendingVerification) {
+            actions.push(btn(card.factorName, "confirm", "Confirm Code"));
+            actions.push(btn(card.factorName, "cancel-pending", "Cancel", true));
+        }
         if (card.enrolled) {
             actions.push(btn(card.factorName, card.enabled ? "disable" : "enable", card.enabled ? "Disable" : "Enable"));
             if (card.canRename) actions.push(btn(card.factorName, "rename-prompt", "Rename"));
@@ -207,9 +311,11 @@
         return `
         <div class="cozy-fm-card">
             <h3>${escapeHtml(card.label)}${card.nickname ? ` — <span class="cozy-fm-nick">${escapeHtml(card.nickname)}</span>` : ""}</h3>
-            <div class="cozy-fm-field"><span class="cozy-fm-k">Status</span><span class="cozy-fm-v">${card.enrolled ? (card.enabled ? "Enrolled — Enabled" : "Enrolled — Disabled") : "Not Enrolled"}</span></div>
+            <div class="cozy-fm-field"><span class="cozy-fm-k">Status</span><span class="cozy-fm-v">${card.pendingVerification ? "Enrollment Pending — Confirm Code" : card.enrolled ? (card.enabled ? "Enrolled — Enabled" : "Enrolled — Disabled") : "Not Enrolled"}</span></div>
             ${card.enrolled ? `<div class="cozy-fm-field"><span class="cozy-fm-k">Enrolled</span><span class="cozy-fm-v">${escapeHtml(card.enrolledAt || "—")}</span></div>
             <div class="cozy-fm-field"><span class="cozy-fm-k">Last Used</span><span class="cozy-fm-v">${escapeHtml(card.lastUsedAt || "Never")}</span></div>` : ""}
+            ${card.pendingVerification ? `<div class="cozy-fm-field"><span class="cozy-fm-k">Secret (manual entry)</span><span class="cozy-fm-v">${escapeHtml(card.pendingVerification.secretBase32 || "—")}</span></div>
+            <div class="cozy-fm-field"><span class="cozy-fm-k">Setup URI</span><span class="cozy-fm-v">${escapeHtml(card.pendingVerification.otpauthUri || "—")}</span></div>` : ""}
             ${card.accountName ? `<div class="cozy-fm-field"><span class="cozy-fm-k">Account</span><span class="cozy-fm-v">${escapeHtml(card.issuer)}:${escapeHtml(card.accountName)}</span></div>` : ""}
             ${card.renameUnavailableReason && card.enrolled ? `<div class="cozy-fm-field"><span class="cozy-fm-k">Rename</span><span class="cozy-fm-v cozy-fm-muted">${escapeHtml(card.renameUnavailableReason)}</span></div>` : ""}
             ${card.enrollUnavailableReason && !card.enrolled ? `<div class="cozy-fm-field"><span class="cozy-fm-k">Enroll Unavailable</span><span class="cozy-fm-v cozy-fm-muted">${escapeHtml(card.enrollUnavailableReason)}</span></div>` : ""}
@@ -280,7 +386,7 @@
      *   Real — routes to the composed engines above. Enroll/Rename call
      *   the real provider FIRST; only a real success is ever recorded.
      */
-    async function doAction(factorName, action, deviceId, nickname) {
+    async function doAction(factorName, action, deviceId, nickname, code) {
         const userId = getCurrentUserId();
         if (!userId) return { success: false, reason: "No signed-in user." };
 
@@ -293,6 +399,8 @@
         }
         if (factorName === "otp") {
             if (action === "enroll") return otpEnroll(userId);
+            if (action === "confirm") return otpConfirm(userId, code);
+            if (action === "cancel-pending") return otpCancelPending(userId);
             if (action === "enable") return window.CozyOS.AuthEnrollmentStore.setEnabled(userId, "otp", true);
             if (action === "disable") return window.CozyOS.AuthEnrollmentStore.setEnabled(userId, "otp", false);
             if (action === "remove") return otpRemove(userId);
@@ -366,6 +474,18 @@
             const nickname = (typeof window.prompt === "function") ? window.prompt("New name:") : null;
             if (!nickname) return;
             lastResult = await doAction(factorName, "rename", deviceId, nickname);
+            rerender();
+            return;
+        }
+        if (action === "confirm") {
+            const code = (typeof window.prompt === "function") ? window.prompt("Enter the 6-digit code from your authenticator app:") : null;
+            if (!code) return;
+            lastResult = await doAction(factorName, "confirm", deviceId, null, code);
+            rerender();
+            return;
+        }
+        if (action === "cancel-pending") {
+            lastResult = await doAction(factorName, "cancel-pending");
             rerender();
             return;
         }

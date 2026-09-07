@@ -133,8 +133,15 @@ async function withBrowser(fn) {
     throw err;
   }
 
-  async function openPage() {
-    const page = await browser.newPage();
+  async function openPage(opts = {}) {
+    // Small, additive extension (found while consolidating the Live
+    // Item 1-6 browser tests onto this canonical harness): those tests
+    // each needed real desktop AND real 390x844 mobile viewports per
+    // page. browser.newPage() already supports a viewport option
+    // natively - this just forwards it, with no change to any existing
+    // caller that doesn't pass one (opts defaults to {}, browser.newPage({})
+    // behaves identically to browser.newPage()).
+    const page = await browser.newPage(opts);
     const consoleErrors = [];
     const pageErrors = [];
     const failedRequests = [];

@@ -129,12 +129,61 @@
      *   livingAI.registerProvider('cloud-llm', provider) itself — a
      *   one-line caller decision, not something this file assumes.
      */
+    /**
+     * Domain 4L dependency #1 (AI Provider/Model Integration) — real,
+     * optional visibility registration into the existing, already-built
+     * core/shell/provider-manager.js tracking layer, mirroring the
+     * exact same pattern rule-based-conversational-provider.js already
+     * uses for itself. No new registry, no new health framework: this
+     * only calls ProviderManager's existing register() with a real,
+     * honest getHealth().
+     *
+     * HONESTY: unlike the rule-based composer (which has zero external
+     * dependency and can honestly always report ONLINE), this provider
+     * genuinely cannot determine whether the same-origin backend has a
+     * real GEMINI_API_KEY configured or has real network egress without
+     * making a live request — and a getHealth() call must not silently
+     * trigger a real, possibly-billed external API call as a side
+     * effect. So this honestly reports "UNKNOWN" rather than guessing
+     * ONLINE or fabricating a specific reachable/unreachable claim;
+     * genuine availability is only ever known from a real think() call
+     * result (isReal), which callers already see directly.
+     */
+    function registerWithProviderManager(provider) {
+        const pm = typeof window !== 'undefined' && window.CozyOS && window.CozyOS.ProviderManager;
+        if (!pm || typeof pm.register !== 'function') return false;
+        pm.register({
+            id: 'gemini-api',
+            name: 'Gemini Cloud Provider',
+            category: 'conversational',
+            version: '1.0.0',
+            // Domain 4L: no `dependencies` entries here — ProviderManager's
+            // own real contract treats each dependency as another
+            // provider id registered with THIS SAME manager (see its
+            // #checkDependencies()); the same-origin backend endpoint
+            // that actually holds the credential is a server-side file,
+            // never itself registered as a ProviderManager entry, so
+            // listing it here would incorrectly report FAILED (missing
+            // dependency) instead of this provider's own genuine UNKNOWN.
+            dependencies: [],
+            getHealth() {
+                return {
+                    health: 'UNKNOWN',
+                    reason: 'Real availability depends on a same-origin backend holding a real GEMINI_API_KEY and having real network egress — neither is knowable from this client-side descriptor without making a live request, which getHealth() must not trigger as a side effect. See the most recent think() result for genuine, observed availability (isReal).'
+                };
+            }
+        });
+        return true;
+    }
+
     function registerGeminiCloudProvider(livingAI, opts = {}) {
         if (!livingAI || typeof livingAI.registerProvider !== 'function') {
             return { success: false, reason: 'A real CozyLivingAI instance with registerProvider() is required.' };
         }
         const provider = createGeminiCloudProvider(opts);
-        return { ...livingAI.registerProvider('gemini-api', provider), provider };
+        const result = livingAI.registerProvider('gemini-api', provider);
+        registerWithProviderManager(provider);
+        return { ...result, provider };
     }
 
     return { createGeminiCloudProvider, registerGeminiCloudProvider };

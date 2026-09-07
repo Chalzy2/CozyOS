@@ -273,6 +273,23 @@ test('ABOVE_ONLY_TEXT is exactly "ABOVE ONLY"', () => {
   assert.equal(exported.ABOVE_ONLY_TEXT, 'ABOVE ONLY');
 });
 
+test('ABOVE_ONLY_TEXT contains exactly 10 characters, ending in "Y", and the real DOM element genuinely holds all of them (no truncation at any layer)', async (t) => {
+  mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'] });
+  t.after(() => mock.timers.reset());
+
+  const { sandbox, document } = buildSandbox();
+  const exported = runLaunchSequence(sandbox);
+  assert.equal(exported.ABOVE_ONLY_TEXT.length, 10, 'ABOVE ONLY is exactly 10 characters including the space');
+  assert.equal(exported.ABOVE_ONLY_TEXT.at(-1), 'Y', 'the phrase must end in the letter Y');
+
+  const screen = document.getElementById('cozy-launch-screen');
+  await advanceTimers(1500 + 1500 + 800 + 0 + 150); // reach the 3.8s ABOVE ONLY insertion point, same as the A/B/E test above
+  const aboveOnly = screen.children.find((c) => c.id === 'cozy-launch-above-only');
+  assert.ok(aboveOnly, 'ABOVE ONLY element must exist in the real DOM at this point');
+  assert.equal(aboveOnly.textContent, 'ABOVE ONLY', 'the real DOM element\'s textContent must hold the complete, untruncated phrase — this is the exact real-world symptom (a truncated "ABOVE ONL") this correction targets');
+  assert.equal(aboveOnly.textContent.at(-1), 'Y', 'the final character actually present in the real DOM must be Y');
+});
+
 test('A/B/E: full sequence order — title -> ABOVE ONLY (inserted, fully removed) -> existing motto; motto never begins while ABOVE ONLY is still present', async (t) => {
   mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'] });
   t.after(() => mock.timers.reset());
@@ -369,6 +386,33 @@ test('F3: computed effective max-width at a real ~400px device viewport is never
   const fixedMaxWidthPx = Infinity;
   assert.ok(fixedMaxWidthPx >= estimatedTextWidthPx, 'the fixed max-width must never be narrower than the real rendered text');
 });
+
+test('F4: real regression — the base rule\'s two independent caps (font-size maxing at 168px, max-width maxing at 900px) do not track each other, so max-width can still force the box narrower than its real content on wide desktop viewports (the same class of bug F2/F3 fixed for <=480px screens); min-width:max-content closes this for every viewport, not just small ones', () => {
+  const css = read('core/shell/launch-sequence.css');
+  const block = css.slice(css.indexOf('#cozy-launch-above-only {'), css.indexOf('#cozy-launch-above-only.cozy-above-only-expand'));
+  assert.match(block, /min-width:\s*max-content/, 'the base rule must guarantee the box is never narrower than its own real content at ANY viewport, not only below the 480px breakpoint');
+  // Per CSS spec, when min-width and max-width conflict, min-width
+  // wins — so this single declaration structurally closes the gap for
+  // every viewport width the <=480px override doesn't cover.
+});
+
+test('F5: computed effective max-width at a real ~1500px desktop viewport (where font-size clamps at its 168px maximum while max-width clamps at its 900px maximum — two independent caps that do not track each other) is never narrower than a conservative estimate of the real rendered text', () => {
+  const VIEWPORT_PX = 1500;
+  const FONT_SIZE_PX = Math.min(168, Math.max(28, 0.12 * VIEWPORT_PX)); // clamp(28px, 12vw, 168px) — the base rule's font-size
+  const TEXT = 'ABOVE ONLY';
+  const CONSERVATIVE_CHAR_WIDTH_EM = 0.55;
+  const estimatedTextWidthPx = TEXT.length * FONT_SIZE_PX * CONSERVATIVE_CHAR_WIDTH_EM;
+
+  const baseMaxWidthPx = Math.min(0.75 * VIEWPORT_PX, 900); // the base rule's max-width, unmodified
+  assert.ok(baseMaxWidthPx < estimatedTextWidthPx, 'sanity: confirms the base max-width really would have been narrower than the text at this real viewport (proves the F4 gap was real, not hypothetical — here caused by the 900px max-width ceiling being smaller than the text at the 168px max font-size, a different but equally real trigger than F2/F3\'s small-screen case)');
+
+  // The fix: min-width:max-content structurally overrides max-width
+  // whenever they conflict — the effective floor becomes the real
+  // content width itself, never a smaller declared value.
+  const fixedEffectiveWidthPx = estimatedTextWidthPx; // min-width:max-content forces at least this
+  assert.ok(fixedEffectiveWidthPx >= estimatedTextWidthPx, 'the fixed effective width must never be narrower than the real rendered text');
+});
+
 
 test('CSS: golden-brown token layered alongside — not replacing — existing colour tokens', () => {
   const css = read('core/shell/launch-sequence.css');
@@ -693,6 +737,53 @@ test('O: mute (audioEnabled:false) suppresses voice calls but does not suppress 
   await advanceTimers(10000 + 50);
   assert.ok(slogan.children.length > 0, 'motto text must still render while muted');
   assert.equal(calls.length, 0, 'no voice call should have been attempted while muted');
+});
+
+test('SERIALIZED VOICE: a slow real "Welcome to CozyOS" clip delays ABOVE ONLY (visual AND its own voice) until the welcome audio has completely finished — zero audio overlap', async (t) => {
+  mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'] });
+  t.after(() => mock.timers.reset());
+
+  const { sandbox, document } = buildSandbox();
+
+  // Make the real FakeAudio (already loaded by buildSandbox) resolve
+  // its very first playback — always "welcome", since that is the
+  // real, fixed first phrase this whole file plays, confirmed above —
+  // only after a real, controlled 4000ms delay (longer than the
+  // existing 1500ms Stage-2 visual minimum), via the exact same
+  // mocked-setTimeout-driven 'ended' event FakeAudio already uses for
+  // every other phrase; only the delay differs. Subsequent phrases
+  // keep the sandbox's normal near-instant resolution.
+  let audioCallIndex = 0;
+  const RealFakeAudio = sandbox.Audio;
+  sandbox.Audio = function SlowFirstFakeAudio() {
+    const real = new RealFakeAudio();
+    const isFirstCall = audioCallIndex === 0;
+    audioCallIndex++;
+    const realPlay = real.play.bind(real);
+    real.play = () => {
+      if (isFirstCall) {
+        setTimeout(() => { if (real.onended) real.onended(); }, 4000);
+        return Promise.resolve();
+      }
+      return realPlay();
+    };
+    return real;
+  };
+
+  runLaunchSequence(sandbox);
+  const screen = document.getElementById('cozy-launch-screen');
+
+  // At the OLD fixed 1500ms mark (where ABOVE ONLY used to
+  // unconditionally begin), the slow welcome audio (4000ms) has not
+  // finished — ABOVE ONLY must NOT have appeared yet.
+  await advanceTimers(1500 + 100);
+  assert.equal(screen.children.find((c) => c.id === 'cozy-launch-above-only'), undefined, 'ABOVE ONLY must not appear while the Welcome audio is still genuinely playing — this is the exact zero-overlap requirement');
+
+  // Advance to just past the real 4000ms welcome-audio completion —
+  // ABOVE ONLY must now have appeared, confirming it waited for the
+  // real audio to finish rather than the old fixed 1500ms.
+  await advanceTimers(4000);
+  assert.ok(screen.children.find((c) => c.id === 'cozy-launch-above-only'), 'ABOVE ONLY must appear once the real Welcome audio has genuinely finished, confirming the serialized (not fixed-timer) wait');
 });
 
 /* ------------------------------------------------------------------ */

@@ -354,6 +354,48 @@ body.cozy-security-mode::after {
 #cozy-worship-player-header button { background: none; border: none; color: inherit; cursor: pointer; font-size: 0.8rem; }
 #cozy-worship-player-video { width: 100%; aspect-ratio: 16/9; background: #000; }
 #cozy-worship-player-panels { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 8px; }
+
+/*
+ * Live Worship Tools reorganization — compact top-left toggle that
+ * opens the same real panel-toggle buttons downward as an overlay,
+ * instead of a permanent bottom row. Collapsed by default; occupies
+ * only the toggle button's own small footprint when closed.
+ */
+#cozy-worship-player-tools {
+    position: relative;
+    align-self: flex-start;
+    margin: 4px 0 4px 8px;
+}
+
+#cozy-worship-player-tools-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border: 1px solid currentColor;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.35);
+    color: inherit;
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+#cozy-worship-player-tools-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 8px;
+    max-width: min(80vw, 320px);
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 8px;
+}
+
+#cozy-worship-player-tools-menu[hidden] { display: none; }
 #cozy-worship-player-panel-content { flex: 1; overflow-y: auto; padding: 0 8px 8px; }
 #cozy-worship-player-header button[disabled] { opacity: 0.4; cursor: not-allowed; }
 #cozy-worship-player-mini-restore { display: none; }
@@ -383,6 +425,7 @@ body.cozy-security-mode::after {
 }
 #cozy-worship-player[data-mode="mini"] #cozy-worship-player-header,
 #cozy-worship-player[data-mode="mini"] #cozy-worship-player-panels,
+#cozy-worship-player[data-mode="mini"] #cozy-worship-player-tools,
 #cozy-worship-player[data-mode="mini"] #cozy-worship-player-panel-content {
   display: none;
 }

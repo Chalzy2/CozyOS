@@ -225,8 +225,20 @@
      *
      *   Never fabricates a translation if the real provider is
      *   unavailable — resolves { success:false, reason } instead.
+     *
+     *   preferredProviderName (Domain 4C addition) — optional. When
+     *   supplied, passed straight through to
+     *   SpeechTranslationProviders.translate()'s own existing
+     *   preferredProviderName parameter (unchanged, not new). Lets a
+     *   caller explicitly request e.g. "gemini-translate" instead of
+     *   whichever provider registered first (nllb-bridge, by default,
+     *   via ensureNllbProviderRegistered() below — unchanged for every
+     *   existing caller that doesn't pass this). Registering the Gemini
+     *   provider is the caller's own responsibility (e.g. via
+     *   SpeechTranslationGeminiProvider.register()), exactly like NLLB
+     *   registration already works.
      */
-    async function translateSegment({ segmentId, sourceLanguage, targetLanguage, sourceText, context = null, sourceTiming = null, pauseMetadata = null } = {}) {
+    async function translateSegment({ segmentId, sourceLanguage, targetLanguage, sourceText, context = null, sourceTiming = null, pauseMetadata = null, preferredProviderName = null } = {}) {
         const segmentCore = window.CozyOS.TranslationSegmentCore;
         if (!segmentCore) return { success: false, reason: 'TranslationSegmentCore is not loaded.' };
 
@@ -262,7 +274,7 @@
             providerName = 'verified-vocabulary';
         } else if (routing.route === 'provider') {
             const providers = window.CozyOS.SpeechTranslationProviders;
-            const result = await providers.translate(sourceText, { sourceLanguage, targetLanguage });
+            const result = await providers.translate(sourceText, { sourceLanguage, targetLanguage }, preferredProviderName);
             if (!result.isReal) {
                 return { success: false, reason: result.reason || 'Translation provider did not return a real result.', voice, routing };
             }

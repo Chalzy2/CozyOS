@@ -1132,4 +1132,43 @@
     }
 
     window.CozyOS.Background = new CozyLivingBackground();
+
+    // Engine Ecosystem discovery dependency #2 — real, additive,
+    // observational registration (see cozy-theme.js's identical
+    // pattern for the full rationale). ProviderManager never becomes
+    // the owner of background rendering; every existing caller of
+    // window.CozyOS.Background's real API is unchanged.
+    if (window.CozyOS.ProviderManager && typeof window.CozyOS.ProviderManager.register === "function") {
+        window.CozyOS.ProviderManager.register({
+            id: "cozy-background",
+            name: "CozyOS Living Background Engine",
+            category: "visual",
+            version: "1.0.0",
+            dependencies: [],
+            getHealth() {
+                const bg = window.CozyOS.Background;
+                // Real, observable facts only: init() creates a real
+                // canvas element; animate()'s own requestAnimationFrame
+                // loop sets a real, non-null animationFrameId while it is
+                // genuinely scheduled to run again. Neither fact is
+                // fabricated — both are the same fields the engine's own
+                // real render loop reads and writes.
+                const initialized = !!bg.canvas;
+                const animating = !!bg.animationFrameId;
+                if (!initialized) {
+                    return { health: "DEGRADED", reason: "init() has not run yet — no canvas exists.", initialized, animating };
+                }
+                if (!animating) {
+                    // A real, honest middle state: this engine has real
+                    // reasons to legitimately pause without being broken
+                    // (prefersReducedMotion, background tab via
+                    // isTabActive) — reported as DEGRADED rather than a
+                    // fabricated ONLINE, since "not currently rendering"
+                    // is the observable truth regardless of the reason.
+                    return { health: "DEGRADED", reason: "Initialized, but no animation frame is currently scheduled (paused, reduced-motion, or inactive tab).", initialized, animating, prefersReducedMotion: !!bg.prefersReducedMotion, isTabActive: !!bg.isTabActive };
+                }
+                return { health: "ONLINE", reason: "Initialized and actively animating.", initialized, animating };
+            }
+        });
+    }
 })();

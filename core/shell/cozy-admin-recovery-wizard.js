@@ -354,15 +354,48 @@
         /**
          * #renderNewBiometricEnrollmentStep(newDevice)
          *   Real new-device biometric enrollment, required by spec after
-         *   any device replacement. Composes the same real
-         *   WebAuthnProvider.registerCredential() the rest of the
-         *   platform already uses for enrollment (see cozy-login-gate.js's
-         *   offerBiometricEnrollmentIfEligible()) — this is a second real
-         *   UI trigger for that one real engine, not a second engine.
-         *   Skippable (an administrator may not want biometrics on this
-         *   device, or the browser may not support WebAuthn) — device
-         *   replacement itself is mandatory and already complete by this
-         *   point; only the biometric re-enrollment is optional.
+         *   any device replacement. Skippable (an administrator may not
+         *   want biometrics on this device, or the browser may not
+         *   support WebAuthn) — device replacement itself is mandatory
+         *   and already complete by this point; only the biometric
+         *   re-enrollment is optional.
+         *
+         *   DOMAIN-1 FIX + DISCLOSED LIMITATION (Security & Sign-in
+         *   discovery, Phase 1A completion): the click handler below now
+         *   goes through the same real, shared enrollBiometricCredential()
+         *   helper cozy-login-gate.js exports — preferring
+         *   AuthCoordinator.registerServerPasskey() (the real
+         *   server-authoritative ceremony) and falling back to the legacy
+         *   client-only WebAuthnProvider only when the server honestly
+         *   reports no session exists (requiresAuth:true).
+         *
+         *   In THIS flow specifically, that fallback branch is expected
+         *   to fire every time, today: this entire wizard (identify user →
+         *   verify recovery method → resetPassword) runs entirely against
+         *   IdentityEngine's own local, per-browser user store — it never
+         *   calls any server/webauthn-rp endpoint and never has a
+         *   cozy_admin_session cookie at any point. Confirmed by direct
+         *   inspection (this.#userId/this.#username come from
+         *   IdentityEngine.getUserIdByUsername(), and password reset
+         *   calls only IdentityEngine.resetPassword() — never
+         *   POST /auth/login or any /webauthn/* route). So going through
+         *   registerServerPasskey() here cannot yet enroll a real,
+         *   server-verified passkey for anyone — it can only confirm
+         *   honestly that no server session exists, then fall back to the
+         *   same client-only credential this step already produced before
+         *   this fix. This wiring is still correct to make now (it will
+         *   automatically start using the real server path the moment
+         *   this recovery flow is ever connected to a real server
+         *   session, with no further code change here) but it does NOT
+         *   by itself let this wizard recover the real production
+         *   administrator account (chalzowuor516@gmail.com / Chalzcozy),
+         *   which exists only in server/webauthn-rp's database and has no
+         *   IdentityEngine record at all — the same gap already disclosed
+         *   in cozy-login-gate.js's password-login fix. That gap is
+         *   real, pre-existing, and NOT closed by this change; it needs
+         *   its own deliberate decision (does the real admin account get
+         *   a server-side recovery flow at all?) before it can be fixed,
+         *   and is out of scope for a WebAuthn call-site swap.
          */
         #renderNewBiometricEnrollmentStep(newDevice) {
             const webauthn = window.CozyOS.WebAuthnProvider;
@@ -380,8 +413,11 @@
             if (enrollBtn) {
                 enrollBtn.addEventListener("click", async () => {
                     const identity = window.CozyOS.IdentityEngine;
-                    const result = await webauthn.registerCredential(this.#userId, { displayName: this.#username });
-                    if (!result.success) { this.#showError(result.reason || "Biometric enrollment failed."); return; }
+                    const enrollBiometric = window.CozyOS.LoginGate && window.CozyOS.LoginGate.enrollBiometricCredential;
+                    const result = typeof enrollBiometric === "function"
+                        ? await enrollBiometric(this.#userId, { displayName: this.#username })
+                        : await webauthn.registerCredential(this.#userId, { displayName: this.#username }); // honest degrade if the shared helper isn't loaded
+                    if (!result || result.success === false) { this.#showError((result && result.reason) || "Biometric enrollment failed."); return; }
                     window.CozyOS.TrustedDeviceManager.setBiometricEnabled(newDevice.deviceId, true);
                     if (identity && typeof identity.logSecurityEvent === "function") {
                         identity.logSecurityEvent("BIOMETRIC_ENROLLED_ON_RECOVERY", `${this.#username} :: ${newDevice.deviceId}`);

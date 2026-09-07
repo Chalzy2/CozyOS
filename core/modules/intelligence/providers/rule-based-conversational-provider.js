@@ -220,8 +220,25 @@
         // never founder-story-seed.js.
         { id: "why-use-cozyos", pattern: /\bwhy\s+(?:should|would)\s+(?:i|someone|you)\s+use\s+cozyos\b|\bwhy\s+use\s+cozyos\b|\bbenefits?\s+of\s+cozyos\b|\bwhy\s+cozyos\b|\bkwa\s+nini\s+nitumie(?:\s+cozyos)?\b|\bkwa\s+nini\s+(?:ni)?tumie\s+cozyos\b|\bfaida\s+za\s+cozyos\b/i },
         { id: "differentiation", pattern: /\bhow\s+is\s+cozyos\s+different\b|\bwhat\s+makes\s+cozyos\s+different\b|\bhow\s+does\s+cozyos\s+differ\b|\bcozyos\s+vs\.?\s|\bcompared\s+to\s+other\s+apps?\b|\binatofautianaje\b|\btofauti\s+(?:ya|na)\s+cozyos\b|\bcozyos\s+inatofautiana(?:naje)?\b/i },
-        { id: "language-support-list", pattern: /\bwhich\s+languages?\s+(?:does\s+)?cozyos\s+support\b|\bwhat\s+languages?\s+(?:does\s+)?cozyos\s+support\b|\blanguage\s+support\b|\bsupported\s+languages\b|\blugha\s+(?:zipi|gani)\s+(?:zinazoungwa\s+mkono|zinazotumika)\b|\bcozyos\s+inaunga\s+mkono\s+lugha\s+gani\b/i },
+        { id: "language-support-list", pattern: /\bwhich\s+languages?\s+(?:does\s+)?cozyos\s+support\b|\bwhat\s+languages?\s+(?:does\s+)?cozyos\s+support\b|\blanguage\s+support\b|\bsupported\s+languages\b|\blugha\s+(?:zipi|gani)\s+(?:zinazoungwa\s+mkono|zinazotumika)\b|\bcozyos\s+inaunga\s+mkono\s+lugha\s+gani\b|\b(?:do|does|can)\s+(?:you|cozyos)\s+(?:speak|understand)\s+[a-z\u00c0-\u024f]+\b|\b(?:una\s*(?:jua|elewa|zungumza)|(?:je,?\s*)?cozyos\s+in(?:aweza|ajua|azungumza))\s+(?:ki)?[a-z]+\b/i },
 
+        // Domain 4D (Intent Understanding discovery) — real, disclosed
+        // fix for a genuine classifier gap: no "translate this" intent
+        // existed anywhere in this file (EN or SW) before this change,
+        // so a real request like the Kiswahili "Nisaidie kutafsiri
+        // ujumbe huu kwa Kifaransa." fell through to the unrelated
+        // "help" intent (via a coincidental "nisaidie" match), and the
+        // English equivalent ("Translate this into French.") fell all
+        // the way through to "unsupported" — neither ever reached
+        // Domain 4C's real, working TranslationService/Gemini adapter,
+        // because nothing here ever classified the request as
+        // translation-shaped in the first place. This rule fixes the
+        // classification only; see the "translate-request" composeReply
+        // case below for the honest (not fabricated) response — this
+        // file still performs zero live translation itself, exactly
+        // like every other fact-backed intent here composes real
+        // evidence rather than generating one.
+        { id: "translate-request", pattern: /\btranslate\s+(?:this|that|it|the\s+following)\b|\btranslate\s+.+\s+(?:into|to)\s+[a-z\u00c0-\u024f]+\b|\bkutafsiri\b|\btafsiri\s+(?:hii|hivi|hiki|ujumbe)\b|\bnisaidie\s+kutafsiri\b/i },
         { id: "founder", pattern: /\bwho\s+(?:created|made|built|founded)\s+(?:you|cozyos)\b|\bfounder\b|\bwho\s+owns\s+cozyos\b|\bowner\s+of\s+cozyos\b/i },
         { id: "what-is-cozyos", pattern: /\bwhat\s+is\s+cozyos\b|\bcozyos\s+ni\s+nini\b/i },
         { id: "list-apps", pattern: /\b(?:what|which)\s+apps?\b|\bshow\s+me\s+the\s+apps\b|\bapplications?\s+(?:are\s+)?(?:available|installed)\b|\bwant\s+to\s+see\s+the\s+apps\b|\bfind\s+an?\s+app\b/i },
@@ -295,6 +312,24 @@
         { id: "nav-dashboard", pattern: /\bfungua\s+dashibodi\b|\bnenda\s+(?:kwenye\s+)?dashibodi\b/i },
         { id: "nav-notifications", pattern: /\bnionyeshe\s+arifa\b|\bfungua\s+arifa\b/i },
         { id: "nav-recent", pattern: /\bshughuli\s+za\s+hivi\s+karibuni\b/i },
+
+        // Domain 4I dependency #1 (Intent Understanding continuation) —
+        // generic application-launch recognition. Positioned AFTER
+        // every specific nav-* rule above (dashboard/notifications/
+        // recent/search/aiproviders/diagnostics, EN+SW) so those exact,
+        // already-real targets keep winning for their own literal
+        // phrasing; this only catches an "open/launch/fungua <name>"
+        // request for an arbitrary OTHER application name. Also
+        // positioned after "how-to-register" (which already owns
+        // "fungua akaunti"/"kufungua akaunti" — opening an ACCOUNT, not
+        // an application). Requires an actual action verb
+        // (open/launch/start/a fungua-stem) — deliberately does NOT
+        // match "QuarryOS ni nini?" / "Je, QuarryOS ipo?" / "Naweza
+        // kutumia QuarryOS?" (no verb-object action), so an
+        // informational question about an app is never misread as a
+        // request to launch it.
+        { id: "app-launch", pattern: /\b(?:please\s+)?(?:open|launch|start)\s+(?:the\s+)?([a-z][\w' -]{1,40}?)\s*(?:app(?:lication)?)?[.!?]*$|\b(?:ni|ku)?fungu\w*\s+([a-z][\w' -]{1,40}?)\s*[.!?]*$/i },
+
         { id: "phone-verification", pattern: /\bphone\s+verification\b|\bverify\s+my\s+phone\b|\bwhy\s+(?:is\s+)?my\s+phone\s+not\s+verified\b|\bwhy\s+did\s+my\s+verification\s+fail\b/i },
         { id: "how-authentication-works", pattern: /\bhow\s+(?:does\s+)?authentication\s+works?\b|\bwhat\s+happens\s+during\s+authentication\b|\bwhy\s+is\s+authentication\s+failing\b/i },
         { id: "account-status", pattern: /\baccount\s+not\s+active\b|\bwhy\s+is\s+my\s+account\b|\baccount\s+status\b|\baccount\s+(?:disabled|pending|inactive)\b/i },
@@ -478,7 +513,22 @@
         // templates.js.
         "why-use-cozyos:not_found": "I don't have a verified answer yet for why someone might want to use CozyOS.",
         "differentiation:not_found": "I don't have a verified answer yet for how CozyOS differs from other options.",
-        "language-support-list:not_found": "I don't have a verified answer yet for CozyOS's language support."
+        "language-support-list:not_found": "I don't have a verified answer yet for CozyOS's language support.",
+        // Domain 4D — honest fallback strings for translate-request,
+        // used only if cozy-language-templates.js somehow isn't loaded
+        // (same "never blank" discipline as every other entry here).
+        "translate-request:target-unknown": "I understood you'd like a translation, but I couldn't tell which language you want it in. Could you say, for example, \"translate this to French\"?",
+        "translate-request:target-known": "I understood you'd like something translated. Please send me the exact text you want translated.",
+        // Domain 4I dependency #1 — honest fallbacks if
+        // cozy-language-templates.js somehow isn't loaded.
+        "app-launch:resolved": "I found an application called \"{name}\". Opening it still requires your authorization to be checked — I haven't opened it yet.",
+        "app-launch:unresolved": "I couldn't find an application matching what you asked for. Could you tell me the exact application name?",
+        // Domain 4I dependency #2 — honest fallbacks for the real
+        // authorization outcome, used only if cozy-language-templates.js
+        // isn't loaded.
+        "app-launch:authorization_required": "I found that application, but you'll need to be signed in before I can check whether you're allowed to open it.",
+        "app-launch:authorization_granted": "I found \"{name}\" and you're authorized to use it. I haven't opened it myself — that's a separate step.",
+        "app-launch:authorization_denied": "I found \"{name}\", but your account doesn't currently have access to it.",
     });
 
     function template(key, lang) {
@@ -511,7 +561,71 @@
      *   (real Vault decryption) — this file's only caller (think())
      *   is already async and awaits this.
      */
-    async function composeReply(intent, lang) {
+    // Domain 4D — a small, disclosed lookup for recognizing a spoken
+    // target-language NAME inside a translate-request utterance (e.g.
+    // "kwa Kifaransa" / "into French"), restricted to the 5 languages
+    // CozyLanguageRegistry actually marks AVAILABLE today. This is not
+    // a second language registry — it exists only because the real
+    // registry's own `name`/`nativeName` fields are English-only/native-
+    // script forms, not the Kiswahili common names ("Kifaransa" for
+    // French) a Kiswahili speaker would actually say. NOT_READY
+    // languages are deliberately absent here: recognizing "Kiluo" as a
+    // target would let this classifier imply a translation capability
+    // Domain 4B/4C never verified as real.
+    const TARGET_LANGUAGE_NAMES = Object.freeze({
+        en: [/\benglish\b/i, /\bkiingereza\b/i],
+        sw: [/\bswahili\b/i, /\bkiswahili\b/i],
+        fr: [/\bfrench\b/i, /\bkifaransa\b/i],
+        ar: [/\barabic\b/i, /\bkiarabu\b/i],
+        so: [/\bsomali\b/i, /\bkisomali\b/i],
+    });
+    function extractTargetLanguageCode(text) {
+        for (const [code, patterns] of Object.entries(TARGET_LANGUAGE_NAMES)) {
+            if (patterns.some((p) => p.test(text))) return code;
+        }
+        return null;
+    }
+
+    // Domain 4I dependency #1 — extracts the candidate application name
+    // text from an app-launch utterance using the exact same pattern
+    // the intent rule above already matched with (kept in sync
+    // deliberately, not re-derived heuristically a second way).
+    const APP_LAUNCH_EXTRACT_PATTERN = /\b(?:please\s+)?(?:open|launch|start)\s+(?:the\s+)?([a-z][\w' -]{1,40}?)\s*(?:app(?:lication)?)?[.!?]*$|\b(?:ni|ku)?fungu\w*\s+([a-z][\w' -]{1,40}?)\s*[.!?]*$/i;
+    function extractAppLaunchCandidate(text) {
+        const m = APP_LAUNCH_EXTRACT_PATTERN.exec(text || "");
+        if (!m) return null;
+        const candidate = (m[1] || m[2] || "").trim();
+        return candidate.length > 0 ? candidate : null;
+    }
+
+    /**
+     * resolveApplicationByName(candidate)
+     *   Real resolution against the canonical, already-existing
+     *   application registry (window.CozyOS.listApplications(), backed
+     *   by core/registry/cozy-registry.js's ServiceRegistry — the exact
+     *   same source cozy-knowledge-registry.js's listApplicationsFact()
+     *   already reads for the "list-apps" intent). No new registry, no
+     *   remembered/hardcoded application list. Case-insensitive
+     *   exact-name match first (the common, unambiguous case), then a
+     *   whole-word substring match as a real, disclosed fallback for
+     *   minor phrasing differences (e.g. a trailing "app"). Returns
+     *   null — never a guessed application — when nothing genuinely
+     *   matches, or when the registry itself isn't loaded.
+     */
+    function resolveApplicationByName(candidate) {
+        if (!candidate) return null;
+        const lister = (window.CozyOS && typeof window.CozyOS.listApplications === "function" && window.CozyOS.listApplications)
+            || (window.CozyOS && window.CozyOS.ServiceRegistry && typeof window.CozyOS.ServiceRegistry.listApplications === "function" && (() => window.CozyOS.ServiceRegistry.listApplications()));
+        if (!lister) return null;
+        const apps = safeCall(() => lister());
+        if (!Array.isArray(apps)) return null;
+        const needle = candidate.trim().toLowerCase();
+        let match = apps.find((a) => a && typeof a.name === "string" && a.name.toLowerCase() === needle);
+        if (!match) match = apps.find((a) => a && typeof a.name === "string" && new RegExp(`\\b${needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(a.name));
+        return match ? { id: match.id, name: match.name } : null;
+    }
+
+    async function composeReply(intent, lang, rawText) {
         const knowledge = window.CozyOS && window.CozyOS.CozyKnowledge;
 
         switch (intent) {
@@ -585,6 +699,50 @@
                     if (typeof frame === "function") return frame(fact.answer);
                 }
                 return template("differentiation:not_found", lang);
+            }
+            case "translate-request": {
+                // Domain 4D — honest, structured recognition only. This
+                // NEVER calls TranslationService/Gemini itself and NEVER
+                // fabricates translated text: "ujumbe huu"/"this message"
+                // refers to conversational context (an earlier message)
+                // this stateless classifier has no access to, and even
+                // where a literal string follows "translate ... to X" in
+                // the same utterance, guessing at it here would risk
+                // mistranslating the WRONG substring rather than the
+                // real, user-intended text. The real value this case
+                // adds is: (a) the request is now correctly classified
+                // as translation-shaped at all (previously it silently
+                // fell through to "help" in Kiswahili or "unsupported"
+                // in English — see the intent rule's own comment above),
+                // and (b) the target language, when recognizably named,
+                // is surfaced in the reply text so the person knows
+                // CozyOS understood which language they meant.
+                const targetLanguageCode = extractTargetLanguageCode(rawText || "");
+                if (targetLanguageCode) {
+                    const frame = template("translate-request:target-known", lang);
+                    return typeof frame === "function" ? frame(languageDisplayName(targetLanguageCode)) : frame;
+                }
+                const unknownFrame = template("translate-request:target-unknown", lang);
+                return typeof unknownFrame === "function" ? unknownFrame() : unknownFrame;
+            }
+            case "app-launch": {
+                // Domain 4I dependency #1 — recognition + resolution
+                // ONLY. This never navigates, never launches, and never
+                // grants access — it returns a real resolved
+                // {applicationId, applicationName} (or an honest
+                // "couldn't find that application" reply) for a FUTURE
+                // action-execution layer to separately authorize and
+                // perform, exactly like the action-boundary rule
+                // requires. requiresAuthorization is always true here —
+                // this classifier has no authority to say otherwise.
+                const candidate = extractAppLaunchCandidate(rawText || "");
+                const resolved = resolveApplicationByName(candidate);
+                if (resolved) {
+                    const frame = template("app-launch:resolved", lang);
+                    return typeof frame === "function" ? frame(resolved.name) : frame;
+                }
+                const frame = template("app-launch:unresolved", lang);
+                return typeof frame === "function" ? frame(candidate || "") : frame;
             }
             case "language-support-list": {
                 const fact = knowledge && typeof knowledge.getLanguageSupportListFact === "function" ? safeCall(() => knowledge.getLanguageSupportListFact()) : null;
@@ -702,12 +860,60 @@
             // all — see resolveLanguage()'s own doc comment for the
             // precedence rule this never overrides.
             const resolvedLanguage = resolveLanguage({ ...options, detectedLanguage: detectLanguageHeuristic(text) });
-            let replyText = await composeReply(intent, resolvedLanguage.code);
+            let replyText = await composeReply(intent, resolvedLanguage.code, text);
             if (resolvedLanguage.fallback) {
                 const templates = window.CozyOS && window.CozyOS.CozyLanguageTemplates;
                 const disclosureFn = templates && templates.FALLBACK_DISCLOSURE && templates.FALLBACK_DISCLOSURE[resolvedLanguage.code];
                 if (typeof disclosureFn === "function") {
                     replyText = `${replyText} ${disclosureFn(languageDisplayName(resolvedLanguage.preferred), languageDisplayName(resolvedLanguage.code))}`;
+                }
+            }
+
+            // Domain 4I dependency #1 — structured application-resolution
+            // fields, populated ONLY for the app-launch intent (no
+            // unnecessary fields added for every other intent).
+            let application = null;
+            let requiresAuthorization;
+            let authorizationState;
+            if (intent === "app-launch") {
+                const candidate = extractAppLaunchCandidate(text);
+                application = resolveApplicationByName(candidate);
+                requiresAuthorization = true;
+
+                // Domain 4I dependency #2 (Authorization/Execution
+                // Boundary) — when an application WAS resolved, perform
+                // the real, already-existing authorization check:
+                // IdentityEngine.canAccessApplication(userId, appName)
+                // — the exact function cozy-workspace.js's own
+                // application list already calls (see its own
+                // canAccessApplication-filtered `applications` array).
+                // No new authorization system, no second registry — this
+                // reuses that real function's real, already-shipped
+                // logic (account status, admin/developer override,
+                // global toggle, per-user assignment) verbatim. This
+                // NEVER performs navigation and NEVER treats a resolved
+                // application name as permission by itself — an ordinary
+                // user asking for "Developer Hub" (a real, registered,
+                // admin/developer-tier application) is honestly denied
+                // here exactly as canAccessApplication() itself decides,
+                // never elevated by the mere fact that the phrase was
+                // understood.
+                if (application) {
+                    const identity = window.CozyOS && window.CozyOS.IdentityEngine;
+                    const actorId = options && options.actorId;
+                    if (!actorId || actorId === "system") {
+                        authorizationState = "AUTHORIZATION_REQUIRED";
+                    } else if (!identity || typeof identity.canAccessApplication !== "function") {
+                        // Honest degrade: the real authorization
+                        // authority isn't loaded in this environment —
+                        // never silently default to granted.
+                        authorizationState = "AUTHORIZATION_REQUIRED";
+                    } else {
+                        const granted = safeCall(() => identity.canAccessApplication(actorId, application.name));
+                        authorizationState = granted === true ? "AUTHORIZATION_GRANTED" : "AUTHORIZATION_DENIED";
+                    }
+                    const frame = template(`app-launch:${authorizationState.toLowerCase()}`, resolvedLanguage.code);
+                    replyText = typeof frame === "function" ? frame(application.name) : frame;
                 }
             }
 
@@ -719,6 +925,7 @@
                     language: resolvedLanguage.code,
                     requestedLanguage: resolvedLanguage.preferred,
                     languageFallback: !!resolvedLanguage.fallback,
+                    ...(intent === "app-launch" ? { application, requiresAuthorization, ...(authorizationState ? { authorizationState } : {}) } : {}),
                     pipeline: pipelineResult
                 }
             };
@@ -774,7 +981,16 @@
         pm.register({
             id: "rule-based-conversational",
             name: "Rule-Based Conversational Composer",
-            category: "intelligence",
+            // Domain 4L dependency #1 correction: this registration
+            // already existed (found while re-verifying the discovery
+            // report against this file directly — the prior grep for
+            // the literal string "ProviderManager.register" missed this
+            // real `pm.register(...)` variable-based call). Category
+            // corrected from "intelligence" to "conversational" to
+            // match gemini-cloud-provider.js's new registration below,
+            // since both are genuinely part of the same conversational-
+            // provider category LivingAI itself uses.
+            category: "conversational",
             version: VERSION,
             dependencies: [],
             getHealth() { return { health: "ONLINE", reason: "Pure local rule-based composer — no external runtime or network dependency to fail." }; }

@@ -74,7 +74,30 @@ console.log('Micro-Milestone I — REAL integration tests (real router + real ge
 
 test('REAL END-TO-END: an advice question resolves through the real chain to real recommendedNextSteps', async () => {
     const CozyOS = freshRealStack();
-    const question = "How can this improve CozyOS?";
+    // Domain 4A fix (AI Integration discovery) note: this question was
+    // originally "How can this improve CozyOS?", which only produced a
+    // VERIFIED answerResult because the identity-FAQ router's word-
+    // overlap scorer counted "how"/"cozyos" — words present in nearly
+    // every question and every trigger phrase — as real match evidence,
+    // weakly (score exactly at the 0.6 threshold) matching COZYOS_FUTURE's
+    // "how can cozyos help communities" despite "improve" sharing no
+    // real meaning with "help communities". That scoring flaw caused
+    // real, unrelated questions (e.g. "What is CozyOS?", "What
+    // applications are part of CozyOS?") to confidently return the WRONG
+    // topic's answer instead of honestly reporting insufficient data —
+    // the actual defect the AI Integration discovery traced and fixed
+    // (see cozyos-identity-faq-router.js's OVERLAP_STOPWORDS). Under the
+    // corrected scorer, "How can this improve CozyOS?" no longer
+    // (falsely) matches anything, which is the correct, honest outcome,
+    // not a regression to work around. This test still needs a REAL
+    // advice-phrased question that resolves to a genuine VERIFIED answer
+    // to prove the Advisor chain's real behavior — swapped to a question
+    // that genuinely, robustly matches COZYOS_COMMUNITY's real trigger
+    // "can i teach cozyos my language" on real distinguishing words
+    // ("teach"/"my"/"language"), not incidental stopword overlap, while
+    // still matching ADVICE_PATTERNS' existing `what('| i)s the best way`
+    // pattern unchanged.
+    const question = "What's the best way to teach CozyOS my language?";
     const answerResult = await CozyOS.CozyAnswerEngine.answer(question);
     assert.strictEqual(answerResult.evidenceState, "VERIFIED");
     const advice = CozyOS.CozyAdvisor.advise({ question, answerResult });

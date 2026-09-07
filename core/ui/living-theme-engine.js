@@ -323,4 +323,31 @@
             });
         } catch (_err) { /* non-fatal */ }
     }
+
+    // Engine Ecosystem discovery dependency #2 — real, additive,
+    // observational registration (see cozy-theme.js's identical
+    // pattern for the full rationale). Reuses this engine's own real,
+    // already-existing getDiagnosticsReport() rather than inventing a
+    // second status surface — ProviderManager never becomes the owner
+    // of theme scheduling/profile execution.
+    if (window.CozyOS.ProviderManager && typeof window.CozyOS.ProviderManager.register === "function") {
+        window.CozyOS.ProviderManager.register({
+            id: "living-theme-engine",
+            name: "CozyOS Living Theme Engine",
+            category: "visual",
+            version: LIVING_THEME_VERSION,
+            dependencies: [],
+            getHealth() {
+                const engine = window.CozyOS.LivingThemeEngine;
+                const diag = engine.getDiagnosticsReport();
+                if (diag.registeredThemes === 0) {
+                    return { health: "DEGRADED", reason: "No themes discovered/registered yet.", ...diag };
+                }
+                if (!diag.activeThemeId) {
+                    return { health: "DEGRADED", reason: "Themes are registered, but no theme is currently active.", ...diag };
+                }
+                return { health: "ONLINE", reason: `${diag.registeredThemes} theme(s) registered; "${diag.activeThemeId}" is currently active.`, ...diag };
+            }
+        });
+    }
 })();

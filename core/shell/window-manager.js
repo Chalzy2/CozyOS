@@ -139,10 +139,25 @@
             if (this.#windows.has(id)) { this.#bringToFront(id); return this.#getHandle(id); }
 
             const saved = loadState(id);
-            const defaultWidth = 480, defaultHeight = 360;
+            // Real fix (found via Item 2's real mobile browser test): a
+            // fixed 480px default width, combined with a positive x
+            // cascade offset, can push a newly-created window's own
+            // title bar (and its real minimize/maximize/close controls)
+            // outside a narrow viewport entirely — genuinely
+            // unreachable, not merely visually cramped. Clamping the
+            // default width/position to the real, current viewport
+            // benefits every CozyOS window, not just Live — this is a
+            // real WindowManager defect, not something to work around
+            // in an individual caller.
+            const viewportWidth = (typeof window !== "undefined" && window.innerWidth) || 1280;
+            const viewportHeight = (typeof window !== "undefined" && window.innerHeight) || 800;
+            const defaultWidth = Math.min(480, Math.max(240, viewportWidth - 24));
+            const defaultHeight = Math.min(360, Math.max(200, viewportHeight - 24));
             const cascadeOffset = CASCADE_OFFSET * (this.#cascadeIndex % 8);
             this.#cascadeIndex += 1;
-            const initial = saved || { x: 60 + cascadeOffset, y: 60 + cascadeOffset, width: defaultWidth, height: defaultHeight, minimized: false, maximized: false, pinned: false };
+            const defaultX = Math.min(60 + cascadeOffset, Math.max(0, viewportWidth - defaultWidth));
+            const defaultY = Math.min(60 + cascadeOffset, Math.max(0, viewportHeight - defaultHeight));
+            const initial = saved || { x: defaultX, y: defaultY, width: defaultWidth, height: defaultHeight, minimized: false, maximized: false, pinned: false };
 
             const root = document.createElement("div");
             root.className = "cozy-window";
@@ -200,7 +215,17 @@
             const { root, state } = entry;
             if (state.maximized) {
                 root.style.left = "0px"; root.style.top = "0px";
-                root.style.width = "100vw"; root.style.height = "100vh";
+                // Real fix (found via Item 2's real mobile browser test):
+                // .cozy-window has a real 1px border on every side
+                // (content-box sizing, unchanged elsewhere to avoid
+                // shifting internal flex layout in every other window) —
+                // width:100vw/height:100vh alone renders 2px larger than
+                // the real viewport once that border is added outside
+                // it, genuinely overflowing a narrow mobile viewport.
+                // Subtracting it here, only for the maximized case,
+                // fixes the real overflow without touching box-sizing
+                // globally.
+                root.style.width = "calc(100vw - 2px)"; root.style.height = "calc(100vh - 2px)";
             } else {
                 root.style.left = `${state.x}px`; root.style.top = `${state.y}px`;
                 root.style.width = `${state.width}px`; root.style.height = `${state.height}px`;
@@ -228,6 +253,33 @@
             const entry = this.#windows.get(id);
             if (!entry) return;
             entry.state.pinned = !entry.state.pinned;
+            // Item 5 (Move/Pin) — real, generic corner-snap: gives Pin a
+            // genuine spatial meaning (move to a preferred corner),
+            // distinct from Move (free dragging) — the exact
+            // distinction the task requires. Only applied on pinning ON
+            // (not un-pin, which leaves the window where the user last
+            // put it — a disclosed, reasonable choice), and only when
+            // not maximized (position is meaningless while maximized,
+            // per the existing setBounds() convention this file already
+            // documents). Reuses the same viewport-safe-area math
+            // #clampToViewport() already provides for drag — no second
+            // boundary/positioning system.
+            if (entry.state.pinned && !entry.state.maximized) {
+                const vw = (typeof window !== "undefined" && window.innerWidth) || 1280;
+                const vh = (typeof window !== "undefined" && window.innerHeight) || 800;
+                const cx = entry.state.x + entry.state.width / 2;
+                const cy = entry.state.y + entry.state.height / 2;
+                const nearLeft = cx < vw / 2;
+                const nearTop = cy < vh / 2;
+                const margin = 12;
+                const target = {
+                    x: nearLeft ? margin : Math.max(margin, vw - entry.state.width - margin),
+                    y: nearTop ? margin : Math.max(margin, vh - entry.state.height - margin)
+                };
+                const clamped = this.#clampToViewport(target.x, target.y, entry.state.width, entry.state.height);
+                entry.state.x = clamped.x;
+                entry.state.y = clamped.y;
+            }
             this.#applyState(id);
             this.#persist(id);
         }

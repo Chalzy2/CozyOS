@@ -322,4 +322,41 @@
 
     // Initialize immediately
     window.CozyOS.Theme = new CozyThemeController();
+
+    // Engine Ecosystem discovery dependency #2 — real, additive,
+    // observational registration into the existing, already-proven
+    // core/shell/provider-manager.js (Domain 4L dependency #1's exact
+    // pattern, category "visual" here). ProviderManager never becomes
+    // the owner of theme execution — every existing caller of
+    // window.CozyOS.Theme's real API (setTheme/getTheme/hasTheme/
+    // getThemeTokens/setThemeToken) is completely unchanged; this only
+    // adds a second, honest way to observe the same real state.
+    if (window.CozyOS.ProviderManager && typeof window.CozyOS.ProviderManager.register === "function") {
+        window.CozyOS.ProviderManager.register({
+            id: "cozy-theme",
+            name: "CozyOS Theme Engine",
+            category: "visual",
+            version: "1.0.0",
+            dependencies: [],
+            getHealth() {
+                // Real, observable facts only: how many themes are
+                // actually registered, and what theme document.
+                // documentElement genuinely carries right now (the same
+                // attribute setTheme() itself writes and getThemeTokens()
+                // reads back from computed style — never a second,
+                // separately-tracked copy that could drift).
+                const registeredThemeCount = window.CozyOS.Theme.themes ? window.CozyOS.Theme.themes.size : 0;
+                const currentTheme = (typeof document !== "undefined" && document.documentElement)
+                    ? document.documentElement.getAttribute("data-cozy-app")
+                    : null;
+                if (registeredThemeCount === 0) {
+                    return { health: "DEGRADED", reason: "No themes are registered.", registeredThemeCount, currentTheme };
+                }
+                if (!currentTheme) {
+                    return { health: "DEGRADED", reason: "Themes are registered, but no theme is currently applied to document.documentElement.", registeredThemeCount, currentTheme };
+                }
+                return { health: "ONLINE", reason: `${registeredThemeCount} theme(s) registered; "${currentTheme}" is currently applied.`, registeredThemeCount, currentTheme };
+            }
+        });
+    }
 })();

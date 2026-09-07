@@ -434,6 +434,75 @@
             fr: "Je n'ai pas encore de réponse vérifiée sur la prise en charge des langues par CozyOS.",
             ar: "ليس لدي بعد إجابة موثّقة عن دعم CozyOS للغات.",
             so: "Weli ma haysto jawaab la xaqiijiyay oo ku saabsan taageerada luqadaha ee CozyOS."
+        }),
+        // Domain 4D (Intent Understanding) — translate-request. Real,
+        // disclosed recognition-only replies: this never claims a
+        // translation was performed. When a target language was
+        // recognized in the person's own message, the reply names it
+        // back so they know CozyOS understood correctly and asks for
+        // the exact text; when no target language could be identified,
+        // it asks for one. Neither variant fabricates translated
+        // content — that remains Domain 4C's TranslationService/Gemini
+        // adapter's job, once wired to a real conversation-context
+        // source this file does not have.
+        "translate-request:target-known": Object.freeze({
+            en: (targetName) => `Got it — you'd like something translated into ${targetName}. Please send me the exact text you want translated.`,
+            sw: (targetName) => `Nimeelewa — unataka kitu kitafsiriwe kwa ${targetName}. Tafadhali nitumie maandishi halisi unayotaka yatafsiriwe.`,
+            fr: (targetName) => `Compris — vous souhaitez que quelque chose soit traduit en ${targetName}. Veuillez m'envoyer le texte exact à traduire.`,
+            ar: (targetName) => `فهمت — تريد ترجمة شيء إلى ${targetName}. يرجى إرسال النص الدقيق الذي تريد ترجمته.`,
+            so: (targetName) => `Waan fahmay — waxaad rabtaa in wax loo turjumo ${targetName}. Fadlan ii soo dir qoraalka saxda ah ee aad rabto in la turjumo.`
+        }),
+        "translate-request:target-unknown": Object.freeze({
+            en: () => `I understood you'd like a translation, but I couldn't tell which language you want it in. Could you say, for example, "translate this to French"?`,
+            sw: () => `Nimeelewa unataka tafsiri, lakini sikuweza kujua ni lugha gani unayotaka. Unaweza kusema, kwa mfano, "tafsiri hii kwa Kifaransa"?`,
+            fr: () => `J'ai compris que vous souhaitez une traduction, mais je n'ai pas pu déterminer la langue cible. Pourriez-vous préciser, par exemple « traduis ceci en français » ?`,
+            ar: () => `فهمت أنك تريد ترجمة، لكن لم أتمكن من معرفة اللغة المطلوبة. هل يمكنك التوضيح، على سبيل المثال "ترجم هذا إلى الفرنسية"؟`,
+            so: () => `Waan fahmay inaad rabto turjumaad, laakiin ma aanan ogaan karin luqadda aad rabto. Fadlan sheeg, tusaale ahaan "tarjun kan Faransiiska"?`
+        }),
+        // Domain 4I dependency #1 — app-launch. Real, disclosed
+        // recognition-only replies: NEVER claims the application was
+        // opened (that requires a separate, real authorization +
+        // action-execution step this classifier does not perform).
+        "app-launch:resolved": Object.freeze({
+            en: (name) => `I found an application called "${name}". Opening it still requires your authorization to be checked — I haven't opened it yet.`,
+            sw: (name) => `Nimepata programu inayoitwa "${name}". Kuifungua bado kunahitaji ruhusa yako ithibitishwe — sijaifungua bado.`,
+            fr: (name) => `J'ai trouvé une application appelée « ${name} ». L'ouvrir nécessite encore que votre autorisation soit vérifiée — je ne l'ai pas encore ouverte.`,
+            ar: (name) => `وجدت تطبيقًا يسمى "${name}". فتحه لا يزال يتطلب التحقق من إذنك — لم أفتحه بعد.`,
+            so: (name) => `Waxaan helay barnaamij loo yaqaan "${name}". Furitaankeedu weli wuxuu u baahan yahay in la hubiyo idanka — weli ma furin.`
+        }),
+        "app-launch:unresolved": Object.freeze({
+            en: (candidate) => candidate ? `I couldn't find an application matching "${candidate}". Could you tell me the exact application name?` : `I couldn't find an application matching what you asked for. Could you tell me the exact application name?`,
+            sw: (candidate) => candidate ? `Sikuweza kupata programu inayolingana na "${candidate}". Unaweza kuniambia jina kamili la programu?` : `Sikuweza kupata programu unayotaka. Unaweza kuniambia jina kamili la programu?`,
+            fr: (candidate) => candidate ? `Je n'ai pas trouvé d'application correspondant à « ${candidate} ». Pourriez-vous me donner le nom exact de l'application ?` : `Je n'ai pas trouvé l'application demandée. Pourriez-vous me donner le nom exact ?`,
+            ar: (candidate) => candidate ? `لم أجد تطبيقًا مطابقًا لـ "${candidate}". هل يمكنك إخباري بالاسم الدقيق للتطبيق؟` : `لم أجد التطبيق المطلوب. هل يمكنك إخباري بالاسم الدقيق؟`,
+            so: (candidate) => candidate ? `Ma helin barnaamij la mid ah "${candidate}". Ma ii sheegi kartaa magaca saxda ah ee barnaamijka?` : `Ma helin barnaamijka aad rabto. Ma ii sheegi kartaa magaca saxda ah?`
+        }),
+        // Domain 4I dependency #2 (Authorization/Execution Boundary) —
+        // real, disclosed authorization-outcome replies. NONE of these
+        // ever claim the application was actually opened — that remains
+        // a separate real navigation/action step this provider never
+        // performs, exactly like the resolved-but-unauthorized template
+        // above already established.
+        "app-launch:authorization_required": Object.freeze({
+            en: () => `I found that application, but you'll need to be signed in before I can check whether you're allowed to open it.`,
+            sw: () => `Nimepata programu hiyo, lakini unahitaji kuingia kwanza ili niweze kuangalia kama una ruhusa ya kuifungua.`,
+            fr: () => `J'ai trouvé cette application, mais vous devez être connecté avant que je puisse vérifier si vous êtes autorisé à l'ouvrir.`,
+            ar: () => `وجدت ذلك التطبيق، لكن يجب عليك تسجيل الدخول أولاً حتى أتمكن من التحقق مما إذا كان يُسمح لك بفتحه.`,
+            so: () => `Waan helay barnaamijkaas, laakiin waa inaad gasho ka hor intaanan hubin haddii lagu ogolyahay inaad furto.`
+        }),
+        "app-launch:authorization_granted": Object.freeze({
+            en: (name) => `I found "${name}" and you're authorized to use it. I haven't opened it myself — that's a separate step.`,
+            sw: (name) => `Nimepata "${name}" na una ruhusa ya kuitumia. Sijaifungua mwenyewe — hilo ni hatua nyingine.`,
+            fr: (name) => `J'ai trouvé « ${name} » et vous êtes autorisé à l'utiliser. Je ne l'ai pas ouverte moi-même — c'est une étape séparée.`,
+            ar: (name) => `وجدت "${name}" وأنت مصرح لك باستخدامه. لم أفتحه بنفسي — تلك خطوة منفصلة.`,
+            so: (name) => `Waxaan helay "${name}" waana lagu ogolyahay inaad isticmaasho. Aniga qudhayda ma furin — taasi waa tallaabo kale.`
+        }),
+        "app-launch:authorization_denied": Object.freeze({
+            en: (name) => `I found "${name}", but your account doesn't currently have access to it.`,
+            sw: (name) => `Nimepata "${name}", lakini akaunti yako haina ruhusa ya kuitumia kwa sasa.`,
+            fr: (name) => `J'ai trouvé « ${name} », mais votre compte n'y a actuellement pas accès.`,
+            ar: (name) => `وجدت "${name}"، لكن حسابك ليس لديه حاليًا إمكانية الوصول إليه.`,
+            so: (name) => `Waxaan helay "${name}", laakiin xisaabtaadu weli ma haysato fasax aad ku isticmaasho.`
         })
     });
 

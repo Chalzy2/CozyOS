@@ -127,7 +127,15 @@
             // WebAuthnProvider.registerCredential() path the enrollment
             // panel's FACTOR_DEFS still calls, so none of the three are
             // ever conflated in getDiagnosticsReport().
-            serverPasskeyRegistrationAttempts: 0, serverPasskeyRegistrationSuccesses: 0, serverPasskeyRegistrationFailures: 0
+            serverPasskeyRegistrationAttempts: 0, serverPasskeyRegistrationSuccesses: 0, serverPasskeyRegistrationFailures: 0,
+            // Domain 2 (Security & Sign-in discovery) — real
+            // server-authoritative TOTP enrollment/disable
+            // (beginServerTotpEnrollment/completeServerTotpEnrollment/
+            // disableServerTotp), tracked separately from the legacy
+            // client-only OtpProvider path (a different, unrelated
+            // account space — see this domain's completion notes).
+            serverTotpEnrollmentAttempts: 0, serverTotpEnrollmentSuccesses: 0, serverTotpEnrollmentFailures: 0,
+            serverTotpDisableAttempts: 0, serverTotpDisableSuccesses: 0, serverTotpDisableFailures: 0
         };
 
         // Phase C §4 — no client-side pending-challenge map anymore.
@@ -1305,6 +1313,159 @@
         }
 
         /**
+         * beginServerTotpEnrollment()
+         *   Domain-2 (Security & Sign-in discovery) — real,
+         *   server-authoritative TOTP enrollment, closing the gap this
+         *   domain's audit found: server/webauthn-rp/server.js's
+         *   POST /auth/mfa/totp/enroll/begin|complete and
+         *   POST /auth/mfa/totp/disable have existed since Phase C, real
+         *   and tested (server/webauthn-rp/test/totp.test.js,
+         *   mfa-pending-auth.test.js), but no client code anywhere ever
+         *   called them — the only production TOTP enrollment path was
+         *   the entirely separate, client-only, self-verifying
+         *   OtpProvider (core/security/otp-provider.js), which never
+         *   reaches server/webauthn-rp/totp.js at all. This method (and
+         *   completeServerTotpEnrollment()/disableServerTotp() below) is
+         *   the real seam — no new engine, no client-side secret
+         *   generation or verification; the server is the sole authority
+         *   for the secret, the QR/otpauth URI, and every future code
+         *   check at login (already true via completeServerLoginWithOtp()
+         *   -> POST /auth/mfa/verify).
+         *
+         *   Requires an already-authenticated session
+         *   (cozy_admin_session) — the server resolves the account from
+         *   that cookie via currentSession(req)/session.userId, never
+         *   from a client-supplied id, exactly like
+         *   registerServerPasskey() above.
+         *
+         *   Returns one of:
+         *     { available:false, code:"server_unavailable", reason }
+         *     { available:false, code:"not_authenticated", reason, requiresAuth:true }
+         *     { available:false, code:<server error>, reason }
+         *     { available:true, code:"enrollment_started", secretBase32, otpauthUri }
+         */
+        async beginServerTotpEnrollment() {
+            this.#diagnostics.serverTotpEnrollmentAttempts++;
+            if (typeof fetch !== "function") {
+                this.#diagnostics.serverTotpEnrollmentFailures++;
+                return { available: false, code: "client_error", reason: "This browser does not support the required network APIs." };
+            }
+            let response;
+            try {
+                response = await fetch("/auth/mfa/totp/enroll/begin", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({}),
+                });
+            } catch (_err) {
+                this.#diagnostics.serverTotpEnrollmentFailures++;
+                return { available: false, code: "server_unavailable", reason: "TOTP enrollment is temporarily unavailable. Please check your connection and try again." };
+            }
+            let body = null;
+            try { body = await response.json(); } catch (_err) { body = null; }
+            if (!response.ok || !body) {
+                this.#diagnostics.serverTotpEnrollmentFailures++;
+                const errCode = (body && body.error) || "enrollment_start_failed";
+                if (errCode === "not_authenticated") {
+                    return { available: false, code: errCode, reason: "You must be signed in to set up an authenticator app.", requiresAuth: true };
+                }
+                return { available: false, code: errCode, reason: "Could not start authenticator app setup. Please try again." };
+            }
+            return { available: true, code: "enrollment_started", secretBase32: body.secret || body.secretBase32 || null, otpauthUri: body.otpauthUrl || body.otpauthUri || null };
+        }
+
+        /**
+         * completeServerTotpEnrollment(code)
+         *   Second half of beginServerTotpEnrollment() — submits the
+         *   6-digit code the person just read from their authenticator
+         *   app to the real server verifier
+         *   (server/webauthn-rp/totp.js verifyTotpCode(), the exact same
+         *   function POST /auth/mfa/verify uses at login). Only a real
+         *   server-confirmed success persists the enrollment
+         *   server-side; this method verifies nothing itself.
+         *
+         *   Returns one of:
+         *     { available:false, code:"server_unavailable"|"not_authenticated"|"code_required"|<AuthError code>, reason, requiresAuth? }
+         *     { available:true, code:"enrolled", recoveryCodes }
+         */
+        async completeServerTotpEnrollment(code) {
+            this.#diagnostics.serverTotpEnrollmentAttempts++;
+            if (!code || typeof code !== "string") {
+                this.#diagnostics.serverTotpEnrollmentFailures++;
+                return { available: false, code: "code_required", reason: "Enter the 6-digit code from your authenticator app." };
+            }
+            if (typeof fetch !== "function") {
+                this.#diagnostics.serverTotpEnrollmentFailures++;
+                return { available: false, code: "client_error", reason: "This browser does not support the required network APIs." };
+            }
+            let response;
+            try {
+                response = await fetch("/auth/mfa/totp/enroll/complete", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ code }),
+                });
+            } catch (_err) {
+                this.#diagnostics.serverTotpEnrollmentFailures++;
+                return { available: false, code: "server_unavailable", reason: "Could not reach the server to confirm authenticator app setup. Please try again." };
+            }
+            let body = null;
+            try { body = await response.json(); } catch (_err) { body = null; }
+            if (!response.ok || !body || body.ok !== true) {
+                this.#diagnostics.serverTotpEnrollmentFailures++;
+                const errCode = (body && body.error) || "enrollment_failed";
+                return {
+                    available: false,
+                    code: errCode,
+                    reason: errCode === "invalid_mfa_code" ? "That code didn't match. Check your authenticator app and try again." : errCode === "mfa_enrollment_not_started" ? "Authenticator app setup was not started. Please start again." : "Could not confirm authenticator app setup. Please try again.",
+                    requiresAuth: errCode === "not_authenticated",
+                };
+            }
+            this.#diagnostics.serverTotpEnrollmentSuccesses++;
+            return { available: true, code: "enrolled", recoveryCodes: body.recoveryCodes || null };
+        }
+
+        /**
+         * disableServerTotp()
+         *   Real, server-authoritative removal — POST
+         *   /auth/mfa/totp/disable, same session-scoped authority as
+         *   enrollment above. Never clears local OtpProvider state (a
+         *   different, unrelated account space — see this domain's own
+         *   completion notes) and never bypasses any step-up requirement
+         *   the caller's UI layer applies before invoking this.
+         */
+        async disableServerTotp() {
+            this.#diagnostics.serverTotpDisableAttempts++;
+            if (typeof fetch !== "function") {
+                this.#diagnostics.serverTotpDisableFailures++;
+                return { available: false, code: "client_error", reason: "This browser does not support the required network APIs." };
+            }
+            let response;
+            try {
+                response = await fetch("/auth/mfa/totp/disable", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({}),
+                });
+            } catch (_err) {
+                this.#diagnostics.serverTotpDisableFailures++;
+                return { available: false, code: "server_unavailable", reason: "Could not reach the server to disable the authenticator app. Please try again." };
+            }
+            let body = null;
+            try { body = await response.json(); } catch (_err) { body = null; }
+            if (!response.ok || !body || body.ok !== true) {
+                this.#diagnostics.serverTotpDisableFailures++;
+                const errCode = (body && body.error) || "disable_failed";
+                return { available: false, code: errCode, reason: "Could not disable the authenticator app. Please try again.", requiresAuth: errCode === "not_authenticated" };
+            }
+            this.#diagnostics.serverTotpDisableSuccesses++;
+            return { available: true, code: "disabled" };
+        }
+
+        /**
          * requestPhoneLoginChallenge(username)
          *   Prompt 10 continuation — real, additive. First half of the
          *   phone browser-login connection identified as the next
@@ -1398,13 +1559,41 @@
 
         /**
          * loginWithTrustedDevice({ userId, deviceId })
-         *   Path 2: real Platform Administrator trusted-device login,
+         *   Path 2: real, LOCAL-ONLY trusted-device recovery login,
          *   delegated entirely to AdminRecoveryPolicy.attemptNormalLogin()
-         *   (device trust + biometric — never re-implemented here). On
-         *   grant, reports the already-verified identity into
-         *   CozyOS.Session via establishFromExternalAuth() — Session's
-         *   real, generic bridge point for any already-authenticated
-         *   source, exactly as it's designed to be used.
+         *   (device trust — never re-implemented here).
+         *
+         *   DOMAIN 3 AUTHORITY FIX (Security & Sign-in discovery):
+         *   attemptNormalLogin()'s grant is real, but its evidence is
+         *   entirely local — IdentityEngine's own client-side
+         *   isPlatformAdmin(userId) (a per-browser IndexedDB record, not
+         *   the real server's is_platform_admin column) plus
+         *   TrustedDeviceManager's admittedly-spoofable browser
+         *   fingerprint (see that file's own honest disclosure: "NOT a
+         *   cryptographically unique or tamper-proof hardware
+         *   identifier"). Discovery confirmed CozyOS has exactly one
+         *   declared deployment (the server-backed Render service) and
+         *   no evidence of an intentional standalone/local admin mode —
+         *   so this local evidence must never be reported to
+         *   establishFromExternalAuth() as roles:["platform-admin"].
+         *   establishFromExternalAuth()'s own contract (cozy-session-
+         *   service.js) is for reporting an identity ALREADY verified by
+         *   a real external authority; this local check is not that,
+         *   and previously claimed it was — a real, now-closed gap.
+         *
+         *   The real local checks (role lookup, device trust,
+         *   TrustedDeviceManager touch, failure handling) are entirely
+         *   unchanged and still run — the ONLY change is that a granted
+         *   result no longer reports platform-admin (or any) role into
+         *   Session. A signed-in, non-elevated external session is still
+         *   established (uid + profile) so identity continuity for this
+         *   local track is preserved; WorkspaceShell's own, unmodified
+         *   #resolveCurrentUserRole() already treats an "external"
+         *   session with an empty roles array as unresolvable (falls
+         *   through to `return null`) — no cozy-workspace.js change
+         *   needed or made. The real, only path to platform-admin
+         *   authority remains GET /webauthn/session, established via
+         *   the real server login paths (password/passkey/TOTP).
          */
         async loginWithTrustedDevice({ userId, deviceId } = {}) {
             this.#diagnostics.trustedDeviceLoginAttempts++;
@@ -1419,15 +1608,20 @@
                 try {
                     session.establishFromExternalAuth({
                         uid: userId,
-                        roles: ["platform-admin"],
-                        profile: { authMode: result.mode, deviceId }
+                        // Domain 3: never platform-admin (or any role) from
+                        // local-only evidence — see header. serverVerified:
+                        // false is additive documentation for any future
+                        // reader/consumer of this profile; nothing in this
+                        // codebase currently branches on it.
+                        roles: [],
+                        profile: { authMode: result.mode, deviceId, serverVerified: false }
                     });
                 } catch (err) { this.#diagnostics.trustedDeviceLoginFailures++; return { granted: false, reason: `Session establishment failed: ${err.message}` }; }
             }
 
             this.#persistPointer({ source: "admin-recovery", userId, deviceId, adminSessionId: result.session.id, since: new Date().toISOString() });
             this.#diagnostics.trustedDeviceLoginSuccesses++;
-            return { granted: true, source: "admin-recovery", userId, adminSessionId: result.session.id };
+            return { granted: true, source: "admin-recovery", userId, adminSessionId: result.session.id, platformAdmin: false };
         }
 
         /**
@@ -1441,6 +1635,15 @@
          *   re-implements device trust or WebAuthn verification; it only
          *   sequences the already-verified result into CozyOS.Session,
          *   exactly as its one declared job is.
+         *
+         *   DOMAIN 3 AUTHORITY FIX: identical rationale to
+         *   loginWithTrustedDevice() immediately above — the
+         *   "security-key" factor consulted here is the LEGACY,
+         *   client-only WebAuthnProvider (self-relying-party, never
+         *   touches server/webauthn-rp), not the real server RP Domain 1
+         *   established as canonical. Combined with the same local
+         *   isPlatformAdmin() check, this result is local-only evidence
+         *   and must not be reported as platform-admin authority.
          */
         async loginWithBiometrics({ userId, deviceId } = {}) {
             this.#diagnostics.trustedDeviceLoginAttempts++;
@@ -1458,15 +1661,18 @@
                 try {
                     session.establishFromExternalAuth({
                         uid: userId,
-                        roles: ["platform-admin"],
-                        profile: { authMode: result.mode, deviceId }
+                        // Domain 3: never platform-admin (or any role) from
+                        // local-only evidence — see loginWithTrustedDevice()'s
+                        // header immediately above for the full rationale.
+                        roles: [],
+                        profile: { authMode: result.mode, deviceId, serverVerified: false }
                     });
                 } catch (err) { this.#diagnostics.trustedDeviceLoginFailures++; return { granted: false, reason: `Session establishment failed: ${err.message}` }; }
             }
 
             this.#persistPointer({ source: "admin-recovery", userId, deviceId, adminSessionId: result.session.id, since: new Date().toISOString() });
             this.#diagnostics.trustedDeviceLoginSuccesses++;
-            return { granted: true, source: "admin-recovery", userId, adminSessionId: result.session.id };
+            return { granted: true, source: "admin-recovery", userId, adminSessionId: result.session.id, platformAdmin: false };
         }
 
         /**
@@ -1615,11 +1821,18 @@
                 if (!policy || !session) { this.#diagnostics.restoreFailures++; return { restored: false, reason: "AdminRecoveryPolicy or Session not loaded yet." }; }
                 const stillActive = policy.listAdminSessions(pointer.userId).find(s => s.id === pointer.adminSessionId && !s.revoked);
                 if (!stillActive) { this.#persistPointer(null); this.#diagnostics.restoreFailures++; return { restored: false, reason: "Admin session no longer active (revoked or unknown)." }; }
+                // Domain 3 authority fix: this restore path re-establishes a
+                // session from a persisted admin-recovery pointer whose
+                // underlying evidence was always local-only (see
+                // loginWithTrustedDevice()/loginWithBiometrics() above) —
+                // it must not re-grant platform-admin on restore either,
+                // for the exact same reason it must not grant it on the
+                // original login.
                 try {
-                    session.establishFromExternalAuth({ uid: pointer.userId, roles: ["platform-admin"], profile: { authMode: stillActive.authMode, deviceId: pointer.deviceId, restored: true } });
+                    session.establishFromExternalAuth({ uid: pointer.userId, roles: [], profile: { authMode: stillActive.authMode, deviceId: pointer.deviceId, restored: true, serverVerified: false } });
                 } catch (err) { this.#persistPointer(null); this.#diagnostics.restoreFailures++; return { restored: false, reason: err.message }; }
                 this.#diagnostics.restoreSuccesses++;
-                return { restored: true, source: "admin-recovery", userId: pointer.userId };
+                return { restored: true, source: "admin-recovery", userId: pointer.userId, platformAdmin: false };
             }
 
             if (pointer.source === "server") {

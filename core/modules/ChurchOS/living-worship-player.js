@@ -62,8 +62,11 @@
     if (window.CozyOS.Modules["living-worship-player"]) return;
 
     const STORAGE_KEY = "cozy.churchos.worshipPlayer.prefs";
-    const REAL_PANELS = ["translation", "scripture", "timeline", "branches"];
-    const DISCLOSED_ABSENT_PANELS = ["lyrics", "notes", "prayer", "chat"];
+    const REAL_PANELS = ["translation", "scripture", "timeline", "branches", "chat"];
+    // Item 6 — "chat" moved here from DISCLOSED_ABSENT_PANELS: it now
+    // has a real backend (window.CozyOS.LivingAssistant.open()), so
+    // leaving it listed as honestly-absent would itself be inaccurate.
+    const DISCLOSED_ABSENT_PANELS = ["lyrics", "notes", "prayer"];
 
     function loadPrefs() {
         try { return JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "{}"); } catch (_err) { return {}; }
@@ -79,6 +82,7 @@
         #controller = null; // M367 - the real 3-state LiveViewController instance
         #serviceId = null;
         #openPanels = new Set();
+        #chatCardShown = false; // Item 6 — see #togglePanel()'s real-state-authority comment
         #detectedScriptures = [];
         #lastCaption = null;
 
@@ -110,11 +114,17 @@
                         <button type="button" data-player-action="expand" title="Theater Mode">⛶ Theater</button>
                         <button type="button" data-player-action="mini" title="Float inside CozyOS">🗗 Float</button>
                         <button type="button" data-player-action="pip" title="${pipSupported ? "Float outside CozyOS (Picture-in-Picture)" : "Picture-in-Picture is not supported in this browser"}" ${pipSupported ? "" : "disabled"}>⧉ PiP</button>
+                        <button type="button" data-player-action="fullscreen" aria-label="Enter Fullscreen" title="Fullscreen">⛶ Fullscreen</button>
                     </div>
                     <video id="cozy-worship-player-video" autoplay muted playsinline></video>
                     <button type="button" id="cozy-worship-player-mini-restore" data-player-action="restore-mini" aria-label="Expand Live Worship video" title="Tap to expand"></button>
-                    <div id="cozy-worship-player-panels">
-                        ${[...REAL_PANELS, ...DISCLOSED_ABSENT_PANELS].map(p => `<button type="button" class="cozy-btn" data-panel-toggle="${p}">${p.charAt(0).toUpperCase() + p.slice(1)}</button>`).join("")}
+                    <div id="cozy-worship-player-tools">
+                        <button type="button" id="cozy-worship-player-tools-toggle" aria-expanded="false" aria-controls="cozy-worship-player-tools-menu" aria-label="Open Live Worship Tools">
+                            <span aria-hidden="true">●</span> Live Worship Tools <span id="cozy-worship-player-tools-arrow" aria-hidden="true">˅</span>
+                        </button>
+                        <div id="cozy-worship-player-tools-menu" hidden>
+                            ${[...REAL_PANELS, ...DISCLOSED_ABSENT_PANELS].map(p => `<button type="button" class="cozy-btn" data-panel-toggle="${p}">${p.charAt(0).toUpperCase() + p.slice(1)}</button>`).join("")}
+                        </div>
                     </div>
                     <div id="cozy-worship-player-panel-content"></div>
                 </div>
@@ -127,7 +137,28 @@
                 this.#windowHandle = wm.create({
                     id: "living-worship-player", title: "Live Worship", element: this.#root,
                     icon: "🎥", draggable: true, resizable: true, minimizable: true, maximizable: true, closable: true,
-                    onClose: () => { this.#controller.setWindowOpen(false); }
+                    // Item 5 (Move/Pin) — enables the real, existing,
+                    // generic WindowManager pin capability for this
+                    // window (previously not requested; the real
+                    // pin button/state/persistence already existed for
+                    // every other CozyOS window). See window-manager.js's
+                    // own #togglePin() for the accompanying real
+                    // corner-snap addition — Pin now has a genuine
+                    // spatial effect, not merely a visual toggle.
+                    pinnable: true,
+                    // Real defect fix (found via Item 5's real close ->
+                    // reopen browser test): onClose previously only
+                    // updated the controller's chip state, but never
+                    // reset this.#root/this.#windowHandle — so
+                    // #mountWindow()'s own existing-root fast path
+                    // (`if (this.#root) { ...; return; }`) silently
+                    // no-op'd on the next real open, since it still
+                    // held a reference to the now-detached DOM node.
+                    // Genuinely closing the real window (the
+                    // WindowManager's own X button) must let the next
+                    // open truly rebuild it, exactly like it does the
+                    // very first time.
+                    onClose: () => { this.#controller.setWindowOpen(false); this.#root = null; this.#windowHandle = null; }
                 });
             } else {
                 // Honest fallback only if the real Window Manager somehow
@@ -185,9 +216,48 @@
             this.#root.addEventListener("click", (evt) => {
                 const btn = evt.target.closest("[data-player-action]");
                 if (btn) { this.#handleAction(btn.getAttribute("data-player-action")); return; }
+                const toolsToggle = evt.target.closest("#cozy-worship-player-tools-toggle");
+                if (toolsToggle) { this.#toggleToolsMenu(); return; }
                 const panelBtn = evt.target.closest("[data-panel-toggle]");
                 if (panelBtn) { this.#togglePanel(panelBtn.getAttribute("data-panel-toggle")); }
             });
+
+            // Item 3 — real, honest label sync via the real
+            // fullscreenchange event, so the button reflects genuine
+            // browser state even when fullscreen is exited natively
+            // (Escape key) rather than via this button.
+            if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+                document.addEventListener("fullscreenchange", () => {
+                    const btn = this.#root.querySelector('[data-player-action="fullscreen"]');
+                    if (!btn) return;
+                    // Real containment check: WindowManager.toggleFullscreen()
+                    // requests fullscreen on the .cozy-window element (an
+                    // ancestor of this.#root, not this.#root itself), so
+                    // this must check containment, not identity.
+                    const isFs = !!(document.fullscreenElement && typeof document.fullscreenElement.contains === "function" && document.fullscreenElement.contains(this.#root));
+                    btn.textContent = isFs ? "⛶ Exit Fullscreen" : "⛶ Fullscreen";
+                    btn.setAttribute("aria-label", isFs ? "Exit Fullscreen" : "Enter Fullscreen");
+                });
+            }
+
+            // Reorganization: the tools menu (Translation/Scripture/
+            // Timeline/Branches/Lyrics/Notes/Prayer/Chat) starts
+            // collapsed, matching the requested "compact by default,
+            // opens downward on demand" behavior — the buttons and
+            // their real #togglePanel()/#renderOpenPanels() logic above
+            // are completely unchanged, only their container's
+            // open/closed presentation is new. Reuses the same real
+            // savePrefs()/loadPrefs() persistence already used for
+            // openPanels/mode, so a returning user's preference is
+            // honored rather than always resetting to collapsed.
+            const toolsMenu = this.#root.querySelector("#cozy-worship-player-tools-menu");
+            const toolsToggleBtn = this.#root.querySelector("#cozy-worship-player-tools-toggle");
+            if (toolsMenu && loadPrefs().toolsMenuOpen) {
+                toolsMenu.hidden = false;
+                if (toolsToggleBtn) toolsToggleBtn.setAttribute("aria-expanded", "true");
+                const arrow = this.#root.querySelector("#cozy-worship-player-tools-arrow");
+                if (arrow) arrow.textContent = "˄";
+            }
             // M389 — real fix, found by the browser test suite: the
             // restore overlay (#cozy-worship-player-mini-restore) is a
             // full-coverage absolute-positioned element while mini, so
@@ -262,6 +332,30 @@
             else if (action === "pip") {
                 this.#togglePip();
             }
+            else if (action === "fullscreen") {
+                // Item 3 — reuses the real, existing, already-generic
+                // WindowManager.toggleFullscreen() (native Fullscreen
+                // API, feature-detected, honestly a no-op failure if
+                // unsupported) via the already-stored real window
+                // handle — no new fullscreen engine, no CSS-only fake
+                // fullscreen. Auto-collapses the real Tools menu on
+                // entry so it never obstructs a genuinely clean
+                // fullscreen view; the same real toggle button remains
+                // the obvious way back out (in addition to the
+                // browser's own native Escape-key exit).
+                if (this.#windowHandle && typeof this.#windowHandle.toggleFullscreen === "function") {
+                    this.#windowHandle.toggleFullscreen();
+                    const menu = this.#root.querySelector("#cozy-worship-player-tools-menu");
+                    const toggleBtn = this.#root.querySelector("#cozy-worship-player-tools-toggle");
+                    const arrow = this.#root.querySelector("#cozy-worship-player-tools-arrow");
+                    if (menu && !menu.hidden) {
+                        menu.hidden = true;
+                        if (toggleBtn) toggleBtn.setAttribute("aria-expanded", "false");
+                        if (arrow) arrow.textContent = "˅";
+                        savePrefs({ ...loadPrefs(), toolsMenuOpen: false });
+                    }
+                }
+            }
             else if (action === "add-language") {
                 const select = this.#root.querySelector("#cozy-worship-lang-select");
                 const lang = select ? select.value : null;
@@ -330,7 +424,48 @@
             }
         }
 
+        /**
+         * #toggleToolsMenu() — Live Worship Tools reorganization: pure
+         * presentation toggle for the panel-button container added
+         * above. Never touches #openPanels/#togglePanel's own real
+         * state; a collapsed tools menu can still have panels open
+         * underneath (matching "collapse the menu, not the content").
+         */
+        #toggleToolsMenu() {
+            const menu = this.#root.querySelector("#cozy-worship-player-tools-menu");
+            const toggleBtn = this.#root.querySelector("#cozy-worship-player-tools-toggle");
+            const arrow = this.#root.querySelector("#cozy-worship-player-tools-arrow");
+            if (!menu) return;
+            const nowOpen = menu.hidden;
+            menu.hidden = !nowOpen;
+            if (toggleBtn) toggleBtn.setAttribute("aria-expanded", nowOpen ? "true" : "false");
+            if (arrow) arrow.textContent = nowOpen ? "˄" : "˅";
+            savePrefs({ ...loadPrefs(), toolsMenuOpen: nowOpen });
+        }
+
         #togglePanel(panel) {
+            // Item 6 (CozyOS Live Chat Workspace) — real defect found
+            // and fixed during real browser testing: "chat" must NOT
+            // be tracked via the local #openPanels on/off Set like the
+            // disclosure-card panels (translation/scripture/timeline/
+            // branches) — that Set has no way to learn if the user
+            // closes the real Assistant window directly (via its own,
+            // separate close control), so a second click on "Chat"
+            // here would then incorrectly toggle the Set entry OFF
+            // instead of reopening the real window, leaving the user
+            // unable to get Chat back without reloading. The real,
+            // already-existing window.CozyOS.LivingAssistant.toggle()
+            // is itself the single, authoritative source of truth for
+            // whether that window is open — delegating to it directly,
+            // every click, avoids any second, desyncable state.
+            if (panel === "chat") {
+                const assistant = window.CozyOS.LivingAssistant;
+                if (assistant && typeof assistant.toggle === "function") assistant.toggle();
+                else if (assistant && typeof assistant.open === "function") assistant.open();
+                this.#chatCardShown = true;
+                this.#renderOpenPanels();
+                return;
+            }
             this.#openPanels.has(panel) ? this.#openPanels.delete(panel) : this.#openPanels.add(panel);
             savePrefs({ ...loadPrefs(), openPanels: [...this.#openPanels] });
             this.#renderOpenPanels();
@@ -340,7 +475,8 @@
             const host = this.#root.querySelector("#cozy-worship-player-panel-content");
             if (!host) return;
             const identity = window.CozyOS.IdentityEngine;
-            host.innerHTML = [...this.#openPanels].map(panel => {
+            const panelsToRender = this.#chatCardShown ? [...this.#openPanels, "chat"] : [...this.#openPanels];
+            host.innerHTML = panelsToRender.map(panel => {
                 if (panel === "branches") {
                     const coordinator = window.CozyOS.MultiBranchCoordinator;
                     const badge = window.CozyOS.LanguageBadge;
@@ -367,6 +503,23 @@
                         <div id="cozy-worship-caption-display">${this.#lastCaption ? `<p>${this.#lastCaption}</p>` : "<p class='cozy-disclosure-note'>No live caption yet.</p>"}</div>
                         <p class='cozy-disclosure-note'>Real, browser-dependent translation (SpeechTranslationAdapter). Tap a badge to add/remove it as a listener language. Status: 🟢 active for this service, ⚪ available, 🔴 offline (no real translator registered for this language in this browser).</p>
                     </div>`;
+                }
+                if (panel === "chat") {
+                    const assistant = window.CozyOS.LivingAssistant;
+                    const available = !!(assistant && typeof assistant.toggle === "function");
+                    // Real, live status — reads the Assistant's own
+                    // getDiagnosticsReport().expanded rather than a
+                    // second, locally-tracked flag that could desync
+                    // from the real window (the exact defect this item
+                    // fixed above).
+                    const diag = available && typeof assistant.getDiagnosticsReport === "function" ? assistant.getDiagnosticsReport() : null;
+                    const isOpen = !!(diag && diag.expanded);
+                    return `<div class="cozy-living-card"><b>Chat</b><p class='cozy-disclosure-note'>${!available
+                        ? "Chat is not available right now — the CozyOS Assistant is not loaded in this environment."
+                        : isOpen
+                            ? "Chat is open in the real CozyOS Assistant workspace, running alongside Live — video and audio continue uninterrupted. Move or resize that window as needed."
+                            : "The CozyOS Assistant workspace was closed. Tap Chat again to reopen it."
+                    }</p></div>`;
                 }
                 return `<div class="cozy-living-card"><p class="cozy-disclosure-note">${panel.charAt(0).toUpperCase() + panel.slice(1)} is not available yet - no real engine exists in this repository for it (confirmed absent, not fabricated).</p></div>`;
             }).join("");
@@ -519,8 +672,8 @@
             this.#root = document.createElement("div");
             this.#root.id = "cozy-liveview-controller";
             this.#root.innerHTML = `
-                <button type="button" id="cozy-liveview-icon" aria-label="Live Worship - tap to open menu" title="Live Worship" tabindex="0"></button>
-                <div id="cozy-liveview-panel" role="menu" aria-label="Live View controls" hidden>
+                <button type="button" id="cozy-liveview-icon" aria-label="CozyOS Live — Video Assist, tap to open menu" title="CozyOS Live — Video Assist" tabindex="0"></button>
+                <div id="cozy-liveview-panel" role="menu" aria-label="CozyOS Live controls" hidden>
                     <button type="button" data-lv-action="open" role="menuitem"></button>
                     <button type="button" data-lv-action="minimize" role="menuitem" aria-label="Minimize Live View controller">— Minimize</button>
                     <button type="button" data-lv-action="hide" role="menuitem" aria-label="Hide Live View controller">✕ Hide</button>

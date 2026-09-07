@@ -96,10 +96,23 @@
             en: ["how did cozyos begin", "when did cozyos start", "when was cozyos created", "why was cozyos created",
                 "how did the idea of cozyos come about", "what inspired cozyos", "what problem led to cozyos",
                 "what is the story behind cozyos", "how did cozyos evolve", "what motivated its creation",
-                "what problem was cozyos meant to solve"],
+                "what problem was cozyos meant to solve",
+                // Domain 4A fix (Security & Sign-in discovery report's AI
+                // Integration follow-on): "What was CozyOS started for?"
+                // previously mis-routed to COZYOS_FOUNDER — its "who
+                // started cozyos" trigger scored 0.667 word-overlap
+                // against this query (sharing only "started"/"cozyos"),
+                // clearing MATCH_THRESHOLD, while no COZYOS_ORIGIN phrase
+                // scored high enough to compete. These are real,
+                // additional phrasings of the SAME already-answered
+                // origin/purpose question (answerWhyCreated(), unchanged)
+                // — not a new answer, not a new intent.
+                "what was cozyos started for", "what was cozyos created for", "what was cozyos built for",
+                "what was cozyos made for", "why was cozyos started", "why was cozyos built"],
             sw: ["cozyos ilianzaje", "cozyos ilianzishwa lini", "kwa nini cozyos iliundwa", "wazo la cozyos lilitoka wapi",
                 "ni nini kilichochochea cozyos", "hadithi ya cozyos ni nini", "tatizo gani lilisababisha cozyos",
-                "cozyos ilianzishwa kutatua tatizo gani"]
+                "cozyos ilianzishwa kutatua tatizo gani",
+                "cozyos ilianzishwa kwa ajili ya nini", "cozyos ilijengwa kwa ajili ya nini"]
         },
         [INTENTS.COZYOS_MISSION]: {
             en: ["what is cozyos's mission", "what is the mission of cozyos", "what does cozyos aim to achieve",
@@ -192,14 +205,38 @@
 
     function _wordSet(s) { return new Set(_normalize(s).split(" ").filter(Boolean)); }
 
-    /** Score a normalized query against one trigger phrase: substring match scores highest, else word-overlap ratio. */
+    // Domain 4A fix (AI Integration discovery): near-universal words that
+    // appear in almost every CozyOS question (the brand name itself, plus
+    // ordinary question connectives) previously counted as real overlap
+    // signal in the word-overlap fallback below. That let short, generic
+    // questions like "What is CozyOS?" or "What applications are part of
+    // CozyOS?" false-positive match onto an unrelated intent (e.g.
+    // COZYOS_FOUNDER's "who is behind cozyos") purely by sharing "what"/
+    // "is"/"cozyos" — words with no distinguishing power, since literally
+    // every trigger phrase and every real question contains "cozyos".
+    // Excluding them from the OVERLAP calculation (never from the exact-
+    // substring check above, which stays a strong, unambiguous signal on
+    // its own) makes the fallback score reflect genuinely distinguishing
+    // words (founded/started/applications/vision/etc.) instead.
+    const OVERLAP_STOPWORDS = new Set([
+        "cozyos", "cozyai", "what", "is", "are", "was", "were", "the", "a", "an",
+        "of", "to", "in", "on", "for", "do", "does", "did", "it", "its", "this",
+        "that", "and", "or", "how", "i"
+    ]);
+    function _distinguishingWordSet(s) {
+        const ws = new Set();
+        for (const w of _wordSet(s)) { if (!OVERLAP_STOPWORDS.has(w)) ws.add(w); }
+        return ws;
+    }
+
+    /** Score a normalized query against one trigger phrase: substring match scores highest, else word-overlap ratio over DISTINGUISHING words only (see OVERLAP_STOPWORDS above). */
     function _scorePhrase(normQuery, phrase) {
         const normPhrase = _normalize(phrase);
         if (!normPhrase) return 0;
         if (normQuery.includes(normPhrase)) return 1;
-        const qWords = _wordSet(normQuery);
-        const pWords = _wordSet(normPhrase);
-        if (pWords.size === 0) return 0;
+        const qWords = _distinguishingWordSet(normQuery);
+        const pWords = _distinguishingWordSet(normPhrase);
+        if (pWords.size === 0) return 0; // a phrase with no distinguishing words can never win the fallback path
         let overlap = 0;
         pWords.forEach((w) => { if (qWords.has(w)) overlap++; });
         return overlap / pWords.size; // 0..1

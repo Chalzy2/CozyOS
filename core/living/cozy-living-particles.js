@@ -134,4 +134,51 @@
     }
 
     window.CozyOS.LivingParticles = new CozyLivingParticles();
+
+    // Engine Ecosystem dependency #4 — real, additive, observational
+    // registration into the existing, already-proven
+    // core/shell/provider-manager.js (same pattern as Theme/Background/
+    // LivingThemeEngine/Animation). ProviderManager never becomes the
+    // owner of particle rendering — every existing caller of start()/
+    // stop()/pause()/resume()/setDensity()/setSpeed()/setGlow() is
+    // completely unchanged; this only adds a second, honest way to
+    // observe the same real state.
+    //
+    // HONESTY: LivingParticles is itself a facade over
+    // window.CozyOS.Background's real particles/sparks arrays (see this
+    // file's own header) — its health is therefore genuinely dependent
+    // on Background, but not REDUNDANT with Background's own
+    // registration (Engine Ecosystem dependency #2): Background's
+    // health reports whether the canvas is initialized/animating at
+    // all, while this reports the narrower, additional fact of whether
+    // the particle subsystem SPECIFICALLY is enabled and genuinely
+    // populated right now — the same relationship LivingThemeEngine
+    // already has to Theme.
+    if (window.CozyOS.ProviderManager && typeof window.CozyOS.ProviderManager.register === "function") {
+        window.CozyOS.ProviderManager.register({
+            id: "living-particles",
+            name: "CozyOS Living Particles Engine",
+            category: "visual",
+            version: "1.0.0",
+            dependencies: [],
+            getHealth() {
+                const particles = window.CozyOS.LivingParticles;
+                const bg = window.CozyOS.Background;
+                if (!bg) {
+                    return { health: "DEGRADED", reason: "Background engine is not loaded — LivingParticles has no real particle system to compose.", backgroundLoaded: false };
+                }
+                const enabled = particles.isEnabled();
+                const particleCount = Array.isArray(bg.particles) ? bg.particles.length : 0;
+                const sparkCount = Array.isArray(bg.sparks) ? bg.sparks.length : 0;
+                const totalCount = particleCount + sparkCount;
+                if (!enabled) {
+                    return { health: "DEGRADED", reason: "LivingParticles is currently disabled (stop()/disable() was called, or start() was never called).", backgroundLoaded: true, enabled, particleCount, sparkCount };
+                }
+                if (totalCount === 0) {
+                    return { health: "DEGRADED", reason: "Enabled, but the particle subsystem is currently empty (no particles/sparks exist in Background's real arrays right now).", backgroundLoaded: true, enabled, particleCount, sparkCount };
+                }
+                return { health: "ONLINE", reason: `Enabled and genuinely populated: ${totalCount} real particle(s)/spark(s) in Background's arrays.`, backgroundLoaded: true, enabled, particleCount, sparkCount };
+            }
+        });
+    }
 })();

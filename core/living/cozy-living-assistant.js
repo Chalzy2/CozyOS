@@ -183,8 +183,29 @@ function renderAdvisorReply(advice) {
 // test.js (and this milestone's new test) require() the real,
 // unmodified functions directly, instead of duplicating their logic
 // into a test (which would test a copy, not the real code).
+/**
+ * shouldLaunchApplication(result)
+ *   Domain 4I dependency #3 — the EXACT, sole gate #send() uses before
+ *   ever calling window.CozyOS.ApplicationLauncher.open(). Extracted as
+ *   a small, real, pure function (same testability precedent as
+ *   renderAdvisorReply()/isNonEmptyReplyText() above) so this decisive
+ *   security boundary can be verified directly against real
+ *   rule-based-conversational-provider.js output, without needing a
+ *   browser. Returns the applicationId to launch, or null — never a
+ *   truthy value for AUTHORIZATION_DENIED, AUTHORIZATION_REQUIRED, or
+ *   an unresolved application.
+ */
+function shouldLaunchApplication(result) {
+    if (!result || !result.success || !result.result) return null;
+    const r = result.result;
+    if (r.intent !== "app-launch") return null;
+    if (r.authorizationState !== "AUTHORIZATION_GRANTED") return null;
+    if (!r.application || !r.application.id) return null;
+    return r.application.id;
+}
+
 if (typeof module !== "undefined" && module.exports) {
-    module.exports = { resolveConversationalReply, NO_CONVERSATIONAL_ENGINE_FALLBACK, renderAdvisorReply, isNonEmptyReplyText };
+    module.exports = { resolveConversationalReply, NO_CONVERSATIONAL_ENGINE_FALLBACK, renderAdvisorReply, isNonEmptyReplyText, shouldLaunchApplication };
 }
 
 // The rest of this file mounts a real, live UI component and touches
@@ -525,8 +546,18 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
             // effects, never as the reply source anymore.
             const ai = window.CozyOS && window.CozyOS.LivingAI;
             const conversationId = this.#getOrCreateConversationId();
+            // Domain 4I dependency #2 (App-Launch Authorization) — the
+            // real, resolved actorId is now passed through to
+            // ai.think() too (same #resolveActorId() call already used
+            // for the verified identity/knowledge chain below), so a
+            // rule-based-conversational provider's app-launch intent
+            // can call the existing, real
+            // IdentityEngine.canAccessApplication(userId, appName) —
+            // the exact function cozy-workspace.js itself already uses
+            // to decide which applications to show — instead of having
+            // no user context to authorize against at all.
             const result = (ai && typeof ai.think === "function")
-                ? await ai.think(text, { context: this.#currentSection, conversationId })
+                ? await ai.think(text, { context: this.#currentSection, conversationId, actorId: this.#resolveActorId() })
                 : null;
 
             // CHECKPOINT K — the real conversational-answer source:
@@ -545,28 +576,66 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
             let replyText = null;
             const answerEngine = window.CozyOS && window.CozyOS.CozyAnswerEngine;
             const advisor = window.CozyOS && window.CozyOS.CozyAdvisor;
+            let unknownRequestFallbackAnswer = null;
             if (answerEngine && typeof answerEngine.answer === "function") {
                 const answerResult = await answerEngine.answer(text, { actorId });
                 if (advisor && typeof advisor.advise === "function") {
                     const advice = advisor.advise({ question: text, answerResult });
-                    replyText = renderAdvisorReply(advice);
-                } else {
+                    // Domain 4B (AI Integration discovery): CozyAdvisor's
+                    // own "UNKNOWN_REQUEST" responseMode means the
+                    // question matched neither an advice- nor
+                    // encouragement-framing pattern, so advise() is just
+                    // passing answerResult.answer straight through
+                    // unmodified (see cozy-advisor.js's own advise()) —
+                    // it added no real value here. ADVICE/ENCOURAGEMENT/
+                    // ADVICE_AND_ENCOURAGEMENT responses are used exactly
+                    // as before this fix, unconditionally, regardless of
+                    // evidenceState (unchanged pre-existing behavior — a
+                    // genuine encouragement reply must still work even
+                    // when the underlying answer isn't VERIFIED). Only in
+                    // the plain UNKNOWN_REQUEST + non-VERIFIED case do we
+                    // hold this answer back to let the separately-
+                    // evidenced rule-based-conversational-provider.js
+                    // (below) try first — e.g. "Do you speak Kiswahili?",
+                    // which CozyIdentityFAQRouter has no intent for at
+                    // all but which composes real, live
+                    // CozyLanguageRegistry (RP-027) + CozyKnowledge.
+                    // getLanguageSupportListFact() evidence elsewhere.
+                    if (advice.responseMode === "UNKNOWN_REQUEST" && answerResult.evidenceState !== "VERIFIED") {
+                        unknownRequestFallbackAnswer = isNonEmptyReplyText(answerResult.answer) ? answerResult.answer : null;
+                    } else {
+                        replyText = renderAdvisorReply(advice);
+                    }
+                } else if (answerResult.evidenceState === "VERIFIED") {
                     replyText = isNonEmptyReplyText(answerResult.answer) ? answerResult.answer : null;
+                } else {
+                    unknownRequestFallbackAnswer = isNonEmptyReplyText(answerResult.answer) ? answerResult.answer : null;
                 }
             }
 
-            // Honest fallback — only reached when the verified chain
-            // genuinely is not loaded in this environment (e.g.
-            // CozyAnswerEngine/CozyAdvisor scripts absent). Never
-            // fabricates an answer: falls back to the same RP-024
-            // discipline as before (a genuine .text/.reply/.answer
-            // field on the side-effect pipeline's result, or the
-            // honest static fallback string).
+            // Honest fallback — reached when the verified identity/
+            // knowledge chain genuinely is not loaded in this environment
+            // (e.g. CozyAnswerEngine/CozyAdvisor scripts absent), AND when
+            // it loaded but produced only a plain, non-advice/
+            // encouragement, non-VERIFIED pass-through (see comment
+            // above). Never fabricates an answer: falls back to the same
+            // RP-024 discipline as before (a genuine .text/.reply/.answer
+            // field on the side-effect pipeline's result — which is where
+            // rule-based-conversational-provider.js's real, separately-
+            // evidenced reply actually surfaces, when it is CozyOS's
+            // active LivingAI provider — or CozyAnswerEngine's own honest
+            // message, or the static "engine not connected" string).
             if (!isNonEmptyReplyText(replyText)) {
-                if (!result || !result.success) {
+                const ruleBasedReply = (result && result.success) ? resolveConversationalReply(result.result) : null;
+                const ruleBasedHasRealAnswer = !!ruleBasedReply && result.result && result.result.intent !== "unsupported";
+                if (ruleBasedHasRealAnswer) {
+                    replyText = ruleBasedReply;
+                } else if (unknownRequestFallbackAnswer) {
+                    replyText = unknownRequestFallbackAnswer;
+                } else if (!result || !result.success) {
                     replyText = (result && result.reason) || NO_CONVERSATIONAL_ENGINE_FALLBACK;
                 } else {
-                    replyText = resolveConversationalReply(result.result) || NO_CONVERSATIONAL_ENGINE_FALLBACK;
+                    replyText = ruleBasedReply || NO_CONVERSATIONAL_ENGINE_FALLBACK;
                 }
             }
             this.#addMessage("assistant", replyText);
@@ -582,6 +651,46 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
             // introduced or fixed here — out of this milestone's scope).
             const navAction = result && result.success && result.result && NAV_INTENT_ACTIONS[result.result.intent];
             if (navAction) this.#runQuickAction(navAction);
+
+            // Domain 4I dependency #3 (Authorized Application Launch —
+            // Real Navigation) — the ONLY consumer of
+            // AUTHORIZATION_GRANTED anywhere in this codebase. Reuses
+            // the existing, real, canonical launcher
+            // (window.CozyOS.ApplicationLauncher.open(applicationId) —
+            // core/shell/application-launcher.js, the exact same
+            // mechanism cozy-workspace.js's own app-card click handler
+            // already composes, confirmed by reading that call site
+            // before writing this). No second launcher, no AI-supplied
+            // URL, no DOM selector, no arbitrary navigation: the ONLY
+            // value ever passed is application.id, itself only ever
+            // populated by resolveApplicationByName() reading the real
+            // application registry — never text the AI generated.
+            //
+            // The gate is exact and non-negotiable: ONLY
+            // authorizationState === "AUTHORIZATION_GRANTED" reaches
+            // this call. AUTHORIZATION_DENIED, AUTHORIZATION_REQUIRED,
+            // and an unresolved application (authorizationState absent)
+            // all fall through to a no-op here — the honest reply text
+            // computed above is the only thing those cases ever produce.
+            const applicationIdToLaunch = shouldLaunchApplication(result);
+            if (applicationIdToLaunch) {
+                const launcher = window.CozyOS && window.CozyOS.ApplicationLauncher;
+                if (launcher && typeof launcher.open === "function") {
+                    launcher.open(applicationIdToLaunch).then((launchResult) => {
+                        if (!launchResult || !launchResult.success) {
+                            // Honest failure surface only — the reply
+                            // already sent never claimed execution, so
+                            // there is nothing to retract; this is
+                            // purely a disclosed diagnostic, matching
+                            // cozy-workspace.js's own click-handler
+                            // pattern for the same real launcher.
+                            console.warn(`[LivingAssistant] ApplicationLauncher.open("${applicationIdToLaunch}") did not succeed:`, launchResult && launchResult.reason);
+                        }
+                    }).catch((err) => {
+                        console.warn(`[LivingAssistant] ApplicationLauncher.open("${applicationIdToLaunch}") threw:`, err && err.message);
+                    });
+                }
+            }
         }
 
         /** #speak() — composes the real VoiceManager, exactly as Founder Story's narration engine already does (M361 Stage 3). Never a second TTS path. */

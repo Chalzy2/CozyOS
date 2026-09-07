@@ -176,11 +176,30 @@
             container.innerHTML = `
                 <div id="cozy-user-dashboard" class="cozy-living-panel cozy-living-glass">
                     <div id="cozy-ud-topbar">
+                        <button type="button" id="cozy-ud-menu-btn" aria-label="Open CozyOS menu" aria-expanded="false" aria-controls="cozy-ud-drawer">☰</button>
                         <div id="cozy-ud-profile">${escapeHtml(userId)}</div>
                         <input type="text" id="cozy-ud-search" class="cozy-living-input" placeholder="Search CozyOS...">
                         <button type="button" id="cozy-ud-notifications-btn" title="Notifications">🔔</button>
                         <button type="button" id="cozy-ud-signout" title="Sign out">Sign Out</button>
                     </div>
+                    <div id="cozy-ud-drawer-overlay"></div>
+                    <nav id="cozy-ud-drawer" aria-label="CozyOS master navigation">
+                        <div id="cozy-ud-drawer-section-cozyos">
+                            <h4 class="cozy-ud-drawer-heading">CozyOS</h4>
+                            ${order.map(name => `
+                                <button type="button"
+                                    class="cozy-ud-drawer-link"
+                                    data-nav-surface="${escapeHtml(name)}"
+                                    aria-current="${name === activeSurface ? "page" : "false"}">
+                                    <span aria-hidden="true">${SURFACE_META[name] ? SURFACE_META[name].icon : "•"}</span>
+                                    <span>${SURFACE_META[name] ? escapeHtml(SURFACE_META[name].label) : escapeHtml(name)}</span>
+                                </button>`).join("")}
+                        </div>
+                        <div id="cozy-ud-drawer-section-apps">
+                            <h4 class="cozy-ud-drawer-heading">Applications</h4>
+                            <div id="cozy-ud-drawer-apps-list"></div>
+                        </div>
+                    </nav>
                     <div id="cozy-ud-surfaces">
                         <section id="cozy-ud-surface-home" class="cozy-ud-surface" data-surface="home"></section>
                         <section id="cozy-ud-surface-community" class="cozy-ud-surface" data-surface="community"></section>
@@ -188,6 +207,18 @@
                         <section id="cozy-ud-surface-apps" class="cozy-ud-surface" data-surface="apps"></section>
                         <section id="cozy-ud-surface-settings" class="cozy-ud-surface" data-surface="settings"></section>
                     </div>
+                    <!-- Level 1 master drawer dependency — the real,
+                         canonical window.CozyOS.ApplicationLauncher.open()
+                         (core/shell/application-launcher.js, Domain 4I)
+                         mounts into exactly this container id in every
+                         other real CozyOS surface (dashboard.html/
+                         admin-workspace.html); it did not previously
+                         exist anywhere in this file's rendered DOM, so
+                         open() could never actually succeed here before
+                         this change. No new launcher — this is the one,
+                         real, missing mount point the existing launcher
+                         already expects. -->
+                    <div id="cozy-workspace-root"></div>
                     <nav id="cozy-ud-bottomnav" aria-label="CozyOS primary navigation">
                         ${order.map(name => `
                             <button type="button"
@@ -204,11 +235,161 @@
 
             this.#wireTopBar();
             this.#wireBottomNav();
+            this.#wireDrawer();
             if (nav && typeof nav.onChange === "function") {
                 nav.onChange(() => this.#applyActiveSurface());
             }
             this.#renderAllSurfaces();
             this.#applyActiveSurface();
+        }
+
+        /**
+         * #wireDrawer() — Level 1 master navigation (small-phone drawer).
+         *   Reuses the proven Administrator Workspace concept
+         *   (admin-workspace.html's real, live .cozy-shell.cozy-
+         *   sidebar-mobile-open off-canvas overlay pattern — confirmed
+         *   by reading that file directly before writing this) at the
+         *   same <600px breakpoint (no canonical CozyOS breakpoint
+         *   token exists to reuse instead — confirmed by search — so
+         *   this matches the one other real, live implementation
+         *   exactly). Opening/closing only toggles a class; it never
+         *   touches #cozy-ud-surfaces or #cozy-workspace-root, so an
+         *   active application is never reloaded or recreated by the
+         *   drawer's own open/close action. Surface-switch links reuse
+         *   #wireBottomNav()'s own [data-nav-surface] wiring — no
+         *   second tab-switch mechanism, since data-nav-surface targets
+         *   the same elements. Application entries are real
+         *   authorization-aware data (this.#visibleApps, from
+         *   ApplicationVisibility.listVisibleApplications(), already
+         *   computed in render()) and launch via the one, real,
+         *   canonical window.CozyOS.ApplicationLauncher.open() — never
+         *   a second launcher, never window.location for these entries.
+         */
+        #wireDrawer() {
+            const root = this.#container;
+            const menuBtn = root.querySelector("#cozy-ud-menu-btn");
+            const drawer = root.querySelector("#cozy-ud-drawer");
+            const overlay = root.querySelector("#cozy-ud-drawer-overlay");
+            const shell = root.querySelector("#cozy-user-dashboard");
+            if (!menuBtn || !drawer || !overlay || !shell) return;
+
+            const closeDrawer = () => {
+                shell.classList.remove("cozy-ud-drawer-open");
+                menuBtn.setAttribute("aria-expanded", "false");
+            };
+            const openDrawer = () => {
+                shell.classList.add("cozy-ud-drawer-open");
+                menuBtn.setAttribute("aria-expanded", "true");
+            };
+            menuBtn.addEventListener("click", () => {
+                shell.classList.contains("cozy-ud-drawer-open") ? closeDrawer() : openDrawer();
+            });
+            overlay.addEventListener("click", closeDrawer);
+
+            // Surface links inside the drawer share the exact same
+            // [data-nav-surface] contract #wireBottomNav() already wires
+            // (querySelectorAll runs against the whole container, so
+            // both the drawer's copies and the bottom nav's copies are
+            // wired identically, from that one existing function) —
+            // this file only needs to additionally close the drawer
+            // after a real surface switch, which is drawer-specific UX,
+            // not navigation logic.
+            drawer.querySelectorAll("[data-nav-surface]").forEach((btn) => {
+                btn.addEventListener("click", closeDrawer);
+            });
+
+            this.#renderDrawerApps();
+        }
+
+        /**
+         * #renderDrawerApps() — Level 1: real, authorization-filtered
+         * application list inside the master drawer; never invents an
+         * entry beyond what ApplicationVisibility already approved for
+         * this user.
+         *
+         * Level 2 (application-specific expandable navigation) — each
+         * row is now a real expand/collapse toggle (pure local UI
+         * state, zero calls to ApplicationLauncher) revealing a small
+         * panel of real, existing per-application actions: "Open"
+         * (the same window.CozyOS.ApplicationLauncher.open() call
+         * Level 1 already used) and, only when
+         * ApplicationLauncher.isOpen(appId) genuinely reports the app
+         * is currently mounted, "Close" (the real, existing
+         * ApplicationLauncher.close(appId)). No new per-app navigation
+         * registry was created — "constituent items" here are the
+         * application's own real, already-existing lifecycle actions
+         * from the one canonical launcher, not fabricated sub-routes.
+         * Expanding/collapsing a row never calls open()/close() itself,
+         * so it can never reload or recreate the active application.
+         */
+        #renderDrawerApps() {
+            const list = this.#container.querySelector("#cozy-ud-drawer-apps-list");
+            if (!list) return;
+            if (!this.#visibleApps.available || !Array.isArray(this.#visibleApps.applications)) {
+                list.innerHTML = `<p class="cozy-disclosure-note">${escapeHtml(this.#visibleApps.reason || "No applications available.")}</p>`;
+                return;
+            }
+            const businessApps = this.#visibleApps.applications.filter((a) => a.kind === "application");
+            if (!businessApps.length) {
+                list.innerHTML = `<p class="cozy-disclosure-note">No applications have been assigned to this account yet.</p>`;
+                return;
+            }
+            const launcher = window.CozyOS && window.CozyOS.ApplicationLauncher;
+            list.innerHTML = businessApps.map((app) => {
+                const isOpen = !!(launcher && typeof launcher.isOpen === "function" && launcher.isOpen(app.appId));
+                return `
+                <div class="cozy-ud-drawer-app-row" data-drawer-app-row="${escapeHtml(app.appId)}">
+                    <button type="button" class="cozy-ud-drawer-link cozy-ud-drawer-app-toggle" data-drawer-toggle-app="${escapeHtml(app.appId)}" aria-expanded="false">
+                        <span aria-hidden="true">📦</span>
+                        <span>${escapeHtml(app.name)}</span>
+                        <span class="cozy-ud-drawer-app-arrow" aria-hidden="true">▸</span>
+                    </button>
+                    <div class="cozy-ud-drawer-app-panel" data-drawer-app-panel="${escapeHtml(app.appId)}" hidden>
+                        <button type="button" class="cozy-ud-drawer-sublink" data-drawer-open-app="${escapeHtml(app.appId)}">Open</button>
+                        <button type="button" class="cozy-ud-drawer-sublink" data-drawer-close-app="${escapeHtml(app.appId)}" ${isOpen ? "" : "hidden"}>Close</button>
+                    </div>
+                </div>`;
+            }).join("");
+
+            // Expand/collapse — pure local UI state, never touches
+            // ApplicationLauncher.
+            list.querySelectorAll("[data-drawer-toggle-app]").forEach((toggleBtn) => {
+                toggleBtn.addEventListener("click", () => {
+                    const appId = toggleBtn.getAttribute("data-drawer-toggle-app");
+                    const panel = list.querySelector(`[data-drawer-app-panel="${appId}"]`);
+                    if (!panel) return;
+                    const nowExpanded = panel.hidden;
+                    panel.hidden = !nowExpanded;
+                    toggleBtn.setAttribute("aria-expanded", nowExpanded ? "true" : "false");
+                });
+            });
+
+            list.querySelectorAll("[data-drawer-open-app]").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    const appId = btn.getAttribute("data-drawer-open-app");
+                    if (!launcher || typeof launcher.open !== "function") return;
+                    launcher.open(appId).then((result) => {
+                        if (!result || !result.success) {
+                            console.warn(`[UserDashboard] ApplicationLauncher.open() did not succeed:`, result && result.reason);
+                        } else {
+                            this.#renderDrawerApps(); // refresh so the real isOpen() state now shows "Close"
+                        }
+                    }).catch((err) => {
+                        console.warn(`[UserDashboard] ApplicationLauncher.open() threw:`, err && err.message);
+                    });
+                    const shell = this.#container.querySelector("#cozy-user-dashboard");
+                    if (shell) shell.classList.remove("cozy-ud-drawer-open");
+                });
+            });
+
+            list.querySelectorAll("[data-drawer-close-app]").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    const appId = btn.getAttribute("data-drawer-close-app");
+                    if (!launcher || typeof launcher.close !== "function") return;
+                    launcher.close(appId);
+                    this.#renderDrawerApps(); // refresh so the real isOpen() state now hides "Close"
+                });
+            });
         }
 
         /** #wireBottomNav() — every tab click goes through the one real navigation-state mutator; this file never tracks its own duplicate "current tab" variable. */

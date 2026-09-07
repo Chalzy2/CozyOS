@@ -601,6 +601,74 @@
      *   along this path, always still calls proceed() — biometrics can
      *   never lock an administrator out of password login.
      */
+    /**
+     * enrollBiometricCredential(userId)
+     *   Domain-1 fix (Security & Sign-in discovery, Phase 1A / completion
+     *   step). This function is the single, real enrollment call both
+     *   the post-password-login prompt below (real cozy_admin_session
+     *   already set by AuthCoordinator.loginWithServerPassword() before
+     *   this ever runs) and the post-local-registration prompt further
+     *   down this file (IdentityEngine.register() + loginWithCredentials()
+     *   — a genuinely separate, local-only, non-server account with no
+     *   session cookie at all) both call — so it cannot assume either
+     *   context.
+     *
+     *   Prefers AuthCoordinator.registerServerPasskey() — the real,
+     *   server-authoritative ceremony against server/webauthn-rp — and
+     *   only falls back to the legacy client-only WebAuthnProvider when
+     *   the real reason is that NO server session exists for this
+     *   identity (code "not_authenticated"/"not_authenticated_admin",
+     *   requiresAuth:true). That specific fallback is honest, not
+     *   theater: an account created through the purely local
+     *   IdentityEngine track (no server row, no session cookie) was
+     *   never going to have a server session, and the legacy provider +
+     *   IdentityEngine.loginWithVerifiedPasskey() is the one real
+     *   authentication track that account actually has — pre-dating
+     *   this fix and unchanged by it.
+     *
+     *   Any OTHER server-reported failure (webauthn_unavailable,
+     *   user_cancelled, webauthn_ceremony_failed, server_unavailable,
+     *   malformed_server_response, or an AuthError code like
+     *   invalid_signature) means a real server session DOES exist and
+     *   the real ceremony genuinely failed — falling back to the legacy
+     *   provider there would silently create a client-only credential
+     *   for an account the server never asked about, exactly the
+     *   duplicate-authority gap this domain closed in
+     *   authentication-factor-management-panel.js. Those cases return
+     *   false (no fallback), matching this function's existing
+     *   "enrollment failure never blocks login" contract — the caller's
+     *   proceed() still runs either way.
+     *
+     *   Exposed publicly (window.CozyOS.CozyLoginGate.enrollBiometricCredential)
+     *   so cozy-admin-recovery-wizard.js's own new-device biometric step
+     *   reuses this exact same real logic rather than re-implementing it
+     *   — no second enrollment-authority-selection engine.
+     *
+     * @returns {Promise<{success:boolean, reason?:string, source?:string}>}
+     */
+    async function enrollBiometricCredential(userId, { displayName } = {}) {
+        const coordinator = window.CozyOS.AuthCoordinator;
+        if (coordinator && typeof coordinator.registerServerPasskey === "function") {
+            const result = await coordinator.registerServerPasskey();
+            if (result && result.available === true) return { success: true, source: "server" };
+            if (!result || !result.requiresAuth) {
+                // Real server session existed and the real ceremony
+                // genuinely failed — do not mask with a legacy fallback.
+                return { success: false, reason: (result && result.reason) || "Passkey registration failed." };
+            }
+            // requiresAuth:true -> no server session exists for this identity
+            // (the local-only IdentityEngine track) -> honest fallback below.
+        }
+        const webauthn = window.CozyOS.WebAuthnProvider;
+        if (!webauthn || typeof webauthn.registerCredential !== "function") {
+            return { success: false, reason: "Neither AuthCoordinator.registerServerPasskey() nor the legacy WebAuthnProvider is loaded." };
+        }
+        const regResult = await webauthn.registerCredential(userId, displayName ? { displayName } : undefined);
+        if (regResult && regResult.available === false) return { success: false, reason: regResult.reason || "Biometric enrollment failed." };
+        if (regResult && regResult.success === false) return { success: false, reason: regResult.reason || "Biometric enrollment failed." };
+        return { success: true, source: "legacy" };
+    }
+
     async function offerBiometricEnrollmentIfEligible(container, userId, proceed) {
         const webauthn = window.CozyOS.WebAuthnProvider;
         const tdm = window.CozyOS.TrustedDeviceManager;
@@ -639,8 +707,8 @@
         container.querySelector("#cozy-biometric-enable").addEventListener("click", async () => {
             tdm.markBiometricPromptShown(device.deviceId);
             try {
-                const regResult = await webauthn.registerCredential(userId);
-                if (regResult && regResult.available !== false) tdm.setBiometricEnabled(device.deviceId, true);
+                const result = await enrollBiometricCredential(userId);
+                if (result && result.success) tdm.setBiometricEnabled(device.deviceId, true);
             } catch (_err) {
                 // Real enrollment failure never blocks proceeding — password
                 // login already succeeded; biometrics are purely additive.
@@ -651,6 +719,11 @@
 
     const CozyOSLoginGate = {
         getVersion() { return GATE_VERSION; },
+
+        // Exposed so cozy-admin-recovery-wizard.js's new-device biometric
+        // step reuses this exact real server-preferred/legacy-fallback
+        // logic — see enrollBiometricCredential()'s own header above.
+        enrollBiometricCredential,
 
         /**
          * mountIfNeeded(container, onAuthenticated)

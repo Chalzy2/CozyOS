@@ -176,7 +176,25 @@
                max-width below still caps growth on large screens per
                the "~75% of usable width" spec, without ever declaring a
                width smaller than the actual content. */
+            /* SECOND REAL FIX (the first fix above only closed this gap
+               below the 480px breakpoint — the exact same root cause it
+               already diagnosed can still occur on WIDE desktop
+               viewports too: font-size clamps at its 168px maximum
+               while max-width independently clamps at its 900px
+               maximum — the two caps do not track each other, so once
+               font-size hits 168px, 10 real characters at that size can
+               exceed the 900px width ceiling. Per CSS spec, when
+               min-width and max-width conflict, min-width wins — so
+               min-width: max-content makes it IMPOSSIBLE for max-width
+               to ever shrink this box below its own real content width,
+               at any viewport, closing the gap for good without
+               touching overflow, animation, or timing. max-width keeps
+               doing its real job — capping growth once the box would
+               otherwise exceed the target ~75%-of-width/900px sizing —
+               exactly as already intended, for every case where content
+               genuinely is narrower than that cap. */
             width: max-content;
+            min-width: max-content;
             max-width: min(75vw, 900px);
             font-size: clamp(28px, 12vw, 168px);
             text-align: center;

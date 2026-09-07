@@ -154,4 +154,62 @@
     }
 
     window.CozyOS.LiveAnimationEngine = new CozyLiveAnimationEngine();
+
+    // Engine Ecosystem dependency #3 — real, additive, observational
+    // registration into the existing, already-proven
+    // core/shell/provider-manager.js (same pattern as Theme/Background/
+    // LivingThemeEngine). ProviderManager never becomes the owner of
+    // animation execution; every existing caller of applyAnimation()/
+    // showTyping()/showFromMessageEngine() is completely unchanged.
+    //
+    // HONESTY: unlike cozy-background.js (a real, ongoing
+    // requestAnimationFrame render loop with genuine "currently
+    // animating" state), this engine is stateless and per-call —
+    // applyAnimation()/showTyping() run synchronously against whatever
+    // element is passed in and return immediately; there is no
+    // persistent "is an animation currently in progress" field
+    // anywhere in this class (confirmed by reading the complete
+    // implementation above before writing this). So health here
+    // reports the one thing that IS genuinely, structurally
+    // observable — whether a real DOM is available for
+    // applyAnimation()/showTyping() to act on at all — rather than
+    // fabricating an "actively animating" claim this engine has no way
+    // to know. prefers-reduced-motion is reported as real environmental
+    // context only; this engine does not itself branch on it (confirmed
+    // by reading applyAnimation()/showTyping() above), so it is
+    // disclosed as an observation, not claimed as an enforced behavior.
+    if (window.CozyOS.ProviderManager && typeof window.CozyOS.ProviderManager.register === "function") {
+        window.CozyOS.ProviderManager.register({
+            id: "live-animation-engine",
+            name: "CozyOS Live Animation Engine",
+            category: "visual",
+            version: VERSION,
+            dependencies: [],
+            getHealth() {
+                const domAvailable = typeof document !== "undefined" && typeof document.createElement === "function";
+                let reducedMotionPreferred = null;
+                try {
+                    reducedMotionPreferred = (typeof window !== "undefined" && typeof window.matchMedia === "function")
+                        ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+                        : null;
+                } catch (_err) { reducedMotionPreferred = null; }
+
+                if (!domAvailable) {
+                    return {
+                        health: "DEGRADED",
+                        reason: "No DOM is available in this environment — applyAnimation()/showTyping() require a real document.createElement to function.",
+                        domAvailable,
+                        reducedMotionPreferred
+                    };
+                }
+                return {
+                    health: "ONLINE",
+                    reason: "A real DOM is available. This is a stateless, per-call engine (no persistent \"currently animating\" state exists to report beyond DOM availability) — applyAnimation()/showTyping() can genuinely execute when called.",
+                    domAvailable,
+                    supportedAnimationCount: Object.keys(REAL_ANIMATION_CLASSES).length,
+                    reducedMotionPreferred
+                };
+            }
+        });
+    }
 })();

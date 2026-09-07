@@ -648,22 +648,34 @@
                 const soundsForChime = window.CozyOS && window.CozyOS.LivingSounds;
                 if (soundsForChime && typeof soundsForChime.play === "function") soundsForChime.play("logo-chime", { category: "ui" });
 
-                // REAL TIMING FIX: "Welcome to CozyOS" belongs with the
-                // moment the logo/wordmark actually appears — it was
-                // previously only spoken much later (chained
-                // immediately before the motto voice, after the ABOVE
-                // ONLY stage AND the motto text had already finished),
-                // which read as disconnected from what was on screen.
-                // Moved here, to fire the instant the logo reveal
-                // begins — the ABOVE ONLY stage's own dedicated voice
-                // and the motto's own voice (still chained together at
-                // the end, unchanged) are completely untouched by this;
-                // only WHEN the welcome line itself starts changed. Not
-                // awaited: the logo/typing/ABOVE ONLY visual stages
-                // continue on their existing schedule regardless of how
-                // long this particular line takes to finish speaking,
-                // exactly as before.
-                playStartupVoice();
+                // SERIALIZED VOICE SEQUENCE FIX (audio must never
+                // overlap: Welcome -> ABOVE ONLY -> Motto, zero
+                // overlap): previously fire-and-forget, which let a
+                // slow "Welcome to CozyOS" line still be speaking when
+                // ABOVE ONLY's own voice began at the fixed 1500ms
+                // mark below. Now genuinely awaited — Stage 3 (typing)
+                // and therefore ABOVE ONLY are held back until this
+                // real audio has completely finished playing. The
+                // logo/typing/ABOVE ONLY VISUAL stages still begin at
+                // the existing minimum (LOGO_STAGE_MS+GLOW_FADE_MS
+                // =1500ms) exactly as before whenever the real voice
+                // finishes at or before that mark — including when
+                // muted, since playStartupVoice() then resolves near-
+                // instantly (its own existing LAUNCH_AUDIO_MUTED early
+                // return) — so "visual animation continues even when
+                // muted" and the previously-approved 1500ms Stage 2
+                // timing are both fully preserved. Only when the real,
+                // enabled voice genuinely takes LONGER than 1500ms does
+                // the transition to Stage 3 wait the extra real time,
+                // which is exactly what "zero overlap" requires. Reuses
+                // playStartupVoice() completely unmodified — no new
+                // audio engine, no second voice call.
+                const stage2StartedAt = Date.now();
+                playStartupVoice().then(() => {
+                    const elapsedSinceStage2Ms = Date.now() - stage2StartedAt;
+                    const remainingStage2HoldMs = Math.max(0, (STARTUP_TIMING.LOGO_STAGE_MS + STARTUP_TIMING.GLOW_FADE_MS) - elapsedSinceStage2Ms);
+                    setTimeout(runStage3TypingSequence, remainingStage2HoldMs);
+                });
 
                 // CP7 Login Gate resync — revealLiveBackground()/
                 // activateLighting() now fire HERE, at Stage 2, instead
@@ -709,7 +721,7 @@
                     if (typeof orchestrator.playStartupSound === "function") orchestrator.playStartupSound();
                 }
 
-                setTimeout(() => {
+                function runStage3TypingSequence() {
                     // Stage 3 (COZYOS Typing): begins only after Stage 2
                     // fully completes - real fix, was previously starting
                     // in parallel with the logo reveal instead of
@@ -917,7 +929,15 @@
                         requestAnimationFrame(() => title.classList.add("cozy-launch-anim-play"));
                         setTimeout(afterTitleRevealed, 900);
                     }
-                }, STARTUP_TIMING.LOGO_STAGE_MS + STARTUP_TIMING.GLOW_FADE_MS); // CP7 Login Gate resync — derived from config (LOGO_STAGE_MS + GLOW_FADE_MS = 1500ms), matching the current authoritative 1.5-3.0s Stage 2 (Logo Reveal).
+                }
+                // Real, serialized call: fires once playStartupVoice()
+                // genuinely finishes (see the .then() above), holding
+                // back at least the original LOGO_STAGE_MS+GLOW_FADE_MS
+                // (1500ms) visual minimum — the exact same timing as
+                // before whenever voice is muted or finishes quickly,
+                // extended only when a real, enabled voice genuinely
+                // takes longer, which is exactly what zero-overlap
+                // between the Welcome and ABOVE ONLY audio requires.
             }, cfg.preRevealDelayMs); // CP7 Login Gate resync — admin-configurable (default 1500ms), matching the current authoritative 0.0-1.5s Stage 1 (Living Green Opening)
 
             // M373 — real, minimal Node test seam. `module` only exists
