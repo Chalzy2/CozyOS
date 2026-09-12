@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<!--
+  core/tests/browser/kiswahili-dep3-tts-fallback-harness.html
+
+  Kiswahili Capability Dependency #3 test fixture only - loads only the
+  real, unmodified TTS chain (cozy-speech.js, cozy-tts-browser-adapter.js,
+  charles-voice-provider.js, voice-manager.js), in the same real order
+  index.html already uses for these specific files, to verify the
+  existing VoiceManager.speak() fallback path directly and in isolation
+  from the conversational chain (kept separate from Dependency #2's own
+  fixture, per instruction, so both dependencies remain independently
+  verifiable).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Kiswahili Dependency #3 - TTS fallback verification fixture</title>
+</head>
+<body>
+<script>window.CozyOS = window.CozyOS || {};</script>
+<script src="/core/modules/speech/cozy-speech.js"></script>
+<script src="/core/modules/speech/adapters/cozy-tts-browser-adapter.js"></script>
+<script src="/core/modules/speech/providers/charles-voice-provider.js"></script>
+<script src="/core/modules/speech/voice-manager.js"></script>
+</body>
+</html>

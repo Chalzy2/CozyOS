@@ -1,0 +1,13 @@
+MANIFEST — COS-STEP4D-LIVE-UI-PATCH-6.zip
+Baseline: COS-STEP4D-LIVE-UI-PATCH-5-AUDIT.zip (352bdd632c118abb42070c67133f6d8b9013bb859c12fb40823b4688a2fcae73)
+
+NEW FILES:
+  core/shell/live/ldce-live-media-coordinator.js
+  core/shell/live/tests/ldce-live-media-coordinator.test.js
+  PATCH-F-IMPLEMENTATION-REPORT.md
+
+MODIFIED FILES (additive only):
+  core/shell/live/ui/cozy-live-host-console-controller.js
+  core/shell/live/ui/cozy-live-join-console-controller.js
+  core/shell/live/ui/cozy-live-host-console.html
+  core/shell/live/ui/cozy-live-join-console.html

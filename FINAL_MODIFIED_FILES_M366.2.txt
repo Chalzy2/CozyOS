@@ -1,0 +1,21 @@
+CozyOS M366.2 — Final UX Audit — Modified Files
+
+This audit pass changed exactly ONE file:
+  core/shell/launch-sequence.css
+    - Added logo upward-rise (translateY) to the existing reveal transform.
+    - Added will-change hints (opacity/transform on screen fade + logo
+      reveal; top/left/width/transform on the shrink transition).
+    - Added overflow-y: auto safety net on #cozy-launch-screen for short
+      landscape viewports.
+  No other file was modified in this pass. No new files were added.
+
+Cumulative changes since the original ZIP (this audit pass + the prior
+M366.2 implementation pass), 19 files total — see
+MODIFIED_FILES_M366.2.txt for the full list from the prior pass, which
+remains accurate; core/shell/launch-sequence.css is the only file that
+changed again in this audit.
+
+Confirmed untouched in this pass and all prior passes (byte-identical,
+sha256-checked): Firebase/*, core/modules/identity/auth-coordinator.js,
+core/security/cozy-auth.js, router.js, core/shell/application-launcher.js,
+Founder Story / Vault / Identity modules, all admin/dashboard routing.

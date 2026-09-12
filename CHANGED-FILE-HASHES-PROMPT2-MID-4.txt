@@ -1,0 +1,7 @@
+57b809cebb8f4f05f36ae96fb932cd0d3824db49538f7921e993f367434688eb  core/modules/intelligence/knowledge/teach/ui/cozy-knowledge-contribution-type-picker-core.js
+9f41d977a5833e7f528c0954853ea47f4871bfc1bb99579462058073f3e98266  core/modules/intelligence/knowledge/teach/ui/cozy-knowledge-contribution-type-picker-ui.js
+8b7e21c6950866fbbd05da7b36a33206d7ac6c9e1a32ac14c044c6807e00928f  core/modules/intelligence/knowledge/teach/ui/tests/cozy-knowledge-contribution-type-picker-core.test.js
+62c56662b7f3ae0804d36599fdd799e4afa37e945bbbc4edcd0460c4a858efb4  core/modules/intelligence/knowledge/teach/ui/cozy-teach-cozyai-ui.js
+7bf75c67565f0d3d0d54ecd78caf3dfb5fbfa1ac0d81312c2c2221a442bccdab  core/modules/intelligence/knowledge/teach/ui/teach-cozyai-form.html
+71ad326945cb1fadd72a729a0b7b4ac8b9cc77c3cce90e59b00aa6ee127b4e4d  core/modules/intelligence/knowledge/ui/contribution-form.css
+07a3a95f76acdc289042fc2825f6124a215a7a66a934899759f4d8beb412e932  core/shell/user-dashboard.js

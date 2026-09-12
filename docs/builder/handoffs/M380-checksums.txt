@@ -1,0 +1,17 @@
+# M380 Artifact Checksums (SHA-256, computed after final save)
+# Generated: 2026-08-05
+
+41629621e5bb6e9380a7e01c233726b2f58408e9f6b7a544d79b48e3173558b6  docs/builder/knowledge/regression-registry.md
+d873feca7fdbd69b2c6cc81d9b62a427f643c10cfaef290ab721b700f6fe01c8  docs/builder/compose/M380-compose-report.md
+5ed75c100a7a117a9cca5f8d1ea0f304f7bbf33bed520c688b90a29c50f65225  docs/builder/reports/M380-verification-report.md
+1c5724347a051dfe1ad2d4f3bbf4289be08a8d79ae886af046d24f477ca1639b  docs/builder/improvements/M380-improvement-report.md
+3199ef47a70d881854f787e60afc134c4b61a61c8365343c48376f3495b6d513  docs/builder/reports/M380-continuation-report.md
+7a5bb0b835c28d554fe5f45e73f6d36eabece5638e099372c7f89f7e69b1577d  docs/builder/handoffs/LATEST.md
+3baa5cd503107decfce9ffd9a99be9526696ca7ceededf276632a6d8d3886538  docs/builder/CHANGELOG.md
+87fa98eca1da37c94a17397878c494cbce32af022ceb7caef9095182000bfe6b  docs/builder/handoffs/M380.md
+
+# ZIP package checksum recorded after packaging below.
+# Note: a ZIP cannot correctly contain its own hash (adding the hash
+# changes the file, invalidating the hash just written). The
+# authoritative ZIP SHA-256 is reported in this milestone's final
+# chat message only, not embedded here.

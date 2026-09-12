@@ -1,0 +1,15 @@
+CozyOS Dashboard — Prompt 2 §8 — Changed File Hashes (SHA-256)
+Baseline: COS-DASHBOARD-PROMPT2-MID-4.zip
+
+core/shell/dashboard-navigation-core.js
+  baseline: 6ff29b9403e384c5ac0b6d87d5445d9f906dd77a14112b2d5897d9bd058cec21
+  new:      3bd6507a05d2a03653e1306664a11492509eee815fdd9e49dc6a08a15ddeda1b
+
+core/shell/user-dashboard.js
+  baseline: 07a3a95f76acdc289042fc2825f6124a215a7a66a934899759f4d8beb412e932
+  new:      dd54264b53fae6d049c1fa78ec60eb9f38fcdff03a2db04c2092fb269116296c
+
+core/shell/tests/dashboard-navigation-core.test.js
+  baseline: a6ed6d05c58566534f9e5a248b33864bd41b8f7c6c58e9d84f1c24da21f5d962
+  new:      1bc1bd0242ddf085009e32ea67610c80091519859486d3f4341c46c4a7bdb2e7
+

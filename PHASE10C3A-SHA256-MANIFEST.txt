@@ -1,0 +1,7 @@
+# Phase 10C-3A — SHA-256 manifest (changed/new files only)
+5855511b405d50adf05987513faea23ac342c5ed156f5d0042fd5e7eaf5f532e  core/modules/cognitive/cognitive-coordinator.js
+9dce2f49e5e408314da8fbf56e5e158ce864945426e0b95bd71706030df43641  core/modules/intelligence/providers/on-device-conversational-provider.js
+c79a4f303a75a06b99744d4ab0ff3866f31f03e62479cc3a1b35c419c9b3c533  core/modules/intelligence/providers/on-device-cognitive-adapter.js
+155d8596103f01c3dee7e0f6babe0c4f88cae71cc056176d5afde7350a52b9a9  core/modules/cognitive/tests/phase10c3a-real-provider-integration.test.js
+2e296a0648d93fa33ebc360a5c71bcb8e4e47bf58d383cf6c177b7f2702c0774  IMPLEMENTATION-REPORT-PHASE10C3A.md
+2ea9ebfb5c129b5c66f7feba3d4a0dc46b1529c5acfcb8abcd19e961547480b7  PHASE10C3A-DEPENDENCY-REPORT.md

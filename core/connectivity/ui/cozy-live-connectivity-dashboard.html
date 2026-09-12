@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CozyOS — Live / Connectivity</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; background: #f7f7f8; color: #1a1a1a; }
+  * { box-sizing: border-box; }
+  h1 { padding: 16px; margin: 0; font-size: 20px; }
+  .live-conn-root { padding: 0 16px 24px; max-width: 100%; overflow-x: hidden; }
+  .live-conn-group { background: #fff; border-radius: 8px; padding: 12px; margin-bottom: 12px; max-width: 100%; }
+  .live-conn-group h2 { font-size: 14px; margin: 0 0 8px; text-transform: uppercase; color: #555; }
+  .live-conn-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; border-bottom: 1px solid #f0f0f0; gap: 8px; flex-wrap: wrap; }
+  .live-conn-row span:first-child { word-break: break-all; min-width: 0; }
+  .live-conn-status { font-weight: 600; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+  .status-AVAILABLE { background: #d1fae5; color: #065f46; }
+  .status-PARTIAL { background: #fef3c7; color: #92400e; }
+  .status-UNAVAILABLE, .status-CAPABILITY_UNAVAILABLE { background: #fee2e2; color: #991b1b; }
+  .status-REQUIRES_USER_ACTION, .status-REQUIRES_NATIVE_COMPANION { background: #e0e7ff; color: #3730a3; }
+  .live-conn-empty { padding: 12px; color: #888; font-size: 13px; }
+  .live-conn-btn { padding: 6px 14px; border: none; border-radius: 6px; background: #2b6cb0; color: #fff; cursor: pointer; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1 class="live-conn-title">Live / Connectivity</h1>
+<div id="live-connectivity-root" class="live-conn-root"></div>
+
+<!-- Real dependency chain: RP-033 Gate 1/2 + supporting composed engines -->
+<script src="../../security/trusted-device-manager.js"></script>
+<script src="../cozy-connect.js"></script>
+<script src="../../engines/collaboration/live-hotspot-engine.js"></script>
+<script src="../../collaboration/cozy-share.js"></script>
+<script src="../cozy-living-connectivity.js"></script>
+<script src="../cozy-connectivity-transport.js"></script>
+<script src="cozy-live-connectivity-app.js"></script>
+<script src="../../modules/identity/identity-engine.js"></script>
+<script src="../../registry/cozy-registry.js"></script>
+
+<script>
+  (function seedDemoData() {
+    var appApi = window.CozyOS.CozyLiveConnectivityApp;
+    if (!appApi) return;
+    appApi.registerAsApplication();
+    // Real queued packet through the real transport, never fabricated.
+    var t = window.CozyOS.CozyConnectivityTransport;
+    if (t) {
+      t.sendPacket({ destination: 'demo-device-B', payloadType: 'text', payload: 'hello from demo seed', sender: 'demo-device-A', sessionId: 'demo-session' });
+    }
+    appApi.startConnectivitySession('demo-session-1');
+  })();
+
+  (function renderLiveConnectivity() {
+    var root = document.getElementById('live-connectivity-root');
+    var appApi = window.CozyOS.CozyLiveConnectivityApp;
+
+    if (!appApi) {
+      root.textContent = 'CAPABILITY_UNAVAILABLE — live connectivity engine not loaded.';
+      return;
+    }
+
+    function renderGroup(title, entries) {
+      var group = document.createElement('div');
+      group.className = 'live-conn-group';
+      var h2 = document.createElement('h2');
+      h2.textContent = title;
+      group.appendChild(h2);
+      entries.forEach(function (e) {
+        var row = document.createElement('div');
+        row.className = 'live-conn-row';
+        row.innerHTML = '<span>' + e.key + '</span><span class="live-conn-status status-' + e.status + '">' + e.status + '</span>';
+        group.appendChild(row);
+      });
+      root.appendChild(group);
+    }
+
+    var overview = appApi.getConnectivityOverview();
+    var statusDiv = document.createElement('div');
+    statusDiv.className = 'live-conn-overview-status';
+    statusDiv.textContent = 'Overview status: ' + overview.status;
+    root.appendChild(statusDiv);
+
+    if (overview.status === 'OK') {
+      renderGroup('Internet', overview.groups.internet);
+      renderGroup('Bluetooth', overview.groups.bluetooth);
+      renderGroup('Wi-Fi Direct', overview.groups.wifiDirect);
+      renderGroup('WebRTC', overview.groups.webRTC);
+      renderGroup('Native Hotspot', overview.groups.nativeHotspot);
+    }
+
+    var queueGroup = document.createElement('div');
+    queueGroup.className = 'live-conn-group live-conn-queue';
+    queueGroup.innerHTML = '<h2>Offline Sync Queue</h2>';
+    var queue = appApi.getQueueStatus();
+    if (queue.status === 'OK' && queue.items.length) {
+      queue.items.forEach(function (item) {
+        var row = document.createElement('div');
+        row.className = 'live-conn-row';
+        row.innerHTML = '<span>' + item.packetId + '</span><span class="live-conn-status status-PARTIAL">' + item.state + '</span>';
+        queueGroup.appendChild(row);
+      });
+    } else {
+      var empty = document.createElement('div');
+      empty.className = 'live-conn-empty';
+      empty.textContent = queue.status === 'OK' ? 'No queued packets.' : queue.status;
+      queueGroup.appendChild(empty);
+    }
+    root.appendChild(queueGroup);
+
+    var devicesGroup = document.createElement('div');
+    devicesGroup.className = 'live-conn-group live-conn-devices';
+    devicesGroup.innerHTML = '<h2>Local Device Discovery</h2>';
+    var devices = appApi.getLocalDevices();
+    var devicesEmpty = document.createElement('div');
+    devicesEmpty.className = 'live-conn-empty';
+    devicesEmpty.textContent = (devices.status === 'OK' && devices.devices.length) ? (devices.devices.length + ' device(s) known.') : 'No local devices discovered.';
+    devicesGroup.appendChild(devicesEmpty);
+    root.appendChild(devicesGroup);
+
+    var sessionGroup = document.createElement('div');
+    sessionGroup.className = 'live-conn-group live-conn-session';
+    sessionGroup.innerHTML = '<h2>Connectivity Session</h2>';
+    var sessionState = appApi.getConnectivitySessionState('demo-session-1');
+    var sessionRow = document.createElement('div');
+    sessionRow.className = 'live-conn-row live-conn-session-state';
+    sessionRow.innerHTML = '<span>demo-session-1</span><span class="live-conn-status status-PARTIAL">' + (sessionState.status === 'OK' ? sessionState.state : sessionState.status) + '</span>';
+    sessionGroup.appendChild(sessionRow);
+    root.appendChild(sessionGroup);
+  })();
+</script>
+</body>
+</html>

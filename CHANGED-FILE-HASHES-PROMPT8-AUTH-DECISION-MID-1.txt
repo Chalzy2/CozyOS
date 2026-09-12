@@ -1,0 +1,3 @@
+290e7d73712e486955ee42738399939588e52ca21534c9098260ca081db21338  core/security/auth-factor-snapshot.js
+99ec6e85d15063c688a63b934b0566b8fccbedfbe5ffbe631a4b794d4d8ebb56  core/security/test/auth-factor-snapshot.test.js
+94e8d70b52d07cbd1c36cf795c15b2283e5cb50c05f289e171e7c5d725e70cf7  core/modules/identity/identity-engine.js

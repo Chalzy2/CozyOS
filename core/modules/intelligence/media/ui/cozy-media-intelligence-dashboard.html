@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CozyOS — Media Intelligence</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; background: #f7f7f8; color: #1a1a1a; }
+  h1 { padding: 16px; margin: 0; font-size: 20px; }
+  .media-intel-root { padding: 0 16px 24px; }
+  .media-intel-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .media-intel-controls input, .media-intel-controls select { padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+  .media-intel-search-btn { padding: 8px 16px; border: none; border-radius: 6px; background: #2b6cb0; color: #fff; cursor: pointer; }
+  .media-intel-status { margin: 8px 0; font-size: 13px; color: #555; }
+  table.media-intel-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; }
+  table.media-intel-table th, table.media-intel-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 13px; }
+  table.media-intel-table th { background: #f0f0f2; }
+  .media-intel-empty { padding: 24px; text-align: center; color: #888; }
+  .media-intel-flag { font-size: 16px; margin-right: 4px; }
+  .media-intel-tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+  .media-intel-tab-btn { padding: 6px 12px; border: 1px solid #ccc; background: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .media-intel-tab-btn[aria-selected="true"] { background: #2b6cb0; color: #fff; }
+  .media-intel-tab-panel[hidden] { display: none; }
+  .media-intel-qa-answer { padding: 12px; background: #fff; border-radius: 8px; margin-top: 8px; font-size: 14px; }
+</style>
+</head>
+<body>
+<h1 class="media-intel-title">Media Intelligence</h1>
+<div id="media-intelligence-root" class="media-intel-root"></div>
+
+<!-- Full real dependency chain, same order as the Phase 1-4 test harness -->
+<script src="../../../../security/trusted-device-manager.js"></script>
+<script src="../../../identity/auth-coordinator.js"></script>
+<script src="../../../memory/cozy-memory-engine.js"></script>
+<script src="../cozy-media-connector.js"></script>
+<script src="../../knowledge/cozy-knowledge-ingestion.js"></script>
+<script src="../../knowledge/cozy-knowledge-community.js"></script>
+<script src="../../knowledge/ui/cozy-knowledge-safety-gate.js"></script>
+<script src="../../language-packs/cozy-language-pack-registry.js"></script>
+<script src="../../language-packs/cozy-optional-language-pack-discovery.js"></script>
+<script src="../../language-packs/cozy-language-country-metadata.js"></script>
+<script src="../cozy-remote-media-index.js"></script>
+<script src="../cozy-remote-media-search.js"></script>
+<script src="../../../../engines/collaboration/live-hotspot-engine.js"></script>
+<script src="../../../../connectivity/cozy-living-connectivity.js"></script>
+<script src="../../../../connectivity/cozy-connectivity-transport.js"></script>
+<script src="../cozy-remote-media-analysis.js"></script>
+<script src="../../language-packs/cozy-african-language-intelligence.js"></script>
+<script src="../../privacy/cozy-intelligence-privacy.js"></script>
+<script src="../../sync/cozy-intelligence-offline-sync.js"></script>
+<script src="../cozy-rp034-integration.js"></script>
+<script src="../cozy-media-analysis-link.js"></script>
+<script src="../cozy-research-intelligence.js"></script>
+<script src="../cozy-research-search.js"></script>
+<script src="../cozy-media-evidence.js"></script>
+<script src="../cozy-media-intelligence.js"></script>
+<script src="../../../identity/identity-engine.js"></script>
+<script src="../../../../registry/cozy-registry.js"></script>
+
+<script>
+  // Demo/test-only seed: creates real records through the real
+  // pipelines (index -> analysis -> link -> research -> evidence).
+  // Never fabricates a search result directly.
+  (function seedDemoData() {
+    var idx = window.CozyOS.CozyRemoteMediaIndex;
+    var analysis = window.CozyOS.CozyRemoteMediaAnalysis;
+    var reg = window.CozyOS.CozyLanguagePacks;
+    var link = window.CozyOS.CozyMediaAnalysisLink;
+    var research = window.CozyOS.CozyResearchIntelligence;
+    var evidence = window.CozyOS.CozyMediaEvidence;
+    if (!idx || !analysis || !reg || !link || !research) return;
+
+    function seedOne(sourceId, title, description, researchType, languageId, country, region) {
+      var created = idx.createRecord({
+        sourceType: 'youtube', sourceId: sourceId, title: title, description: description,
+        ownerAuthorization: { state: 'AUTHORIZED' }, searchableTerms: [researchType.toLowerCase()]
+      });
+      reg.registerRegionalContext(languageId, { country: country, region: region });
+      var job = analysis.createJob('LANGUAGE_IDENTIFICATION', { indexId: created.indexId, languageId: languageId, region: region });
+      analysis.runJob(job.jobId);
+      link.linkAnalysisToRecord(job.jobId);
+      var rr = research.createResearchRecord({ sourceRecordId: created.indexId, researchType: researchType, analysisJobId: job.jobId });
+      if (rr.status === 'CREATED') {
+        research.applyPrivacy(rr.researchId);
+        if (evidence) evidence.enrichResearchRecord(rr.researchId);
+      }
+    }
+
+    seedOne('demoTestimonySw', 'Healing Testimony', 'A testimony of healing and prayer', 'HEALING', 'sw', 'KE', 'Nairobi');
+    seedOne('demoSermonLuo', 'Sunday Sermon', 'A sermon in Dholuo', 'SERMON', 'luo', 'KE', 'Kisumu');
+    seedOne('demoWorshipZu', 'Worship Service', 'A worship gathering', 'WORSHIP', 'zu', 'ZA', 'Durban');
+
+    if (window.CozyOS.CozyMediaIntelligence) {
+      window.CozyOS.CozyMediaIntelligence.registerAsCoreApplication();
+    }
+  })();
+
+  // DEMO-ONLY authorization stub, matching the established convention
+  // — no real identity backend exists behind this page.
+  (function demoAuth() {
+    var params = new URLSearchParams(window.location.search);
+    var role = params.get('demoRole');
+    if (role === 'admin') {
+      window.CozyOS.AuthCoordinator = { getCurrentIdentity: function () { return { userId: 'demo-admin', roles: ['platform-admin'] }; } };
+    }
+  })();
+
+  // Minimal real render logic — no framework, calls the real
+  // CozyMediaIntelligence composition API only.
+  (function renderMediaIntelligence() {
+    var root = document.getElementById('media-intelligence-root');
+    var mi = window.CozyOS.CozyMediaIntelligence;
+
+    var controls = document.createElement('div');
+    controls.className = 'media-intel-controls';
+    controls.innerHTML =
+      '<input class="media-intel-query" type="text" placeholder="Search testimonies, e.g. healing" />' +
+      '<select class="media-intel-type"><option value="">Any type</option></select>' +
+      '<input class="media-intel-language" type="text" placeholder="Language code (e.g. sw)" />' +
+      '<button class="media-intel-search-btn">Search</button>';
+    root.appendChild(controls);
+
+    var status = document.createElement('div');
+    status.className = 'media-intel-status';
+    root.appendChild(status);
+
+    var resultsContainer = document.createElement('div');
+    resultsContainer.className = 'media-intel-results';
+    root.appendChild(resultsContainer);
+
+    var qaBox = document.createElement('div');
+    qaBox.innerHTML = '<input class="media-intel-qa-input" type="text" placeholder="Ask CozyAI: e.g. Find healing testimonies in Swahili" style="width:60%;padding:8px;border:1px solid #ccc;border-radius:6px;" />' +
+      '<button class="media-intel-qa-btn" style="padding:8px 16px;border:none;border-radius:6px;background:#444;color:#fff;cursor:pointer;">Ask</button>' +
+      '<div class="media-intel-qa-answer" hidden></div>';
+    root.appendChild(qaBox);
+
+    if (!mi) {
+      status.textContent = 'CAPABILITY_UNAVAILABLE — media intelligence engine not loaded.';
+      return;
+    }
+
+    var typeSelect = controls.querySelector('.media-intel-type');
+    var typesResult = window.CozyOS.CozyResearchSearch ? window.CozyOS.CozyResearchSearch.discoverResearchTypes() : { types: [] };
+    (typesResult.types || []).forEach(function (t) {
+      var opt = document.createElement('option');
+      opt.value = t; opt.textContent = t;
+      typeSelect.appendChild(opt);
+    });
+
+    function renderResults(results) {
+      resultsContainer.innerHTML = '';
+      if (!results.length) {
+        var empty = document.createElement('div');
+        empty.className = 'media-intel-empty';
+        empty.textContent = 'No matching evidence found.';
+        resultsContainer.appendChild(empty);
+        return;
+      }
+      var table = document.createElement('table');
+      table.className = 'media-intel-table';
+      table.innerHTML = '<thead><tr><th>Title</th><th>Type</th><th>Language</th><th>Country</th></tr></thead>';
+      var tbody = document.createElement('tbody');
+      results.forEach(function (r) {
+        var tr = document.createElement('tr');
+        var flag = (r.country && r.country.flag) ? '<span class="media-intel-flag">' + r.country.flag + '</span>' : '';
+        tr.innerHTML = '<td>' + (r.title || 'NOT_AVAILABLE') + '</td><td>' + r.researchType + '</td><td>' + r.language + '</td><td>' + flag + (r.country && r.country.name ? r.country.name : 'NOT_AVAILABLE') + '</td>';
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      resultsContainer.appendChild(table);
+    }
+
+    function runSearch() {
+      var query = controls.querySelector('.media-intel-query').value;
+      var researchType = typeSelect.value || undefined;
+      var languageId = controls.querySelector('.media-intel-language').value || undefined;
+      var result = mi.discoverTestimonies({ query: query, researchType: researchType, languageId: languageId });
+      if (result.status !== 'OK') {
+        status.textContent = result.status;
+        renderResults([]);
+        return;
+      }
+      status.textContent = result.total + ' result(s) found.';
+      renderResults(result.results);
+    }
+
+    controls.querySelector('.media-intel-search-btn').addEventListener('click', runSearch);
+    runSearch();
+
+    qaBox.querySelector('.media-intel-qa-btn').addEventListener('click', function () {
+      var question = qaBox.querySelector('.media-intel-qa-input').value;
+      var answer = mi.answerMediaQuestion(question);
+      var answerEl = qaBox.querySelector('.media-intel-qa-answer');
+      answerEl.hidden = false;
+      answerEl.textContent = 'Answer: ' + answer.answer + (answer.resultCount ? ' (' + answer.resultCount + ' result(s))' : '');
+    });
+  })();
+</script>
+</body>
+</html>

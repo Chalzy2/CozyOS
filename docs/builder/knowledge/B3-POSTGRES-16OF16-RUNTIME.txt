@@ -1,0 +1,34 @@
+[postgres-adapter-runtime.test.js] connecting to postgresql://ep-square-credit-ayvhqrlu-pooler.c-5.us-east-2.aws.neon.tech/neondb
+(node:27716) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ placeholder conversion: ? -> $1,$2,... in call-site order (30.600616ms)
+✔ connects to the real server and migrations apply cleanly (6081.930462ms)
+✔ rerunning migrations is idempotent (no error, nothing double-applied) (5958.294385ms)
+✔ foreign keys exist on credentials/sessions -> users (5258.152078ms)
+✔ unique constraint on users.email is enforced (7479.894769ms)
+✔ get/all/run/exec all work against the real server (6643.841615ms)
+✔ transaction commits all statements together (6203.364924ms)
+✔ transaction rolls back ALL statements when an error is thrown partway through — no partial writes remain (6147.658847ms)
+✔ RelyingParty: full password auth + session + reset lifecycle on real PostgreSQL (14905.638462ms)
+✔ RelyingParty: challenge issue/consume and passkey credential persistence on real PostgreSQL (6023.485538ms)
+✔ RelyingParty: TOTP MFA enrollment + pending-auth lifecycle on real PostgreSQL (19000.251694ms)
+✔ RelyingParty: Firebase session convergence — same session model as password/passkey on real PostgreSQL (10649.662077ms)
+✔ OrganizationRegistry: create, invite, roles, permissions, isolation on real PostgreSQL (21253.779924ms)
+✔ concurrent organization creation by two different users does not corrupt either row (real PostgreSQL concurrency) (12515.207616ms)
+✔ concurrent Firebase logins for a brand-new email do not create duplicate users (real PostgreSQL race, transaction-protected) (8413.540846ms)
+✔ bootstrap-admin.js grant/revoke/list against real PostgreSQL (disposable test identity, never the production admin) (6768.492308ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 145293.863778

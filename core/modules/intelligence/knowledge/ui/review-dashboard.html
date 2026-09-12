@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CozyOS \u2014 Community Review Dashboard</title>
+<link rel="stylesheet" href="../../../../ui/cozy-tokens.css">
+<link rel="stylesheet" href="../../../../ui/cozy-components.css">
+<link rel="stylesheet" href="review-dashboard.css">
+</head>
+<body>
+<h1 class="cozy-text-page-title" style="padding:16px 16px 0;">Community Review Dashboard</h1>
+<div id="review-dashboard-root"></div>
+
+<!-- RP-029-A -->
+<script src="../cozy-knowledge-ingestion.js"></script>
+<!-- RP-029-B -->
+<script src="../cozy-knowledge-community.js"></script>
+<!-- RP-029-C Phase 1 -->
+<script src="../cozy-knowledge-review.js"></script>
+<!-- RP-027 language modules (used read-only by the Rule 82 gate) -->
+<script src="../../language/cozy-language-templates.js"></script>
+<script src="../../language/cozy-language-registry.js"></script>
+<!-- Cozy Offline Hotspot (existing, real engine — composed, not duplicated) -->
+<script src="../../../../engines/collaboration/live-hotspot-engine.js"></script>
+<script src="cozy-knowledge-safety-gate.js"></script>
+<script src="cozy-knowledge-review-hotspot-bridge.js"></script>
+<!-- RP-029-C Phase 2 -->
+<script src="cozy-knowledge-review-dashboard-core.js"></script>
+<script src="cozy-knowledge-review-dashboard-ui.js"></script>
+<script>
+  // seedDemoData:true is for this demo page only, so the dashboard has
+  // something real to show/test. A production embedding of this module
+  // would omit it and rely on real contributions.
+  window.CozyOS.CozyKnowledgeReviewDashboard.init(
+    document.getElementById("review-dashboard-root"),
+    { seedDemoData: true, reviewerUserIds: ["demo-reviewer"] }
+  );
+</script>
+</body>
+</html>

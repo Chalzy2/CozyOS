@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CozyOS \u2014 Teach CozyAI</title>
+<link rel="stylesheet" href="../../../../ui/cozy-tokens.css">
+<link rel="stylesheet" href="../../../../ui/cozy-components.css">
+<link rel="stylesheet" href="contribution-form.css">
+</head>
+<body>
+<h1 class="cozy-text-page-title" style="padding:16px 16px 0;">Teach CozyAI</h1>
+<div id="contribution-form-root"></div>
+
+<!-- RP-029-A -->
+<script src="../cozy-knowledge-ingestion.js"></script>
+<!-- RP-029-B -->
+<script src="../cozy-knowledge-community.js"></script>
+<!-- RP-029-C Phase 1 -->
+<script src="../cozy-knowledge-review.js"></script>
+<!-- RP-027 language modules -->
+<script src="../../language/cozy-language-templates.js"></script>
+<script src="../../language/cozy-language-registry.js"></script>
+<!-- Cozy Offline Hotspot (existing, real engine) + Phase 2 bridge -->
+<script src="../../../../engines/collaboration/live-hotspot-engine.js"></script>
+<script src="cozy-knowledge-safety-gate.js"></script>
+<script src="cozy-knowledge-review-hotspot-bridge.js"></script>
+<!-- Phase 2 dashboard (optional — provides the review view this form links to) -->
+<script src="cozy-knowledge-review-dashboard-core.js"></script>
+<script src="cozy-knowledge-review-dashboard-ui.js"></script>
+<!-- RP-029-C Phase 3 -->
+<script src="cozy-knowledge-contribution-core.js"></script>
+<script src="cozy-knowledge-contribution-ui.js"></script>
+<script>
+  window.CozyOS.CozyKnowledgeContribution.init(document.getElementById("contribution-form-root"), {});
+</script>
+</body>
+</html>

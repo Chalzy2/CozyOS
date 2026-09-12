@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<!--
+  core/modules/ChurchOS/test/living-worship-player-mini-pip-harness.html
+
+  M389 test fixture only — not a shipped application entry point, not
+  referenced from dashboard.html. Loads the real, unmodified-by-this-
+  fixture production files (window-manager.js, living-worship-player.js,
+  cozy-living.css) so the Playwright suite in
+  living-worship-player-mini-pip-browser.test.js exercises actual
+  browser behavior (real Pointer Events drag, real CSS :has() min-width
+  override, real Picture-in-Picture feature detection) rather than
+  mocking any of it. Deliberately does NOT load LiveCaptureEngine/
+  LiveHotspotEngine/ChurchWorshipSession/etc — living-worship-player.js
+  already guards every one of those as optional (confirmed by reading
+  its source before writing this fixture), so the real player mounts
+  and runs correctly without them; the test suite attaches its own
+  real synthetic MediaStream (canvas.captureStream()) directly to
+  prove stream continuity, rather than depending on camera hardware.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Living Worship Player — M389 test harness</title>
+<link rel="stylesheet" href="/core/living/cozy-living.css">
+<style>html,body{margin:0;height:100%;background:#0a1a12;}</style>
+</head>
+<body>
+<script src="/core/shell/window-manager.js"></script>
+<script src="/core/modules/ChurchOS/living-worship-player.js"></script>
+</body>
+</html>

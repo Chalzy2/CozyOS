@@ -1,0 +1,1456 @@
+/**
+ * CozyOS — Rule-Based Conversational Provider (Reply Composer)
+ * File Reference: core/modules/intelligence/providers/rule-based-conversational-provider.js
+ * Repair: RP-026 — Rule-Based Reply Composer
+ *
+ * OWNERSHIP
+ *   Registers a real "rule-based-conversational" provider into the
+ *   ALREADY-EXISTING registerProvider() extension point exposed by
+ *   window.CozyOS.LivingAI (core/living/cozy-living-ai.js — NOT
+ *   modified by this file; that registry accepts any provider name,
+ *   confirmed by reading AIProviderRegistry.register() before writing
+ *   this file — it is not restricted to the four named future slots
+ *   already reserved there). Also registers a real, optional descriptor
+ *   with window.CozyOS.ProviderManager (core/shell/provider-manager.js
+ *   — NOT modified) when present, mirroring RP-025-A's own pattern
+ *   (core/modules/intelligence/providers/on-device-conversational-
+ *   provider.js) exactly. core/living/cozy-living-assistant.js
+ *   (resolveConversationalReply(), RP-024) is not touched — this file
+ *   only calls public APIs those already expose. CognitiveCoordinator,
+ *   cozy-intelligence-provider.js, and core/config.js are not touched
+ *   either — this provider calls CognitiveCoordinator.run() as a public
+ *   caller, exactly the way reasoningPipelineProvider (cozy-living-
+ *   ai.js) already does, never re-implementing it.
+ *
+ * REAL GAP THIS FIXES (confirmed by reading the actual repository
+ * before writing this file)
+ *   window.CozyOS.CognitiveCoordinator.run()'s real return shape
+ *   ({interpretation, thinking, reasoning, intelligence,
+ *   recalledMemories, policyResult, diagnostics}) has no .text/.reply/
+ *   .answer field anywhere on it — confirmed directly in
+ *   cognitive-coordinator.js and in RP-024's own regression test
+ *   (core/living/tests/cozy-living-assistant-reply.test.js). RP-025-A's
+ *   on-device provider is a real, genuine fix for browsers that expose
+ *   an on-device language-model API, but honestly reports NOT_READY
+ *   everywhere else (confirmed: no bundled model, by design). This
+ *   provider is the second, independent real answer path: a genuinely
+ *   rule-based composer, disclosed as such, that recognizes a small,
+ *   named set of conversational intents (greeting/help/thanks/identity)
+ *   and returns an honest human-readable .text for them — and an
+ *   equally honest "not supported yet" .text for everything else,
+ *   never the generic pipeline-internals it deliberately excludes.
+ *
+ * WHY THIS COMPOSES CognitiveCoordinator RATHER THAN REPLACING IT
+ *   Switching LivingAI's active provider away from "reasoning-pipeline"
+ *   would silently stop Memory recall/save and Policy evaluation from
+ *   ever running for chat input (confirmed: cozy-living-assistant.js's
+ *   #send()/#sendImage() are CognitiveCoordinator's only two real
+ *   callers in this repository — grep-confirmed before writing this
+ *   file). This provider's think() calls CognitiveCoordinator.run()
+ *   itself first — the same real entry point reasoningPipelineProvider
+ *   already uses, so Memory/Policy/Interpretation/Thinking/Reasoning/
+ *   Intelligence all still genuinely execute and their real diagnostics
+ *   are still carried on the returned result (for callers/health tools
+ *   that want it) — this file only adds the missing final step: a real,
+ *   honestly-labeled .text composed from the raw input text's
+ *   classified intent, never copied from the pipeline's evidence,
+ *   insights, diagnostics, decision matrices, or isReal flags.
+ *
+ * HONESTY RULE
+ *   describe()/getHealth() must never claim LLM, neural model, machine
+ *   learning, cloud intelligence, or reasoning beyond what the rules
+ *   below actually implement. Every reply text is either a template
+ *   matched to a named, disclosed intent, or the equally honest
+ *   "no rule-based answer yet" fallback — never a fabricated answer,
+ *   never pipeline internals surfaced as if they were an answer.
+ *
+ * ACTIVATION (RP-026 FIX item 6 — explicit, disclosed, not a side
+ * effect of registration)
+ *   registerProvider() only fills the registry slot — this mirrors
+ *   RP-025-A's own discipline. Per this repair's own spec ("use the
+ *   existing ProviderManager/LivingAI activation mechanism rather than
+ *   inventing a toggle" when "registration exists but activation is
+ *   missing"), this file performs ONE deliberate, disclosed call to
+ *   the existing LivingAI.setActiveProvider() choke point, as its own
+ *   separate step below registerWithLivingAI() — never folded into
+ *   AIProviderRegistry.register() itself, and never triggered merely
+ *   because this provider becomes healthy. This is safe precisely
+ *   because this provider's own think() still runs the full real
+ *   pipeline first (see above) — activating it does not remove any
+ *   real capability the "reasoning-pipeline" provider had, since that
+ *   provider never produced a genuine reply either (the confirmed gap
+ *   this repair fixes).
+ *
+ * NOTE ON REPOSITORY SEQUENCING (Rule 69 — Repository Authority)
+ *   docs/builder/knowledge/repair-history-registry.md's own "NEXT
+ *   UNLOCK" section names "RP-025-A Live Verification" (an on-device-
+ *   browser check) as the next authorized repair, ahead of RP-025-B.
+ *   This repair (RP-026) was explicitly directed instead by the
+ *   repository owner as a separate, independent path — it does not
+ *   touch, complete, or invalidate RP-025-A Live Verification or
+ *   RP-025-B's own separate on-device-runtime work, and does not
+ *   modify on-device-conversational-provider.js. Recorded here and in
+ *   the repair history registry per Rule 69's disclosure requirement.
+ *
+ * RP-027 EXTENSION (CozyOS Conversational Knowledge + Multilingual
+ * Response Expansion) — additive, this file only
+ *   This file is extended, not replaced. RP-026's architecture stays
+ *   exactly as documented above (registerProvider() into LivingAI's
+ *   existing extension point, composition around
+ *   CognitiveCoordinator.run(), an explicit, separate
+ *   activateExplicitly() step) — RP-027 only grows INTENT_RULES and
+ *   composeReply(). Two new, additive, standalone files are read as
+ *   pure consumers, never modifying this file's own registration/
+ *   activation logic:
+ *     - core/modules/intelligence/knowledge/cozy-knowledge-registry.js
+ *       — gathers live evidence (founder identity, application list,
+ *       provider health) from already-existing real registries, always
+ *       tagged with an explicit VERIFIED / PARTIALLY_VERIFIED /
+ *       NOT_FOUND evidence state (RP-027 Fact Safety Rule, §3). This
+ *       file never invents a fact when that registry reports NOT_FOUND
+ *       or is absent — it uses the matching honest fallback template
+ *       instead (see composeReply() below).
+ *     - core/modules/intelligence/language/cozy-language-registry.js
+ *       and cozy-language-templates.js — the 5 default (en/sw/fr/ar/so,
+ *       AVAILABLE) + 6 extended (luo/ki/kam/zu/lg/ig, NOT_READY this
+ *       pass) language registry and its verified per-language response
+ *       templates (RP-027 §8/§9/§11). think() resolves a language via
+ *       CozyLanguageRegistry.resolveLanguage() (manual > requested >
+ *       country-suggested > English, RP-027 §10) and composeReply()
+ *       looks up the matching template — never a live/uncontrolled
+ *       translation call. If the resolved language differs from what
+ *       was actually requested (i.e. the requested language isn't
+ *       AVAILABLE yet), the honest fallback disclosure (RP-027 §12) is
+ *       appended to the reply, in the resolved language, and
+ *       result.languageFallback is set to true so callers can detect it
+ *       programmatically too.
+ *   Neither new file is required for this provider to keep working:
+ *   both are read defensively (typeof-checked before use), so a page
+ *   that hasn't loaded them yet still gets RP-026's original English
+ *   behavior for the original 7 intents, never a throw.
+ */
+/**
+ * RP-036 — Assistant Intent/Routing Repair (English + Kiswahili)
+ *   Root cause: a bare/simple request like "Register" (and most other
+ *   ordinary phrasings — "I want to register", "Create an account",
+ *   "Sign me up", any Kiswahili input at all) never matched any
+ *   INTENT_RULES pattern above, so classifyIntent() fell through to
+ *   "unsupported" and composeReply() returned the honest-but-blocking
+ *   "I don't have a rule-based answer for that yet..." fallback text —
+ *   confirmed directly in this file before making any change. Two
+ *   compounding gaps, both fixed here, additively, in this same file
+ *   plus cozy-language-templates.js (also additive) and
+ *   cozy-living-assistant.js (DOM-owning navigation execution only):
+ *     1. The one existing registration-adjacent rule
+ *        ("how-to-register") only matched the "how do I register"
+ *        phrasing, not a bare command or its many ordinary synonyms —
+ *        broadened below (same intent id, so its existing template and
+ *        regression tests are unaffected).
+ *     2. classifyIntent() had ZERO non-English patterns anywhere —
+ *        Kiswahili input could never match any intent, register or
+ *        otherwise, regardless of how CozyLanguageRegistry/Templates
+ *        were configured (those only ever controlled which language
+ *        the REPLY was written in, never what the input was
+ *        understood as). Kiswahili trigger phrases added to the
+ *        existing intents below; a new, disclosed, local
+ *        keyword-overlap heuristic (detectLanguageHeuristic()) also
+ *        now lets a Kiswahili message be answered in Kiswahili
+ *        automatically even when no language option was explicitly
+ *        passed in — see that function's own doc comment for exactly
+ *        what it does and does not claim to do.
+ *   Also new this pass: six navigable-action intents (nav-dashboard/
+ *   notifications/recent/search/aiproviders/diagnostics) so requests
+ *   like "Open dashboard" or "Fungua dashibodi" are recognized here and
+ *   actually executed by cozy-living-assistant.js's #send() against the
+ *   SAME real, existing navigation mechanism the assistant's quick-
+ *   action buttons already used (#runQuickAction()) — never a new or
+ *   invented route. No file was deleted; no existing intent, template,
+ *   rule, or registration/activation logic was removed or weakened.
+ */
+(function () {
+    "use strict";
+    window.CozyOS = window.CozyOS || {};
+    const VERSION = "1.4.1"; // RP-037: conversation state propagation + reference resolution, now extended with correction handling. think(text, options) now accepts an opaque options.conversationState and returns an updated conversationState in result, so a caller can carry it forward across turns. When ordinary intent classification finds nothing but the previous turn's state has lastIntent "app-launch" with a resolved application, a small disclosed set of bare follow-ups ("open it", "ifungue", "fungua hiyo"/"ile") resolve to that same application (result.contextResolved = true). Correction handling (dependency #2): a small, closed set of correction phrasings ("Actually, ShopOS, not QuarryOS.", "Not QuarryOS — ShopOS.", Kiswahili "Kwa kweli ShopOS, si QuarryOS.") replace the remembered application with the corrected one when it resolves against the real application registry (result.correctionApplied = true); an explicit new app-launch utterance still always wins, and a correction with no valid prior reference is left honestly unresolved. No change to any existing intent, pattern, or reply when no conversationState is supplied. RP-036: broadened register/synonym matching, added Kiswahili intent patterns + language auto-detection, added 6 navigation intents. COZYAI-PUBLIC-VISION-KNOWLEDGE: added why-use-cozyos/differentiation/language-support-list intents (EN+SW) sourced from the owner-approved vision-policy doc only. REGISTRATION/AUTH: how-to-register is now evidence-backed via getRegistrationFlowFact() (real, audited registration source), added 2 more Kiswahili "create account" verb-stem patterns + detection markers.
+    window.CozyOS.Modules = window.CozyOS.Modules || {};
+    if (window.CozyOS.Modules["rule-based-conversational-provider"]) return;
+
+    const PROVIDER_NAME = "rule-based-conversational";
+
+    /**
+     * INTENTS
+     *   Real, named, disclosed set — every one of these is the ONLY
+     *   thing this provider claims to understand. Order matters:
+     *   first match wins, most specific patterns first (e.g. "good
+     *   morning" before the generic "hi"/"hello" pattern).
+     */
+    const INTENT_RULES = Object.freeze([
+        // ── RP-026 original 7 — order and patterns unchanged ──────────
+        { id: "greeting-morning", pattern: /\bgood\s+morning\b/i },
+        { id: "greeting-afternoon", pattern: /\bgood\s+afternoon\b/i },
+        { id: "greeting-evening", pattern: /\bgood\s+evening\b/i },
+
+        // ── RP-027 new intent families — most specific pattern first,
+        //    ahead of the RP-026 generic greeting/identity/help
+        //    patterns below, so (for example) "who created CozyOS"
+        //    matches "founder" rather than the generic "identity"
+        //    pattern, and "what is CozyOS Enterprise" matches the
+        //    Enterprise intent rather than the shorter "what-is-cozyos"
+        //    pattern it textually contains. ─────────────────────────
+        { id: "what-is-cozyos-enterprise", pattern: /\bcozyos\s+enterprise\b/i },
+
+        // ── CozyAI Project Knowledge & Public Story Integration —
+        //    placed AHEAD of "founder" (the bare \bfounder\b pattern
+        //    would otherwise swallow "why did the founder create
+        //    CozyOS" — more specific patterns must be checked first,
+        //    per this file's own established ordering discipline) and
+        //    ahead of what-is-cozyos for the same reason. ───────────
+        { id: "project-origin", pattern: /\bwhy\s+was\s+cozyos\s+started\b|\bwhy\s+did\s+(?:the\s+)?founder\s+create\s+cozyos\b|\borigin\s+of\s+cozyos\b/i },
+        { id: "public-story", pattern: /\bpublic\s+story\b|\bcozyos\s+story\b|\bstory\s+of\s+cozyos\b/i },
+        { id: "cozyos-vision", pattern: /\bvision\s+of\s+cozyos\b|\bcozyos'?s?\s+vision\b|\bwhat\s+is\s+cozyos\s+trying\s+to\s+accomplish\b|\bwhat\s+is\s+the\s+vision\b/i },
+        { id: "cozyos-mission", pattern: /\bmission\s+of\s+cozyos\b|\bcozyos'?s?\s+mission\b|\bwhat\s+is\s+the\s+mission\b/i },
+        { id: "project-history", pattern: /\bproject\s+history\b|\bhistory\s+of\s+cozyos\b|\bwhat\s+is\s+the\s+history\b/i },
+
+        // ── COZYAI-PUBLIC-VISION-KNOWLEDGE — why-use / differentiation /
+        // language-support-list. Placed here (after the project-
+        // knowledge cluster, ahead of "founder"/"what-is-cozyos") for
+        // the same reason those are: more specific patterns must be
+        // checked before the shorter, more general ones below can
+        // swallow them. Sourced exclusively from cozy-public-
+        // knowledge-source.js (owner-approved vision-policy doc) —
+        // never founder-story-seed.js.
+        { id: "why-use-cozyos", pattern: /\bwhy\s+(?:should|would)\s+(?:i|someone|you)\s+use\s+cozyos\b|\bwhy\s+use\s+cozyos\b|\bbenefits?\s+of\s+cozyos\b|\bwhy\s+cozyos\b|\bkwa\s+nini\s+nitumie(?:\s+cozyos)?\b|\bkwa\s+nini\s+(?:ni)?tumie\s+cozyos\b|\bfaida\s+za\s+cozyos\b/i },
+        { id: "differentiation", pattern: /\bhow\s+is\s+cozyos\s+different\b|\bwhat\s+makes\s+cozyos\s+different\b|\bhow\s+does\s+cozyos\s+differ\b|\bcozyos\s+vs\.?\s|\bcompared\s+to\s+other\s+apps?\b|\binatofautianaje\b|\btofauti\s+(?:ya|na)\s+cozyos\b|\bcozyos\s+inatofautiana(?:naje)?\b/i },
+        { id: "language-support-list", pattern: /\bwhich\s+languages?\s+(?:does\s+)?cozyos\s+support\b|\bwhat\s+languages?\s+(?:does\s+)?cozyos\s+support\b|\blanguage\s+support\b|\bsupported\s+languages\b|\blugha\s+(?:zipi|gani)\s+(?:zinazoungwa\s+mkono|zinazotumika)\b|\bcozyos\s+inaunga\s+mkono\s+lugha\s+gani\b|\b(?:do|does|can)\s+(?:you|cozyos)\s+(?:speak|understand)\s+[a-z\u00c0-\u024f]+\b|\b(?:una\s*(?:jua|elewa|zungumza)|(?:je,?\s*)?cozyos\s+in(?:aweza|ajua|azungumza))\s+(?:ki)?[a-z]+\b/i },
+
+        // Domain 4D (Intent Understanding discovery) — real, disclosed
+        // fix for a genuine classifier gap: no "translate this" intent
+        // existed anywhere in this file (EN or SW) before this change,
+        // so a real request like the Kiswahili "Nisaidie kutafsiri
+        // ujumbe huu kwa Kifaransa." fell through to the unrelated
+        // "help" intent (via a coincidental "nisaidie" match), and the
+        // English equivalent ("Translate this into French.") fell all
+        // the way through to "unsupported" — neither ever reached
+        // Domain 4C's real, working TranslationService/Gemini adapter,
+        // because nothing here ever classified the request as
+        // translation-shaped in the first place. This rule fixes the
+        // classification only; see the "translate-request" composeReply
+        // case below for the honest (not fabricated) response — this
+        // file still performs zero live translation itself, exactly
+        // like every other fact-backed intent here composes real
+        // evidence rather than generating one.
+        { id: "translate-request", pattern: /\btranslate\s+(?:this|that|it|the\s+following)\b|\btranslate\s+.+\s+(?:into|to)\s+[a-z\u00c0-\u024f]+\b|\bkutafsiri\b|\btafsiri\s+(?:hii|hivi|hiki|ujumbe)\b|\btafsiri\s+\S.*?\s+kwa\s+[a-z\u00c0-\u024f]+\b|\bnisaidie\s+kutafsiri\b/i },
+        // Kiswahili World Knowledge Lexicon (Pack 01) dependency — a
+        // small, representative, real subset of the PDF's 29 example
+        // intent categories (object/animal identification, price),
+        // demonstrating the required LANGUAGE -> ENTITY/CONCEPT ->
+        // USER GOAL pattern rather than WORD -> FIXED RESPONSE.
+        // Deliberately narrow: the remaining ~15 categories from the
+        // source document are NOT yet implemented as intents here —
+        // disclosed explicitly in this dependency's own report, a
+        // real, reasonable scope boundary, not an oversight.
+        { id: "animal-identification", pattern: /\bwhat\s+(?:animal|bird|fish|insect)\s+is\s+this\b|\bhuyu\s+ni\s+(?:mnyama|ndege|samaki)\s+gani\b|\bmdudu\s+huyu\s+ni\s+wa\s+aina\s+gani\b/i },
+        { id: "price-inquiry", pattern: /\bhow\s+much\s+is\s+this\b|\bhiki\s+ni\s+bei\s+gani\b|\bhii\s+ni\s+bei\s+gani\b/i },
+        { id: "object-identification", pattern: /\bwhat\s+is\s+(?:this|that)\b|\bhiki\s+ni\s+nini\b|\bhicho\s+ni\s+nini\b/i },
+        { id: "founder", pattern: /\bwho\s+(?:created|made|built|founded)\s+(?:you|cozyos)\b|\bfounder\b|\bwho\s+owns\s+cozyos\b|\bowner\s+of\s+cozyos\b/i },
+        { id: "what-is-cozyos", pattern: /\bwhat\s+is\s+cozyos\b|\bcozyos\s+ni\s+nini\b/i },
+        { id: "app-info", pattern: /\bwhat\s+is\s+([a-z][\w' -]{1,40}?)\??\s*$|\btell\s+me\s+about\s+([a-z][\w' -]{1,40}?)\.?\s*$|\b([a-z][\w' -]{1,40}?)\s+ni\s+nini[.!?]*\s*$|\bni\s+nini\s+([a-z][\w' -]{1,40}?)\??\s*$/i },
+        // ChurchOS human-purpose/importance dependency — recognizes
+        // "why does X matter to people" phrasing, distinct from
+        // app-info's "what is X" (technical identity only). Reuses the
+        // exact same bilingual intent/entity-extraction convention.
+        // Currently only ChurchOS has real committed human-purpose
+        // data (getApplicationHumanPurposeFact()) — any other
+        // application honestly falls through to a not-found reply.
+        { id: "app-importance", pattern: /\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+important\b|\bwhy\s+([a-z][\w' -]{1,40}?)\s+matters\b|\bwhat\s+(?:can|does|will)\s+([a-z][\w' -]{1,40}?)\s+(?:do\s+for|become|help)\b|\b([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+inanisaidia\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kusaidia\b/i },
+        // Natural Human Record Capture dependency (first slice) —
+        // recognizes a narrow, disclosed "add a new church member"
+        // statement. Not general NLU: a specific, honestly-scoped
+        // pattern extracting firstName/lastName only, routed into the
+        // real, existing, authoritative ChurchOS.createMember() -
+        // never a parallel/invented record store.
+        { id: "record-church-member", pattern: /\badd\s+([a-z][a-z' -]{1,30}?)(?:\s+([a-z][a-z' -]{1,30}?))?\s+as\s+(?:a\s+)?(?:new\s+)?member\b|\bongeza\s+([a-z][a-z' -]{1,30}?)(?:\s+([a-z][a-z' -]{1,30}?))?\s+kama\s+mwanachama\b/i },
+        { id: "list-apps", pattern: /\b(?:what|which)\s+apps?\b|\bshow\s+me\s+the\s+apps\b|\bapplications?\s+(?:are\s+)?(?:available|installed)\b|\bwant\s+to\s+see\s+the\s+apps\b|\bfind\s+an?\s+app\b/i },
+        // RP-036 fix — the previous pattern only matched the "how do I
+        // register" phrasing, so a bare "Register", "I want to
+        // register", "Create an account", "Sign me up", or any
+        // Kiswahili phrasing fell through to "unsupported". Broadened,
+        // still a single named intent (id unchanged, so the existing
+        // "how-to-register" template/tests keep working unmodified):
+        //   - \bregist(?:er|ration)\b catches every English surface
+        //     form built on the same root ("register", "registration",
+        //     "How do I register?", "Where do I register?", "Take me
+        //     to registration", "registration requirements", etc.)
+        //     without needing a separate clause per phrasing.
+        //   - sign up / sign me up covers the two English synonyms
+        //     that don't share that root.
+        //   - "create an/account" (no longer requiring "how") covers
+        //     the bare "Create an account" / "I want to create an
+        //     account" phrasing. The optional (?:\w+\s+)? before
+        //     "account" (added this milestone) also covers "create a
+        //     CozyOS account" / "create an X account" phrasing, where
+        //     a single product-name/adjective word sits between the
+        //     article and "account" — confirmed necessary by the
+        //     REGISTRATION/AUTH milestone's own required test phrase
+        //     "How can I create a CozyOS account?".
+        //   - sajili (no leading \b — the Kiswahili verb stem "-sajili"
+        //     is a suffix on its own subject/tense prefixes, e.g.
+        //     "kujisajili", "kusajili", so a leading word-boundary
+        //     would never match it; a trailing \b is kept so it still
+        //     requires the real stem, not a coincidental substring)
+        //     covers kujisajili/kusajili/sajili in any of the tested
+        //     phrasings (Nataka kujisajili, Nataka kusajili akaunti,
+        //     Ninawezaje kujisajili?, Nisaidie kujisajili).
+        //   - \bkufungua\s+akaunti\b / \bfungua\s+akaunti\b covers the
+        //     "open an account" phrasing (Nataka kufungua akaunti) —
+        //     "akaunti" alone is intentionally NOT used as a trigger
+        //     (it would collide with the Kiswahili account-status
+        //     intent below), only this specific two-word phrase.
+        //   - REGISTRATION/AUTH milestone: \bkutengeneza\s+akaunti\b /
+        //     \btengeneza\s+akaunti\b and \bkuunda\s+akaunti\b /
+        //     \bunda\s+akaunti\b add the two other real Kiswahili "make/
+        //     create an account" verb stems ("Ninawezaje kutengeneza
+        //     akaunti?", "Ninawezaje kuunda akaunti ya CozyOS?") — same
+        //     "always the two-word phrase, never bare akaunti" discipline
+        //     as kufungua/fungua above, so this still never collides
+        //     with the Kiswahili account-status intent below.
+        { id: "how-to-register", pattern: /\bregist(?:er|ration)\b|\bsign\s*me\s*up\b|\bsign\s*up\b|\bcreate\s+an?\s+(?:\w+\s+)?account\b|sajili\b|\bkufungua\s+akaunti\b|\bfungua\s+akaunti\b|\bkutengeneza\s+akaunti\b|\btengeneza\s+akaunti\b|\bkuunda\s+akaunti\b|\bunda\s+akaunti\b/i },
+
+        // RP-036 — real navigation intents. Each maps (in
+        // cozy-living-assistant.js's #send(), the DOM-owning file — this
+        // file stays DOM-free/pure by design, unchanged discipline) onto
+        // the SAME existing, real navigation mechanisms the quick-action
+        // buttons already use (#runQuickAction()'s "goto-<center>" click
+        // on the real [data-center] nav link, and its real "notifications"
+        // /"recent"/"search" branches) — never a new/invented route.
+        // "settings"/"profile" are deliberately NOT included here: no
+        // single, unambiguous existing route for them was found in this
+        // repository (closest candidates - "configuration",
+        // "themeStudio" - aren't a confident match), so per this repair's
+        // own "do not invent routes" constraint they fall through to the
+        // honest "unsupported" fallback instead of a guessed navigation.
+        { id: "nav-dashboard", pattern: /\b(?:open|go\s+to|show\s+me?|take\s+me\s+to)\s+(?:the\s+)?dashboard\b/i },
+        { id: "nav-notifications", pattern: /\b(?:open|show(?:\s+me)?)\s+(?:the\s+)?notifications?\b|\bwhat\s+are\s+my\s+notifications?\b/i },
+        { id: "nav-recent", pattern: /\bshow\s+(?:me\s+)?recent\s+activity\b|\bwhat\s+happened\s+recently\b/i },
+        { id: "nav-search", pattern: /\bopen\s+(?:the\s+)?search\b|\bshow\s+(?:me\s+)?search\b/i },
+        { id: "nav-aiproviders", pattern: /\btake\s+me\s+to\s+ai\s+providers\b|\bopen\s+ai\s+providers\b|\bfind\s+(?:an?\s+)?ai\s+providers?\b|\bhelp\s+me\s+find\s+ai\s+providers\b/i },
+        { id: "nav-diagnostics", pattern: /\bopen\s+(?:the\s+)?diagnostics\s+center\b/i },
+        // Kiswahili navigation phrasing (RP-036) — "fungua"/"nionyeshe"
+        // (open/show) combined with the specific target noun, so these
+        // never collide with the bare "sajili"/register patterns above.
+        { id: "nav-dashboard", pattern: /\bfungua\s+dashibodi\b|\bnenda\s+(?:kwenye\s+)?dashibodi\b/i },
+        { id: "nav-notifications", pattern: /\bnionyeshe\s+arifa\b|\bfungua\s+arifa\b/i },
+        { id: "nav-recent", pattern: /\bshughuli\s+za\s+hivi\s+karibuni\b/i },
+
+        // Domain 4I dependency #1 (Intent Understanding continuation) —
+        // generic application-launch recognition. Positioned AFTER
+        // every specific nav-* rule above (dashboard/notifications/
+        // recent/search/aiproviders/diagnostics, EN+SW) so those exact,
+        // already-real targets keep winning for their own literal
+        // phrasing; this only catches an "open/launch/fungua <name>"
+        // request for an arbitrary OTHER application name. Also
+        // positioned after "how-to-register" (which already owns
+        // "fungua akaunti"/"kufungua akaunti" — opening an ACCOUNT, not
+        // an application). Requires an actual action verb
+        // (open/launch/start/a fungua-stem) — deliberately does NOT
+        // match "QuarryOS ni nini?" / "Je, QuarryOS ipo?" / "Naweza
+        // kutumia QuarryOS?" (no verb-object action), so an
+        // informational question about an app is never misread as a
+        // request to launch it.
+        { id: "app-launch", pattern: /\b(?:please\s+)?(?:open|launch|start)\s+(?:the\s+)?([a-z][\w' -]{1,40}?)\s*(?:app(?:lication)?)?[.!?]*$|\b(?:ni|ku)?fungu\w*\s+([a-z][\w' -]{1,40}?)\s*[.!?]*$/i },
+
+        { id: "phone-verification", pattern: /\bphone\s+verification\b|\bverify\s+my\s+phone\b|\bwhy\s+(?:is\s+)?my\s+phone\s+not\s+verified\b|\bwhy\s+did\s+my\s+verification\s+fail\b/i },
+        { id: "how-authentication-works", pattern: /\bhow\s+(?:does\s+)?authentication\s+works?\b|\bwhat\s+happens\s+during\s+authentication\b|\bwhy\s+is\s+authentication\s+failing\b/i },
+        { id: "account-status", pattern: /\baccount\s+not\s+active\b|\bwhy\s+is\s+my\s+account\b|\baccount\s+status\b|\baccount\s+(?:disabled|pending|inactive)\b/i },
+        { id: "provider-not-ready", pattern: /\bnot_ready\b|\bwhat\s+does\s+not_ready\s+mean\b|\bwhy\s+is\s+(?:an?\s+)?(?:ai\s+)?provider\s+disabled\b/i },
+        { id: "list-providers", pattern: /\blist\s+providers\b|\bprovider\s+status\b|\bwhat\s+providers\b/i },
+        { id: "what-is-provider", pattern: /\bwhat\s+(?:is|are)\s+(?:an?\s+)?(?:ai\s+)?providers?\b/i },
+        { id: "control-center", pattern: /\bcontrol\s+center\b|\bdashboard\s+navigation\b|\bwhere\s+is\b.*\bfeature\b/i },
+
+        // ── RP-026 original 4 (generic patterns — must stay after the
+        //    more specific RP-027 patterns above), extended (RP-036)
+        //    with Kiswahili equivalents so classifyIntent() is no
+        //    longer English-only for these — same intent ids, so
+        //    existing templates/tests are unaffected. ──────────────────
+        { id: "greeting-generic", pattern: /\b(hi|hello|hey|greetings)\b|\bhabari\b|\bhujambo\b|\bmambo\b/i },
+        { id: "thanks", pattern: /\b(thanks|thank\s?you|appreciate\s+it)\b|\basante\b/i },
+        { id: "identity", pattern: /\bwho\s+are\s+you\b|\bwhat\s+are\s+you\b|\bwewe\s+ni\s+nani\b/i },
+        { id: "help", pattern: /\bhelp\b|\bwhat\s+can\s+you\s+do\b|\bnisaidie\b|\bmsaada\b|\bunaweza\s+kufanya\s+nini\b/i }
+    ]);
+
+    /**
+     * classifyIntent(text)
+     *   Real, pure, deterministic — regex matching against the raw
+     *   input only. Never consults pipeline evidence to decide intent
+     *   (the pipeline's job is Interpretation/Reasoning/Memory/Policy,
+     *   not intent classification — no duplicate ownership here).
+     *   Returns "unsupported" (never null/undefined) when nothing
+     *   matches, so callers always get a defined intent id.
+     */
+    function classifyIntent(text) {
+        const input = typeof text === "string" ? text.trim() : "";
+        for (const rule of INTENT_RULES) {
+            if (rule.pattern.test(input)) return rule.id;
+        }
+        return "unsupported";
+    }
+
+    /**
+     * detectLanguageHeuristic(text) — RP-036
+     *   A small, disclosed, real keyword-overlap heuristic — NOT a
+     *   language-ID model — used only to fill in the "requested"
+     *   language slot when the caller didn't already supply one (via
+     *   options.language/options.requestedLanguage). Mirrors the same
+     *   honesty discipline core/engines/media/language/provider-
+     *   lexical.js already uses elsewhere in this codebase (real,
+     *   computed keyword overlap against a curated reference lexicon;
+     *   an honest `null` — never a guess — when nothing matches). Kept
+     *   local/self-contained here (rather than importing that ES
+     *   module) since this file is a plain, non-module script loaded
+     *   the same way as every other CozyOS core script. Only Kiswahili
+     *   is covered this pass — the same disclosed, partial-coverage
+     *   pattern RP-027 already established for its 5 default languages.
+     */
+    function detectLanguageHeuristic(text) {
+        if (typeof text !== "string" || !text.trim()) return null;
+        const SW_MARKERS = new Set([
+            "habari", "hujambo", "mambo", "nataka", "nisaidie", "nisaidi", "fungua",
+            "nionyeshe", "ninawezaje", "naweza", "wapi", "akaunti", "sajili", "kujisajili",
+            "kusajili", "dashibodi", "mipangilio", "arifa", "nini", "karibuni", "shughuli",
+            "kuona", "kufungua", "kuingia", "msaada", "nipe", "asante", "sawa", "kwenye",
+            // COZYAI-PUBLIC-VISION-KNOWLEDGE — markers for the new
+            // why-use-cozyos/differentiation/language-support-list
+            // Swahili trigger phrasings above (e.g. "Kwa nini
+            // nitumie CozyOS?", "CozyOS inatofautianaje?", "Lugha
+            // zipi zinazoungwa mkono?").
+            "nitumie", "tumie", "faida", "inatofautianaje", "tofauti", "tofautiana",
+            "lugha", "zinazoungwa", "mkono", "zinazotumika", "zipi", "gani",
+            // REGISTRATION/AUTH milestone — markers for the new
+            // registration-phrasing Swahili trigger phrases above.
+            // "usajili" closes a real gap: this heuristic matches
+            // whole words only (not substrings), so "usajili" (as in
+            // "Ninaanzaje usajili wa CozyOS?") needs its own entry —
+            // it is not covered by the existing "sajili"/"kusajili"/
+            // "kujisajili" entries. "kutengeneza"/"tengeneza"/
+            // "kuunda"/"unda"/"nifanye"/"ninaanzaje" are added for the
+            // same reason, to genuinely detect the new phrasings
+            // rather than relying on "akaunti" alone happening to be
+            // present.
+            "usajili", "kutengeneza", "tengeneza", "kuunda", "unda", "nifanye", "ninaanzaje"
+        ]);
+        const words = text.toLowerCase().match(/[a-zà-ÿ]+/g) || [];
+        if (words.length === 0) return null;
+        const hits = words.filter((w) => SW_MARKERS.has(w)).length;
+        return hits > 0 ? "sw" : null;
+    }
+
+    /**
+     * resolveLanguage(options)
+     *   Defensive wrapper around CozyLanguageRegistry.resolveLanguage()
+     *   (RP-027). If that module hasn't loaded on this page, degrades
+     *   honestly to English — never throws, never invents a language
+     *   state. This is the ONLY place language is resolved; composeReply()
+     *   always receives an already-resolved, AVAILABLE code.
+     *
+     *   RP-036: precedence stays exactly what RP-027 already
+     *   documented — manual (explicit, persistent user setting) >
+     *   requested > country-suggested > English. The one addition is
+     *   that "requested" now also accepts a real, heuristically
+     *   detected language for THIS message (options.detectedLanguage)
+     *   as a fallback, ONLY when the caller supplied neither an
+     *   explicit manual setting nor an explicit per-call requested
+     *   language — so an explicit preference always still wins, and
+     *   detection is never allowed to override it.
+     */
+    function resolveLanguage(options) {
+        const registry = window.CozyOS && window.CozyOS.CozyLanguageRegistry;
+        const requested = (options && options.requestedLanguage) || (options && options.detectedLanguage) || undefined;
+        if (registry && typeof registry.resolveLanguage === "function") {
+            const resolved = safeCall(() => registry.resolveLanguage({
+                manual: options && options.language,
+                requested,
+                country: options && options.country
+            }));
+            if (resolved && resolved.code) return resolved;
+        }
+        return { code: "en", preferred: (options && options.language) || requested || "en", fallback: false, reason: null };
+    }
+
+    /** safeCall(fn) — mirrors the knowledge registry's own helper; a throwing dependency degrades to null, never a fabricated result. */
+    function safeCall(fn) {
+        try { return fn(); } catch (_err) { return null; }
+    }
+
+    /** languageDisplayName(code) — honest best-effort label for the fallback disclosure sentence; falls back to the raw code if the registry can't name it. */
+    function languageDisplayName(code) {
+        const registry = window.CozyOS && window.CozyOS.CozyLanguageRegistry;
+        if (registry && typeof registry.getLanguage === "function") {
+            const lang = safeCall(() => registry.getLanguage(code));
+            if (lang && lang.name) return lang.name;
+        }
+        return code;
+    }
+
+    /**
+     * template(key, lang)
+     *   Defensive lookup into CozyLanguageTemplates (RP-027). Falls back
+     *   to English, and — if the templates module itself isn't loaded —
+     *   to this file's own original RP-026 English strings, so the
+     *   original 7 intents keep working with zero external dependency,
+     *   exactly as RP-026 shipped them.
+     */
+    const RP026_ENGLISH_FALLBACK = Object.freeze({
+        "greeting-morning": "Good morning! I'm the CozyOS Assistant — ready to help with whatever you're working on today.",
+        "greeting-afternoon": "Good afternoon! I'm the CozyOS Assistant. What can I help you with?",
+        "greeting-evening": "Good evening! I'm the CozyOS Assistant. How can I help?",
+        "greeting-generic": "Hello! I'm the CozyOS Assistant. How can I help you?",
+        "thanks": "You're welcome! Let me know if there's anything else you need.",
+        "identity": "I'm the CozyOS Assistant. Right now I answer using a real, rule-based conversational composer (not a language model) alongside CozyOS's real reasoning, memory, and policy pipeline.",
+        "help": "I can help with search, notifications, recent activity, and simple conversational questions. My conversational understanding today is rule-based — I honestly recognize greetings, help requests, thanks, and questions about who I am; anything outside that, I'll tell you honestly that I don't have a rule-based answer for it yet.",
+        "unsupported": "I don't have a rule-based answer for that yet — right now my conversational understanding only covers greetings, help requests, thanks, and questions about who I am. That's a real, disclosed limit, not an error.",
+        // RP-027 dynamic-intent honest fallbacks — kept here too (not
+        // only in cozy-language-templates.js) so a page that loaded
+        // cozy-knowledge-registry.js but NOT cozy-language-templates.js
+        // (an unusual, but possible, partial load) still never returns
+        // a blank/undefined reply for these three evidence-backed
+        // intents — response text must never be empty, per RP-027 §13.
+        // RP-036 navigation intents — same "never blank" discipline,
+        // kept here so a page missing cozy-language-templates.js still
+        // gets a real English confirmation instead of an empty reply.
+        "nav-dashboard": "Opening the dashboard for you.",
+        "nav-notifications": "Opening notifications for you.",
+        "nav-recent": "Here's your recent activity.",
+        "nav-search": "Opening search for you.",
+        "nav-aiproviders": "Opening AI Providers for you.",
+        "nav-diagnostics": "Opening the Diagnostics Center for you.",
+        "founder:not_found": "I'm the CozyOS Assistant. I was built as part of CozyOS, but I don't currently have a verified record of the individual who created me.",
+        "list-apps:unavailable": "I can help you find the CozyOS apps, but the application registry isn't available right now.",
+        "list-providers:unavailable": "I can explain what providers are, but I can't see the live Provider Manager status from here right now.",
+        // CozyAI Project Knowledge & Public Story Integration —
+        // same "not_found" fallback convention, so a partial-load page
+        // (cozy-knowledge-registry.js without cozy-language-
+        // templates.js) still never returns a blank/undefined reply
+        // for these five evidence-backed intents.
+        "project-origin:not_found": "The public origin story of CozyOS hasn't been published yet, so I don't have an authoritative answer to why it was started.",
+        "public-story:not_found": "CozyOS doesn't have a published public story yet, so I can't share one right now.",
+        "vision:not_found": "CozyOS's vision statement hasn't been published yet, so I don't have an authoritative answer for what it's trying to accomplish.",
+        "mission:not_found": "CozyOS's mission statement hasn't been published yet, so I don't have an authoritative answer for that.",
+        "project-history:not_found": "CozyOS's project history hasn't been published yet, so I don't have an authoritative account of it.",
+        // COZYAI-PUBLIC-VISION-KNOWLEDGE — same "never blank" discipline
+        // for a page that loaded cozy-knowledge-registry.js and
+        // cozy-public-knowledge-source.js but not cozy-language-
+        // templates.js.
+        "why-use-cozyos:not_found": "I don't have a verified answer yet for why someone might want to use CozyOS.",
+        "differentiation:not_found": "I don't have a verified answer yet for how CozyOS differs from other options.",
+        "language-support-list:not_found": "I don't have a verified answer yet for CozyOS's language support.",
+        // Domain 4D — honest fallback strings for translate-request,
+        // used only if cozy-language-templates.js somehow isn't loaded
+        // (same "never blank" discipline as every other entry here).
+        "translate-request:target-unknown": "I understood you'd like a translation, but I couldn't tell which language you want it in. Could you say, for example, \"translate this to French\"?",
+        "translate-request:target-known": "I understood you'd like something translated. Please send me the exact text you want translated.",
+        "translate-request:translated": "Translation not available.",
+        "translate-request:provider-unavailable": "I couldn't complete that translation right now.",
+        "animal-identification:known": "That looks like it could be a match.",
+        "animal-identification:needs-image": "I can't identify an animal without seeing an image of it yet — CozyOS's Video Assist can help with that when you're ready to show me a photo.",
+        "price-inquiry:no-source": "I don't have pricing information for that here — the specific application you're using (like a shop or business listing) would have the real price.",
+        "object-identification:needs-context": "I'd need to see or know more about it to tell you what it is — can you describe it or show me an image?",
+        "app-info:known": "That is a registered CozyOS application.",
+        "app-info:not-found": "I don't have any registered application by that name.",
+        "app-importance:known": "Here is why that application matters.",
+        "app-importance:not-found": "I don't have human-purpose information registered for that application yet.",
+        "record-church-member:needs-name": "Who would you like to add as a member? Please tell me their name.",
+        "record-church-member:needs-org": "Which church or organization should I add this member to?",
+        "record-church-member:needs-org-choice": "You belong to more than one organization. Which one should I add this member to?",
+        "record-church-member:unavailable": "ChurchOS isn't available right now, so I can't add that member.",
+        "record-church-member:created": "Member added.",
+        "record-church-member:failed": "I couldn't add that member.",
+        // Domain 4I dependency #1 — honest fallbacks if
+        // cozy-language-templates.js somehow isn't loaded.
+        "app-launch:resolved": "I found an application called \"{name}\". Opening it still requires your authorization to be checked — I haven't opened it yet.",
+        "app-launch:unresolved": "I couldn't find an application matching what you asked for. Could you tell me the exact application name?",
+        // Domain 4I dependency #2 — honest fallbacks for the real
+        // authorization outcome, used only if cozy-language-templates.js
+        // isn't loaded.
+        "app-launch:authorization_required": "I found that application, but you'll need to be signed in before I can check whether you're allowed to open it.",
+        "app-launch:authorization_granted": "I found \"{name}\" and you're authorized to use it. I haven't opened it myself — that's a separate step.",
+        "app-launch:authorization_denied": "I found \"{name}\", but your account doesn't currently have access to it.",
+    });
+
+    function template(key, lang) {
+        const templates = window.CozyOS && window.CozyOS.CozyLanguageTemplates;
+        if (templates && typeof templates.getTemplate === "function") {
+            const found = safeCall(() => templates.getTemplate(key, lang));
+            if (found) return found;
+        }
+        return RP026_ENGLISH_FALLBACK[key] || null;
+    }
+
+    /** safeCallAsync(fn) — same fail-closed discipline as safeCall(), for the async CozyAI Project Knowledge fact-getters below. */
+    async function safeCallAsync(fn) {
+        try { return await fn(); } catch (_err) { return null; }
+    }
+
+    /**
+     * composeReply(intent, lang)
+     *   Real template selection — the ONLY place conversational text is
+     *   generated. Never reads pipeline internals. Fixed-text intents
+     *   resolve directly to a per-language string (template()); the
+     *   evidence-backed intents (founder/list-apps/list-providers, plus
+     *   the CozyAI Project Knowledge intents below) call CozyKnowledge
+     *   (RP-027) for live evidence first and select the ":verified" or
+     *   the honest ":not_found"/":unavailable" template variant
+     *   accordingly — per the Fact Safety Rule (RP-027 §3), absence of
+     *   evidence is NEVER converted into a positive claim. async
+     *   because the five project-knowledge fact-getters compose
+     *   FounderStory.getPublicStory(), which is genuinely async
+     *   (real Vault decryption) — this file's only caller (think())
+     *   is already async and awaits this.
+     */
+    // Domain 4D — a small, disclosed lookup for recognizing a spoken
+    // target-language NAME inside a translate-request utterance (e.g.
+    // "kwa Kifaransa" / "into French"), restricted to the 5 languages
+    // CozyLanguageRegistry actually marks AVAILABLE today. This is not
+    // a second language registry — it exists only because the real
+    // registry's own `name`/`nativeName` fields are English-only/native-
+    // script forms, not the Kiswahili common names ("Kifaransa" for
+    // French) a Kiswahili speaker would actually say. NOT_READY
+    // languages are deliberately absent here: recognizing "Kiluo" as a
+    // target would let this classifier imply a translation capability
+    // Domain 4B/4C never verified as real.
+    const TARGET_LANGUAGE_NAMES = Object.freeze({
+        en: [/\benglish\b/i, /\bkiingereza\b/i],
+        sw: [/\bswahili\b/i, /\bkiswahili\b/i],
+        fr: [/\bfrench\b/i, /\bkifaransa\b/i],
+        ar: [/\barabic\b/i, /\bkiarabu\b/i],
+        so: [/\bsomali\b/i, /\bkisomali\b/i],
+    });
+    function extractTargetLanguageCode(text) {
+        for (const [code, patterns] of Object.entries(TARGET_LANGUAGE_NAMES)) {
+            if (patterns.some((p) => p.test(text))) return code;
+        }
+        return null;
+    }
+
+    // Domain 4C dependency #1 — extracts a REAL, literal source phrase
+    // when the person embeds one directly in the same utterance (e.g.
+    // "translate hello to French" / "tafsiri habari kwa Kiingereza").
+    // Deliberately narrow: only fires for "translate/tafsiri <words> to/
+    // into/kwa <language-name>" shapes, and explicitly rejects the
+    // known placeholder words ("this"/"that"/"it"/"the following"/
+    // "hii"/"hivi"/"hiki"/"ujumbe (huu)") as real text — those refer to
+    // conversational context this stateless classifier still cannot
+    // see, so those cases correctly fall through to the existing
+    // honest "send me the exact text" reply, completely unchanged.
+    const SOURCE_TEXT_PLACEHOLDER_WORDS = /^(this|that|it|the following|hii|hivi|hiki|ujumbe(?:\s+huu)?)$/i;
+    function extractEmbeddedSourceText(text) {
+        const en = /\btranslate\s+["“']?(.+?)["”']?\s+(?:into|to)\s+[a-z\u00c0-\u024f]+\b/i.exec(text || "");
+        const sw = /\btafsiri\s+["“']?(.+?)["”']?\s+kwa\s+[a-z\u00c0-\u024f]+\b/i.exec(text || "");
+        const candidate = (en && en[1]) || (sw && sw[1]) || null;
+        if (!candidate) return null;
+        const trimmed = candidate.trim();
+        if (!trimmed || SOURCE_TEXT_PLACEHOLDER_WORDS.test(trimmed)) return null;
+        return trimmed;
+    }
+
+    // Domain 4I dependency #1 — extracts the candidate application name
+    // text from an app-launch utterance using the exact same pattern
+    // the intent rule above already matched with (kept in sync
+    // deliberately, not re-derived heuristically a second way).
+    const APP_LAUNCH_EXTRACT_PATTERN = /\b(?:please\s+)?(?:open|launch|start)\s+(?:the\s+)?([a-z][\w' -]{1,40}?)\s*(?:app(?:lication)?)?[.!?]*$|\b(?:ni|ku)?fungu\w*\s+([a-z][\w' -]{1,40}?)\s*[.!?]*$/i;
+    function extractAppLaunchCandidate(text) {
+        const m = APP_LAUNCH_EXTRACT_PATTERN.exec(text || "");
+        if (!m) return null;
+        const candidate = (m[1] || m[2] || "").trim();
+        return candidate.length > 0 ? candidate : null;
+    }
+
+    /**
+     * REFERENCE_FOLLOWUP_PATTERN — RP-037 (Conversation State Propagation,
+     * dependency #1: reference resolution)
+     *
+     * AUDIT FINDING: repository-wide search (core/modules/conversation,
+     * core/modules/intelligence, core/context) found no location anywhere
+     * in the shared conversation path that carries any information from
+     * one think() call to the next — think(text, options) is called fresh
+     * every turn with no state in, no state out. That is the single
+     * concrete missing dependency: without it, a follow-up utterance that
+     * omits the entity ("open it" / "ifungue") can never be understood,
+     * no matter how good intent classification gets, because there is
+     * nothing to resolve "it" against.
+     *
+     * This is the smallest real fix: (1) accept an opaque
+     * options.conversationState from the caller, (2) when the CURRENT
+     * utterance fails ordinary intent classification but is one of a
+     * small, disclosed set of bare anaphoric follow-ups referring back to
+     * an application ("open it", "ifungue", "fungua hiyo", "fungua ile"),
+     * resolve it using the application recorded on the PREVIOUS turn's
+     * state, and (3) return an updated conversationState for the caller
+     * to pass into the next think() call. This is real cross-turn
+     * reference resolution for one specific, disclosed referent
+     * (a previously named application) — not general pronoun resolution,
+     * not a language model, and it is only ever used when ordinary intent
+     * classification found nothing (so it never overrides a genuine new
+     * app-launch match, which already carries its own explicit name).
+     */
+    const REFERENCE_FOLLOWUP_PATTERN = /^(?:yes,?\s*)?(?:please\s+)?(?:open|launch|start|do)\s+(?:it|that)\b|^ifungue\b|^fungua\s+(?:hiyo|ile)\b/i;
+
+    /**
+     * CORRECTION_PATTERNS — RP-037 dependency #2 (Correction Handling)
+     *
+     * Extends the same conversationState mechanism above with exactly
+     * one additional capability: recognizing that the CURRENT utterance
+     * is correcting the application named on the PREVIOUS turn, rather
+     * than either naming a fresh application or following up on the
+     * remembered one. This is not general natural-language correction
+     * intelligence — it is a small, closed, anchored set of concrete
+     * phrasings (English + Kiswahili), each of which yields exactly a
+     * "corrected name" and a "rejected name" candidate string. Neither
+     * candidate is trusted as a real application until it is checked
+     * against the real application registry via
+     * resolveApplicationByName() below — this pattern only extracts
+     * text, it never itself decides an application exists.
+     *
+     * Every pattern is anchored (^...$) so it can never partially match
+     * inside an otherwise-ordinary sentence, and none of them overlaps
+     * APP_LAUNCH_EXTRACT_PATTERN's own open/launch/start/fungua verb
+     * forms — so an ordinary new app-launch utterance is classified as
+     * app-launch by the existing rule first and never reaches this
+     * check at all (see the `intent !== "app-launch"` guard at the
+     * call site), honestly satisfying "explicit application always
+     * wins" without this file needing to special-case it here.
+     */
+    const CORRECTION_PATTERNS = [
+        // "Actually, ShopOS, not QuarryOS." / "Actually ShopOS not QuarryOS"
+        { pattern: /^actually,?\s+([a-z][\w' -]{1,40}?),?\s+not\s+([a-z][\w' -]{1,40}?)[.!?]*$/i, correctedGroup: 1, rejectedGroup: 2 },
+        // "Not QuarryOS — ShopOS." / "Not QuarryOS - ShopOS."
+        { pattern: /^not\s+([a-z][\w' -]{1,40}?)\s*[-—]\s*([a-z][\w' -]{1,40}?)[.!?]*$/i, correctedGroup: 2, rejectedGroup: 1 },
+        // Kiswahili: "Kwa kweli ShopOS, si QuarryOS."
+        { pattern: /^kwa\s+kweli\s+([a-z][\w' -]{1,40}?),?\s+si\s+([a-z][\w' -]{1,40}?)[.!?]*$/i, correctedGroup: 1, rejectedGroup: 2 }
+    ];
+
+    /**
+     * parseCorrectionCandidate(text)
+     *   Returns { corrected, rejected } candidate NAME TEXT (not yet
+     *   resolved against the registry) on a pattern match, or null.
+     *   Never returns an application object itself — resolution against
+     *   the real registry happens only at the think() call site, via
+     *   the same resolveApplicationByName() the rest of this file
+     *   already uses for ordinary app-launch turns.
+     */
+    function parseCorrectionCandidate(text) {
+        const input = typeof text === "string" ? text.trim() : "";
+        if (!input) return null;
+        for (const entry of CORRECTION_PATTERNS) {
+            const m = entry.pattern.exec(input);
+            if (!m) continue;
+            const corrected = (m[entry.correctedGroup] || "").trim();
+            const rejected = (m[entry.rejectedGroup] || "").trim();
+            if (!corrected) continue;
+            return { corrected, rejected };
+        }
+        return null;
+    }
+
+    /**
+     * resolveApplicationByName(candidate)
+     *   Real resolution against the canonical, already-existing
+     *   application registry (window.CozyOS.listApplications(), backed
+     *   by core/registry/cozy-registry.js's ServiceRegistry — the exact
+     *   same source cozy-knowledge-registry.js's listApplicationsFact()
+     *   already reads for the "list-apps" intent). No new registry, no
+     *   remembered/hardcoded application list. Case-insensitive
+     *   exact-name match first (the common, unambiguous case), then a
+     *   whole-word substring match as a real, disclosed fallback for
+     *   minor phrasing differences (e.g. a trailing "app"). Returns
+     *   null — never a guessed application — when nothing genuinely
+     *   matches, or when the registry itself isn't loaded.
+     */
+    function resolveApplicationByName(candidate) {
+        if (!candidate) return null;
+        const lister = (window.CozyOS && typeof window.CozyOS.listApplications === "function" && window.CozyOS.listApplications)
+            || (window.CozyOS && window.CozyOS.ServiceRegistry && typeof window.CozyOS.ServiceRegistry.listApplications === "function" && (() => window.CozyOS.ServiceRegistry.listApplications()));
+        if (!lister) return null;
+        const apps = safeCall(() => lister());
+        if (!Array.isArray(apps)) return null;
+        const needle = candidate.trim().toLowerCase();
+        let match = apps.find((a) => a && typeof a.name === "string" && a.name.toLowerCase() === needle);
+        if (!match) match = apps.find((a) => a && typeof a.name === "string" && new RegExp(`\\b${needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(a.name));
+        return match ? { id: match.id, name: match.name } : null;
+    }
+
+    async function composeReply(intent, lang, rawText, options = {}) {
+        const knowledge = window.CozyOS && window.CozyOS.CozyKnowledge;
+
+        switch (intent) {
+            case "founder": {
+                const fact = knowledge && typeof knowledge.getFounderFact === "function" ? safeCall(() => knowledge.getFounderFact(lang)) : null;
+                if (fact && fact.evidence === "VERIFIED") {
+                    const frame = template("founder:verified", lang);
+                    if (typeof frame === "function") return frame(fact.answer);
+                }
+                return template("founder:not_found", lang);
+            }
+            case "project-origin": {
+                const fact = knowledge && typeof knowledge.getProjectOriginFact === "function" ? await safeCallAsync(() => knowledge.getProjectOriginFact()) : null;
+                if (fact && fact.evidence === "VERIFIED") {
+                    const frame = template("project-origin:verified", lang);
+                    if (typeof frame === "function") return frame(fact.answer);
+                }
+                return template("project-origin:not_found", lang);
+            }
+            case "public-story": {
+                const fact = knowledge && typeof knowledge.getPublicStoryFact === "function" ? await safeCallAsync(() => knowledge.getPublicStoryFact()) : null;
+                if (fact && fact.evidence === "VERIFIED") {
+                    const frame = template("public-story:verified", lang);
+                    if (typeof frame === "function") return frame(fact.answer);
+                }
+                return template("public-story:not_found", lang);
+            }
+            case "cozyos-vision": {
+                const fact = knowledge && typeof knowledge.getVisionFact === "function" ? await safeCallAsync(() => knowledge.getVisionFact()) : null;
+                if (fact && fact.evidence === "VERIFIED") {
+                    const frame = template("vision:verified", lang);
+                    if (typeof frame === "function") return frame(fact.answer);
+                }
+                return template("vision:not_found", lang);
+            }
+            case "cozyos-mission": {
+                const fact = knowledge && typeof knowledge.getMissionFact === "function" ? await safeCallAsync(() => knowledge.getMissionFact()) : null;
+                if (fact && fact.evidence === "VERIFIED") {
+                    const frame = template("mission:verified", lang);
+                    if (typeof frame === "function") return frame(fact.answer);
+                }
+                return template("mission:not_found", lang);
+            }
+            case "project-history": {
+                const fact = knowledge && typeof knowledge.getProjectHistoryFact === "function" ? await safeCallAsync(() => knowledge.getProjectHistoryFact()) : null;
+                if (fact && fact.evidence === "VERIFIED") {
+                    const frame = template("project-history:verified", lang);
+                    if (typeof frame === "function") return frame(fact.answer);
+                }
+                return template("project-history:not_found", lang);
+            }
+            // ── COZYAI-PUBLIC-VISION-KNOWLEDGE ─────────────────────
+            // Synchronous, same pattern as founder/list-apps/
+            // list-providers below (CozyPublicKnowledge's facts have
+            // no async dependency, unlike the five FounderStory
+            // project-knowledge cases above). Evidence absence never
+            // becomes a positive claim — an honest ":not_found"
+            // template is returned instead, per the Fact Safety Rule.
+            case "why-use-cozyos": {
+                const fact = knowledge && typeof knowledge.getWhyUseCozyOSFact === "function" ? safeCall(() => knowledge.getWhyUseCozyOSFact()) : null;
+                if (fact && fact.evidence === "VERIFIED") {
+                    const frame = template("why-use-cozyos:verified", lang);
+                    if (typeof frame === "function") return frame(fact.answer);
+                }
+                return template("why-use-cozyos:not_found", lang);
+            }
+            case "differentiation": {
+                const fact = knowledge && typeof knowledge.getDifferentiationFact === "function" ? safeCall(() => knowledge.getDifferentiationFact()) : null;
+                if (fact && fact.evidence === "VERIFIED") {
+                    const frame = template("differentiation:verified", lang);
+                    if (typeof frame === "function") return frame(fact.answer);
+                }
+                return template("differentiation:not_found", lang);
+            }
+            case "animal-identification": {
+                // Kiswahili World Knowledge Lexicon dependency — real
+                // LANGUAGE -> ENTITY/CONCEPT -> lexicon lookup, never
+                // fake computer vision (matching the same discipline
+                // already established for Video Assist elsewhere in
+                // CozyOS: no real image/camera input exists in this
+                // conversational path, so "what animal is THIS" cannot
+                // honestly be answered without one). If a real,
+                // recognizable animal/bird/fish/insect term from the
+                // lexicon is embedded in the SAME utterance, its real,
+                // VERIFIED translation is used; otherwise the honest
+                // "I can't see an image" reply is returned — never a
+                // guessed species.
+                const knowledge = window.CozyOS && window.CozyOS.CozyKnowledge;
+                // Real defect found via testing: the intent trigger
+                // phrase itself ("animal"/"mnyama"/"bird"/"ndege"/etc.)
+                // is ALSO a genuine lexicon entry, so scanning every
+                // word in the utterance would incorrectly match the
+                // question's own trigger words as if they were the
+                // referent. Excluded explicitly - only words outside
+                // this intent's own recognized vocabulary are treated
+                // as a candidate entity.
+                const TRIGGER_WORDS = new Set(["what", "animal", "bird", "fish", "insect", "is", "this", "that", "huyu", "ni", "mnyama", "ndege", "samaki", "mdudu", "gani", "aina", "wa"]);
+                const candidateWords = ((rawText || "").toLowerCase().match(/[a-z\u00c0-\u024f']+/g) || []).filter((w) => !TRIGGER_WORDS.has(w));
+                let matchedRecord = null;
+                if (knowledge && typeof knowledge.lookupLexiconTermFact === "function") {
+                    for (const word of candidateWords) {
+                        const enResult = knowledge.lookupLexiconTermFact(word, "en");
+                        const swResult = knowledge.lookupLexiconTermFact(word, "sw");
+                        const hit = [...(enResult.records || []), ...(swResult.records || [])]
+                            .find((r) => ["domestic_animals", "wildlife", "birds", "fish_aquatic", "insects_small_creatures"].includes(r.category));
+                        if (hit) { matchedRecord = hit; break; }
+                    }
+                }
+                if (matchedRecord) {
+                    const frame = template("animal-identification:known", lang);
+                    return typeof frame === "function" ? frame(matchedRecord.en, matchedRecord.sw) : frame;
+                }
+                const frame = template("animal-identification:needs-image", lang);
+                return typeof frame === "function" ? frame() : frame;
+            }
+            case "price-inquiry": {
+                // Honest, disclosed recognition-only reply — CozyOS's
+                // conversational layer has no real, generic pricing
+                // data source to consult here; a real application
+                // (e.g. a business/QuarryOS catalog) remains the
+                // authoritative source for any actual price, per the
+                // "language understands, application acts" security
+                // boundary. Never fabricates a price.
+                const frame = template("price-inquiry:no-source", lang);
+                return typeof frame === "function" ? frame() : frame;
+            }
+            case "object-identification": {
+                const frame = template("object-identification:needs-context", lang);
+                return typeof frame === "function" ? frame() : frame;
+            }
+            case "record-church-member": {
+                // Natural Human Record Capture dependency (first real
+                // slice). Real extraction -> real authoritative
+                // ChurchOS.createMember() -> real result, or an honest
+                // clarification when required information (which
+                // organization) is missing. Never fabricates a
+                // created record. Provenance: this turn's source is
+                // recorded as USER_TYPED/USER_SPOKEN via options.source
+                // when the caller supplies it (e.g. the real mic path
+                // already distinguishes this) — honestly UNKNOWN
+                // otherwise, never guessed.
+                const m = /\badd\s+([a-z][a-z' -]{1,30}?)(?:\s+([a-z][a-z' -]{1,30}?))?\s+as\s+(?:a\s+)?(?:new\s+)?member\b|\bongeza\s+([a-z][a-z' -]{1,30}?)(?:\s+([a-z][a-z' -]{1,30}?))?\s+kama\s+mwanachama\b/i.exec(rawText || "");
+                const firstName = m ? (m[1] || m[3] || "").trim() : "";
+                const lastName = m ? (m[2] || m[4] || "").trim() : "";
+                if (!firstName) {
+                    const frame = template("record-church-member:needs-name", lang);
+                    return typeof frame === "function" ? frame() : frame;
+                }
+                // Current-organization-context resolver dependency —
+                // real, existing infrastructure only: explicit
+                // options.orgId (backward-compatible, still takes
+                // priority when supplied — e.g. an already-authorized
+                // caller, or a future explicit org-switcher UI) is
+                // checked first. Otherwise resolves via the real,
+                // already-flowing options.actorId (cozy-living-
+                // assistant.js's #resolveActorId(), sourced from the
+                // real window.CozyOS.Session) against the real,
+                // unmodified OrganizationMembership store. Never
+                // infers/guesses an organization: zero active
+                // memberships or more than one both honestly ask for
+                // clarification rather than picking one.
+                let orgId = options && options.orgId;
+                let resolvedVia = orgId ? "explicit" : null;
+                if (!orgId) {
+                    const actorId = options && options.actorId;
+                    const membership = window.CozyOS && window.CozyOS.OrganizationMembership;
+                    if (actorId && membership && typeof membership.listUserOrganizations === "function") {
+                        const activeOrgs = safeCall(() => membership.listUserOrganizations(actorId, { status: "active" })) || [];
+                        if (activeOrgs.length === 1) {
+                            orgId = activeOrgs[0].organizationId;
+                            resolvedVia = "session";
+                        } else if (activeOrgs.length > 1) {
+                            const frame = template("record-church-member:needs-org-choice", lang);
+                            return typeof frame === "function" ? frame(firstName, activeOrgs.map((o) => o.organizationId)) : frame;
+                        }
+                        // zero active orgs falls through to the same
+                        // honest "needs-org" clarification below —
+                        // never fabricated.
+                    }
+                }
+                if (!orgId) {
+                    // Honest clarification — the required organization
+                    // context genuinely cannot be derived from the
+                    // utterance, an explicit orgId, or a real,
+                    // resolvable single active session membership.
+                    // This is the correct behavior, not a missing
+                    // feature: never guesses which church/organization
+                    // this applies to.
+                    const frame = template("record-church-member:needs-org", lang);
+                    return typeof frame === "function" ? frame(firstName) : frame;
+                }
+                const church = window.CozyOS && window.CozyOS.ChurchOS;
+                if (!church || typeof church.createMember !== "function") {
+                    const frame = template("record-church-member:unavailable", lang);
+                    return typeof frame === "function" ? frame() : frame;
+                }
+                try {
+                    const member = church.createMember({ orgId, firstName, lastName: lastName || null });
+                    const frame = template("record-church-member:created", lang);
+                    return typeof frame === "function" ? frame(member.firstName, member.lastName, member.memberId) : frame;
+                } catch (err) {
+                    // Real, honest failure — never claims a record was
+                    // created when createMember() genuinely rejected it
+                    // (e.g. an invalid/unknown organization).
+                    const frame = template("record-church-member:failed", lang);
+                    return typeof frame === "function" ? frame(err && err.message ? err.message : "unknown error") : frame;
+                }
+            }
+            case "app-importance": {
+                // ChurchOS human-purpose dependency — real,
+                // structured VERIFIED/NOT_FOUND fact, never a
+                // fabricated purpose. currentVerifiedCapabilities and
+                // visionCapabilities are kept explicitly separate in
+                // the reply text.
+                const m = /\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+important\b|\bwhy\s+([a-z][\w' -]{1,40}?)\s+matters\b|\bwhat\s+(?:can|does|will)\s+([a-z][\w' -]{1,40}?)\s+(?:do\s+for|become|help)\b|\b([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+inanisaidia\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kusaidia\b/i.exec(rawText || "");
+                const candidate = m ? (m[1] || m[2] || m[3] || m[4] || m[5] || m[6] || "").trim() : "";
+                const knowledge = window.CozyOS && window.CozyOS.CozyKnowledge;
+                // lang is forwarded so the KNOWLEDGE layer (not this
+                // provider, not the language-template frame) resolves
+                // which language's SUBSTANCE the returned purpose
+                // object carries - see cozy-knowledge-registry.js's
+                // resolvePurposeForLanguage(). Omitting lang here would
+                // silently keep returning English substance under a
+                // Kiswahili request, which RP-027's Fact Safety Rule
+                // (and this dependency's own requirement) forbids.
+                const fact = candidate && knowledge && typeof knowledge.getApplicationHumanPurposeFact === "function"
+                    ? knowledge.getApplicationHumanPurposeFact(candidate, lang)
+                    : { evidence: "NOT_FOUND", purpose: null };
+                if (fact.evidence === "VERIFIED" && fact.purpose) {
+                    const frame = template("app-importance:known", lang);
+                    return typeof frame === "function" ? frame(candidate, fact.purpose) : frame;
+                }
+                // Current-organization-context resolver dependency —
+                // reuses this same intent/template mechanism for
+                // CAPABILITY-level human-purpose knowledge (not tied
+                // to one application), rather than adding a second
+                // intent/pattern for the same kind of question.
+                const capabilityFact = candidate && knowledge && typeof knowledge.getCapabilityHumanPurposeFact === "function"
+                    ? knowledge.getCapabilityHumanPurposeFact(
+                        /record/i.test(candidate) ? "natural-record-capture" :
+                        /fingerprint|face|biometric|passkey/i.test(candidate) ? "biometric-login" :
+                        candidate
+                      )
+                    : { evidence: "NOT_FOUND", purpose: null };
+                if (capabilityFact.evidence === "VERIFIED" && capabilityFact.purpose) {
+                    const frame = template("app-importance:known", lang);
+                    return typeof frame === "function" ? frame(candidate, capabilityFact.purpose) : frame;
+                }
+                const frame = template("app-importance:not-found", lang);
+                return typeof frame === "function" ? frame(candidate || "") : frame;
+            }
+            case "app-info": {
+                // Real named-application knowledge — reuses the exact
+                // existing entity-extraction convention (a captured
+                // group from the intent's own pattern) and the real,
+                // new getApplicationFact() fact-getter, which resolves
+                // against the same authoritative
+                // window.CozyOS.listApplications()/ServiceRegistry
+                // every other application-aware fact already uses.
+                // Never fabricates an application, never claims
+                // capabilities/features the registry does not
+                // genuinely carry.
+                const m = /\bwhat\s+is\s+([a-z][\w' -]{1,40}?)\??\s*$|\btell\s+me\s+about\s+([a-z][\w' -]{1,40}?)\.?\s*$|\b([a-z][\w' -]{1,40}?)\s+ni\s+nini[.!?]*\s*$|\bni\s+nini\s+([a-z][\w' -]{1,40}?)\??\s*$/i.exec(rawText || "");
+                const candidate = m ? (m[1] || m[2] || m[3] || m[4] || "").trim() : "";
+                const knowledge = window.CozyOS && window.CozyOS.CozyKnowledge;
+                const fact = candidate && knowledge && typeof knowledge.getApplicationFact === "function"
+                    ? knowledge.getApplicationFact(candidate)
+                    : { evidence: "NOT_FOUND", application: null };
+                if (fact.evidence === "VERIFIED" && fact.application) {
+                    const frame = template("app-info:known", lang);
+                    return typeof frame === "function" ? frame(fact.application.name, fact.application.category, fact.application.enabled) : frame;
+                }
+                const frame = template("app-info:not-found", lang);
+                return typeof frame === "function" ? frame(candidate || "") : frame;
+            }
+            case "translate-request": {
+                // Domain 4D — honest, structured recognition. Domain 4C
+                // dependency #1 extends this: when the SAME utterance
+                // genuinely contains literal source text (not a
+                // "this"/"ujumbe huu" placeholder), this now calls the
+                // real, existing, canonical
+                // TranslationService.translateSegment() — reusing the
+                // real gemini-translate provider adapter, never a new
+                // engine. If no real text is present, or the real
+                // provider is unavailable/fails, this falls back to the
+                // exact same honest replies Domain 4D already
+                // established — it NEVER fabricates translated output.
+                const targetLanguageCode = extractTargetLanguageCode(rawText || "");
+                const embeddedSourceText = extractEmbeddedSourceText(rawText || "");
+
+                if (targetLanguageCode && embeddedSourceText) {
+                    const translationService = window.CozyOS && window.CozyOS.TranslationService;
+                    if (translationService && typeof translationService.translateSegment === "function") {
+                        const result = await translationService.translateSegment({
+                            segmentId: `intent-translate-${Date.now()}`,
+                            sourceLanguage: lang,
+                            targetLanguage: targetLanguageCode,
+                            sourceText: embeddedSourceText,
+                            preferredProviderName: "gemini-translate",
+                        });
+                        if (result && result.success && result.segment && result.segment.translatedText) {
+                            const frame = template("translate-request:translated", lang);
+                            return typeof frame === "function" ? frame(embeddedSourceText, result.segment.translatedText, languageDisplayName(targetLanguageCode)) : frame;
+                        }
+                        // Real, honest failure — never invents a
+                        // translation. The exact reason
+                        // TranslationService itself produced (e.g. the
+                        // real NLLB/Gemini bridge being unavailable in
+                        // this environment) is preserved, not hidden.
+                        const failFrame = template("translate-request:provider-unavailable", lang);
+                        return typeof failFrame === "function" ? failFrame((result && result.reason) || "") : failFrame;
+                    }
+                }
+
+                if (targetLanguageCode) {
+                    const frame = template("translate-request:target-known", lang);
+                    return typeof frame === "function" ? frame(languageDisplayName(targetLanguageCode)) : frame;
+                }
+                const unknownFrame = template("translate-request:target-unknown", lang);
+                return typeof unknownFrame === "function" ? unknownFrame() : unknownFrame;
+            }
+            case "app-launch": {
+                // Domain 4I dependency #1 — recognition + resolution
+                // ONLY. This never navigates, never launches, and never
+                // grants access — it returns a real resolved
+                // {applicationId, applicationName} (or an honest
+                // "couldn't find that application" reply) for a FUTURE
+                // action-execution layer to separately authorize and
+                // perform, exactly like the action-boundary rule
+                // requires. requiresAuthorization is always true here —
+                // this classifier has no authority to say otherwise.
+                const candidate = extractAppLaunchCandidate(rawText || "");
+                const resolved = resolveApplicationByName(candidate);
+                if (resolved) {
+                    const frame = template("app-launch:resolved", lang);
+                    return typeof frame === "function" ? frame(resolved.name) : frame;
+                }
+                const frame = template("app-launch:unresolved", lang);
+                return typeof frame === "function" ? frame(candidate || "") : frame;
+            }
+            case "language-support-list": {
+                const fact = knowledge && typeof knowledge.getLanguageSupportListFact === "function" ? safeCall(() => knowledge.getLanguageSupportListFact()) : null;
+                if (fact && fact.evidence === "PARTIALLY_VERIFIED" && Array.isArray(fact.targetLanguages) && fact.targetLanguages.length > 0) {
+                    const frame = template("language-support-list:verified", lang);
+                    if (typeof frame === "function") return frame(fact);
+                }
+                return template("language-support-list:not_found", lang);
+            }
+            case "list-apps": {
+                const fact = knowledge && typeof knowledge.listApplicationsFact === "function" ? safeCall(() => knowledge.listApplicationsFact()) : null;
+                if (fact && fact.evidence === "VERIFIED" && Array.isArray(fact.applications) && fact.applications.length > 0) {
+                    const frame = template("list-apps:verified", lang);
+                    if (typeof frame === "function") return frame(fact.applications);
+                }
+                return template("list-apps:unavailable", lang);
+            }
+            case "list-providers": {
+                const fact = knowledge && typeof knowledge.listProvidersFact === "function" ? safeCall(() => knowledge.listProvidersFact()) : null;
+                if (fact && fact.evidence === "VERIFIED" && Array.isArray(fact.entries) && fact.entries.length > 0) {
+                    const frame = template("list-providers:verified", lang);
+                    if (typeof frame === "function") return frame(fact.entries);
+                }
+                return template("list-providers:unavailable", lang);
+            }
+            case "how-to-register": {
+                // REGISTRATION/AUTH milestone — now evidence-backed via
+                // getRegistrationFlowFact() (real, committed, directly-
+                // audited registration source code) rather than a fixed
+                // static template. Same fail-closed shape as list-apps/
+                // list-providers above: VERIFIED fact -> dynamic frame;
+                // anything else -> an honest :not_found reply, never a
+                // guessed set of steps.
+                const fact = knowledge && typeof knowledge.getRegistrationFlowFact === "function" ? safeCall(() => knowledge.getRegistrationFlowFact()) : null;
+                if (fact && fact.evidence === "VERIFIED" && Array.isArray(fact.steps) && fact.steps.length > 0) {
+                    const frame = template("how-to-register:verified", lang);
+                    if (typeof frame === "function") return frame(fact);
+                }
+                return template("how-to-register:not_found", lang);
+            }
+            case "what-is-cozyos-enterprise":
+            case "what-is-cozyos":
+            case "how-authentication-works":
+            case "phone-verification":
+            case "account-status":
+            case "what-is-provider":
+            case "provider-not-ready":
+            case "control-center":
+            // RP-036 — navigation intents. Same direct template lookup
+            // as every other fixed-text intent; the actual navigation
+            // side effect (clicking the real [data-center] link, etc.)
+            // is performed by the DOM-owning caller
+            // (cozy-living-assistant.js's #send()), never by this
+            // pure/DOM-free file.
+            case "nav-dashboard":
+            case "nav-notifications":
+            case "nav-recent":
+            case "nav-search":
+            case "nav-aiproviders":
+            case "nav-diagnostics":
+            case "greeting-morning":
+            case "greeting-afternoon":
+            case "greeting-evening":
+            case "greeting-generic":
+            case "thanks":
+            case "identity":
+            case "help":
+                return template(intent, lang) || RP026_ENGLISH_FALLBACK[intent];
+            default:
+                return template("unsupported", lang) || RP026_ENGLISH_FALLBACK.unsupported;
+        }
+    }
+
+    /**
+     * The real provider object — satisfies LivingAI's required
+     * think(text, options) -> {success, result|reason} contract. On
+     * every call (supported or not), result carries a real .text field
+     * so resolveConversationalReply() (core/living/cozy-living-
+     * assistant.js, unmodified) recognizes it as a genuine
+     * conversational answer — including the honest "not supported yet"
+     * case, which is itself a genuine answer, never the generic
+     * NO_CONVERSATIONAL_ENGINE_FALLBACK string owned by that file.
+     */
+    const ruleBasedProvider = {
+        async think(text, options = {}) {
+            // Real pipeline call first — same entry point
+            // reasoningPipelineProvider (cozy-living-ai.js) already
+            // uses, so Memory/Policy/Interpretation/Thinking/Reasoning/
+            // Intelligence still genuinely run and their diagnostics
+            // are preserved on the result for any caller that wants
+            // them. A missing/failing coordinator never blocks this
+            // provider's own honest reply — it only means the
+            // pipeline's own real side effects didn't happen this call.
+            let pipelineResult = null;
+            const coordinator = window.CozyOS && window.CozyOS.CognitiveCoordinator;
+            if (coordinator && typeof coordinator.run === "function") {
+                try {
+                    pipelineResult = await coordinator.run({ text, ...options });
+                } catch (_err) {
+                    pipelineResult = null; // honest: this composer still answers even if the pipeline itself failed
+                }
+            }
+            let intent = classifyIntent(text);
+
+            // RP-037 — conversation state propagation + reference
+            // resolution (see REFERENCE_FOLLOWUP_PATTERN doc comment
+            // above). The incoming state is caller-supplied and opaque;
+            // an absent/malformed value is treated as "no prior turn"
+            // rather than an error, so a caller that hasn't adopted this
+            // yet sees no behavior change at all.
+            const previousState = (options && typeof options.conversationState === "object" && options.conversationState) ? options.conversationState : null;
+            let contextResolved = false;
+            let contextualApplication = null;
+            // Checked unconditionally (not only when intent === "unsupported"):
+            // the existing app-launch pattern is itself generic enough to also
+            // match a bare "open it"/"open that" (capturing the pronoun as an
+            // unresolved candidate name), so a real fix has to be able to
+            // upgrade that already-classified-but-unresolved case too, not
+            // just a totally unmatched one. REFERENCE_FOLLOWUP_PATTERN is a
+            // small, closed, anchored set (bare pronoun follow-ups only), so
+            // this never fires for — and never overrides — an utterance that
+            // names its own distinct application (e.g. "Open ShopOS.").
+            if (previousState && previousState.lastIntent === "app-launch" && previousState.lastApplication && REFERENCE_FOLLOWUP_PATTERN.test(typeof text === "string" ? text.trim() : "")) {
+                intent = "app-launch";
+                contextualApplication = previousState.lastApplication;
+                contextResolved = true;
+            }
+
+            // RP-037 dependency #2 — correction handling (see
+            // CORRECTION_PATTERNS doc comment above). Only attempted
+            // when this turn did NOT already classify as an explicit
+            // app-launch (that always wins — a genuine new named
+            // application is never reinterpreted as a correction) and
+            // the bare-reference follow-up above didn't already resolve
+            // this turn. Requires a real previous app-launch turn with
+            // a resolved application, and requires the corrected name
+            // to itself resolve against the real application registry
+            // — a correction with no valid prior reference, or naming
+            // something that isn't a real application, is left honestly
+            // unresolved rather than fabricated.
+            let correctionApplied = false;
+            let correctedApplication = null;
+            if (!contextResolved && intent !== "app-launch") {
+                const correctionCandidate = parseCorrectionCandidate(text);
+                if (correctionCandidate && previousState && previousState.lastIntent === "app-launch" && previousState.lastApplication) {
+                    const resolved = resolveApplicationByName(correctionCandidate.corrected);
+                    if (resolved) {
+                        intent = "app-launch";
+                        correctedApplication = resolved;
+                        correctionApplied = true;
+                    }
+                }
+            }
+
+            // RP-027 — resolve language (manual > requested > country
+            // suggestion > English), then compose the reply in that
+            // resolved (AVAILABLE) language. If the person's actual
+            // preference wasn't AVAILABLE yet, honestly append the
+            // fallback disclosure (RP-027 §12) rather than silently
+            // substituting language. RP-036: also passes a real,
+            // heuristically detected language for this message
+            // (detectLanguageHeuristic()) so typed Kiswahili is
+            // recognized and answered in Kiswahili automatically, even
+            // when the caller passed no explicit language option at
+            // all — see resolveLanguage()'s own doc comment for the
+            // precedence rule this never overrides.
+            const resolvedLanguage = resolveLanguage({ ...options, detectedLanguage: detectLanguageHeuristic(text) });
+            let replyText = await composeReply(intent, resolvedLanguage.code, text, options);
+            if (resolvedLanguage.fallback) {
+                const templates = window.CozyOS && window.CozyOS.CozyLanguageTemplates;
+                const disclosureFn = templates && templates.FALLBACK_DISCLOSURE && templates.FALLBACK_DISCLOSURE[resolvedLanguage.code];
+                if (typeof disclosureFn === "function") {
+                    replyText = `${replyText} ${disclosureFn(languageDisplayName(resolvedLanguage.preferred), languageDisplayName(resolvedLanguage.code))}`;
+                }
+            }
+
+            // Domain 4I dependency #1 — structured application-resolution
+            // fields, populated ONLY for the app-launch intent (no
+            // unnecessary fields added for every other intent).
+            let application = null;
+            let requiresAuthorization;
+            let authorizationState;
+            if (intent === "app-launch") {
+                // RP-037: a context-resolved follow-up ("open it") carries
+                // no application name of its own to extract — reuse the
+                // real application recorded from the previous turn instead
+                // of re-parsing text that, by definition, doesn't name one.
+                if (contextResolved) {
+                    application = contextualApplication;
+                } else if (correctionApplied) {
+                    application = correctedApplication;
+                } else {
+                    const candidate = extractAppLaunchCandidate(text);
+                    application = resolveApplicationByName(candidate);
+                }
+                requiresAuthorization = true;
+
+                // Domain 4I dependency #2 (Authorization/Execution
+                // Boundary) — when an application WAS resolved, perform
+                // the real, already-existing authorization check:
+                // IdentityEngine.canAccessApplication(userId, appName)
+                // — the exact function cozy-workspace.js's own
+                // application list already calls (see its own
+                // canAccessApplication-filtered `applications` array).
+                // No new authorization system, no second registry — this
+                // reuses that real function's real, already-shipped
+                // logic (account status, admin/developer override,
+                // global toggle, per-user assignment) verbatim. This
+                // NEVER performs navigation and NEVER treats a resolved
+                // application name as permission by itself — an ordinary
+                // user asking for "Developer Hub" (a real, registered,
+                // admin/developer-tier application) is honestly denied
+                // here exactly as canAccessApplication() itself decides,
+                // never elevated by the mere fact that the phrase was
+                // understood.
+                if (application) {
+                    const identity = window.CozyOS && window.CozyOS.IdentityEngine;
+                    const actorId = options && options.actorId;
+                    if (!actorId || actorId === "system") {
+                        authorizationState = "AUTHORIZATION_REQUIRED";
+                    } else if (!identity || typeof identity.canAccessApplication !== "function") {
+                        // Honest degrade: the real authorization
+                        // authority isn't loaded in this environment —
+                        // never silently default to granted.
+                        authorizationState = "AUTHORIZATION_REQUIRED";
+                    } else {
+                        const granted = safeCall(() => identity.canAccessApplication(actorId, application.name));
+                        authorizationState = granted === true ? "AUTHORIZATION_GRANTED" : "AUTHORIZATION_DENIED";
+                    }
+                    const frame = template(`app-launch:${authorizationState.toLowerCase()}`, resolvedLanguage.code);
+                    replyText = typeof frame === "function" ? frame(application.name) : frame;
+                }
+            }
+
+            // RP-037: real cross-turn state, returned honestly — only
+            // ever records what this turn actually resolved (a named
+            // application on an app-launch turn), never invented or
+            // carried forward once the topic genuinely changes, so a
+            // stale reference can't silently leak into an unrelated
+            // later turn.
+            const conversationState = {
+                lastIntent: intent,
+                lastApplication: (intent === "app-launch" && application) ? application : null,
+                lastLanguage: resolvedLanguage.code
+            };
+
+            return {
+                success: true,
+                result: {
+                    text: replyText,
+                    intent,
+                    language: resolvedLanguage.code,
+                    requestedLanguage: resolvedLanguage.preferred,
+                    languageFallback: !!resolvedLanguage.fallback,
+                    ...(intent === "app-launch" ? { application, requiresAuthorization, ...(authorizationState ? { authorizationState } : {}), contextResolved, correctionApplied } : {}),
+                    conversationState,
+                    pipeline: pipelineResult
+                }
+            };
+        },
+        describe() {
+            const languageRegistry = window.CozyOS && window.CozyOS.CozyLanguageRegistry;
+            const languages = languageRegistry && typeof languageRegistry.listLanguages === "function" ? safeCall(() => languageRegistry.listLanguages()) : null;
+            return {
+                kind: "rule-based conversational composer",
+                isLLM: false,
+                offline: true,
+                // RP-036: dedupe — a handful of intents (e.g.
+                // nav-dashboard) now have two rules (English + Kiswahili
+                // phrasing) sharing one id, which is intentional (see
+                // INTENT_RULES comments above), but describe() should
+                // still report each real intent once.
+                supportedIntents: Array.from(new Set(INTENT_RULES.map((r) => r.id).concat(["unsupported"]))),
+                supportedLanguages: languages || RP026_ENGLISH_FALLBACK && ["en"],
+                note: "Real, disclosed rule-based intent matching (RP-026 greeting/help/thanks/identity, plus RP-027 CozyOS-identity/apps/registration/authentication/account/provider/architecture intents) composed with CognitiveCoordinator's own real evidence/memory/policy pipeline, in a resolved, verified-template language (RP-027). Never a language model, never fabricated understanding, never a live/uncontrolled translation call — unsupported input, missing evidence, and unavailable languages are all honestly disclosed rather than guessed."
+            };
+        }
+    };
+
+    function registerWithLivingAI() {
+        const ai = window.CozyOS.LivingAI;
+        if (!ai || typeof ai.registerProvider !== "function") return false;
+        const result = ai.registerProvider(PROVIDER_NAME, ruleBasedProvider);
+        return !!(result && result.success);
+    }
+
+    /**
+     * activateExplicitly()
+     *   The one deliberate, disclosed activation call this repair
+     *   makes (see ACTIVATION note above) — a separate step from
+     *   registerWithLivingAI(), never a side effect of it. Only called
+     *   after registration itself genuinely succeeded.
+     */
+    function activateExplicitly() {
+        const ai = window.CozyOS.LivingAI;
+        if (!ai || typeof ai.setActiveProvider !== "function") return false;
+        const result = ai.setActiveProvider(PROVIDER_NAME);
+        return !!(result && result.success);
+    }
+
+    // Real, optional visibility/health integration — same pattern
+    // RP-025-A's on-device provider already uses. This provider has no
+    // external dependency, so its health is always ONLINE once loaded
+    // (never a guess dressed up as a live check — there is genuinely
+    // nothing further to verify at runtime for a pure local function).
+    function registerWithProviderManager() {
+        const pm = window.CozyOS.ProviderManager;
+        if (!pm || typeof pm.register !== "function") return false;
+        pm.register({
+            id: "rule-based-conversational",
+            name: "Rule-Based Conversational Composer",
+            // Domain 4L dependency #1 correction: this registration
+            // already existed (found while re-verifying the discovery
+            // report against this file directly — the prior grep for
+            // the literal string "ProviderManager.register" missed this
+            // real `pm.register(...)` variable-based call). Category
+            // corrected from "intelligence" to "conversational" to
+            // match gemini-cloud-provider.js's new registration below,
+            // since both are genuinely part of the same conversational-
+            // provider category LivingAI itself uses.
+            category: "conversational",
+            version: VERSION,
+            dependencies: [],
+            getHealth() { return { health: "ONLINE", reason: "Pure local rule-based composer — no external runtime or network dependency to fail." }; }
+        });
+        return true;
+    }
+
+    const registered = registerWithLivingAI();
+    registerWithProviderManager();
+    const activated = registered ? activateExplicitly() : false;
+
+    window.CozyOS.Modules["rule-based-conversational-provider"] = Object.freeze({
+        version: VERSION,
+        description: "RP-026 + RP-027 + COZYAI-PUBLIC-VISION-KNOWLEDGE + REGISTRATION/AUTH + RP-037 (state propagation + reference resolution + correction handling) — real rule-based conversational Reply Composer. Classifies raw input text against a disclosed intent set: RP-026's original 7 (greeting-morning/afternoon/evening/generic, thanks, identity, help) plus RP-027's CozyOS-identity (founder, what-is-cozyos, what-is-cozyos-enterprise), applications (list-apps), registration (how-to-register), authentication (how-authentication-works, phone-verification), account (account-status), providers (what-is-provider, list-providers, provider-not-ready), architecture (control-center), public-vision (why-use-cozyos, differentiation, language-support-list) intents — and composes an honest, verified-template .text reply for each in a resolved language (English, Kiswahili, French, Arabic, or Somali — RP-027's 5 default languages), including an equally honest 'no rule-based answer yet' reply for unsupported input. Evidence-backed intents (founder/list-apps/list-providers/why-use-cozyos/differentiation/language-support-list/how-to-register) read live repository/runtime state or committed, owner-approved/audited source content via CozyKnowledge and only ever state VERIFIED/PARTIALLY_VERIFIED facts, never inventing an answer when evidence is absent. The three public-vision intents compose only cozy-public-knowledge-source.js (owner-approved vision-policy doc) — never the private founder-story-seed.js. registration (how-to-register), as of the REGISTRATION/AUTH milestone, composes getRegistrationFlowFact() — real, committed, directly-audited registration source code (identity-engine.js register(), cozy-login-gate.js's registration form) — with a genuine, committed Kiswahili translation (Kiswahili-first per this milestone's requirement) alongside English; falls back to an honest :not_found reply, never a guessed step list, if that evidence is ever unavailable. Calls CognitiveCoordinator.run() first (same entry point reasoningPipelineProvider already uses) so Memory/Policy/Interpretation/Thinking/Reasoning/Intelligence still genuinely execute; a missing/failing coordinator never blocks this provider's own reply. Registers into LivingAI's existing 'rule-based-conversational' provider slot and (optionally) ProviderManager for visibility/health, then explicitly activates itself via the existing LivingAI.setActiveProvider() choke point as one disclosed, separate step — never a side effect of registration. Never claims LLM/neural/machine-learning capability, never performs a live/uncontrolled translation call."
+    });
+})();

@@ -1,0 +1,29 @@
+{
+  "language": "ar",
+  "direction": "rtl",
+  "strings": {
+    "panel.title": "خزينة قصة المؤسس",
+    "panel.subtitle": "سيرتك الذاتية الخاصة، محمية ومشاركتها بيدك.",
+    "panel.newStory": "قصة جديدة",
+    "panel.noStories": "لا توجد قصص بعد. ابدأ فصلك الأول.",
+    "field.title": "العنوان",
+    "field.subtitle": "العنوان الفرعي",
+    "field.language": "اللغة",
+    "field.category": "الفئة",
+    "field.chapters": "الفصول",
+    "status.draft": "مسودة",
+    "status.archived": "مؤرشفة",
+    "visibility.only-me": "🔒 أنا فقط",
+    "visibility.selected": "👥 أشخاص محددون",
+    "visibility.family": "👨‍👩‍👧 العائلة",
+    "visibility.mentors": "🤝 الموجهون",
+    "visibility.public": "🌍 عام",
+    "private.badge": "🔒 محتوى خاص بالمؤسس",
+    "private.message": "هذه القصة خاصة.",
+    "action.view": "عرض",
+    "action.edit": "تعديل",
+    "action.share": "مشاركة",
+    "action.addChapter": "إضافة فصل",
+    "action.requestPublish": "طلب النشر (قريباً)"
+  }
+}

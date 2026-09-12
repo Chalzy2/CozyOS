@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CozyOS — Live Camera Capture</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; background: #f7f7f8; color: #1a1a1a; }
+  * { box-sizing: border-box; }
+  h1 { padding: 16px; margin: 0; font-size: 20px; }
+  .camera-root { padding: 0 16px 24px; max-width: 100%; overflow-x: hidden; }
+  .camera-group { background: #fff; border-radius: 8px; padding: 12px; margin-bottom: 12px; max-width: 100%; }
+  .camera-group h2 { font-size: 14px; margin: 0 0 8px; text-transform: uppercase; color: #555; }
+  .camera-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; border-bottom: 1px solid #f0f0f0; gap: 8px; flex-wrap: wrap; }
+  .camera-row span:first-child { word-break: break-all; min-width: 0; }
+  .camera-status { font-weight: 600; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+  .status-AVAILABLE { background: #d1fae5; color: #065f46; }
+  .status-PARTIAL { background: #fef3c7; color: #92400e; }
+  .status-UNAVAILABLE, .status-CAPABILITY_UNAVAILABLE { background: #fee2e2; color: #991b1b; }
+  .status-REQUIRES_USER_ACTION, .status-REQUIRES_NATIVE_COMPANION { background: #e0e7ff; color: #3730a3; }
+  .camera-preview { width: 100%; max-width: 400px; background: #000; border-radius: 8px; margin-bottom: 8px; }
+  .camera-btn { padding: 6px 14px; border: none; border-radius: 6px; background: #2b6cb0; color: #fff; cursor: pointer; font-size: 13px; margin: 2px; }
+  .camera-btn:disabled { background: #ccc; cursor: not-allowed; }
+  .camera-empty { padding: 12px; color: #888; font-size: 13px; }
+  .camera-result { padding: 8px; background: #f0f4ff; border-radius: 6px; font-size: 12px; margin-top: 8px; word-break: break-all; }
+</style>
+</head>
+<body>
+<h1 class="camera-title">Live Camera Capture</h1>
+<div id="live-camera-root" class="camera-root"></div>
+
+<!-- Real dependency chain: RP-033 Gate 1 + browser camera provider + LiveVideoCapture -->
+<script src="../../../security/trusted-device-manager.js"></script>
+<script src="../../../connectivity/cozy-connect.js"></script>
+<script src="../../collaboration/live-hotspot-engine.js"></script>
+<script src="../../../collaboration/cozy-share.js"></script>
+<script src="../../../connectivity/cozy-living-connectivity.js"></script>
+<script src="../../camera/browser-camera-provider.js"></script>
+<script src="../live-video-capture-engine.js"></script>
+<script src="cozy-live-camera-capture-app.js"></script>
+<script src="../../../modules/identity/identity-engine.js"></script>
+<script src="../../../registry/cozy-registry.js"></script>
+
+<script>
+  (function seedDemoData() {
+    var appApi = window.CozyOS.CozyLiveCameraCaptureApp;
+    if (!appApi) return;
+    appApi.registerAsApplication();
+  })();
+
+  (function renderLiveCamera() {
+    var root = document.getElementById('live-camera-root');
+    var appApi = window.CozyOS.CozyLiveCameraCaptureApp;
+
+    if (!appApi) {
+      root.textContent = 'CAPABILITY_UNAVAILABLE — live camera capture engine not loaded.';
+      return;
+    }
+
+    // Permission / capability group
+    var capGroup = document.createElement('div');
+    capGroup.className = 'camera-group camera-capability-group';
+    capGroup.innerHTML = '<h2>Camera / Microphone Capability</h2>';
+    var capStatus = appApi.getCameraCapabilityStatus();
+    if (capStatus.status === 'OK') {
+      var camRow = document.createElement('div');
+      camRow.className = 'camera-row';
+      camRow.innerHTML = '<span>Camera permission</span><span class="camera-status status-' + capStatus.camera.status + '">' + capStatus.camera.status + '</span>';
+      capGroup.appendChild(camRow);
+      var micRow = document.createElement('div');
+      micRow.className = 'camera-row';
+      micRow.innerHTML = '<span>Microphone permission</span><span class="camera-status status-' + capStatus.microphone.status + '">' + capStatus.microphone.status + '</span>';
+      capGroup.appendChild(micRow);
+      var recRow = document.createElement('div');
+      recRow.className = 'camera-row';
+      var recStatus = capStatus.engine.mediaRecorder ? 'AVAILABLE' : 'CAPABILITY_UNAVAILABLE';
+      recRow.innerHTML = '<span>Video recording (MediaRecorder)</span><span class="camera-status status-' + recStatus + '">' + recStatus + '</span>';
+      capGroup.appendChild(recRow);
+    } else {
+      var capEmpty = document.createElement('div');
+      capEmpty.className = 'camera-empty';
+      capEmpty.textContent = capStatus.status;
+      capGroup.appendChild(capEmpty);
+    }
+    root.appendChild(capGroup);
+
+    // Preview + controls
+    var previewGroup = document.createElement('div');
+    previewGroup.className = 'camera-group camera-preview-group';
+    previewGroup.innerHTML = '<h2>Preview</h2>';
+    var video = document.createElement('video');
+    video.className = 'camera-preview';
+    video.autoplay = true;
+    video.muted = true;
+    previewGroup.appendChild(video);
+
+    var controls = document.createElement('div');
+    controls.className = 'camera-controls';
+    controls.innerHTML =
+      '<button class="camera-btn camera-start-preview">Start Preview</button>' +
+      '<button class="camera-btn camera-stop-preview">Stop Preview</button>' +
+      '<button class="camera-btn camera-pause-preview">Pause</button>' +
+      '<button class="camera-btn camera-resume-preview">Resume</button>' +
+      '<button class="camera-btn camera-switch">Switch Camera</button>' +
+      '<button class="camera-btn camera-capture-photo">Capture Photo</button>' +
+      '<button class="camera-btn camera-start-record">Start Recording</button>' +
+      '<button class="camera-btn camera-pause-record">Pause Recording</button>' +
+      '<button class="camera-btn camera-resume-record">Resume Recording</button>' +
+      '<button class="camera-btn camera-stop-record">Stop Recording</button>';
+    previewGroup.appendChild(controls);
+
+    var resultDiv = document.createElement('div');
+    resultDiv.className = 'camera-result';
+    resultDiv.hidden = true;
+    previewGroup.appendChild(resultDiv);
+
+    root.appendChild(previewGroup);
+
+    controls.querySelector('.camera-start-preview').addEventListener('click', async function () {
+      var result = await appApi.startPreview(video, {});
+      resultDiv.hidden = false;
+      resultDiv.textContent = result.success ? 'Preview started.' : 'Preview failed: ' + result.reason;
+    });
+    controls.querySelector('.camera-stop-preview').addEventListener('click', function () {
+      var result = appApi.stopPreview();
+      resultDiv.hidden = false;
+      resultDiv.textContent = result.success ? 'Preview stopped.' : 'Stop failed: ' + (result.reason || result.status);
+    });
+    controls.querySelector('.camera-pause-preview').addEventListener('click', function () {
+      var result = appApi.pausePreview();
+      resultDiv.hidden = false;
+      resultDiv.textContent = result.success ? 'Preview paused.' : 'Pause failed: ' + (result.reason || result.status);
+    });
+    controls.querySelector('.camera-resume-preview').addEventListener('click', function () {
+      var result = appApi.resumePreview();
+      resultDiv.hidden = false;
+      resultDiv.textContent = result.success ? 'Preview resumed.' : 'Resume failed: ' + (result.reason || result.status);
+    });
+    controls.querySelector('.camera-switch').addEventListener('click', async function () {
+      var result = await appApi.switchCamera(null);
+      resultDiv.hidden = false;
+      resultDiv.textContent = result.success ? 'Camera switched.' : 'Switch failed: ' + (result.reason || result.status);
+    });
+    controls.querySelector('.camera-capture-photo').addEventListener('click', async function () {
+      var result = await appApi.capturePhoto();
+      resultDiv.hidden = false;
+      resultDiv.textContent = result.success
+        ? 'Photo captured. clarityProcessed=' + result.clarityProcessed + ' syncState=' + result.syncState
+        : 'Capture failed: ' + (result.reason || result.status);
+    });
+    controls.querySelector('.camera-start-record').addEventListener('click', function () {
+      var result = appApi.startRecording({});
+      resultDiv.hidden = false;
+      resultDiv.textContent = result.success ? 'Recording started (' + result.mimeType + ').' : 'Recording failed: ' + (result.reason || result.status);
+    });
+    controls.querySelector('.camera-pause-record').addEventListener('click', function () {
+      var result = appApi.pauseRecording();
+      resultDiv.hidden = false;
+      resultDiv.textContent = result.success ? 'Recording paused.' : 'Pause failed: ' + (result.reason || result.status);
+    });
+    controls.querySelector('.camera-resume-record').addEventListener('click', function () {
+      var result = appApi.resumeRecording();
+      resultDiv.hidden = false;
+      resultDiv.textContent = result.success ? 'Recording resumed.' : 'Resume failed: ' + (result.reason || result.status);
+    });
+    controls.querySelector('.camera-stop-record').addEventListener('click', async function () {
+      var result = await appApi.stopRecording();
+      resultDiv.hidden = false;
+      resultDiv.textContent = result.success
+        ? 'Recording stopped. sizeBytes=' + result.sizeBytes + ' clarityProcessed=' + result.clarityProcessed + ' syncState=' + result.syncState
+        : 'Stop failed: ' + (result.reason || result.status);
+    });
+
+    // Device info
+    var deviceGroup = document.createElement('div');
+    deviceGroup.className = 'camera-group camera-devices-group';
+    deviceGroup.innerHTML = '<h2>Devices</h2>';
+    root.appendChild(deviceGroup);
+    appApi.getDevices().then(function (r) {
+      if (r.status === 'OK' && r.devices.length) {
+        r.devices.forEach(function (d) {
+          var row = document.createElement('div');
+          row.className = 'camera-row';
+          row.innerHTML = '<span>' + (d.label || d.id) + '</span><span class="camera-status status-AVAILABLE">KNOWN</span>';
+          deviceGroup.appendChild(row);
+        });
+      } else {
+        var empty = document.createElement('div');
+        empty.className = 'camera-empty';
+        empty.textContent = 'No cameras detected.';
+        deviceGroup.appendChild(empty);
+      }
+    });
+
+    // Status group
+    var statusGroup = document.createElement('div');
+    statusGroup.className = 'camera-group camera-status-group';
+    statusGroup.innerHTML = '<h2>Capture Status</h2>';
+    var status = appApi.getStatus();
+    var statusRow = document.createElement('div');
+    statusRow.className = 'camera-row';
+    statusRow.innerHTML = '<span>previewState / recordingState</span><span class="camera-status status-PARTIAL">' + (status.previewState || 'n/a') + ' / ' + (status.recordingState || 'n/a') + '</span>';
+    statusGroup.appendChild(statusRow);
+    root.appendChild(statusGroup);
+  })();
+</script>
+</body>
+</html>

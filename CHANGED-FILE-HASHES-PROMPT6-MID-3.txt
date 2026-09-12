@@ -1,0 +1,26 @@
+CozyOS — Prompt 6 MID-3 — Changed File Hashes (SHA-256)
+Generated after edit, before packaging. Baseline: PROMPT6-MID-2.
+
+MODIFIED FILES
+ea08b484e956c782df684fc803d8bb7e65ec92e6fe1cd8d4a94d8304e9ff41d5  login.html
+1b088f73a0be2192de9517482c00ad18d7e01bf33be14f39442fa788b29fc736  core/security/password-reset-service.js
+
+NEW FILES
+b730e5346fdcb3077eb5ead4062a805c3bf9279070d59a4961a64557a37d1ce8  core/security/delivery-backend-registry.js
+498360c2fb8ee3e9f8b4e15798c02152d98aa9fc3cef2c0ff0b3ba5a49229dc3  core/security/phone-provider.js
+9e520093484ecea40577558acb73723dd8877b740f83b05d5de796c37d4fb0ab  core/security/test/delivery-backend-registry.test.js
+cf49d088720fab9921e4f66ca218ea1a6b44af398ba4aed86f922421c4efea92  core/security/test/phone-provider.test.js
+
+PROTECTED FILES — VERIFIED UNCHANGED (hashed for the record, not modified)
+000124d4669b6ab4801ff1010ba942439ec0373482c9fd5de4b57d08b8f7293f  core/modules/founder-story/founder-story-narration.js
+c795b9f69fc155e08bac69b0c8c0bf7819b835048d16d02f276b8f402ed29bf0  core/modules/founder-story/founder-story-seed.js
+1af0abcbf6e8f7a7f24391373ad87551e7a709d05ae2c99e5758d84094b824db  core/modules/founder-story/founder-story-panel.js
+18b8e9a7ab12cb526f9a6472bd3bb3b255c8021792d92e8137dd9d47151b7898  core/modules/founder-story/founder-story-engine.js
+500956363b3cfa92a8b1c6228f93e9fef13dad23c6b9519ec99bdf7d88dec457  core/modules/founder-story/i18n/sw.json
+3fce6b4a15e9373d8775b50ab116527b66051b7b9c6f0bce43939b5f3a16c62f  core/modules/founder-story/i18n/fr.json
+e903a8acbd6b728001f7564fd330b89896525d22206156ed129bae0543529bf8  core/modules/founder-story/i18n/en.json
+69c0c12dc28d2f0103bd65c6c2f05059a37cba1e93b47855492b2d2923a719b0  core/modules/founder-story/i18n/ar.json
+c3f80ef51fee137e0394e201fca81a3213a9fd5c344999fcfbee4522886bcd30  core/shell/cozy-login-gate.js
+
+All nine protected-file hashes are byte-identical to PROMPT6-MID-2 —
+independently re-verified this checkpoint, not merely copied forward.

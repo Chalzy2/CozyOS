@@ -1,0 +1,353 @@
+=== NEW FILE: server/auth/google-linkage-store-adapter.js ===
+--- /dev/null	2026-08-21 04:29:52.591437791 +0000
++++ server/auth/google-linkage-store-adapter.js	2026-08-22 02:45:28.015026978 +0000
+@@ -0,0 +1,143 @@
++'use strict';
++
++/**
++ * server/auth/google-linkage-store-adapter.js
++ * CozyOS — Persistent Google Linkage Store (server-side)
++ * Milestone: Prompt 10 (Google Account Linkage — persistence)
++ * Version: 1.0.0-ENTERPRISE
++ *
++ * WHY THIS FILE EXISTS
++ *   CozyGoogleAccountLinkage (core/security/google-account-linkage.js)
++ *   requires a SYNCHRONOUS store: getRecord(userId), setRecord(userId,
++ *   record), findUserIdByGoogleUid(uid) — same real contract as
++ *   phone-account-linkage.js's. It runs server-side only (Node,
++ *   requires firebase-identity-issuer.js's crypto/cert-fetch), and
++ *   this repo's server/ directory has NO persistence mechanism at all
++ *   (confirmed by repo-wide search — server/live-relay/* is stateless
++ *   signaling, and google-login-endpoint.js explicitly documents it
++ *   receives its store from its caller rather than owning one).
++ *
++ * WHY THIS IS SIMPLER THAN THE BROWSER-SIDE PHONE ADAPTER
++ *   core/security/phone-linkage-store-adapter.js needed an async
++ *   hydrate-then-cache design because IndexedDB is Promise-based, and
++ *   a synchronous store had to be built on top of it. Node's `fs`
++ *   module offers REAL synchronous file I/O
++ *   (readFileSync/writeFileSync) — so this store can be genuinely,
++ *   directly synchronous, with no cache/hydration-race class of bug
++ *   to guard against. Every getRecord/setRecord/findUserIdByGoogleUid
++ *   call reads/writes the on-disk JSON file directly (through a small
++ *   in-memory mirror kept in lockstep on every write, so repeated
++ *   reads in a single request don't re-parse the file each time).
++ *
++ * FAIL-CLOSED ON CORRUPTION
++ *   If the backing file exists but contains invalid JSON, this
++ *   adapter throws at construction rather than silently starting from
++ *   an empty store — an empty store would look identical to "no one
++ *   has ever linked Google," which could let collision detection miss
++ *   a real existing link.
++ *
++ * NOT A GENERAL-PURPOSE DATABASE
++ *   This is deliberately the smallest correct persistence primitive
++ *   for exactly one record type (userId -> Google linkage record),
++ *   matching Prompt 10 §17 ("store only the minimum identity
++ *   information actually required"). It is not a second account
++ *   database — CozyOS accounts themselves remain browser-local
++ *   (IdentityEngine + IdentityStorage); this store only ever holds
++ *   the server-side half of the Google identity association
++ *   (googleUid, googleEmail, googleLinked, googleLinkedAt,
++ *   googleLoginEnabled) keyed by the same userId the browser already
++ *   uses.
++ *
++ * HONEST SCOPE
++ *   Locally verified via node:test against a real temp file on this
++ *   sandbox's real filesystem (see
++ *   server/auth/test/google-linkage-store-adapter.test.js) — genuine
++ *   file persistence, not a mock. NOT verified: multi-process/
++ *   multi-instance concurrent access (no file locking — a real
++ *   concern for a genuine production deployment with more than one
++ *   server process, disclosed here rather than silently assumed
++ *   away), and real production deployment/reachability.
++ */
++
++const fs = require('fs');
++const path = require('path');
++
++class GoogleLinkageStoreAdapter {
++    #filePath;
++    #records; // Map<userId, record>, kept in lockstep with the file on every write
++
++    constructor({ filePath } = {}) {
++        if (!filePath || typeof filePath !== 'string') {
++            throw new Error('[GoogleLinkageStoreAdapter] A real filePath is required.');
++        }
++        this.#filePath = filePath;
++        this.#records = new Map();
++        this.#loadFromDisk();
++    }
++
++    #loadFromDisk() {
++        let raw;
++        try {
++            raw = fs.readFileSync(this.#filePath, 'utf8');
++        } catch (err) {
++            if (err && err.code === 'ENOENT') {
++                // Real first-run case: no file yet. Create an empty,
++                // valid one now so a concurrent reader never sees a
++                // missing-vs-corrupt ambiguity, and so file permissions
++                // are validated immediately rather than deferred to
++                // the first write.
++                this.#persistToDisk();
++                return;
++            }
++            throw err;
++        }
++        let parsed;
++        try {
++            parsed = JSON.parse(raw);
++        } catch (_e) {
++            throw new Error('[GoogleLinkageStoreAdapter] Backing file exists but contains invalid JSON — refusing to start from an empty store, which could silently hide real existing Google linkages: ' + this.#filePath);
++        }
++        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
++            throw new Error('[GoogleLinkageStoreAdapter] Backing file does not contain a JSON object: ' + this.#filePath);
++        }
++        for (const [userId, record] of Object.entries(parsed)) {
++            this.#records.set(userId, record);
++        }
++    }
++
++    #persistToDisk() {
++        const obj = {};
++        for (const [userId, record] of this.#records.entries()) obj[userId] = record;
++        const dir = path.dirname(this.#filePath);
++        fs.mkdirSync(dir, { recursive: true });
++        // Write to a temp file then rename — real atomic-write
++        // convention, avoids a torn/partial file if the process is
++        // killed mid-write.
++        const tmpPath = this.#filePath + '.tmp-' + process.pid + '-' + Date.now();
++        fs.writeFileSync(tmpPath, JSON.stringify(obj, null, 2), 'utf8');
++        fs.renameSync(tmpPath, this.#filePath);
++    }
++
++    getVersion() { return '1.0.0-ENTERPRISE'; }
++
++    /** getRecord(userId) — real, synchronous, direct from the in-memory mirror (kept exactly in sync with disk on every write). */
++    getRecord(userId) {
++        return this.#records.has(userId) ? { ...this.#records.get(userId) } : null;
++    }
++
++    /** setRecord(userId, record) — real, synchronous write-through: in-memory mirror AND on-disk file are updated before this call returns (no background/best-effort persistence — unlike the browser case, sync fs makes a genuinely synchronous durable write possible). */
++    setRecord(userId, record) {
++        this.#records.set(userId, { ...record });
++        this.#persistToDisk();
++    }
++
++    /** findUserIdByGoogleUid(uid) — real, synchronous reverse scan; matches InMemoryGoogleLinkageStore's own scan exactly. */
++    findUserIdByGoogleUid(uid) {
++        for (const [userId, record] of this.#records.entries()) {
++            if (record.googleLinked && record.googleUid === uid) return userId;
++        }
++        return null;
++    }
++}
++
++module.exports = { GoogleLinkageStoreAdapter };
+=== NEW FILE: server/auth/test/google-linkage-store-adapter.test.js ===
+--- /dev/null	2026-08-21 04:29:52.591437791 +0000
++++ server/auth/test/google-linkage-store-adapter.test.js	2026-08-22 02:45:41.823027798 +0000
+@@ -0,0 +1,83 @@
++'use strict';
++const test = require('node:test');
++const assert = require('node:assert/strict');
++const fs = require('fs');
++const os = require('os');
++const path = require('path');
++const { GoogleLinkageStoreAdapter } = require('../google-linkage-store-adapter');
++
++function tempFilePath() {
++    return path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cozyos-google-linkage-')), 'google-linkages.json');
++}
++
++test('construction requires a real filePath', () => {
++    assert.throws(() => new GoogleLinkageStoreAdapter({}), /A real filePath is required/);
++});
++
++test('first run creates a valid empty file at the given path', () => {
++    const filePath = tempFilePath();
++    assert.equal(fs.existsSync(filePath), false);
++    new GoogleLinkageStoreAdapter({ filePath });
++    assert.equal(fs.existsSync(filePath), true);
++    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
++    assert.deepEqual(parsed, {});
++});
++
++test('unknown user returns null, not a fabricated record', () => {
++    const adapter = new GoogleLinkageStoreAdapter({ filePath: tempFilePath() });
++    assert.equal(adapter.getRecord('nobody'), null);
++    assert.equal(adapter.findUserIdByGoogleUid('some-uid'), null);
++});
++
++test('setRecord persists synchronously and survives real adapter destroy/recreate (real reload/restart simulation)', () => {
++    const filePath = tempFilePath();
++    const adapter1 = new GoogleLinkageStoreAdapter({ filePath });
++    adapter1.setRecord('user-1', { googleUid: 'g-uid-1', googleEmail: 'a@example.com', googleLinked: true, googleLoginEnabled: true });
++    // Synchronous — the on-disk file must already be correct before setRecord() returns, no waiting.
++    const onDisk = JSON.parse(fs.readFileSync(filePath, 'utf8'));
++    assert.equal(onDisk['user-1'].googleUid, 'g-uid-1');
++
++    // Real destroy/recreate against the same file.
++    const adapter2 = new GoogleLinkageStoreAdapter({ filePath });
++    const recovered = adapter2.getRecord('user-1');
++    assert.ok(recovered);
++    assert.equal(recovered.googleUid, 'g-uid-1');
++    assert.equal(recovered.googleLinked, true);
++});
++
++test('findUserIdByGoogleUid finds the real owner and survives adapter recreation', () => {
++    const filePath = tempFilePath();
++    const adapter1 = new GoogleLinkageStoreAdapter({ filePath });
++    adapter1.setRecord('user-A', { googleUid: 'g-uid-9', googleLinked: true, googleLoginEnabled: true });
++
++    const adapter2 = new GoogleLinkageStoreAdapter({ filePath });
++    assert.equal(adapter2.findUserIdByGoogleUid('g-uid-9'), 'user-A');
++});
++
++test('corrupted backing file fails closed at construction (never silently starts empty)', () => {
++    const filePath = tempFilePath();
++    fs.writeFileSync(filePath, '{ this is not valid JSON', 'utf8');
++    assert.throws(() => new GoogleLinkageStoreAdapter({ filePath }), /invalid JSON/);
++});
++
++test('backing file that is valid JSON but not an object fails closed', () => {
++    const filePath = tempFilePath();
++    fs.writeFileSync(filePath, '[1,2,3]', 'utf8');
++    assert.throws(() => new GoogleLinkageStoreAdapter({ filePath }), /does not contain a JSON object/);
++});
++
++test('record replacement is reflected immediately and survives reload', () => {
++    const filePath = tempFilePath();
++    const adapter1 = new GoogleLinkageStoreAdapter({ filePath });
++    adapter1.setRecord('user-1', { googleUid: 'g-uid-old', googleLinked: true, googleLoginEnabled: true });
++    assert.equal(adapter1.findUserIdByGoogleUid('g-uid-old'), 'user-1');
++
++    // Real unlink then relink to a different Google identity, same user.
++    adapter1.setRecord('user-1', { googleUid: null, googleLinked: false, googleLoginEnabled: false });
++    assert.equal(adapter1.findUserIdByGoogleUid('g-uid-old'), null);
++
++    adapter1.setRecord('user-1', { googleUid: 'g-uid-new', googleLinked: true, googleLoginEnabled: true });
++    const adapter2 = new GoogleLinkageStoreAdapter({ filePath });
++    assert.equal(adapter2.findUserIdByGoogleUid('g-uid-new'), 'user-1');
++    assert.equal(adapter2.findUserIdByGoogleUid('g-uid-old'), null);
++});
+=== NEW FILE: server/auth/test/google-persistent-linkage-integration.test.js ===
+--- /dev/null	2026-08-21 04:29:52.591437791 +0000
++++ server/auth/test/google-persistent-linkage-integration.test.js	2026-08-22 02:46:09.379029436 +0000
+@@ -0,0 +1,115 @@
++'use strict';
++
++/**
++ * server/auth/test/google-persistent-linkage-integration.test.js
++ * Prompt 10 — proves the REAL missing piece end-to-end: a persistent,
++ * filesystem-backed store composed with the REAL, already-existing
++ * GoogleAuthAdapterServer + CozyGoogleAccountLinkage +
++ * firebase-identity-issuer verification chain, surviving a genuine
++ * server process stop/restart against the same backing file.
++ *
++ * HARNESS DISCLOSURE: same real RSA/RS256 JWT fixture pattern as
++ * google-login-endpoint.test.js (no shortcuts, no `if (token ===
++ * 'valid')`). The only thing new here is GoogleLinkageStoreAdapter in
++ * place of InMemoryGoogleLinkageStore.
++ */
++
++const test = require('node:test');
++const assert = require('node:assert/strict');
++const crypto = require('crypto');
++const fs = require('fs');
++const os = require('os');
++const path = require('path');
++
++const { GoogleAuthAdapterServer } = require('../google-login-endpoint');
++const { CozyGoogleAccountLinkage } = require('../../../core/security/google-account-linkage');
++const { GoogleLinkageStoreAdapter } = require('../google-linkage-store-adapter');
++
++const PROJECT_ID = 'cozycabin-affiliate';
++const KID = 'test-kid-1';
++const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
++const PUBLIC_KEY_PEM = publicKey.export({ type: 'spki', format: 'pem' });
++
++function b64url(buf) {
++    return Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
++}
++function makeIdToken({ uid = 'user-abc', email = 'abc@example.com', now = Math.floor(Date.now() / 1000) } = {}) {
++    const header = b64url(JSON.stringify({ alg: 'RS256', kid: KID, typ: 'JWT' }));
++    const payload = b64url(JSON.stringify({
++        iss: `https://securetoken.google.com/${PROJECT_ID}`, aud: PROJECT_ID,
++        sub: uid, user_id: uid, email, exp: now + 3600, iat: now - 1, auth_time: now - 1,
++    }));
++    const signedData = `${header}.${payload}`;
++    const signature = b64url(crypto.sign('RSA-SHA256', Buffer.from(signedData), privateKey));
++    return `${signedData}.${signature}`;
++}
++async function fetchGoogleCerts() { return { [KID]: PUBLIC_KEY_PEM }; }
++
++function tempFilePath() {
++    return path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cozyos-google-persist-')), 'google-linkages.json');
++}
++
++async function startServerWithPersistentStore(filePath) {
++    const store = new GoogleLinkageStoreAdapter({ filePath });
++    const linkage = new CozyGoogleAccountLinkage({ store, projectId: PROJECT_ID, fetchGoogleCerts });
++    const server = new GoogleAuthAdapterServer({ linkage });
++    const addr = await server.listen(0, '127.0.0.1');
++    return { server, store, linkage, baseUrl: `http://127.0.0.1:${addr.port}` };
++}
++
++async function postGoogle(baseUrl, body) {
++    const res = await fetch(`${baseUrl}/auth/google`, {
++        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
++    });
++    return { status: res.status, body: await res.json() };
++}
++
++test('REAL END-TO-END: link persists to disk, and login resolves correctly after a genuine server stop/restart against the same file', async () => {
++    const filePath = tempFilePath();
++
++    // "Server run 1": link a real, cryptographically verified Google
++    // identity to a CozyOS account (simulating what linkAccount() would
++    // do once a real authenticated-linking endpoint exists — see the
++    // implementation report's disclosed gap on that specific flow).
++    const run1 = await startServerWithPersistentStore(filePath);
++    const linkResult = await run1.linkage.linkAccount('cozy-user-1', makeIdToken({ uid: 'g-uid-real-1' }));
++    assert.equal(linkResult.linked, true);
++
++    // Real login attempt against the real HTTP endpoint, same process.
++    const loginToken = makeIdToken({ uid: 'g-uid-real-1' });
++    const { status, body } = await postGoogle(run1.baseUrl, { idToken: loginToken });
++    assert.equal(status, 200);
++    assert.equal(body.userId, 'cozy-user-1');
++
++    // Genuine process-level stop.
++    await run1.server.close();
++
++    // "Server run 2": brand-new server, brand-new store instance,
++    // SAME backing file — a real restart, not a reused in-memory object.
++    const run2 = await startServerWithPersistentStore(filePath);
++    try {
++        const secondLoginToken = makeIdToken({ uid: 'g-uid-real-1' });
++        const { status: status2, body: body2 } = await postGoogle(run2.baseUrl, { idToken: secondLoginToken });
++        assert.equal(status2, 200);
++        assert.equal(body2.userId, 'cozy-user-1', 'the link must survive a real server restart, not just live in memory');
++    } finally {
++        await run2.server.close();
++    }
++});
++
++test('REAL END-TO-END: cross-account Google UID collision is rejected even after a restart', async () => {
++    const filePath = tempFilePath();
++    const run1 = await startServerWithPersistentStore(filePath);
++    await run1.linkage.linkAccount('cozy-user-A', makeIdToken({ uid: 'g-uid-shared' }));
++    await run1.server.close();
++
++    const run2 = await startServerWithPersistentStore(filePath);
++    try {
++        const attempt = await run2.linkage.linkAccount('cozy-user-B', makeIdToken({ uid: 'g-uid-shared' }));
++        assert.equal(attempt.linked, false);
++        assert.equal(attempt.reason, 'GOOGLE_ALREADY_LINKED');
++        assert.equal(run2.store.findUserIdByGoogleUid('g-uid-shared'), 'cozy-user-A');
++    } finally {
++        await run2.server.close();
++    }
++});

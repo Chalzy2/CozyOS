@@ -1,0 +1,21 @@
+BYTE-LEVEL DIFF vs COS-STEP4D-B-PHASE6-PATCH-2.zip (original parent)
+Parent SHA-256: fd4ef3dc9e53fcf3c65c68ecb8cf94f4cc6ce009af637db4d4c5e7c7aa458a54
+
+ADDED:
+  server/live-relay/firebase-identity-issuer.js
+  server/live-relay/test/firebase-identity-issuer.test.js
+  server/live-relay/test/identity-route-integration.test.js
+
+MODIFIED:
+  server/live-relay/live-distribution-signaling-server.js
+
+REMOVED:
+  (none)
+
+Raw recursive diff (parent -> this patch):
+Only in patch4_build_tree: BYTE-DIFF-VS-PARENT.txt
+Only in patch4_build_tree: PATCH-4-REPORT.md
+Only in patch4_build_tree/server/live-relay: firebase-identity-issuer.js
+Files parent_check/parent/cumulative-tree/server/live-relay/live-distribution-signaling-server.js and patch4_build_tree/server/live-relay/live-distribution-signaling-server.js differ
+Only in patch4_build_tree/server/live-relay/test: firebase-identity-issuer.test.js
+Only in patch4_build_tree/server/live-relay/test: identity-route-integration.test.js

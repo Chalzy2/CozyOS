@@ -1,0 +1,127 @@
+/**
+ * CozyOS Enterprise Design System — Smooth Micro-interactivity
+ * File Reference: core/ui/cozy-animations.css
+ */
+@keyframes cozyPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+  50% {
+    transform: scale(1.03);
+    opacity: 1;
+  }
+}
+
+.cozy-animate-pulse {
+  animation: cozyPulse 4s infinite ease-in-out;
+}
+
+.cozy-fade-in {
+  animation: cozyFadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes cozyFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Milestone M206 — Live Animation Engine (scoped extension) */
+
+@keyframes cozyGlowEmerald {
+  0%, 100% { text-shadow: 0 0 4px rgba(16,185,129,0.4); }
+  50% { text-shadow: 0 0 12px rgba(16,185,129,0.9); }
+}
+@keyframes cozyGlowGold {
+  0%, 100% { text-shadow: 0 0 4px rgba(234,179,8,0.4); }
+  50% { text-shadow: 0 0 12px rgba(234,179,8,0.9); }
+}
+@keyframes cozyGlowBlue {
+  0%, 100% { text-shadow: 0 0 4px rgba(37,99,235,0.4); }
+  50% { text-shadow: 0 0 12px rgba(37,99,235,0.9); }
+}
+.cozy-glow-emerald { animation: cozyGlowEmerald 2.4s ease-in-out infinite; }
+.cozy-glow-gold { animation: cozyGlowGold 2.4s ease-in-out infinite; }
+.cozy-glow-blue { animation: cozyGlowBlue 2.4s ease-in-out infinite; }
+
+@keyframes cozyBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.cozy-animate-bounce { animation: cozyBounce 0.6s ease-in-out 2; }
+
+@keyframes cozyRise {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.cozy-animate-rise { animation: cozyRise 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+/* M364.1 addition — falls from above, slight bounce, settles. Distinct
+   from cozyRise (which rises from below) and cozyBounce (which never
+   leaves the resting position) — a real, new per-letter motion, not a
+   relabeling of either existing keyframe. */
+@keyframes cozyLetterFall {
+  0%   { opacity: 0; transform: translateY(-32px); }
+  60%  { opacity: 1; transform: translateY(4px); }
+  80%  { transform: translateY(-2px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.cozy-animate-fall-bounce { animation: cozyLetterFall 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+@keyframes cozyTypingCursorBlink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.cozy-typing-cursor {
+  display: inline-block;
+  width: 2px;
+  margin-left: 2px;
+  animation: cozyTypingCursorBlink 0.9s step-end infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cozy-animate-pulse, .cozy-fade-in, .cozy-glow-emerald, .cozy-glow-gold,
+  .cozy-glow-blue, .cozy-animate-bounce, .cozy-animate-rise, .cozy-animate-fall-bounce, .cozy-typing-cursor,
+  .cozy-living-card, .cozy-living-bg {
+    animation: none !important;
+  }
+}
+
+/* Milestone M204 — Approved Gemini login UI, migrated to plain CSS (no
+   Tailwind/Lucide CDN — this repository has zero external CDN
+   dependencies anywhere else; introducing one here would be a real,
+   new architectural inconsistency). */
+@keyframes cozyCardBreathing {
+  0%, 100% { transform: scale(1) translateY(0); box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 20px var(--cozy-dynamic-glow, rgba(249,168,37,0.25)); }
+  50% { transform: scale(1.006) translateY(-4px); box-shadow: 0 15px 40px rgba(0,0,0,0.6), 0 0 35px var(--cozy-dynamic-glow, rgba(249,168,37,0.35)); }
+}
+.cozy-living-card { animation: cozyCardBreathing 7s ease-in-out infinite; }
+
+@keyframes cozyBgPanZoom {
+  0% { transform: scale(1) translate(0,0); }
+  50% { transform: scale(1.06) translate(-1%,-1%); }
+  100% { transform: scale(1) translate(0,0); }
+}
+.cozy-living-bg { animation: cozyBgPanZoom 25s ease-in-out infinite; }
+
+/* Living Light Engine v1.0 - Global Ambient Lighting (section 3).
+   Real 6s cycle: brightness rises, holds, falls, repeats. No abrupt
+   transitions, no flashing - matches the spec exactly. */
+@keyframes cozyAmbientBreathe {
+  0%   { filter: brightness(1); }
+  35%  { filter: brightness(1.08); }
+  50%  { filter: brightness(1.08); }
+  85%  { filter: brightness(1); }
+  100% { filter: brightness(1); }
+}
+.cozy-ambient-light { animation: cozyAmbientBreathe 6s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cozy-ambient-light { animation: none; }
+}

@@ -1,0 +1,35 @@
+CozyOS Main Final (M366.2) — Modified Files (19 total)
+Verified by recursive diff against the original ZIP; nothing else changed.
+
+Branding assets (replaced with supplied logo):
+  assets/branding/apple-touch-icon.png
+  assets/branding/cozyoslogo-emblem.png
+  assets/branding/cozyoslogo.png
+  assets/branding/favicon-16.png
+  assets/branding/favicon-32.png
+  assets/branding/icon-192.png
+  assets/branding/icon-512.png
+  icons/icon-72x72.png
+  icons/icon-96x96.png
+  icons/icon-128x128.png
+  icons/icon-144x144.png
+  icons/icon-152x152.png
+  icons/icon-192x192.png
+  icons/icon-384x384.png
+  icons/icon-512x512.png
+
+Launch timing / glow:
+  core/shell/launch-sequence.css
+  core/shell/launch-sequence.js
+  core/shell/startup-orchestrator.js
+  login.html
+
+Byte-identical (confirmed via sha256, spot-checked):
+  Firebase/firebase-auth.js
+  core/modules/identity/auth-coordinator.js
+  core/security/cozy-auth.js
+  router.js
+  core/shell/application-launcher.js
+
+Full recursive diff against the original project shows no files changed
+outside the 19 listed above.

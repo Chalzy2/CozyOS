@@ -1,0 +1,150 @@
+--- baseline/core/platform/application-visibility.js	2026-08-21 04:33:36.000000000 +0000
++++ work/core/platform/application-visibility.js	2026-08-21 04:48:18.243588189 +0000
+@@ -37,8 +37,12 @@
+  *     window.CozyOS.<Name>.visibility = {
+  *       appId, name, icon, category: "platform-tool",
+  *       launchTarget: { center: "...", section: "..." (optional) },
+- *       audience: "admin" | "developer"   // who can ever see this tool at all
++ *       audience: "admin" | "developer" | "all"   // who can ever see this tool at all
+  *     }
++ *   "all" is for genuine built-in end-user capabilities that are not a
++ *   registered application (e.g. ChurchOS) — surfaced to ordinary users
++ *   as `capabilities`, kept separate from `applications` (see
++ *   listVisibleApplications() below).
+  *   Not mandatory for existing coordinators as of this milestone. Migrated
+  *   gradually, one at a time, the same discipline as Rule 41 — this
+  *   version migrates Developer Hub (the real host) and this session's own
+@@ -208,26 +212,41 @@
+             const all = this.listAllApplications();
+ 
+             if (config.dashboardType === "admin") {
+-                return { available: true, dashboardType: "admin", applications: all };
++                return { available: true, dashboardType: "admin", applications: all, capabilities: all.filter(a => a.kind === "platform-tool" && a.audience === "all") };
+             }
+             if (config.dashboardType === "developer") {
+                 const allowedBusiness = new Set(config.developerApplications || []);
+                 return {
+                     available: true, dashboardType: "developer",
+-                    applications: all.filter(a => a.kind === "application" ? allowedBusiness.has(a.appId) : a.audience === "developer" || a.audience === "admin")
++                    applications: all.filter(a => a.kind === "application" ? allowedBusiness.has(a.appId) : a.audience === "developer" || a.audience === "admin"),
++                    capabilities: all.filter(a => a.kind === "platform-tool" && a.audience === "all")
+                 };
+             }
+             // End user: only assigned + globally-enabled business
+-            // applications. Platform tools (internal dev/admin utilities)
+-            // are never shown — matches "End User Never sees: internal
+-            // platform tools, developer utilities, diagnostic engines,
+-            // administrator-only modules" from the spec, achieved simply
+-            // by never including platform-tool entries here, not by a
+-            // separate hide-list this file would have to maintain itself.
++            // applications. Internal dev/admin platform tools (audience
++            // "admin"/"developer") are never shown here — matches "End
++            // User Never sees: internal platform tools, developer
++            // utilities, diagnostic engines, administrator-only modules"
++            // from the spec.
++            //
++            // CAPABILITIES (audience: "all") — real, honest addition:
++            // a small number of coordinators (ChurchOS, WholesaleOS,
++            // QuarryOS's own module-level declaration) already
++            // self-declare `visibility.audience === "all"` — meaning
++            // their own code states they are genuine, ordinary-user-
++            // facing built-in capabilities, not admin/dev tools. Prior
++            // to this fix they were silently dropped by the blanket
++            // "no platform-tool entries for end users" rule above,
++            // which under-served users rather than protecting them.
++            // Returned separately as `capabilities`, never merged into
++            // `applications`, so nothing here can be mistaken for a
++            // registered application and every existing consumer of
++            // `applications` is unaffected.
+             const assigned = new Set(config.assignedApplications || []);
+             return {
+                 available: true, dashboardType: "user",
+-                applications: all.filter(a => a.kind === "application" && assigned.has(a.appId) && a.enabled)
++                applications: all.filter(a => a.kind === "application" && assigned.has(a.appId) && a.enabled),
++                capabilities: all.filter(a => a.kind === "platform-tool" && a.audience === "all")
+             };
+         }
+ 
+--- baseline/core/shell/user-dashboard.js	2026-08-21 04:33:36.000000000 +0000
++++ work/core/shell/user-dashboard.js	2026-08-21 04:48:36.303814015 +0000
+@@ -377,28 +377,65 @@
+             }
+         }
+ 
+-        /** #renderAppsSurface() — the real registry/visibility-backed grid, now the dedicated Apps tab (Prompt 1 §16). */
++        /**
++         * #renderAppsSurface() — the dedicated Apps tab (Prompt 1 §16;
++         * Prompt 2 "Apps surface truthfulness").
++         *
++         *   Renders two distinct, honestly-labeled sections, never
++         *   merged into one undifferentiated grid:
++         *     - "Installed Apps"        — real ApplicationVisibility
++         *       entries with kind === "application" (registered,
++         *       shell-integrated applications only — e.g. ShopOS,
++         *       QuarryOS; whatever the real registry/ServiceRegistry
++         *       currently assigns to this user).
++         *     - "CozyOS Capabilities"   — real, self-declared built-in
++         *       capabilities (visibility.audience === "all", e.g.
++         *       ChurchOS) that are not registered applications. Shown
++         *       separately so a user never mistakes a capability for an
++         *       installable app, and this file never invents a fake
++         *       application-registry entry to make one appear here.
++         *   Both use ApplicationVisibility.getRealLaunchPath() for the
++         *   only real launcher this platform currently has (business
++         *   HTML entry points). A capability without a real path is
++         *   shown honestly as "Not yet launchable" — never a fake
++         *   onclick/overlay.
++         */
+         #renderAppsSurface() {
+             const host = this.#container.querySelector("#cozy-ud-surface-apps");
+             if (!host) return;
+-            host.innerHTML = `<h3>Apps</h3><div id="cozy-ud-apps-surface-grid"></div>`;
+-            const grid = host.querySelector("#cozy-ud-apps-surface-grid");
+             if (!this.#visibleApps.available) {
+-                grid.innerHTML = `<p class="cozy-disclosure-note">${escapeHtml(this.#visibleApps.reason || "No applications available.")}</p>`;
++                host.innerHTML = `<h3>Apps</h3><p class="cozy-disclosure-note">${escapeHtml(this.#visibleApps.reason || "No applications available.")}</p>`;
+                 return;
+             }
+-            const businessApps = this.#visibleApps.applications.filter(a => a.kind === "application");
++            const installedApps = this.#visibleApps.applications.filter(a => a.kind === "application");
++            const capabilities = this.#visibleApps.capabilities || [];
+             const visibility = window.CozyOS.ApplicationVisibility;
+-            grid.innerHTML = businessApps.length ? businessApps.map(app => {
+-                const path = visibility && typeof visibility.getRealLaunchPath === "function" ? visibility.getRealLaunchPath(app.appId) : null;
+-                return `
+-                    <div class="cozy-living-card cozy-ud-app-tile">
+-                        <span class="cozy-ud-app-name">${escapeHtml(app.name)}</span>
+-                        <button type="button" class="cozy-btn" data-ud-apps-open="${escapeHtml(app.appId)}" ${path ? "" : `disabled title="Not launchable yet."`}>Open</button>
+-                    </div>` ;
+-            }).join("") : `<p class="cozy-disclosure-note">No applications have been assigned to this account yet.</p>`;
+-            grid.querySelectorAll("[data-ud-apps-open]").forEach(btn => btn.addEventListener("click", () => {
+-                const path = visibility.getRealLaunchPath(btn.getAttribute("data-ud-apps-open"));
++            const getPath = (appId) => visibility && typeof visibility.getRealLaunchPath === "function" ? visibility.getRealLaunchPath(appId) : null;
++
++            const tile = (app, path) => `
++                <div class="cozy-living-card cozy-ud-app-tile">
++                    <span class="cozy-ud-app-name">${escapeHtml(app.name)}</span>
++                    <button type="button" class="cozy-btn" data-ud-apps-open="${escapeHtml(app.appId)}" ${path ? "" : `disabled title="Not yet launchable."`}>${path ? "Open" : "Not yet launchable"}</button>
++                </div>`;
++
++            host.innerHTML = `
++                <h3>Apps</h3>
++                <section id="cozy-ud-installed-apps">
++                    <h4>Installed Apps</h4>
++                    <div id="cozy-ud-apps-surface-grid">
++                        ${installedApps.length ? installedApps.map(app => tile(app, getPath(app.appId))).join("") : `<p class="cozy-disclosure-note">No applications have been assigned to this account yet.</p>`}
++                    </div>
++                </section>
++                <section id="cozy-ud-capabilities">
++                    <h4>CozyOS Capabilities</h4>
++                    <p class="cozy-disclosure-note">Built-in CozyOS capabilities — not installed applications.</p>
++                    <div id="cozy-ud-capabilities-grid">
++                        ${capabilities.length ? capabilities.map(cap => tile(cap, getPath(cap.appId))).join("") : `<p class="cozy-disclosure-note">No built-in capabilities are available to this account right now.</p>`}
++                    </div>
++                </section>
++            `;
++            host.querySelectorAll("[data-ud-apps-open]").forEach(btn => btn.addEventListener("click", () => {
++                const path = getPath(btn.getAttribute("data-ud-apps-open"));
+                 if (path) window.location.href = path;
+             }));
+         }

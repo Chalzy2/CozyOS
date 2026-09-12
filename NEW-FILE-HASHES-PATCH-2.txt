@@ -1,0 +1,4 @@
+d243cf235bd941aca776bc15569a2b7465e4baa76098b0087d253b4b7b8ec06c  PRODUCTION-SPEC-live-host-console.md
+11b83ccd8773e7407dcc99e69c513d1aa9bc1cf6ce2f19b919cfe7628345b331  core/shell/live/ui/cozy-live-host-console-controller.js
+50abb21a48e1ca95b7d840da9eb99d7f0848ef3db3fc30f00bf457bf9dabbf5e  core/shell/live/ui/cozy-live-host-console.html
+754c5f04208f2d109409908ff4f8e4c38dde96b405d5c64ccbdac41573fbce73  core/shell/live/tests/live-host-console-controller.test.js

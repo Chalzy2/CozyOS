@@ -1,0 +1,3 @@
+1eadc6259001993b96529878cd387bb528adee6088af1112a28380d0a0335606  core/shell/live/ui/cozy-live-join-console-controller.js
+7b2a9b91a542a5cbe70eabfd815c3e3d74f7d99fb6bc99fe1736eecbfe73daf6  core/shell/live/ui/cozy-live-join-console.html
+91d502f473507da066fce3683b33a1a2ee1a6832b96dba13ca82535a58fc6ec3  core/shell/live/tests/live-join-console-controller.test.js
