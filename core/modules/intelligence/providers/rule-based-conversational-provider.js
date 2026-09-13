@@ -177,6 +177,63 @@
     const PROVIDER_NAME = "rule-based-conversational";
 
     /**
+     * APP_IMPORTANCE_PATTERN — M363.1 real-device fix.
+     *
+     * Single, shared source of truth for every "why does this
+     * application matter to people" phrasing this provider recognizes
+     * — consolidated here (used by the INTENT_RULES entry below, the
+     * "app-importance" composeReply case, and the lastDiscussedApplication
+     * conversation-state tracker) instead of three separately-maintained
+     * copies, which is exactly the kind of accidental drift a real
+     * device test caught (several natural EN/SW phrasings — "What's
+     * ChurchOS", "ChurchOS inasaidia mtu aje", "What benefits is
+     * ChurchOS", "who benefits from X", "what problem does X solve",
+     * "how does X help me" — had no trigger anywhere). One capture
+     * group is populated per alternative; extractAppImportanceCandidate()
+     * below is the one place that reads whichever group matched, so
+     * every call site stays in sync automatically.
+     */
+    const APP_IMPORTANCE_PATTERN = /\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+important\b|\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+useful\b|\bwhy\s+does\s+([a-z][\w' -]{1,40}?)\s+exist\b|\bwhy\s+([a-z][\w' -]{1,40}?)\s+matters\b|\bwhat\s+(?:can|does|will)\s+([a-z][\w' -]{1,40}?)\s+(?:do\s+for|become|help)\b|\bwhat\s+does\s+([a-z][\w' -]{1,40}?)\s+do\b|\bhow\s+(?:does|can)\s+([a-z][\w' -]{1,40}?)\s+help\b|\bwho\s+benefits\s+from\s+([a-z][\w' -]{1,40}?)\b|\bwhat\s+problem\s+does\s+([a-z][\w' -]{1,40}?)\s+solve\b|\bwhat\s+benefits?\s+(?:is|does|has)\s+([a-z][\w' -]{1,40}?)\s*(?:provide|have)?\s*\??\s*$|\bhow\s+does\s+([a-z][\w' -]{1,40}?)\s+fit\s+into\s+cozyos\b|\bkwa\s+nini\s+([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\b|\b([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+ilianzishwa\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+inalenga\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+ina\s+faida\s+gani\b|\bnani\s+atanufaika\s+na\s+([a-z][\w' -]{1,40}?)\b|\b([a-z][\w' -]{1,40}?)\s+(?:ina|ita)nisaidia(?:je)?(?:\s+nini)?\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kunisaidiaje\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kusaidia\b|\btatizo\s+gani\s+([a-z][\w' -]{1,40}?)\s+inatatua\b|\b([a-z][\w' -]{1,40}?)\s+inatatua\s+tatizo\s+gani\b|\b(?:programu\s+ya\s+)?([a-z][\w' -]{1,40}?)\s+inasaidia(?:\s+mtu)?\s+aje\b|\b([a-z][\w' -]{1,40}?)\s+iko\s+wapi\s+ndani\s+ya\s+cozyos\b/i;
+
+    /**
+     * APP_IMPORTANCE_PRONOUNS — M363.1 real-device fix.
+     *
+     * A bare pronoun ("it", "this", "that", Kiswahili "hii"/"hiyo") can
+     * satisfy APP_IMPORTANCE_PATTERN's own capture group (e.g. "Why is
+     * it useful?" literally captures "it"), but a pronoun is never a
+     * real application name — treating it as one produced a real,
+     * observed regression ("I don't have human-purpose information
+     * registered for 'it' yet." instead of resolving via conversation
+     * context). extractAppImportanceCandidate() below filters these out
+     * so every caller consistently falls through to the real contextual
+     * resolution (conversationState.lastDiscussedApplication) instead.
+     */
+    const APP_IMPORTANCE_PRONOUNS = new Set(["it", "this", "that", "hii", "hiyo"]);
+
+    /**
+     * extractAppImportanceCandidate(text)
+     *   Real, single extraction point for APP_IMPORTANCE_PATTERN above —
+     *   returns whichever capture group matched (there is always at
+     *   most one, since the alternatives are mutually exclusive), or ""
+     *   if none did OR the only thing that matched was a bare pronoun
+     *   (see APP_IMPORTANCE_PRONOUNS above). Every caller (INTENT_RULES
+     *   doesn't need this, only composeReply's case and the
+     *   conversationState tracker) uses this instead of re-deriving the
+     *   group list by hand.
+     */
+    function extractAppImportanceCandidate(text) {
+        const m = APP_IMPORTANCE_PATTERN.exec(typeof text === "string" ? text : "");
+        if (!m) return "";
+        for (let i = 1; i < m.length; i++) {
+            if (m[i]) {
+                const trimmed = m[i].trim();
+                return APP_IMPORTANCE_PRONOUNS.has(trimmed.toLowerCase()) ? "" : trimmed;
+            }
+        }
+        return "";
+    }
+
+    /**
      * INTENTS
      *   Real, named, disclosed set — every one of these is the ONLY
      *   thing this provider claims to understand. Order matters:
@@ -230,7 +287,12 @@
         // — genuinely covers all four of these framings); no new
         // answer text, only recognizing more real ways people ask for
         // it.
-        { id: "why-use-cozyos", pattern: /\bwhy\s+(?:should|would)\s+(?:i|someone|you)\s+use\s+cozyos\b|\bwhy\s+use\s+cozyos\b|\bbenefits?\s+of\s+cozyos\b|\bwhy\s+cozyos\b|\bkwa\s+nini\s+nitumie(?:\s+cozyos)?\b|\bkwa\s+nini\s+(?:ni)?tumie\s+cozyos\b|\bfaida\s+za\s+cozyos\b|\bcozyos\s+itanisaidia\s+nini\b|\bcozyos\s+inanisaidia\s+nini\b|\bmtumiaji\s+anapata\s+faida\s+gani\b|\bkwa\s+nini\s+cozyos\s+ni\s+nzuri\s+kwa\s+afrika\b|\bcozyos\s+inabadilisha\s+maisha\s+(?:ya\s+mtu\s+)?kwa\s+njia\s+gani\b/i },
+        // M363.1 real-device fix — "Why is cozyos benefits" (broken
+        // grammar, clear intent) had no trigger. "Na CozyOS je?" (and
+        // what about CozyOS — a real, natural way to switch the topic
+        // of conversation explicitly back to the platform itself after
+        // discussing a specific application) also had no trigger.
+        { id: "why-use-cozyos", pattern: /\bwhy\s+(?:should|would)\s+(?:i|someone|you)\s+use\s+cozyos\b|\bwhy\s+use\s+cozyos\b|\bbenefits?\s+of\s+cozyos\b|\bwhy\s+cozyos\b|\bwhy\s+is\s+cozyos\s+benefits?\b|\bkwa\s+nini\s+nitumie(?:\s+cozyos)?\b|\bkwa\s+nini\s+(?:ni)?tumie\s+cozyos\b|\bfaida\s+za\s+cozyos\b|\bcozyos\s+itanisaidia\s+nini\b|\bcozyos\s+inanisaidia\s+nini\b|\bmtumiaji\s+anapata\s+faida\s+gani\b|\bkwa\s+nini\s+cozyos\s+ni\s+nzuri\s+kwa\s+afrika\b|\bcozyos\s+inabadilisha\s+maisha\s+(?:ya\s+mtu\s+)?kwa\s+njia\s+gani\b|\bna\s+cozyos\s+je\b/i },
         { id: "differentiation", pattern: /\bhow\s+is\s+cozyos\s+different\b|\bwhat\s+makes\s+cozyos\s+different\b|\bhow\s+does\s+cozyos\s+differ\b|\bcozyos\s+vs\.?\s|\bcompared\s+to\s+other\s+apps?\b|\binatofautianaje\b|\btofauti\s+(?:ya|na)\s+cozyos\b|\bcozyos\s+inatofautiana(?:naje)?\b/i },
         { id: "language-support-list", pattern: /\bwhich\s+languages?\s+(?:does\s+)?cozyos\s+support\b|\bwhat\s+languages?\s+(?:does\s+)?cozyos\s+support\b|\blanguage\s+support\b|\bsupported\s+languages\b|\blugha\s+(?:zipi|gani)\s+(?:zinazoungwa\s+mkono|zinazotumika)\b|\bcozyos\s+inaunga\s+mkono\s+lugha\s+gani\b|\b(?:do|does|can)\s+(?:you|cozyos)\s+(?:speak|understand)\s+[a-z\u00c0-\u024f]+\b|\b(?:una\s*(?:jua|elewa|zungumza)|(?:je,?\s*)?cozyos\s+in(?:aweza|ajua|azungumza))\s+(?:ki)?[a-z]+\b/i },
 
@@ -264,7 +326,9 @@
         { id: "price-inquiry", pattern: /\bhow\s+much\s+is\s+this\b|\bhiki\s+ni\s+bei\s+gani\b|\bhii\s+ni\s+bei\s+gani\b/i },
         { id: "object-identification", pattern: /\bwhat\s+is\s+(?:this|that)\b|\bhiki\s+ni\s+nini\b|\bhicho\s+ni\s+nini\b/i },
         { id: "founder", pattern: /\bwho\s+(?:created|made|built|founded)\s+(?:you|cozyos)\b|\bfounder\b|\bwho\s+owns\s+cozyos\b|\bowner\s+of\s+cozyos\b/i },
-        { id: "what-is-cozyos", pattern: /\bwhat\s+is\s+cozyos\b|\bcozyos\s+ni\s+nini\b/i },
+        // M363.1 real-device fix — "What's CozyOS" (contraction) had no
+        // trigger at all; only literal "what is cozyos" matched.
+        { id: "what-is-cozyos", pattern: /\bwhat(?:'s|\s+is)\s+cozyos\b|\bcozyos\s+ni\s+nini\b/i },
         // M355 fix — genuine classifier gap found and disclosed in
         // AUDIT-CHECKPOINT-V2: "What is verified vs planned?" has the
         // exact surface shape of app-info's generic "what is X" pattern
@@ -281,7 +345,9 @@
         // it is composed the same way as the other fixed-text intents
         // below (identity/help/etc.), never via a fabricated fact.
         { id: "meta-verified-vs-planned", pattern: /\bverified\s+(?:vs\.?|versus|and|or)\s+planned\b|\bplanned\s+(?:vs\.?|versus|and|or)\s+verified\b|\bdifference\s+between\s+verified\s+and\s+planned\b|\bverified\s+vs\.?\s+vision\b|\bkilicho\s*thibitishwa\s+na\s+kilicho\s*pangwa\b|\bthibitishwa\s+dhidi\s+ya\s+(?:kilicho)?pangwa\b/i },
-        { id: "app-info", pattern: /\bwhat\s+is\s+([a-z][\w' -]{1,40}?)\??\s*$|\btell\s+me\s+about\s+([a-z][\w' -]{1,40}?)\.?\s*$|\b([a-z][\w' -]{1,40}?)\s+ni\s+nini[.!?]*\s*$|\bni\s+nini\s+([a-z][\w' -]{1,40}?)\??\s*$/i },
+        // M363.1 real-device fix — "What's ChurchOs" (contraction)
+        // had no trigger; only literal "what is X" matched.
+        { id: "app-info", pattern: /\bwhat(?:'s|\s+is)\s+([a-z][\w' -]{1,40}?)\??\s*$|\btell\s+me\s+about\s+([a-z][\w' -]{1,40}?)\.?\s*$|\b([a-z][\w' -]{1,40}?)\s+ni\s+nini[.!?]*\s*$|\bni\s+nini\s+([a-z][\w' -]{1,40}?)\??\s*$/i },
         // ChurchOS human-purpose/importance dependency — recognizes
         // "why does X matter to people" phrasing, distinct from
         // app-info's "what is X" (technical identity only). Reuses the
@@ -296,18 +362,15 @@
         // "X inanisaidiaje"/"itanisaidia nini" (helps-me-how, and
         // future tense), and "tatizo gani X inatatua" (what problem
         // does X solve — the app name sits BETWEEN the trigger words,
-        // a real, different sentence shape from every existing
-        // capture group here). Same existing app-importance answer
-        // (getApplicationHumanPurposeFact(), unchanged) — only
-        // recognizing more real ways people ask for it.
-        { id: "app-importance", pattern: /\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+important\b|\bwhy\s+([a-z][\w' -]{1,40}?)\s+matters\b|\bwhat\s+(?:can|does|will)\s+([a-z][\w' -]{1,40}?)\s+(?:do\s+for|become|help)\b|\bkwa\s+nini\s+([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\b|\b([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+(?:ina|ita)nisaidia(?:je)?(?:\s+nini)?\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kusaidia\b|\btatizo\s+gani\s+([a-z][\w' -]{1,40}?)\s+inatatua\b/i },
-        // Natural Human Record Capture dependency (first slice) —
-        // recognizes a narrow, disclosed "add a new church member"
-        // statement. Not general NLU: a specific, honestly-scoped
-        // pattern extracting firstName/lastName only, routed into the
-        // real, existing, authoritative ChurchOS.createMember() -
-        // never a parallel/invented record store.
-        { id: "record-church-member", pattern: /\badd\s+([a-z][a-z' -]{1,30}?)(?:\s+([a-z][a-z' -]{1,30}?))?\s+as\s+(?:a\s+)?(?:new\s+)?member\b|\bongeza\s+([a-z][a-z' -]{1,30}?)(?:\s+([a-z][a-z' -]{1,30}?))?\s+kama\s+mwanachama\b/i },
+        // M363.1 real-device fix — list-apps must be checked BEFORE
+        // app-importance: a "how many apps... and how do they help"
+        // question ("Kuna programu ngapi na inasaidia aje?") contains
+        // both an app-count phrase AND an "X inasaidia...aje" shape
+        // app-importance's own pattern recognizes; without this
+        // ordering, app-importance would fuzzy-capture the word
+        // immediately before "inasaidia" (e.g. "na") as a bogus
+        // application name instead of the real, correct count-and-list
+        // answer this question is actually asking for.
         // M363 fix — real gap found via a live browser test of the
         // mounted Live Assistant: "CozyOS ina application gani?" /
         // "CozyOS ina programu gani?" (real, natural Kiswahili phrasings
@@ -322,6 +385,24 @@
         // is included alongside "application" since a real Kiswahili
         // speaker is at least as likely to use it.
         { id: "list-apps", pattern: /\b(?:what|which)\s+apps?\b|\bshow\s+me\s+the\s+apps\b|\bapplications?\s+(?:are\s+)?(?:available|installed)\b|\bwant\s+to\s+see\s+the\s+apps\b|\bfind\s+an?\s+app\b|\bcozyos\s+ina\s+(?:application|programu)\s+gani\b|\bkuna\s+(?:application|programu)\s+gani\b|\bnionyeshe\s+programu\b|\bkuna\s+(?:application|programu)\s+ngapi\b|\b(?:application|programu)\s+ngapi\b/i },
+        // M363.1 real-device fix — several natural EN/SW human-value
+        // phrasings ("What's ChurchOS", "ChurchOS inasaidia mtu aje",
+        // "What benefits is ChurchOS", "who benefits from X", "what
+        // problem does X solve", "how does X help me") had no trigger
+        // anywhere. Consolidated into APP_IMPORTANCE_PATTERN (declared
+        // near the top of this file, shared with the composeReply case
+        // a real, different sentence shape from every existing
+        // capture group here). Same existing app-importance answer
+        // (getApplicationHumanPurposeFact(), unchanged) — only
+        // recognizing more real ways people ask for it.
+        { id: "app-importance", pattern: APP_IMPORTANCE_PATTERN },
+        // Natural Human Record Capture dependency (first slice) —
+        // recognizes a narrow, disclosed "add a new church member"
+        // statement. Not general NLU: a specific, honestly-scoped
+        // pattern extracting firstName/lastName only, routed into the
+        // real, existing, authoritative ChurchOS.createMember() -
+        // never a parallel/invented record store.
+        { id: "record-church-member", pattern: /\badd\s+([a-z][a-z' -]{1,30}?)(?:\s+([a-z][a-z' -]{1,30}?))?\s+as\s+(?:a\s+)?(?:new\s+)?member\b|\bongeza\s+([a-z][a-z' -]{1,30}?)(?:\s+([a-z][a-z' -]{1,30}?))?\s+kama\s+mwanachama\b/i },
         // RP-036 fix — the previous pattern only matched the "how do I
         // register" phrasing, so a bare "Register", "I want to
         // register", "Create an account", "Sign me up", or any
@@ -499,7 +580,7 @@
             // important", "what problem does X solve", "how does
             // CozyOS change lives"), added after the same live-test
             // pass that broadened app-importance/why-use-cozyos above.
-            "muhimu", "tatizo", "nzuri", "nufaika", "atanufaika", "maisha", "inabadilisha", "ngapi", "hii"
+            "muhimu", "tatizo", "nzuri", "nufaika", "atanufaika", "maisha", "inabadilisha", "ngapi", "hii", "aje"
         ]);
         const words = text.toLowerCase().match(/[a-zà-ÿ]+/g) || [];
         if (words.length === 0) return null;
@@ -778,7 +859,7 @@
      * lastDiscussedApplication) — never overrides a genuine new,
      * explicitly-named app-importance question.
      */
-    const APP_IMPORTANCE_FOLLOWUP_PATTERN = /^(?:programu\s+)?hii\s*\??$|^hii\s+ina(?:ni)?saidia(?:je)?\??$|^kwa\s+nini\??$|^nani\s+atanufaika(?:\s+na\s+hii)?\??$/i;
+    const APP_IMPORTANCE_FOLLOWUP_PATTERN = /^(?:programu\s+)?hii\s*\??$|^(?:programu\s+)?hii\s+ina(?:ni)?saidia(?:\s+mtu)?(?:je)?\??$|^kwa\s+nini\??$|^nani\s+atanufaika(?:\s+na\s+hii)?\??$/i;
 
     /**
      * CORRECTION_PATTERNS — RP-037 dependency #2 (Correction Handling)
@@ -858,9 +939,17 @@
         if (!lister) return null;
         const apps = safeCall(() => lister());
         if (!Array.isArray(apps)) return null;
-        const needle = candidate.trim().toLowerCase();
-        let match = apps.find((a) => a && typeof a.name === "string" && a.name.toLowerCase() === needle);
-        if (!match) match = apps.find((a) => a && typeof a.name === "string" && new RegExp(`\\b${needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(a.name));
+        // M363.1 real-device fix — same space/case normalization as
+        // cozy-knowledge-registry.js's getApplicationFact()/
+        // getApplicationHumanPurposeFact() (see those files' own
+        // comments on this exact fix) — "Church OS" must resolve the
+        // same real registered "ChurchOS" application.
+        const needle = candidate.trim().toLowerCase()
+            .replace(/^(?:pro\w*|application|app)\s+(?:ya\s+)?/i, "")
+            .replace(/\s+app$/i, "")
+            .replace(/\s+/g, "");
+        let match = apps.find((a) => a && typeof a.name === "string" && a.name.toLowerCase().replace(/\s+/g, "") === needle);
+        if (!match) match = apps.find((a) => a && typeof a.name === "string" && new RegExp(`\\b${needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(a.name.replace(/\s+/g, "")));
         return match ? { id: match.id, name: match.name } : null;
     }
 
@@ -1062,7 +1151,14 @@
                     return typeof frame === "function" ? frame() : frame;
                 }
                 try {
-                    const member = church.createMember({ orgId, firstName, lastName: lastName || null });
+                    // NEXT DEPENDENCY (Verify Existing Record Authorization)
+                    // — actorId now threaded through so
+                    // ChurchOS.createMember()'s own real
+                    // OrganizationMembership.isAuthorized() check has
+                    // what it needs. This is the SAME actorId already
+                    // used just above to resolve orgId via session
+                    // membership — not a new/second identity signal.
+                    const member = church.createMember({ orgId, firstName, lastName: lastName || null, actorId: options && options.actorId });
                     const frame = template("record-church-member:created", lang);
                     return typeof frame === "function" ? frame(member.firstName, member.lastName, member.memberId) : frame;
                 } catch (err) {
@@ -1079,7 +1175,17 @@
                 // fabricated purpose. currentVerifiedCapabilities and
                 // visionCapabilities are kept explicitly separate in
                 // the reply text.
-                const m = /\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+important\b|\bwhy\s+([a-z][\w' -]{1,40}?)\s+matters\b|\bwhat\s+(?:can|does|will)\s+([a-z][\w' -]{1,40}?)\s+(?:do\s+for|become|help)\b|\bkwa\s+nini\s+([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\b|\b([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+(?:ina|ita)nisaidia(?:je)?(?:\s+nini)?\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kusaidia\b|\btatizo\s+gani\s+([a-z][\w' -]{1,40}?)\s+inatatua\b/i.exec(rawText || "");
+                //
+                // M363.1 real-device fix — uses the single shared
+                // APP_IMPORTANCE_PATTERN/extractAppImportanceCandidate()
+                // (declared near the top of this file) instead of a
+                // separately-typed-out copy of this regex, eliminating
+                // the risk of this case handler's own trigger list
+                // silently drifting out of sync with INTENT_RULES'
+                // entry — exactly the kind of gap the real-device test
+                // caught (several natural phrasings recognized by
+                // neither copy).
+                const freshCandidate = extractAppImportanceCandidate(rawText || "");
                 // M363 real-device fix — a bare contextual follow-up
                 // ("programu hii", "kwa nini?", "nani atanufaika?") has
                 // no subject of its own to capture; think() resolves it
@@ -1089,7 +1195,7 @@
                 // — used ONLY when this exact utterance's own regex found
                 // nothing, so an explicitly-named question is never
                 // overridden by stale context.
-                const candidate = m ? (m[1] || m[2] || m[3] || m[4] || m[5] || m[6] || m[7] || m[8] || "").trim() : ((options && options.contextualAppImportanceName) || "");
+                const candidate = freshCandidate || ((options && options.contextualAppImportanceName) || "");
                 const knowledge = window.CozyOS && window.CozyOS.CozyKnowledge;
                 // lang is forwarded so the KNOWLEDGE layer (not this
                 // provider, not the language-template frame) resolves
@@ -1103,8 +1209,31 @@
                     ? knowledge.getApplicationHumanPurposeFact(candidate, lang)
                     : { evidence: "NOT_FOUND", purpose: null };
                 if (fact.evidence === "VERIFIED" && fact.purpose) {
+                    // M363.1 real-device fix — display the real,
+                    // properly-cased application name (via
+                    // resolveApplicationByName(), the same real
+                    // ServiceRegistry lookup app-launch already uses)
+                    // rather than echoing the user's raw, possibly
+                    // typo'd/prefixed input verbatim (e.g. "Progmu ya
+                    // ChurchOs" -> "ChurchOS"). Falls back to the raw
+                    // candidate, unchanged, when the registry doesn't
+                    // have this app registered on this page — never
+                    // blocks the real, already-VERIFIED answer on a
+                    // cosmetic lookup.
+                    const resolvedForDisplay = safeCall(() => resolveApplicationByName(candidate));
+                    // M363.1 — same filler-prefix cleanup as the real
+                    // knowledge-lookup normalization (see
+                    // cozy-knowledge-registry.js's getApplicationFact()/
+                    // getApplicationHumanPurposeFact()) applied here too,
+                    // for the case where the real ServiceRegistry lookup
+                    // above legitimately has nothing registered on this
+                    // page yet (a real, previously-documented scenario,
+                    // not an error) — the raw candidate is still cleaned
+                    // for display rather than echoing "programu ya X"
+                    // verbatim.
+                    const displayName = (resolvedForDisplay && resolvedForDisplay.name) || candidate.replace(/^(?:pro\w*|application|app)\s+(?:ya\s+)?/i, "").replace(/\s+app$/i, "").trim();
                     const frame = template("app-importance:known", lang);
-                    return typeof frame === "function" ? frame(candidate, fact.purpose) : frame;
+                    return typeof frame === "function" ? frame(displayName, fact.purpose) : frame;
                 }
                 // Current-organization-context resolver dependency —
                 // reuses this same intent/template mechanism for
@@ -1136,7 +1265,7 @@
                 // Never fabricates an application, never claims
                 // capabilities/features the registry does not
                 // genuinely carry.
-                const m = /\bwhat\s+is\s+([a-z][\w' -]{1,40}?)\??\s*$|\btell\s+me\s+about\s+([a-z][\w' -]{1,40}?)\.?\s*$|\b([a-z][\w' -]{1,40}?)\s+ni\s+nini[.!?]*\s*$|\bni\s+nini\s+([a-z][\w' -]{1,40}?)\??\s*$/i.exec(rawText || "");
+                const m = /\bwhat(?:'s|\s+is)\s+([a-z][\w' -]{1,40}?)\??\s*$|\btell\s+me\s+about\s+([a-z][\w' -]{1,40}?)\.?\s*$|\b([a-z][\w' -]{1,40}?)\s+ni\s+nini[.!?]*\s*$|\bni\s+nini\s+([a-z][\w' -]{1,40}?)\??\s*$/i.exec(rawText || "");
                 const candidate = m ? (m[1] || m[2] || m[3] || m[4] || "").trim() : "";
                 const knowledge = window.CozyOS && window.CozyOS.CozyKnowledge;
                 const fact = candidate && knowledge && typeof knowledge.getApplicationFact === "function"
@@ -1400,9 +1529,20 @@
             // app-launch turns, so this never conflates "opened X" with
             // "asked about X's purpose").
             let contextualAppImportanceName = null;
-            if (intent === "unsupported" && previousState && previousState.lastDiscussedApplication && APP_IMPORTANCE_FOLLOWUP_PATTERN.test(typeof text === "string" ? text.trim() : "")) {
-                intent = "app-importance";
-                contextualAppImportanceName = previousState.lastDiscussedApplication;
+            if (previousState && previousState.lastDiscussedApplication) {
+                if (intent === "unsupported" && APP_IMPORTANCE_FOLLOWUP_PATTERN.test(typeof text === "string" ? text.trim() : "")) {
+                    intent = "app-importance";
+                    contextualAppImportanceName = previousState.lastDiscussedApplication;
+                } else if (intent === "app-importance" && !extractAppImportanceCandidate(text)) {
+                    // M363.1 real-device fix — a genuine app-importance
+                    // match whose own candidate was empty or a bare
+                    // pronoun ("Why is it useful?" -> "it", filtered by
+                    // extractAppImportanceCandidate() above) still needs
+                    // a real subject; resolve it against the real
+                    // previous turn's discussed application instead of
+                    // asking about a literal "it".
+                    contextualAppImportanceName = previousState.lastDiscussedApplication;
+                }
             }
 
             // RP-037 dependency #2 — correction handling (see
@@ -1535,8 +1675,10 @@
                 // never the raw, unverified candidate string.
                 lastDiscussedApplication: (() => {
                     if (intent !== "app-importance") return null;
-                    const freshMatch = /\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+important\b|\bwhy\s+([a-z][\w' -]{1,40}?)\s+matters\b|\bwhat\s+(?:can|does|will)\s+([a-z][\w' -]{1,40}?)\s+(?:do\s+for|become|help)\b|\bkwa\s+nini\s+([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\b|\b([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+(?:ina|ita)nisaidia(?:je)?(?:\s+nini)?\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kusaidia\b|\btatizo\s+gani\s+([a-z][\w' -]{1,40}?)\s+inatatua\b/i.exec(typeof text === "string" ? text : "");
-                    const freshCandidate = freshMatch ? (freshMatch[1] || freshMatch[2] || freshMatch[3] || freshMatch[4] || freshMatch[5] || freshMatch[6] || freshMatch[7] || freshMatch[8] || "").trim() : "";
+                    // M363.1 real-device fix — uses the single shared
+                    // extractAppImportanceCandidate() helper instead of
+                    // a third separately-typed-out copy of this regex.
+                    const freshCandidate = extractAppImportanceCandidate(typeof text === "string" ? text : "");
                     const candidateToCheck = freshCandidate || contextualAppImportanceName;
                     if (!candidateToCheck) return null;
                     // Verified the SAME way composeReply's own

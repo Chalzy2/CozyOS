@@ -58,7 +58,14 @@ function freshFullStack() {
 test('1. A real user with exactly one real active membership resolves the org automatically, no clarification asked', async () => {
     const { provider, window: win } = freshFullStack();
     const org = win.CozyOS.OrganizationRegistry.createOrganization({ name: 'Grace Church' });
-    win.CozyOS.OrganizationMembership.createMembership({ userId: 'user-1', organizationId: org.orgId });
+    // NEXT DEPENDENCY (Verify Existing Record Authorization) — this
+    // test is about ORG RESOLUTION (session -> orgId), a separate real
+    // concern from authorization; the real "churchos-members:create"
+    // permission is granted here purely so this test can still reach a
+    // successful creation to observe the org-resolution behavior it
+    // actually tests. Authorization-denial itself is covered by
+    // cozy-natural-record-capture-churchos-member.test.js.
+    win.CozyOS.OrganizationMembership.createMembership({ userId: 'user-1', organizationId: org.orgId, permissions: [win.CozyOS.ChurchOS.MEMBERS_CREATE_PERMISSION] });
 
     const result = await provider.think('Add John Mwangi as a new member', { actorId: 'user-1' });
     assert.equal(result.result.intent, 'record-church-member');
@@ -106,6 +113,12 @@ test('5. Explicit orgId remains backward-compatible and still takes priority ove
     const sessionOrg = win.CozyOS.OrganizationRegistry.createOrganization({ name: 'Session Org' });
     const explicitOrg = win.CozyOS.OrganizationRegistry.createOrganization({ name: 'Explicit Org' });
     win.CozyOS.OrganizationMembership.createMembership({ userId: 'user-both', organizationId: sessionOrg.orgId });
+    // NEXT DEPENDENCY — the real action executes against explicitOrg
+    // (that is exactly what this test verifies), so authorization is
+    // granted there, not on sessionOrg — proving explicit orgId truly
+    // drives which organization's authorization is checked too, not
+    // just which organization's member list gets the new record.
+    win.CozyOS.OrganizationMembership.createMembership({ userId: 'user-both', organizationId: explicitOrg.orgId, permissions: [win.CozyOS.ChurchOS.MEMBERS_CREATE_PERMISSION] });
 
     const result = await provider.think('Add Grace Achieng as a new member', { actorId: 'user-both', orgId: explicitOrg.orgId });
     assert.equal(result.result.intent, 'record-church-member');

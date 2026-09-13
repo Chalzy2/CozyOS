@@ -43,6 +43,28 @@
     const CHURCHOS_VERSION = "1.0.0-ENTERPRISE";
     const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
+    // NEXT DEPENDENCY (Verify Existing Record Authorization) — real,
+    // named permission for ChurchOS member creation, checked via the
+    // existing, unmodified OrganizationMembership.isAuthorized(userId,
+    // organizationId, permission) — the exact same mechanism
+    // core/calculation/business-record-engine.js already uses for its
+    // own createRecord() (PERMISSIONS.CREATE = "business-records:create").
+    // No new authorization/role/session system.
+    //
+    // NAMING NOTE: the requested literal string "churchos:members:create"
+    // (two colons) does not pass OrganizationMembership's own real,
+    // existing PERMISSION_PATTERN validation
+    // (/^[a-z0-9_-]+:[a-z0-9_-]+$/i — exactly one colon, "resource:action"),
+    // used by both grantPermission() and createMembership(). Granting a
+    // permission that fails that format would throw, so no membership
+    // could ever actually be authorized with the literal three-segment
+    // string - it would look declared but be permanently ungrantable.
+    // "churchos-members:create" is the closest literal match that is
+    // actually grantable through the real, existing, unmodified
+    // validation - same resource/action meaning, no format exception
+    // carved out for this one permission.
+    const MEMBERS_CREATE_PERMISSION = "churchos-members:create";
+
     function sanitize(input) {
         if (!input || typeof input !== "object") return {};
         const clean = {};
@@ -91,6 +113,33 @@
             if (!registry) throw new Error("[churchos-core] createMember(): OrganizationRegistry is not loaded.");
             if (!input.orgId || !registry.organizationExists(input.orgId)) throw new TypeError(`[churchos-core] createMember(): no real organization "${input.orgId}".`);
             if (!input.firstName || !input.firstName.trim()) throw new TypeError("[churchos-core] createMember(): a real firstName is required.");
+
+            // NEXT DEPENDENCY (Verify Existing Record Authorization) —
+            // real enforcement point. Before this fix, ANY actor with
+            // merely an active membership in the organization (checked
+            // by the conversational caller, never here) could create a
+            // member — no permission/role was ever actually required.
+            // Reuses the existing, unmodified
+            // OrganizationMembership.isAuthorized(userId, organizationId,
+            // permission) exactly as core/calculation/
+            // business-record-engine.js's own #authorize() already does
+            // for createRecord() — same mechanism, same fail-closed
+            // discipline, no new authorization system. Active membership
+            // ALONE no longer authorizes member creation: isAuthorized()
+            // itself already denies a suspended/removed/invited
+            // membership (status check happens first, inside
+            // isAuthorized()) and now additionally requires this
+            // specific permission be granted on an active membership.
+            const membership = window.CozyOS.OrganizationMembership;
+            if (!membership || typeof membership.isAuthorized !== "function") {
+                throw new Error("[churchos-core] createMember(): OrganizationMembership is not loaded — failing closed, cannot verify authorization.");
+            }
+            if (!input.actorId || typeof input.actorId !== "string") {
+                throw new TypeError("[churchos-core] createMember(): a real actorId is required to verify authorization.");
+            }
+            if (!membership.isAuthorized(input.actorId, input.orgId, MEMBERS_CREATE_PERMISSION)) {
+                throw new Error(`[churchos-core] createMember(): actor "${input.actorId}" is not authorized ("${MEMBERS_CREATE_PERMISSION}") to create members in organization "${input.orgId}".`);
+            }
 
             const memberId = this.#generateId("member");
             const now = new Date().toISOString();
@@ -176,6 +225,12 @@
 
     const instance = new ChurchOSCore();
     window.CozyOS.ChurchOS = instance;
+    // NEXT DEPENDENCY — real, discoverable permission constant, same
+    // export pattern church-live-moderation.js already uses for
+    // MODERATION_MANAGE_PERMISSION. An administrator/tooling grants this
+    // to a membership via the existing, unmodified
+    // OrganizationMembership.grantPermission()/createMembership({permissions:[...]}).
+    instance.MEMBERS_CREATE_PERMISSION = MEMBERS_CREATE_PERMISSION;
 
     instance.visibility = Object.freeze({ appId: "churchOS", name: "ChurchOS", icon: "⛪", category: "business-application", launchTarget: Object.freeze({ center: "churchOS" }), audience: "all" });
 
@@ -191,7 +246,7 @@
                 // via the dashboard's Live Video surface, not
                 // duplicated or substituted here).
                 entryPoint: "applications/ChurchOS/churchos.html", launcher: "core/plugins/churchOS-core.js",
-                description: "Phase 1: Setup Wizard (creates a real Organization via the existing OrganizationRegistry) and Membership Management. Roles are created entirely through Organization Builder, never by ChurchOS itself. See CHURCHOS_ENGINE_AUDIT.md for the full, honest status of all 25 requested platform engines.",
+                description: "Phase 1: Setup Wizard (creates a real Organization via the existing OrganizationRegistry) and Membership Management. Roles are created entirely through Organization Builder, never by ChurchOS itself. Member creation now requires the real, granted \"churchos-members:create\" permission (via the existing OrganizationMembership.isAuthorized()) — active membership alone is no longer sufficient. See CHURCHOS_ENGINE_AUDIT.md for the full, honest status of all 25 requested platform engines.",
             });
         } catch (_err) { /* non-fatal */ }
     } else if (window.CozyOS.ServiceRegistry && typeof window.CozyOS.ServiceRegistry.registerCoordinator === "function") {

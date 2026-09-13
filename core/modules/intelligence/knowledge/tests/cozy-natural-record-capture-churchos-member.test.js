@@ -17,6 +17,7 @@ const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..', '..', '..', '..', '..');
 const ORG_REGISTRY_PATH = path.join(ROOT, 'core', 'organization', 'organization-registry.js');
+const ORG_MEMBERSHIP_PATH = path.join(ROOT, 'core', 'organization', 'organization-membership.js');
 const CHURCHOS_PATH = path.join(ROOT, 'core', 'plugins', 'churchOS-core.js');
 const KNOWLEDGE_REGISTRY_PATH = path.join(ROOT, 'core', 'modules', 'intelligence', 'knowledge', 'cozy-knowledge-registry.js');
 const LANGUAGE_REGISTRY_PATH = path.join(ROOT, 'core', 'modules', 'intelligence', 'language', 'cozy-language-registry.js');
@@ -36,8 +37,19 @@ function makeFakeLivingAI() {
 function makeFakeCoordinator() { return { async run() { return {}; } }; }
 function makeFakeProviderManager() { return { register() {}, healthReport: () => ({}) }; }
 
+// NEXT DEPENDENCY (Verify Existing Record Authorization) — real
+// OrganizationMembership now loaded (it was not before this fix, since
+// member creation performed no authorization check at all). Tests that
+// expect a member to actually be created now grant the real
+// "churchos-members:create" permission to a real test actor and pass
+// that actorId through options — proving the real authorization path,
+// not bypassing it.
+const AUTHORIZED_ACTOR_ID = 'user_authorized_pastor';
+const UNAUTHORIZED_ACTOR_ID = 'user_plain_member';
+const SUSPENDED_ACTOR_ID = 'user_suspended_pastor';
+
 function freshFullStack() {
-    const files = [ORG_REGISTRY_PATH, CHURCHOS_PATH, KNOWLEDGE_REGISTRY_PATH, LANGUAGE_REGISTRY_PATH, LANGUAGE_TEMPLATES_PATH, PUBLIC_KNOWLEDGE_PATH, PROVIDER_PATH];
+    const files = [ORG_REGISTRY_PATH, ORG_MEMBERSHIP_PATH, CHURCHOS_PATH, KNOWLEDGE_REGISTRY_PATH, LANGUAGE_REGISTRY_PATH, LANGUAGE_TEMPLATES_PATH, PUBLIC_KNOWLEDGE_PATH, PROVIDER_PATH];
     files.forEach((p) => delete require.cache[require.resolve(p)]);
     const fakeWindow = {
         CozyOS: {
@@ -50,6 +62,19 @@ function freshFullStack() {
     global.window = fakeWindow;
     files.forEach((p) => require(p));
     const org = fakeWindow.CozyOS.OrganizationRegistry.createOrganization({ name: 'Test Church Org' });
+    const membership = fakeWindow.CozyOS.OrganizationMembership;
+    // Real, granted permission on a real, active membership — the
+    // authorized path this dependency adds.
+    membership.createMembership({ userId: AUTHORIZED_ACTOR_ID, organizationId: org.orgId, permissions: [fakeWindow.CozyOS.ChurchOS.MEMBERS_CREATE_PERMISSION] });
+    // Real, active membership WITHOUT the permission — the "active
+    // membership alone is no longer sufficient" case this dependency
+    // specifically closes.
+    membership.createMembership({ userId: UNAUTHORIZED_ACTOR_ID, organizationId: org.orgId, permissions: [] });
+    // Real membership WITH the permission, then suspended — proves
+    // isAuthorized()'s own status check (suspended always denies,
+    // regardless of granted permissions) still applies here.
+    membership.createMembership({ userId: SUSPENDED_ACTOR_ID, organizationId: org.orgId, permissions: [fakeWindow.CozyOS.ChurchOS.MEMBERS_CREATE_PERMISSION] });
+    membership.suspendMembership(SUSPENDED_ACTOR_ID, org.orgId);
     return {
         window: fakeWindow,
         provider: fakeWindow.CozyOS.LivingAI._registered.get('rule-based-conversational'),
@@ -59,14 +84,14 @@ function freshFullStack() {
 
 test('1/2. ENGLISH: "Add John Mwangi as a new member" is interpreted, extracting firstName/lastName without invention', async () => {
     const { provider, orgId } = freshFullStack();
-    const result = await provider.think('Add John Mwangi as a new member', { orgId });
+    const result = await provider.think('Add John Mwangi as a new member', { orgId, actorId: AUTHORIZED_ACTOR_ID });
     assert.equal(result.result.intent, 'record-church-member');
     assert.match(result.result.text, /John Mwangi/);
 });
 
 test('2b. KISWAHILI: "Ongeza John Mwangi kama mwanachama" is interpreted equivalently', async () => {
     const { provider, orgId } = freshFullStack();
-    const result = await provider.think('Ongeza John Mwangi kama mwanachama', { orgId });
+    const result = await provider.think('Ongeza John Mwangi kama mwanachama', { orgId, actorId: AUTHORIZED_ACTOR_ID });
     assert.equal(result.result.intent, 'record-church-member');
     assert.match(result.result.text, /John Mwangi/);
 });
@@ -74,7 +99,7 @@ test('2b. KISWAHILI: "Ongeza John Mwangi kama mwanachama" is interpreted equival
 test('4/5. A real record is created through the real, authoritative ChurchOS.createMember() - not a duplicated/invented store', async () => {
     const { provider, window: win, orgId } = freshFullStack();
     const before = win.CozyOS.ChurchOS.listMembers({ orgId }).length;
-    const result = await provider.think('Add Grace Achieng as a new member', { orgId });
+    const result = await provider.think('Add Grace Achieng as a new member', { orgId, actorId: AUTHORIZED_ACTOR_ID });
     assert.equal(result.result.intent, 'record-church-member');
     assert.match(result.result.text, /record MEM/i);
     const after = win.CozyOS.ChurchOS.listMembers({ orgId }).length;
@@ -83,14 +108,14 @@ test('4/5. A real record is created through the real, authoritative ChurchOS.cre
 
 test('6. The resulting record can be retrieved via the real, existing ChurchOS.listMembers()', async () => {
     const { provider, window: win, orgId } = freshFullStack();
-    await provider.think('Add Peter Otieno as a new member', { orgId });
+    await provider.think('Add Peter Otieno as a new member', { orgId, actorId: AUTHORIZED_ACTOR_ID });
     const members = win.CozyOS.ChurchOS.listMembers({ orgId });
     assert.ok(members.some((m) => m.firstName === 'Peter' && m.lastName === 'Otieno'));
 });
 
 test('7a. Missing name -> honest clarification or no match, never a fabricated member', async () => {
     const { provider, orgId } = freshFullStack();
-    const result = await provider.think('Add as a new member', { orgId });
+    const result = await provider.think('Add as a new member', { orgId, actorId: AUTHORIZED_ACTOR_ID });
     if (result.result.intent === 'record-church-member') {
         assert.match(result.result.text, /who would you like|jina lake/i);
     }
@@ -105,14 +130,14 @@ test('7b. Missing organization context -> honest clarification, never guesses wh
 
 test('8. An invalid organization is honestly rejected, never silently creates a record under a fake org', async () => {
     const { provider } = freshFullStack();
-    const result = await provider.think('Add John Mwangi as a new member', { orgId: 'org_does_not_exist' });
+    const result = await provider.think('Add John Mwangi as a new member', { orgId: 'org_does_not_exist', actorId: AUTHORIZED_ACTOR_ID });
     assert.equal(result.result.intent, 'record-church-member');
     assert.match(result.result.text, /couldn't add/i);
 });
 
 test('9. The real created record carries the real, existing provenance fields ChurchOS itself already produces', async () => {
     const { provider, window: win, orgId } = freshFullStack();
-    await provider.think('Add Faith Wanjiru as a new member', { orgId });
+    await provider.think('Add Faith Wanjiru as a new member', { orgId, actorId: AUTHORIZED_ACTOR_ID });
     const members = win.CozyOS.ChurchOS.listMembers({ orgId });
     const created = members.find((m) => m.firstName === 'Faith');
     assert.ok(created.memberId);
@@ -121,7 +146,58 @@ test('9. The real created record carries the real, existing provenance fields Ch
 
 test('10. The conversational layer never bypasses ChurchOS.createMember()\'s own real validation', () => {
     const { window: win, orgId } = freshFullStack();
-    assert.throws(() => win.CozyOS.ChurchOS.createMember({ orgId, firstName: '' }), /firstName is required/);
+    assert.throws(() => win.CozyOS.ChurchOS.createMember({ orgId, firstName: '', actorId: AUTHORIZED_ACTOR_ID }), /firstName is required/);
+});
+
+// ---- NEXT DEPENDENCY (Verify Existing Record Authorization) — new tests ----
+
+test('11. AUTHORIZED: an actor whose real membership was granted "churchos-members:create" can create a member', () => {
+    const { window: win, orgId } = freshFullStack();
+    const member = win.CozyOS.ChurchOS.createMember({ orgId, firstName: 'Authorized', lastName: 'Actor', actorId: AUTHORIZED_ACTOR_ID });
+    assert.ok(member.memberId);
+});
+
+test('12. UNAUTHORIZED: an active member WITHOUT the permission is denied - active membership alone is no longer sufficient', () => {
+    const { window: win, orgId } = freshFullStack();
+    assert.throws(
+        () => win.CozyOS.ChurchOS.createMember({ orgId, firstName: 'Unauthorized', actorId: UNAUTHORIZED_ACTOR_ID }),
+        /not authorized/
+    );
+});
+
+test('13. SUSPENDED: a suspended membership is denied even though the permission was granted before suspension', () => {
+    const { window: win, orgId } = freshFullStack();
+    assert.throws(
+        () => win.CozyOS.ChurchOS.createMember({ orgId, firstName: 'Suspended', actorId: SUSPENDED_ACTOR_ID }),
+        /not authorized/
+    );
+});
+
+test('14. No actorId at all is denied honestly, never silently authorized', () => {
+    const { window: win, orgId } = freshFullStack();
+    assert.throws(() => win.CozyOS.ChurchOS.createMember({ orgId, firstName: 'NoActor' }), /actorId is required/);
+});
+
+test('15. OrganizationMembership missing entirely fails closed, never silently authorized', () => {
+    const { window: win, orgId } = freshFullStack();
+    const real = win.CozyOS.OrganizationMembership;
+    win.CozyOS.OrganizationMembership = undefined;
+    try {
+        assert.throws(() => win.CozyOS.ChurchOS.createMember({ orgId, firstName: 'NoMembership', actorId: AUTHORIZED_ACTOR_ID }), /OrganizationMembership is not loaded/);
+    } finally {
+        win.CozyOS.OrganizationMembership = real;
+    }
+});
+
+test('16. Conversational path end-to-end: an unauthorized actor is honestly told the member could not be added, never fabricated as created', async () => {
+    const { provider, window: win, orgId } = freshFullStack();
+    const before = win.CozyOS.ChurchOS.listMembers({ orgId }).length;
+    const result = await provider.think('Add Someone Random as a new member', { orgId, actorId: UNAUTHORIZED_ACTOR_ID });
+    assert.equal(result.result.intent, 'record-church-member');
+    assert.match(result.result.text, /couldn't add/i);
+    assert.match(result.result.text, /not authorized/i);
+    const after = win.CozyOS.ChurchOS.listMembers({ orgId }).length;
+    assert.equal(after, before, 'no record should have been created for an unauthorized actor');
 });
 
 test('13a. Existing app-info intent remains unaffected by the new options parameter threading', async () => {
