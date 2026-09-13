@@ -321,7 +321,7 @@
         // already used elsewhere in this same file's own sw templates)
         // is included alongside "application" since a real Kiswahili
         // speaker is at least as likely to use it.
-        { id: "list-apps", pattern: /\b(?:what|which)\s+apps?\b|\bshow\s+me\s+the\s+apps\b|\bapplications?\s+(?:are\s+)?(?:available|installed)\b|\bwant\s+to\s+see\s+the\s+apps\b|\bfind\s+an?\s+app\b|\bcozyos\s+ina\s+(?:application|programu)\s+gani\b|\bkuna\s+(?:application|programu)\s+gani\b|\bnionyeshe\s+programu\b/i },
+        { id: "list-apps", pattern: /\b(?:what|which)\s+apps?\b|\bshow\s+me\s+the\s+apps\b|\bapplications?\s+(?:are\s+)?(?:available|installed)\b|\bwant\s+to\s+see\s+the\s+apps\b|\bfind\s+an?\s+app\b|\bcozyos\s+ina\s+(?:application|programu)\s+gani\b|\bkuna\s+(?:application|programu)\s+gani\b|\bnionyeshe\s+programu\b|\bkuna\s+(?:application|programu)\s+ngapi\b|\b(?:application|programu)\s+ngapi\b/i },
         // RP-036 fix — the previous pattern only matched the "how do I
         // register" phrasing, so a bare "Register", "I want to
         // register", "Create an account", "Sign me up", or any
@@ -499,7 +499,7 @@
             // important", "what problem does X solve", "how does
             // CozyOS change lives"), added after the same live-test
             // pass that broadened app-importance/why-use-cozyos above.
-            "muhimu", "tatizo", "nzuri", "nufaika", "atanufaika", "maisha", "inabadilisha"
+            "muhimu", "tatizo", "nzuri", "nufaika", "atanufaika", "maisha", "inabadilisha", "ngapi", "hii"
         ]);
         const words = text.toLowerCase().match(/[a-zà-ÿ]+/g) || [];
         if (words.length === 0) return null;
@@ -761,6 +761,24 @@
      * app-launch match, which already carries its own explicit name).
      */
     const REFERENCE_FOLLOWUP_PATTERN = /^(?:yes,?\s*)?(?:please\s+)?(?:open|launch|start|do)\s+(?:it|that)\b|^ifungue\b|^fungua\s+(?:hiyo|ile)\b/i;
+
+    /**
+     * APP_IMPORTANCE_FOLLOWUP_PATTERN — M363 real-device fix.
+     *
+     * Same real cross-turn reference-resolution shape as
+     * REFERENCE_FOLLOWUP_PATTERN above, for a different referent: a
+     * previously DISCUSSED application's human-purpose (not one being
+     * launched). A small, closed, anchored set of bare Kiswahili/English
+     * follow-ups found missing on a real device — "programu hii"/"hii"
+     * (this app), "hii inasaidiaje?"/"inanisaidiaje?" (how does this
+     * help), "kwa nini?" (why, bare), "nani atanufaika (na hii)?" (who
+     * benefits (from this)). Only ever consulted when ordinary intent
+     * classification found nothing AND a real previous turn actually
+     * discussed a specific, real application (conversationState.
+     * lastDiscussedApplication) — never overrides a genuine new,
+     * explicitly-named app-importance question.
+     */
+    const APP_IMPORTANCE_FOLLOWUP_PATTERN = /^(?:programu\s+)?hii\s*\??$|^hii\s+ina(?:ni)?saidia(?:je)?\??$|^kwa\s+nini\??$|^nani\s+atanufaika(?:\s+na\s+hii)?\??$/i;
 
     /**
      * CORRECTION_PATTERNS — RP-037 dependency #2 (Correction Handling)
@@ -1062,7 +1080,16 @@
                 // visionCapabilities are kept explicitly separate in
                 // the reply text.
                 const m = /\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+important\b|\bwhy\s+([a-z][\w' -]{1,40}?)\s+matters\b|\bwhat\s+(?:can|does|will)\s+([a-z][\w' -]{1,40}?)\s+(?:do\s+for|become|help)\b|\bkwa\s+nini\s+([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\b|\b([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+(?:ina|ita)nisaidia(?:je)?(?:\s+nini)?\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kusaidia\b|\btatizo\s+gani\s+([a-z][\w' -]{1,40}?)\s+inatatua\b/i.exec(rawText || "");
-                const candidate = m ? (m[1] || m[2] || m[3] || m[4] || m[5] || m[6] || m[7] || m[8] || "").trim() : "";
+                // M363 real-device fix — a bare contextual follow-up
+                // ("programu hii", "kwa nini?", "nani atanufaika?") has
+                // no subject of its own to capture; think() resolves it
+                // against the real previous turn's discussed
+                // application (conversationState.lastDiscussedApplication)
+                // and passes it here as options.contextualAppImportanceName
+                // — used ONLY when this exact utterance's own regex found
+                // nothing, so an explicitly-named question is never
+                // overridden by stale context.
+                const candidate = m ? (m[1] || m[2] || m[3] || m[4] || m[5] || m[6] || m[7] || m[8] || "").trim() : ((options && options.contextualAppImportanceName) || "");
                 const knowledge = window.CozyOS && window.CozyOS.CozyKnowledge;
                 // lang is forwarded so the KNOWLEDGE layer (not this
                 // provider, not the language-template frame) resolves
@@ -1195,9 +1222,35 @@
                 }
                 return template("language-support-list:not_found", lang);
             }
+            // M363 real-device fix — natural "how many apps / kuna
+            // programu ngapi" phrasing must state the real count and
+            // (EN/SW only, verified-translation discipline as
+            // elsewhere in this file) a short, real, per-app human-
+            // value line composed from getApplicationHumanPurposeFact()
+            // — never a second knowledge source, never invented text.
             case "list-apps": {
                 const fact = knowledge && typeof knowledge.listApplicationsFact === "function" ? safeCall(() => knowledge.listApplicationsFact()) : null;
                 if (fact && fact.evidence === "VERIFIED" && Array.isArray(fact.applications) && fact.applications.length > 0) {
+                    if (lang === "en" || lang === "sw") {
+                        const purposeClauses = [];
+                        for (const name of fact.applications) {
+                            const purposeFact = knowledge && typeof knowledge.getApplicationHumanPurposeFact === "function"
+                                ? safeCall(() => knowledge.getApplicationHumanPurposeFact(name, lang))
+                                : null;
+                            if (purposeFact && purposeFact.evidence === "VERIFIED" && purposeFact.purpose && purposeFact.purpose.humanPurpose) {
+                                // Real, already-VERIFIED text, trimmed to
+                                // its own first sentence only — this is a
+                                // count-and-list answer, not a full essay
+                                // per app (app-importance already gives
+                                // the full purpose on request).
+                                const firstSentence = String(purposeFact.purpose.humanPurpose).split(/(?<=[.!?])\s/)[0];
+                                purposeClauses.push(`${name}: ${firstSentence}`);
+                            }
+                        }
+                        const purposeLine = purposeClauses.join(" ");
+                        const frame = template("list-apps:verified-with-count", lang);
+                        if (typeof frame === "function") return frame(fact.applications.length, fact.applications, purposeLine);
+                    }
                     const frame = template("list-apps:verified", lang);
                     if (typeof frame === "function") return frame(fact.applications);
                 }
@@ -1333,6 +1386,25 @@
                 contextResolved = true;
             }
 
+            // M363 real-device fix — same real, closed follow-up
+            // resolution shape as immediately above, for "programu
+            // hii"/"hii inasaidiaje?"/"kwa nini?"/"nani atanufaika?"
+            // style bare human-purpose follow-ups. Only fires when
+            // ordinary classification found nothing (never overrides a
+            // genuine new, explicitly-named question — e.g. "Why is
+            // ShopOS important?" still classifies as app-importance
+            // with its own real candidate on its own, unaffected) and a
+            // real previous turn actually discussed a specific
+            // application (conversationState.lastDiscussedApplication,
+            // set further below — additive, never populated by
+            // app-launch turns, so this never conflates "opened X" with
+            // "asked about X's purpose").
+            let contextualAppImportanceName = null;
+            if (intent === "unsupported" && previousState && previousState.lastDiscussedApplication && APP_IMPORTANCE_FOLLOWUP_PATTERN.test(typeof text === "string" ? text.trim() : "")) {
+                intent = "app-importance";
+                contextualAppImportanceName = previousState.lastDiscussedApplication;
+            }
+
             // RP-037 dependency #2 — correction handling (see
             // CORRECTION_PATTERNS doc comment above). Only attempted
             // when this turn did NOT already classify as an explicit
@@ -1372,7 +1444,7 @@
             // all — see resolveLanguage()'s own doc comment for the
             // precedence rule this never overrides.
             const resolvedLanguage = resolveLanguage({ ...options, detectedLanguage: detectLanguageHeuristic(text) });
-            let replyText = await composeReply(intent, resolvedLanguage.code, text, options);
+            let replyText = await composeReply(intent, resolvedLanguage.code, text, { ...options, contextualAppImportanceName });
             if (resolvedLanguage.fallback) {
                 const templates = window.CozyOS && window.CozyOS.CozyLanguageTemplates;
                 const disclosureFn = templates && templates.FALLBACK_DISCLOSURE && templates.FALLBACK_DISCLOSURE[resolvedLanguage.code];
@@ -1448,6 +1520,39 @@
             const conversationState = {
                 lastIntent: intent,
                 lastApplication: (intent === "app-launch" && application) ? application : null,
+                // M363 real-device fix — tracks the real, registry-
+                // confirmed application a genuine app-importance turn
+                // discussed (fresh mention or a chained contextual
+                // follow-up), so the NEXT bare follow-up ("kwa nini?",
+                // "nani atanufaika?") can resolve against it via
+                // APP_IMPORTANCE_FOLLOWUP_PATTERN above. Deliberately
+                // separate from lastApplication (app-launch's own
+                // field) — discussing an app's purpose is not the same
+                // real event as opening it, and this must never let an
+                // app-launch "open it" follow-up resolve against an
+                // app someone only asked ABOUT. Only ever set to a name
+                // resolveApplicationByName() itself confirms is real —
+                // never the raw, unverified candidate string.
+                lastDiscussedApplication: (() => {
+                    if (intent !== "app-importance") return null;
+                    const freshMatch = /\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+important\b|\bwhy\s+([a-z][\w' -]{1,40}?)\s+matters\b|\bwhat\s+(?:can|does|will)\s+([a-z][\w' -]{1,40}?)\s+(?:do\s+for|become|help)\b|\bkwa\s+nini\s+([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\b|\b([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+(?:ina|ita)nisaidia(?:je)?(?:\s+nini)?\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kusaidia\b|\btatizo\s+gani\s+([a-z][\w' -]{1,40}?)\s+inatatua\b/i.exec(typeof text === "string" ? text : "");
+                    const freshCandidate = freshMatch ? (freshMatch[1] || freshMatch[2] || freshMatch[3] || freshMatch[4] || freshMatch[5] || freshMatch[6] || freshMatch[7] || freshMatch[8] || "").trim() : "";
+                    const candidateToCheck = freshCandidate || contextualAppImportanceName;
+                    if (!candidateToCheck) return null;
+                    // Verified the SAME way composeReply's own
+                    // app-importance case verifies it — via
+                    // getApplicationHumanPurposeFact(), not
+                    // resolveApplicationByName() (a different,
+                    // ServiceRegistry-based check that may legitimately
+                    // be empty on a page with no registered
+                    // applications yet, per the M355 checkpoint's own
+                    // documented finding — human-purpose data is a
+                    // separate, real source, not gated on that).
+                    const purposeFact = window.CozyOS && window.CozyOS.CozyKnowledge && typeof window.CozyOS.CozyKnowledge.getApplicationHumanPurposeFact === "function"
+                        ? safeCall(() => window.CozyOS.CozyKnowledge.getApplicationHumanPurposeFact(candidateToCheck, resolvedLanguage.code))
+                        : null;
+                    return (purposeFact && purposeFact.evidence === "VERIFIED") ? candidateToCheck : null;
+                })(),
                 lastLanguage: resolvedLanguage.code
             };
 

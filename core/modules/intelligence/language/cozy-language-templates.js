@@ -283,6 +283,18 @@
             ar: (names) => `هذه هي تطبيقات CozyOS التي يمكنني رؤيتها حاليًا في السجل: ${names.join("، ")}.`,
             so: (names) => `Kuwan waa app-yada CozyOS ee aan hadda ku arki karo diiwaanka: ${names.join(", ")}.`
         }),
+        // M363 real-device fix — "Kuna programu ngapi na inasaidia
+        // aje?" (how many applications are there, and how do they
+        // help?) needs the real COUNT stated explicitly (not just an
+        // implied list) plus a short, real, per-app human-value line —
+        // composed here only from getApplicationHumanPurposeFact()'s
+        // already-VERIFIED data (cozy-knowledge-registry.js), never
+        // invented. EN+SW only (human-authored); fr/ar/so keep using
+        // the plain "list-apps:verified" template above, unchanged.
+        "list-apps:verified-with-count": Object.freeze({
+            en: (count, names, purposeLine) => `CozyOS currently has ${count} real, registered application${count === 1 ? "" : "s"}: ${names.join(", ")}.${purposeLine ? ` ${purposeLine}` : ""}`,
+            sw: (count, names, purposeLine) => `CozyOS ina programu ${count} halisi zilizosajiliwa kwa sasa: ${names.join(", ")}.${purposeLine ? ` ${purposeLine}` : ""}`
+        }),
         "list-apps:unavailable": Object.freeze({
             en: "I can help you find the CozyOS apps, but the application registry isn't available right now.",
             sw: "Naweza kukusaidia kutafuta programu za CozyOS, lakini rejista ya programu haipatikani kwa sasa.",

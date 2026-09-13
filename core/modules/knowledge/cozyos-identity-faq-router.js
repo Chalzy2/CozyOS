@@ -131,6 +131,20 @@
                 "ni nini kilichochochea cozyos", "hadithi ya cozyos ni nini", "tatizo gani lilisababisha cozyos",
                 "cozyos ilianzishwa kutatua tatizo gani",
                 "cozyos ilianzishwa kwa ajili ya nini", "cozyos ilijengwa kwa ajili ya nini",
+                // M363 real-device fix — "kwa nini CozyOS ilianzishwa?"
+                // (why was CozyOS founded/started, passive voice with
+                // "ilianzishwa") and "kwa nini alianzisha CozyOS?"
+                // (why did he found CozyOS, active voice) failed to
+                // match anything: this trigger list only had "iliundwa"
+                // (was created/built), a different real verb with no
+                // shared vocabulary once "kwa"/"nini" are stopworded.
+                // Same already-answered origin/story question
+                // (answerWhyCreated()), no new prose.
+                "kwa nini cozyos ilianzishwa", "cozyos ilianzishwa kwa nini", "kwa nini alianzisha cozyos",
+                // Bare form (no explicit "CozyOS" object) — real,
+                // natural shorthand for the same question when CozyOS
+                // is already the obvious subject of the conversation.
+                "kwa nini alianzisha",
                 // M355 Kiswahili wiring pass — real, previously-unmatched
                 // natural synonyms for "origin/story" ("chimbuko"/
                 // "asili"/"chanzo") and natural "tell me about" request
