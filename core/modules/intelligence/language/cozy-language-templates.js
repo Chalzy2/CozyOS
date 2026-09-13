@@ -103,6 +103,19 @@
             ar: "يمكنني المساعدة في البحث، والإشعارات، والنشاط الأخير، والأسئلة الحوارية البسيطة حول CozyOS نفسه — من أنشأه، وما التطبيقات ومزوّدو الخدمة المتاحون، وكيف يعمل التسجيل والمصادقة، وماذا تعني حالات الحساب/المزوّد. فهمي قائم على القواعد، لذا سأخبرك دائمًا بصدق عندما يكون الأمر خارج ما أتعرف عليه حاليًا.",
             so: "Waan kaa caawin karaa raadinta, ogeysiisyada, dhaqdhaqaaqa dhawaan dhacay, iyo su'aalo fudud oo ku saabsan CozyOS lafteeda — cidda abuurtay, ka fiican maxay tahay app-yada iyo bixiyeyaasha (providers) ee la heli karo, sida diiwaangelinta iyo xaqiijinta u shaqeeyaan, iyo waxa ay ka dhigan tahay xaaladaha akoonka/bixiyaha. Fahamkaygu waxa uu ku salaysan yahay xeerar, sidaas darteed had iyo jeer si daacad ah ayaan kuu sheegi doonaa marka wax ka baxsan yahay waxa aan hadda aqoonsanahay."
         }),
+        // M355 fix — fixed-text meta answer, same convention as
+        // "identity"/"help" above: describes CozyOS's own real,
+        // already-implemented VERIFIED vs PLANNED/VISION separation
+        // discipline. Not sourced from a per-topic fact getter because
+        // it isn't a per-topic claim — it's a statement of how this
+        // system itself is built to answer, true across every intent
+        // in this file. EN+SW fully authored (this pass's disclosed
+        // gap was found via a Kiswahili-adjacent audit); fr/ar/so
+        // deliberately left to getTemplate()'s honest en fallback.
+        "meta-verified-vs-planned": Object.freeze({
+            en: "CozyOS separates VERIFIED information (implemented, tested, and confirmed today) from PLANNED/VISION information (the intended direction, not yet built) in every answer I give. I never blend the two or present a plan as if it already exists. Ask me about a specific application or topic and I'll tell you which category applies.",
+            sw: "CozyOS hutenganisha taarifa ZILIZOTHIBITISHWA (zilizojengwa, kujaribiwa, na kuthibitishwa leo) na taarifa za MPANGO/DIRA (mwelekeo uliokusudiwa, ambao bado haujajengwa) katika kila jibu ninalotoa. Sichanganyi hizo mbili wala kuwasilisha mpango kana kwamba tayari upo. Niulize kuhusu programu au mada mahususi nami nitakuambia kategoria inayohusika."
+        }),
         // ── RP-036 navigation intents ─────────────────────────────
         // en/sw fully authored (Kiswahili support is a hard
         // requirement of RP-036). fr/ar/so deliberately have no entry
@@ -142,6 +155,16 @@
             fr: "Je n'ai pas encore de réponse basée sur des règles pour cela — pour l'instant, ma compréhension conversationnelle couvre uniquement les salutations, les demandes d'aide, les remerciements, et un ensemble de questions déclarées sur CozyOS lui-même. C'est une limite réelle et déclarée, pas une erreur.",
             ar: "ليس لدي بعد إجابة قائمة على القواعد لذلك — حاليًا فهمي الحواري يغطي فقط التحيات، وطلبات المساعدة، والشكر، ومجموعة من الأسئلة المُعلنة حول CozyOS نفسه. هذا حد حقيقي ومُعلن، وليس خطأً.",
             so: "Wali ma haysto jawaab ku salaysan xeerar taas — hadda fahamkayga wadahadalka wuxuu koobayaa oo kaliya salaanta, codsiyada caawimada, mahadnaqa, iyo su'aalo la sheegay oo ku saabsan CozyOS lafteeda. Taasi waa xad dhab ah oo la sheegay, mana aha khalad."
+        }),
+        // M360 ASK-AND-LEARN — same honest disclosure as "unsupported"
+        // above, PLUS a real, natural clarifying question, per the M360
+        // spec's own example phrasing ("Unamaanisha nini?"). EN+SW only
+        // (human-authored, not machine-translated); see the composeReply
+        // call site in rule-based-conversational-provider.js for why
+        // fr/ar/so deliberately do NOT fall back to this key.
+        "unsupported-clarify": Object.freeze({
+            en: "I don't have a rule-based answer for that yet — my conversational understanding today only covers greetings, help requests, thanks, and a set of disclosed questions about CozyOS itself. What do you mean? Could you say it a different way?",
+            sw: "Bado sina jibu la kanuni kwa hilo — kwa sasa uelewa wangu wa mazungumzo unahusisha tu salamu, maombi ya msaada, shukrani, na maswali yaliyowekwa wazi kuhusu CozyOS yenyewe. Unamaanisha nini? Unaweza kunieleza kwa njia nyingine?"
         }),
 
         "what-is-cozyos": Object.freeze({

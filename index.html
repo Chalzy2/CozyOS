@@ -253,6 +253,8 @@
 <script src="core/modules/intelligence/language/cozy-language-registry.js"></script>
 <script src="core/modules/intelligence/language/cozy-language-templates.js"></script>
 <script src="core/modules/intelligence/knowledge/cozy-knowledge-registry.js"></script>
+<!-- M363 fix: this real, complete, previously-written file (registers window.CozyOS.CozyPublicKnowledge, the owner-approved vision/why-use/language-support-list facts) was never actually loaded on any real page - confirmed by a real Playwright/Chromium run showing why-use-cozyos/differentiation/language-support-list always resolving to NOT_FOUND live. Composed by cozy-knowledge-registry.js at CALL time only (see that file's own header), so exact placement order does not matter, only that it is present. -->
+<script src="core/modules/intelligence/knowledge/cozy-public-knowledge-source.js"></script>
 <!-- Checkpoint K — the verified intelligence chain (Checkpoints F-J),
      real and previously reachable only from admin-workspace.html /
      Node tests. Wired here, in the same dependency order already
@@ -495,12 +497,30 @@
 
     if (bus && typeof bus.once === "function") {
       bus.once("cozy:launch-sequence-complete", proceedOnce);
-      // Honest, bounded fallback matching the approved timeline's real
-      // total duration (500ms Stage1 + 2500ms Stage2 + ~1000ms typing/
-      // hold + voice + ~1000ms motto + settle, generously rounded up so
-      // real voice-playback variance never cuts the sequence short) -
-      // never blocks forever if the event is somehow never emitted.
-      setTimeout(proceedOnce, 10000);
+      // M356 TIMING FIX: this fallback was 10000ms — stale from an
+      // older, shorter cut of the sequence (per the comment it used to
+      // carry: "500ms Stage1 + 2500ms Stage2 + ~1000ms typing + ~1000ms
+      // motto"). The real, current core/shell/launch-sequence.js
+      // timeline (STARTUP_TIMING) is materially longer: 1500ms
+      // pre-reveal + 1500ms logo + 800ms typing + a full 10000ms
+      // "ABOVE ONLY" identity stage (M373) + ~3500ms motto reveal +
+      // motto voice + a 2200ms breathing hold — genuinely ~19.5-20s+
+      // before "cozy:launch-sequence-complete" fires (never touched by
+      // this fix). Because 10000ms elapsed BEFORE that real event, this
+      // fallback was winning the race on every single real page load,
+      // cutting the sequence off mid-"ABOVE ONLY" (before the tagline
+      // ever got to render) and immediately navigating to login.html —
+      // which then plays the ENTIRE sequence again from a fresh page
+      // load. That double-play, from mid-animation, is the real cause
+      // of "BUILT FOR AFRICA..." appearing to fire at the wrong time and
+      // of the background/sound seeming out of sync — not a bug in the
+      // animation, color, or sound code itself, only in this fallback's
+      // stale duration. Raised to 30000ms — the same, already-correct,
+      // already-shipped bound login.html itself uses for this identical
+      // real timeline (see login.html's own proceedOnce() fallback) —
+      // so in normal operation the real completion event always wins
+      // this race and this timer never actually fires.
+      setTimeout(proceedOnce, 30000);
     } else {
       // PlatformEventBus or the shared sequence genuinely failed to
       // load - honest fallback so a visitor is never stuck on a green

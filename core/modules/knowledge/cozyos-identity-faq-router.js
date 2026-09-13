@@ -90,7 +90,17 @@
                 "who is the person behind cozyos", "what company is behind cozyos"],
             sw: ["nani alianzisha cozyos", "nani aliunda cozyos", "nani alijenga cozyos", "nani mwanzilishi wa cozyos",
                 "nani mmiliki wa cozyos", "nani yuko nyuma ya cozyos", "nani anaendesha cozyos",
-                "mwanzilishi wa cozyos ni nani", "muundaji wa cozyos ni nani"]
+                "mwanzilishi wa cozyos ni nani", "muundaji wa cozyos ni nani",
+                // M355 Kiswahili wiring pass — real, previously-unmatched
+                // relative-clause phrasings ("aliyeanzisha"/"aliyeunda"/
+                // "aliyejenga" = "[the one] who founded/created/built",
+                // grammatically distinct from the plain verb forms
+                // above, so the word-overlap scorer had no shared
+                // vocabulary to match against). Same already-answered
+                // COZYOS_FOUNDER question, no new answer text.
+                "ni nani aliyeanzisha cozyos", "nani aliyeanzisha cozyos", "aliyeanzisha cozyos ni nani",
+                "ni nani aliyeunda cozyos", "nani aliyeunda cozyos", "aliyeunda cozyos ni nani",
+                "nani aliyejenga cozyos", "ni nani mwasisi wa cozyos"]
         },
         [INTENTS.COZYOS_ORIGIN]: {
             en: ["how did cozyos begin", "when did cozyos start", "when was cozyos created", "why was cozyos created",
@@ -120,7 +130,16 @@
             sw: ["cozyos ilianzaje", "cozyos ilianzishwa lini", "kwa nini cozyos iliundwa", "wazo la cozyos lilitoka wapi",
                 "ni nini kilichochochea cozyos", "hadithi ya cozyos ni nini", "tatizo gani lilisababisha cozyos",
                 "cozyos ilianzishwa kutatua tatizo gani",
-                "cozyos ilianzishwa kwa ajili ya nini", "cozyos ilijengwa kwa ajili ya nini"]
+                "cozyos ilianzishwa kwa ajili ya nini", "cozyos ilijengwa kwa ajili ya nini",
+                // M355 Kiswahili wiring pass — real, previously-unmatched
+                // natural synonyms for "origin/story" ("chimbuko"/
+                // "asili"/"chanzo") and natural "tell me about" request
+                // forms, sharing no vocabulary with the phrases above.
+                // Same already-answered origin/story question
+                // (answerWhyCreated(), unchanged), no new prose.
+                "chimbuko la cozyos", "asili ya cozyos", "chanzo cha cozyos",
+                "nieleze kuhusu chimbuko la cozyos", "nieleze kuhusu asili ya cozyos",
+                "nieleze kuhusu cozyos", "eleza kuhusu cozyos", "niambie hadithi ya cozyos"]
         },
         [INTENTS.COZYOS_MISSION]: {
             en: ["what is cozyos's mission", "what is the mission of cozyos", "what does cozyos aim to achieve",
@@ -229,7 +248,50 @@
     const OVERLAP_STOPWORDS = new Set([
         "cozyos", "cozyai", "what", "is", "are", "was", "were", "the", "a", "an",
         "of", "to", "in", "on", "for", "do", "does", "did", "it", "its", "this",
-        "that", "and", "or", "how", "i"
+        "that", "and", "or", "how", "i",
+        // M355 fix — pre-existing gap found while adding the Kiswahili
+        // phrasings below (unrelated to that addition; confirmed present
+        // in the original, unmodified file first): "tell"/"me"/"about"
+        // are generic request-verb connectives, not CozyOS-specific
+        // content, so a completely unrelated question ("Tell me the
+        // administrator password") was clearing MATCH_THRESHOLD against
+        // the "tell me about cozyos" trigger purely by sharing "tell"/
+        // "me" — the exact false-positive class this stopword set exists
+        // to prevent (see the comment above it). The literal phrase
+        // "tell me about cozyos" itself still matches via the substring
+        // check above (score 1), unaffected.
+        "tell", "me", "about",
+        // Kiswahili wiring pass — the equivalent Kiswahili glue words
+        // for the same "tell/explain me about X" request shape
+        // ("nieleze"/"eleza"/"niambie"/"kuhusu"), so the new Kiswahili
+        // phrasings added below gain real distinguishing power (e.g.
+        // "chimbuko"/"asili"/"hadithi") instead of matching on the
+        // generic request verb alone.
+        "nieleze", "eleza", "niambie", "kuhusu",
+        // M363 fix — real, browser-confirmed false positive: "CozyOS ina
+        // application gani?" (a genuine app-list question, no app-list
+        // intent exists in THIS router at all) fuzzy-matched
+        // COZYOS_UNIQUENESS's "cozyos ina upekee gani" trigger at 0.667
+        // confidence, purely by sharing "ina"/"gani" — common Kiswahili
+        // grammatical words ("has/is" and "what kind/which") with no
+        // real distinguishing power, exactly the class of false positive
+        // this stopword set exists to prevent (see the English-only
+        // words above and their own comment). Verified via a real
+        // Playwright/Chromium run of the mounted Live Assistant before
+        // this fix, and re-verified after.
+        "ina", "gani",
+        // M363 — real, extremely common Kiswahili grammatical words
+        // (kwa=for/by, nini=what, ni=is/am/are), the exact Kiswahili
+        // counterparts of the English "what"/"is"/"for" already
+        // stopworded above, with the same "shared by nearly every
+        // trigger and every real question, no distinguishing power"
+        // property. Found via a live browser test: "Kwa nini ChurchOS
+        // ni muhimu?" was fuzzy-matching COZYOS_UNIQUENESS's "kwa nini
+        // cozyos ni maalum" at 0.75 confidence purely by sharing these
+        // three words, never "maalum" (the one real distinguishing
+        // word in that trigger) or "muhimu"/"churchos" (present only
+        // in the query).
+        "kwa", "nini", "ni"
     ]);
     function _distinguishingWordSet(s) {
         const ws = new Set();
@@ -258,9 +320,37 @@
      * best — a real signal (not a language detector), used only to pick
      * which canonical answer language to prefer by default.
      */
+    // M363 — real, disclosed scope guard. This router answers questions
+    // about CozyOS the PLATFORM (founder/origin/mission/vision/etc.)
+    // from window.CozyOS.DeveloperIdentity only — it owns no per-
+    // application knowledge at all (that is
+    // getApplicationHumanPurposeFact()'s job, composed elsewhere in
+    // rule-based-conversational-provider.js's own "app-importance"/
+    // "app-info" intents). Before this fix, a real, natural question
+    // about a NAMED application ("Ni tatizo gani ShopOS inatatua?")
+    // could still fuzzy-match a generic platform trigger via shared
+    // grammatical words (e.g. "tatizo"/"inatatua" alone reaching 100%
+    // overlap against COZYOS_MISSION's "cozyos inatatua tatizo gani"
+    // once short/common words are stopworded) and confidently answer
+    // with the wrong, platform-level text instead of the app's own
+    // real, verified human-purpose data. Real, committed application
+    // names only (the same ones with real human-purpose records in
+    // cozy-knowledge-registry.js) — never a guess at what "sounds like"
+    // an app name.
+    const KNOWN_OTHER_APPLICATIONS = Object.freeze([
+        "shopos", "churchos", "mpesaos", "quarryos", "pharmacyos", "wholesaleos", "interestos"
+    ]);
+    function _mentionsOtherApplication(normQuery) {
+        return KNOWN_OTHER_APPLICATIONS.some((name) => normQuery.includes(name));
+    }
+
     function detectIntent(text) {
         const normQuery = _normalize(text);
         if (!normQuery) return null;
+        // Real scope guard (see comment above) — a query naming another
+        // real CozyOS application is never this router's to answer,
+        // regardless of how high a fuzzy score it might otherwise reach.
+        if (_mentionsOtherApplication(normQuery)) return null;
         let best = null;
         for (const intentId of Object.keys(TRIGGERS)) {
             for (const langHint of ["en", "sw"]) {

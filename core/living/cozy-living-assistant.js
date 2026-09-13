@@ -567,6 +567,20 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
             // the exact function cozy-workspace.js itself already uses
             // to decide which applications to show — instead of having
             // no user context to authorize against at all.
+            // M363 — considered also feeding this.#currentLanguage
+            // forward into ai.think() as a carried-forward language
+            // hint, but reverted: the provider's resolveLanguage() has
+            // no "soft, only-if-nothing-else-detected" precedence tier
+            // lower than per-message detection — passing it as `manual`
+            // (the only slot that could carry it) would have made a
+            // clearly English follow-up message after one Kiswahili turn
+            // incorrectly stay in Kiswahili for the whole conversation
+            // (manual outranks this-turn detection). Real per-message
+            // detection (detectLanguageHeuristic() below) already runs
+            // fresh on every turn — improving via the marker list
+            // (below) is the safe fix; forcing continuity across turns
+            // is not, without a real "soft preference" precedence tier
+            // this file does not have today.
             const result = (ai && typeof ai.think === "function")
                 ? await ai.think(text, { context: this.#currentSection, conversationId, actorId: this.#resolveActorId() })
                 : null;
@@ -655,7 +669,28 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
             if (!isNonEmptyReplyText(replyText)) {
                 const ruleBasedReply = (result && result.success) ? resolveConversationalReply(result.result) : null;
                 const ruleBasedHasRealAnswer = !!ruleBasedReply && result.result && result.result.intent !== "unsupported";
+                // M363 fix — real gap found via a live browser test: a
+                // genuinely unmatched, non-English turn (e.g. Kiswahili)
+                // was always answered with CozyAnswerEngine's own
+                // English-only, hardcoded "I don't have verified
+                // information..." fallback (unknownRequestFallbackAnswer),
+                // completely bypassing the rule-based provider's own
+                // honest, LANGUAGE-AWARE "unsupported"/clarifying reply
+                // (M360's Kiswahili "Unamaanisha nini?") that was sitting
+                // right there in ruleBasedReply. CozyAnswerEngine has no
+                // language concept at all (confirmed by reading it) — it
+                // is not being duplicated or modified here; this only
+                // changes which of the two EXISTING honest fallbacks
+                // cozy-living-assistant.js prefers, and only when the
+                // resolved language for this turn is not English, so
+                // every existing English-path test/behavior (where
+                // CozyAnswerEngine's fallback was already being used) is
+                // completely unaffected.
+                const resolvedLanguage = result && result.result && result.result.language;
+                const preferLocalizedFallback = !ruleBasedHasRealAnswer && !!ruleBasedReply && resolvedLanguage && resolvedLanguage !== "en";
                 if (ruleBasedHasRealAnswer) {
+                    replyText = ruleBasedReply;
+                } else if (preferLocalizedFallback) {
                     replyText = ruleBasedReply;
                 } else if (unknownRequestFallbackAnswer) {
                     replyText = unknownRequestFallbackAnswer;

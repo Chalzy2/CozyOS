@@ -218,7 +218,19 @@
         // swallow them. Sourced exclusively from cozy-public-
         // knowledge-source.js (owner-approved vision-policy doc) —
         // never founder-story-seed.js.
-        { id: "why-use-cozyos", pattern: /\bwhy\s+(?:should|would)\s+(?:i|someone|you)\s+use\s+cozyos\b|\bwhy\s+use\s+cozyos\b|\bbenefits?\s+of\s+cozyos\b|\bwhy\s+cozyos\b|\bkwa\s+nini\s+nitumie(?:\s+cozyos)?\b|\bkwa\s+nini\s+(?:ni)?tumie\s+cozyos\b|\bfaida\s+za\s+cozyos\b/i },
+        // M363 — real, natural Kiswahili variants of "why should I use
+        // CozyOS" found missing via the task's own example questions:
+        // "CozyOS itanisaidia nini?" (future tense "will it help me"),
+        // "Mtumiaji anapata faida gani?" (what benefit does the user
+        // get), "Kwa nini CozyOS ni nzuri kwa Afrika?" (why is CozyOS
+        // good for Africa), "CozyOS inabadilisha maisha ya mtu kwa njia
+        // gani?" (how does CozyOS change someone's life). Same existing
+        // why-use-cozyos answer (mission-derived, EN+SW, already
+        // separates offline-first/multilingual/community/African-focus
+        // — genuinely covers all four of these framings); no new
+        // answer text, only recognizing more real ways people ask for
+        // it.
+        { id: "why-use-cozyos", pattern: /\bwhy\s+(?:should|would)\s+(?:i|someone|you)\s+use\s+cozyos\b|\bwhy\s+use\s+cozyos\b|\bbenefits?\s+of\s+cozyos\b|\bwhy\s+cozyos\b|\bkwa\s+nini\s+nitumie(?:\s+cozyos)?\b|\bkwa\s+nini\s+(?:ni)?tumie\s+cozyos\b|\bfaida\s+za\s+cozyos\b|\bcozyos\s+itanisaidia\s+nini\b|\bcozyos\s+inanisaidia\s+nini\b|\bmtumiaji\s+anapata\s+faida\s+gani\b|\bkwa\s+nini\s+cozyos\s+ni\s+nzuri\s+kwa\s+afrika\b|\bcozyos\s+inabadilisha\s+maisha\s+(?:ya\s+mtu\s+)?kwa\s+njia\s+gani\b/i },
         { id: "differentiation", pattern: /\bhow\s+is\s+cozyos\s+different\b|\bwhat\s+makes\s+cozyos\s+different\b|\bhow\s+does\s+cozyos\s+differ\b|\bcozyos\s+vs\.?\s|\bcompared\s+to\s+other\s+apps?\b|\binatofautianaje\b|\btofauti\s+(?:ya|na)\s+cozyos\b|\bcozyos\s+inatofautiana(?:naje)?\b/i },
         { id: "language-support-list", pattern: /\bwhich\s+languages?\s+(?:does\s+)?cozyos\s+support\b|\bwhat\s+languages?\s+(?:does\s+)?cozyos\s+support\b|\blanguage\s+support\b|\bsupported\s+languages\b|\blugha\s+(?:zipi|gani)\s+(?:zinazoungwa\s+mkono|zinazotumika)\b|\bcozyos\s+inaunga\s+mkono\s+lugha\s+gani\b|\b(?:do|does|can)\s+(?:you|cozyos)\s+(?:speak|understand)\s+[a-z\u00c0-\u024f]+\b|\b(?:una\s*(?:jua|elewa|zungumza)|(?:je,?\s*)?cozyos\s+in(?:aweza|ajua|azungumza))\s+(?:ki)?[a-z]+\b/i },
 
@@ -253,6 +265,22 @@
         { id: "object-identification", pattern: /\bwhat\s+is\s+(?:this|that)\b|\bhiki\s+ni\s+nini\b|\bhicho\s+ni\s+nini\b/i },
         { id: "founder", pattern: /\bwho\s+(?:created|made|built|founded)\s+(?:you|cozyos)\b|\bfounder\b|\bwho\s+owns\s+cozyos\b|\bowner\s+of\s+cozyos\b/i },
         { id: "what-is-cozyos", pattern: /\bwhat\s+is\s+cozyos\b|\bcozyos\s+ni\s+nini\b/i },
+        // M355 fix — genuine classifier gap found and disclosed in
+        // AUDIT-CHECKPOINT-V2: "What is verified vs planned?" has the
+        // exact surface shape of app-info's generic "what is X" pattern
+        // (X = "verified vs planned"), so app-info's catch-all below
+        // was matching first and misrouting it into the app-name-lookup
+        // path (wrong template, not a fabricated answer, but the wrong
+        // one). This intent must be listed BEFORE app-info so its more
+        // specific pattern wins. The reply itself states the system's
+        // own real, already-implemented VERIFIED/PARTIALLY_VERIFIED/
+        // NOT_FOUND vs PLANNED-VISION separation discipline (visible
+        // throughout this file's own templates and RP-027's Fact
+        // Safety Rule) — a fixed, disclosed statement of how CozyOS
+        // itself behaves, not a claim requiring per-topic evidence, so
+        // it is composed the same way as the other fixed-text intents
+        // below (identity/help/etc.), never via a fabricated fact.
+        { id: "meta-verified-vs-planned", pattern: /\bverified\s+(?:vs\.?|versus|and|or)\s+planned\b|\bplanned\s+(?:vs\.?|versus|and|or)\s+verified\b|\bdifference\s+between\s+verified\s+and\s+planned\b|\bverified\s+vs\.?\s+vision\b|\bkilicho\s*thibitishwa\s+na\s+kilicho\s*pangwa\b|\bthibitishwa\s+dhidi\s+ya\s+(?:kilicho)?pangwa\b/i },
         { id: "app-info", pattern: /\bwhat\s+is\s+([a-z][\w' -]{1,40}?)\??\s*$|\btell\s+me\s+about\s+([a-z][\w' -]{1,40}?)\.?\s*$|\b([a-z][\w' -]{1,40}?)\s+ni\s+nini[.!?]*\s*$|\bni\s+nini\s+([a-z][\w' -]{1,40}?)\??\s*$/i },
         // ChurchOS human-purpose/importance dependency — recognizes
         // "why does X matter to people" phrasing, distinct from
@@ -261,7 +289,18 @@
         // Currently only ChurchOS has real committed human-purpose
         // data (getApplicationHumanPurposeFact()) — any other
         // application honestly falls through to a not-found reply.
-        { id: "app-importance", pattern: /\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+important\b|\bwhy\s+([a-z][\w' -]{1,40}?)\s+matters\b|\bwhat\s+(?:can|does|will)\s+([a-z][\w' -]{1,40}?)\s+(?:do\s+for|become|help)\b|\b([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+inanisaidia\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kusaidia\b/i },
+        // M363 — real, natural Kiswahili variants found missing via
+        // the task's own example questions: "kwa nini X ni muhimu"
+        // (why-fronted, the far more natural Kiswahili question order
+        // vs. the existing postfix-only "X ni muhimu kwa nini"),
+        // "X inanisaidiaje"/"itanisaidia nini" (helps-me-how, and
+        // future tense), and "tatizo gani X inatatua" (what problem
+        // does X solve — the app name sits BETWEEN the trigger words,
+        // a real, different sentence shape from every existing
+        // capture group here). Same existing app-importance answer
+        // (getApplicationHumanPurposeFact(), unchanged) — only
+        // recognizing more real ways people ask for it.
+        { id: "app-importance", pattern: /\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+important\b|\bwhy\s+([a-z][\w' -]{1,40}?)\s+matters\b|\bwhat\s+(?:can|does|will)\s+([a-z][\w' -]{1,40}?)\s+(?:do\s+for|become|help)\b|\bkwa\s+nini\s+([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\b|\b([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+(?:ina|ita)nisaidia(?:je)?(?:\s+nini)?\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kusaidia\b|\btatizo\s+gani\s+([a-z][\w' -]{1,40}?)\s+inatatua\b/i },
         // Natural Human Record Capture dependency (first slice) —
         // recognizes a narrow, disclosed "add a new church member"
         // statement. Not general NLU: a specific, honestly-scoped
@@ -269,7 +308,20 @@
         // real, existing, authoritative ChurchOS.createMember() -
         // never a parallel/invented record store.
         { id: "record-church-member", pattern: /\badd\s+([a-z][a-z' -]{1,30}?)(?:\s+([a-z][a-z' -]{1,30}?))?\s+as\s+(?:a\s+)?(?:new\s+)?member\b|\bongeza\s+([a-z][a-z' -]{1,30}?)(?:\s+([a-z][a-z' -]{1,30}?))?\s+kama\s+mwanachama\b/i },
-        { id: "list-apps", pattern: /\b(?:what|which)\s+apps?\b|\bshow\s+me\s+the\s+apps\b|\bapplications?\s+(?:are\s+)?(?:available|installed)\b|\bwant\s+to\s+see\s+the\s+apps\b|\bfind\s+an?\s+app\b/i },
+        // M363 fix — real gap found via a live browser test of the
+        // mounted Live Assistant: "CozyOS ina application gani?" /
+        // "CozyOS ina programu gani?" (real, natural Kiswahili phrasings
+        // of "what applications does CozyOS have") had NO Kiswahili
+        // pattern here at all (English-only before this fix), so once
+        // the upstream CozyIdentityFAQRouter's own false-positive on
+        // this phrase was fixed (see that file's own M363 comment), the
+        // query would have fallen all the way through to "unsupported"
+        // instead of reaching this real, ServiceRegistry-backed answer.
+        // "programu" (the everyday Kiswahili word for "app"/"program",
+        // already used elsewhere in this same file's own sw templates)
+        // is included alongside "application" since a real Kiswahili
+        // speaker is at least as likely to use it.
+        { id: "list-apps", pattern: /\b(?:what|which)\s+apps?\b|\bshow\s+me\s+the\s+apps\b|\bapplications?\s+(?:are\s+)?(?:available|installed)\b|\bwant\s+to\s+see\s+the\s+apps\b|\bfind\s+an?\s+app\b|\bcozyos\s+ina\s+(?:application|programu)\s+gani\b|\bkuna\s+(?:application|programu)\s+gani\b|\bnionyeshe\s+programu\b/i },
         // RP-036 fix — the previous pattern only matched the "how do I
         // register" phrasing, so a bare "Register", "I want to
         // register", "Create an account", "Sign me up", or any
@@ -435,7 +487,19 @@
             // same reason, to genuinely detect the new phrasings
             // rather than relying on "akaunti" alone happening to be
             // present.
-            "usajili", "kutengeneza", "tengeneza", "kuunda", "unda", "nifanye", "ninaanzaje"
+            "usajili", "kutengeneza", "tengeneza", "kuunda", "unda", "nifanye", "ninaanzaje",
+            // M363 — a handful more real, common, unambiguous Kiswahili
+            // words (not English homographs), added after a live
+            // browser test showed genuinely novel Kiswahili sentences
+            // using these exact words had no marker to detect on at
+            // all. Whole-word matching only, same as every marker
+            // above — no behavior change for any existing marker/test.
+            "sielewi", "elewi", "samahani", "kwaheri", "karibu", "ndiyo", "hapana", "vizuri",
+            // M363 — human-benefit-question markers ("why is X
+            // important", "what problem does X solve", "how does
+            // CozyOS change lives"), added after the same live-test
+            // pass that broadened app-importance/why-use-cozyos above.
+            "muhimu", "tatizo", "nzuri", "nufaika", "atanufaika", "maisha", "inabadilisha"
         ]);
         const words = text.toLowerCase().match(/[a-zà-ÿ]+/g) || [];
         if (words.length === 0) return null;
@@ -507,6 +571,11 @@
         "identity": "I'm the CozyOS Assistant. Right now I answer using a real, rule-based conversational composer (not a language model) alongside CozyOS's real reasoning, memory, and policy pipeline.",
         "help": "I can help with search, notifications, recent activity, and simple conversational questions. My conversational understanding today is rule-based — I honestly recognize greetings, help requests, thanks, and questions about who I am; anything outside that, I'll tell you honestly that I don't have a rule-based answer for it yet.",
         "unsupported": "I don't have a rule-based answer for that yet — right now my conversational understanding only covers greetings, help requests, thanks, and questions about who I am. That's a real, disclosed limit, not an error.",
+        // M355 fix — fixed-text meta answer describing CozyOS's own
+        // real evidence discipline (kept here too, per the same
+        // "never blank on a partial load" convention as the other
+        // fallbacks in this object).
+        "meta-verified-vs-planned": "CozyOS separates VERIFIED information (implemented, tested, and confirmed today) from PLANNED/VISION information (the intended direction, not yet built) in every answer I give. I never blend the two or present a plan as if it already exists. Ask me about a specific application or topic and I'll tell you which category applies.",
         // RP-027 dynamic-intent honest fallbacks — kept here too (not
         // only in cozy-language-templates.js) so a page that loaded
         // cozy-knowledge-registry.js but NOT cozy-language-templates.js
@@ -992,8 +1061,8 @@
                 // fabricated purpose. currentVerifiedCapabilities and
                 // visionCapabilities are kept explicitly separate in
                 // the reply text.
-                const m = /\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+important\b|\bwhy\s+([a-z][\w' -]{1,40}?)\s+matters\b|\bwhat\s+(?:can|does|will)\s+([a-z][\w' -]{1,40}?)\s+(?:do\s+for|become|help)\b|\b([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+inanisaidia\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kusaidia\b/i.exec(rawText || "");
-                const candidate = m ? (m[1] || m[2] || m[3] || m[4] || m[5] || m[6] || "").trim() : "";
+                const m = /\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+important\b|\bwhy\s+([a-z][\w' -]{1,40}?)\s+matters\b|\bwhat\s+(?:can|does|will)\s+([a-z][\w' -]{1,40}?)\s+(?:do\s+for|become|help)\b|\bkwa\s+nini\s+([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\b|\b([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+(?:ina|ita)nisaidia(?:je)?(?:\s+nini)?\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kusaidia\b|\btatizo\s+gani\s+([a-z][\w' -]{1,40}?)\s+inatatua\b/i.exec(rawText || "");
+                const candidate = m ? (m[1] || m[2] || m[3] || m[4] || m[5] || m[6] || m[7] || m[8] || "").trim() : "";
                 const knowledge = window.CozyOS && window.CozyOS.CozyKnowledge;
                 // lang is forwarded so the KNOWLEDGE layer (not this
                 // provider, not the language-template frame) resolves
@@ -1184,8 +1253,27 @@
             case "thanks":
             case "identity":
             case "help":
+            case "meta-verified-vs-planned":
                 return template(intent, lang) || RP026_ENGLISH_FALLBACK[intent];
             default:
+                // M360 ASK-AND-LEARN: for EN/SW specifically (the only
+                // languages with a real, human-authored clarifying
+                // question — see cozy-language-templates.js's
+                // "unsupported-clarify" entry), the honest "I don't
+                // understand" moment also invites the user to rephrase,
+                // per the M360 spec's own example ("Unamaanisha nini?").
+                // fr/ar/so are deliberately excluded here (rather than
+                // left to getTemplate()'s entry[lang]||entry.en
+                // fallback) because that fallback would silently hand
+                // them the ENGLISH clarifying question instead of their
+                // own existing, correct "unsupported" text — an
+                // unverified-translation regression this file's own
+                // rules forbid. Their behavior is byte-for-byte
+                // unchanged.
+                if (lang === "en" || lang === "sw") {
+                    const clarify = template("unsupported-clarify", lang);
+                    if (clarify) return clarify;
+                }
                 return template("unsupported", lang) || RP026_ENGLISH_FALLBACK.unsupported;
         }
     }
@@ -1371,6 +1459,14 @@
                     language: resolvedLanguage.code,
                     requestedLanguage: resolvedLanguage.preferred,
                     languageFallback: !!resolvedLanguage.fallback,
+                    // M360 DETECT requirement — "whether clarification is
+                    // needed" as an explicit, structured signal (not just
+                    // buried in reply text) for any caller (e.g. the
+                    // Assistance Window) to act on. True exactly when
+                    // this turn genuinely matched no real intent — never
+                    // set for a real, resolved intent, however honest or
+                    // partial that intent's own answer is.
+                    needsClarification: intent === "unsupported",
                     ...(intent === "app-launch" ? { application, requiresAuthorization, ...(authorizationState ? { authorizationState } : {}), contextResolved, correctionApplied } : {}),
                     conversationState,
                     pipeline: pipelineResult

@@ -223,7 +223,7 @@
                 return { available: false, reason: "Permission denied." };
             }
 
-            const textResult = await ocr.extractText(imageSource, { lang: options.lang || "eng" });
+            const textResult = await ocr.extractText(imageSource, { lang: options.lang || "eng+swa" }); // M359 fix — matches cozy-ocr.js's own corrected Kenyan-document default
             if (!textResult.available) return textResult;
 
             const { documentType, confidence: typeConfidence } = this.detectDocumentType(textResult.text);

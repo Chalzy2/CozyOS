@@ -280,6 +280,8 @@
 <script src="core/modules/intelligence/language/cozy-language-registry.js"></script>
 <script src="core/modules/intelligence/language/cozy-language-templates.js"></script>
 <script src="core/modules/intelligence/knowledge/cozy-knowledge-registry.js"></script>
+<!-- M363 fix: this real, complete, previously-written file (registers window.CozyOS.CozyPublicKnowledge, the owner-approved vision/why-use/language-support-list facts) was never actually loaded on any real page - confirmed by a real Playwright/Chromium run showing why-use-cozyos/differentiation/language-support-list always resolving to NOT_FOUND live. Composed by cozy-knowledge-registry.js at CALL time only (see that file's own header), so exact placement order does not matter, only that it is present. -->
+<script src="core/modules/intelligence/knowledge/cozy-public-knowledge-source.js"></script>
 <!-- Checkpoint K — the verified intelligence chain (Checkpoints F-J),
      real and previously reachable only from admin-workspace.html /
      Node tests. Wired here, in the same dependency order already
@@ -545,12 +547,15 @@
 
     if (bus && typeof bus.once === "function") {
       bus.once("cozy:launch-sequence-complete", proceedOnce);
-      // Honest, bounded fallback matching the approved timeline's real
-      // total duration (500ms Stage1 + 2500ms Stage2 + ~1000ms typing/
-      // hold + voice + ~1000ms motto + settle, generously rounded up so
-      // real voice-playback variance never cuts the sequence short) -
-      // never blocks forever if the event is somehow never emitted.
-      setTimeout(proceedOnce, 10000);
+      // M356 TIMING FIX — same stale-fallback bug as index.html (see
+      // that file's own comment on this identical line for the full
+      // real-timeline breakdown): 10000ms elapsed before the real
+      // ~19.5-20s+ "cozy:launch-sequence-complete" event, so this
+      // fallback — not the real event — was what actually ended the
+      // sequence on every load, mid-"ABOVE ONLY", before the tagline
+      // ever rendered. Raised to 30000ms, matching login.html's
+      // already-correct bound for this same shared timeline.
+      setTimeout(proceedOnce, 30000);
     } else {
       // PlatformEventBus or the shared sequence genuinely failed to
       // load - honest fallback so a visitor is never stuck on a green

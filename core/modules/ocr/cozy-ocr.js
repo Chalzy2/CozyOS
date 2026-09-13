@@ -286,7 +286,19 @@
          *   or {available:false, reason} if no provider is loaded or
          *   recognition itself fails — never fabricated text either way.
          */
-        async extractText(imageSource, { lang = "eng" } = {}) {
+        // M359 fix: default changed from "eng" to "eng+swa" — matches
+        // tesseract-plugin.js's own real _activeLanguageTarget default
+        // ("English + Kiswahili default for Kenyan documents"). Before
+        // this fix, every caller that omitted `lang` (extractText(img),
+        // understanding-engine.js's real call, and this file's own
+        // extractTables()/extractForm() below) forced the plugin's
+        // active language DOWN from "eng+swa" to English-only via the
+        // setLanguage() call below, silently degrading Kiswahili OCR to
+        // nothing for the majority of real call sites. No new engine,
+        // no new language data — the "swa" trained data and the
+        // "eng+swa" combined-language concept were already real in
+        // tesseract-plugin.js; only this caller-side default was wrong.
+        async extractText(imageSource, { lang = "eng+swa" } = {}) {
             const plugin = this.#getActivePlugin();
 
             // ─ Path 1: a registered driver (e.g. tesseract-plugin.js) owns
@@ -355,7 +367,7 @@
          *   A failed/unavailable individual image is marked inline rather
          *   than silently dropped.
          */
-        async extractFromMultiple(images, { lang = "eng" } = {}) {
+        async extractFromMultiple(images, { lang = "eng+swa" } = {}) { // M359 fix — same default correction as extractText() above
             if (!Array.isArray(images) || images.length === 0) {
                 throw new TypeError("[CozyOCR] extractFromMultiple(): images must be a non-empty array.");
             }
@@ -432,7 +444,7 @@
          *   explicitly not guaranteed structure, the same honesty
          *   standard extractTables()/extractForm() already hold to.
          */
-        async parseReceipt(imageSource, { lang = "eng" } = {}) {
+        async parseReceipt(imageSource, { lang = "eng+swa" } = {}) { // M359 fix — same default correction as extractText() above
             const ocrResult = await this.extractText(imageSource, { lang });
             if (!ocrResult.available) return ocrResult;
 

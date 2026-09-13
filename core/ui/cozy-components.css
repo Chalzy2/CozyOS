@@ -234,82 +234,31 @@
 .cozy-settings-card-desc { font-size: 12px; color: var(--cozy-muted, #6b7280); }
 .cozy-settings-card-arrow { position: absolute; top: 14px; right: 14px; opacity: 0.6; }
 
-/* Master sidebar collapse/mobile-drawer dependency — real CSS backing
-   the existing, already-real JS state (#sidebarCollapsed,
-   #sidebarMobileOpen, cozy-shell.js). No new navigation component: this
-   only styles the exact classes/elements cozy-workspace.js already
-   renders (.cozy-shell, .cozy-sidebar, .cozy-nav-section-label,
-   .cozy-nav-link-label). Previously the JS toggled these classes with
-   no visual effect at all - this closes that real gap. */
-.cozy-shell { display: flex; min-height: 100vh; }
-.cozy-sidebar {
-    width: 240px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    transition: width var(--cozy-transition-fast, 0.2s ease);
-    overflow-x: hidden;
-}
-.cozy-shell.cozy-sidebar-collapsed .cozy-sidebar { width: 64px; }
-.cozy-shell.cozy-sidebar-collapsed .cozy-nav-section-label .cozy-nav-link-label,
-.cozy-shell.cozy-sidebar-collapsed .cozy-nav-link .cozy-nav-link-label,
-.cozy-shell.cozy-sidebar-collapsed .cozy-shell-title {
-    display: none;
-}
-.cozy-shell.cozy-sidebar-collapsed .cozy-nav-link,
-.cozy-shell.cozy-sidebar-collapsed .cozy-nav-section-label {
-    justify-content: center;
-    padding-left: 0;
-    padding-right: 0;
-}
+/* M354 — the old ".cozy-shell / .cozy-sidebar / .cozy-mobile-menu-btn /
+   .cozy-mobile-overlay" block that used to live here has been removed.
+   It duplicated — with a different breakpoint (768px vs. 600px),
+   a different display model (flex vs. grid), and different z-index
+   values (1000/999 vs. 30/25) — the real, current shell CSS that
+   already lives in admin-workspace.html's own <style> block, which is
+   the one and only place cozy-workspace.js's WorkspaceShell is mounted
+   from. The two rulesets were fighting each other in the ~600-768px
+   width band (common for phones in landscape and small tablets):
+   the sidebar ended up permanently translated off-canvas with no
+   matching "open" rule in scope, and the hamburger button that would
+   have let the Administrator open it was itself hidden by this file's
+   stale, non-matching media query. No other page in this codebase
+   renders .cozy-shell/.cozy-sidebar markup — dashboard.html's
+   UserDashboard uses its own separate user-dashboard.css classes — so
+   removing this dead block is not a behavior change for anything else,
+   it only stops it from silently overriding admin-workspace.html's
+   real, working styles. See admin-workspace.html's own <style> block
+   for the single authoritative implementation of this navigation. */
 .cozy-sidebar-toggle {
     background: transparent;
     border: none;
     color: inherit;
     cursor: pointer;
     font-size: 16px;
-    padding: 6px 10px;
-}
-.cozy-mobile-menu-btn { display: none; }
-
-@media (max-width: 768px) {
-    .cozy-sidebar {
-        position: fixed;
-        top: 0; left: 0; bottom: 0;
-        width: 260px;
-        max-width: 80vw;
-        transform: translateX(-100%);
-        transition: transform var(--cozy-transition-fast, 0.2s ease);
-        z-index: 1000;
-        overflow-y: auto;
-    }
-    .cozy-shell.cozy-sidebar-mobile-open .cozy-sidebar { transform: translateX(0); }
-    /* Real, existing .cozy-mobile-overlay element (cozy-workspace.js)
-       already has a real click-to-close handler - it only needed real
-       visual/positioning CSS, which was missing entirely. */
-    .cozy-mobile-overlay { display: none; }
-    .cozy-shell.cozy-sidebar-mobile-open .cozy-mobile-overlay {
-        display: block;
-        position: fixed; inset: 0;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 999;
-    }
-    .cozy-mobile-menu-btn {
-        display: inline-flex;
-        background: transparent;
-        border: none;
-        color: inherit;
-        font-size: 20px;
-        cursor: pointer;
-    }
-    /* Collapsed-desktop rules must not apply on mobile - the drawer is
-       either fully open (translated in) or fully closed (off-canvas),
-       never icon-only. */
-    .cozy-shell.cozy-sidebar-collapsed .cozy-sidebar { width: 260px; }
-    .cozy-shell.cozy-sidebar-collapsed .cozy-nav-link .cozy-nav-link-label,
-    .cozy-shell.cozy-sidebar-collapsed .cozy-shell-title {
-        display: initial;
-    }
 }
 
 

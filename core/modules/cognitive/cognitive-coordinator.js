@@ -366,7 +366,7 @@
             return this.run({ text, ...options, memoryNamespace, category: options.category || "application" });
         }
 
-        async runFromImage(imageSource, { actorId = "system", conversationId = null, memoryNamespace = "cognitive-default", lang = "eng" } = {}) {
+        async runFromImage(imageSource, { actorId = "system", conversationId = null, memoryNamespace = "cognitive-default", lang = "eng+swa" } = {}) { // M359 fix — matches cozy-ocr.js's own corrected Kenyan-document default; this explicit value previously overrode it
             const ocr = window.CozyOS.OCR;
             if (!ocr || typeof ocr.extractText !== "function") return { success: false, reason: "CozyOS.OCR is not loaded." };
             const ocrResult = await ocr.extractText(imageSource, { lang });

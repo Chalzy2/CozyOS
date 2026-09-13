@@ -1461,6 +1461,8 @@
     <script src="core/modules/intelligence/language/cozy-language-registry.js"></script>
     <script src="core/modules/intelligence/language/cozy-language-templates.js"></script>
     <script src="core/modules/intelligence/knowledge/cozy-knowledge-registry.js"></script>
+<!-- M363 fix: this real, complete, previously-written file (registers window.CozyOS.CozyPublicKnowledge, the owner-approved vision/why-use/language-support-list facts) was never actually loaded on any real page - confirmed by a real Playwright/Chromium run showing why-use-cozyos/differentiation/language-support-list always resolving to NOT_FOUND live. Composed by cozy-knowledge-registry.js at CALL time only (see that file's own header), so exact placement order does not matter, only that it is present. -->
+<script src="core/modules/intelligence/knowledge/cozy-public-knowledge-source.js"></script>
     <script src="core/modules/intelligence/providers/rule-based-conversational-provider.js"></script>
     <script src="core/modules/ChurchOS/multi-branch-coordinator.js"></script>
     <!-- ChurchOS C003 — genuine new feature (real camera/mic capture).
@@ -1928,7 +1930,18 @@
                 let proceeded = false;
                 const proceedOnce = () => { if (proceeded) return; proceeded = true; proceedPastLaunchScreen(); };
                 bus.once("cozy:launch-sequence-complete", proceedOnce);
-                setTimeout(proceedOnce, 12000); // honest, bounded fallback — never hangs forever if the signal is somehow never emitted
+                // M356 TIMING FIX — same stale-fallback bug as index.html/
+                // dashboard.html (see index.html's own comment on this
+                // line for the full real-timeline breakdown): 12000ms
+                // elapsed before the real ~19.5-20s+ "cozy:launch-sequence-
+                // complete" event on a standalone load, so this fallback
+                // was winning the race and cutting the sequence off
+                // mid-"ABOVE ONLY". Raised to 30000ms, matching
+                // login.html's already-correct bound for this same shared
+                // timeline. The Bootstrap-in-progress (post-login,
+                // no-replay) branch above is untouched — it never reaches
+                // this timer at all.
+                setTimeout(proceedOnce, 30000); // honest, bounded fallback — never hangs forever if the signal is somehow never emitted
             } else {
                 // PlatformEventBus genuinely unavailable — honest fallback
                 // to the prior immediate behavior rather than hanging.
