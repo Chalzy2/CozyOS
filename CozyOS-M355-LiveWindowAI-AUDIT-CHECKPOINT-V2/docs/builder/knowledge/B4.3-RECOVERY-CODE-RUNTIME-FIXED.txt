@@ -1,0 +1,23 @@
+[postgres-recovery-code-runtime.test.js] connecting to postgresql://ep-bold-dream-ayj2peo3-pooler.c-5.us-east-2.aws.neon.tech/neondb
+(node:22933) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ recovery codes: TOTP enrollment on real PostgreSQL generates 10 unique recovery codes, stored hashed (not raw) (12063.858462ms)
+✔ recovery codes: a valid code authenticates successfully, becomes consumed, and cannot be reused (real PostgreSQL) (19650.942386ms)
+✔ recovery codes: an invalid code is rejected and does not authenticate (real PostgreSQL) (15392.328001ms)
+✔ recovery codes: transactional consistency — redemption failure never leaves a code half-consumed (real PostgreSQL) (14699.408309ms)
+✔ recovery codes: no raw code appears in thrown error messages (failure path does not leak the attempted code) (14087.292924ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 76998.682389

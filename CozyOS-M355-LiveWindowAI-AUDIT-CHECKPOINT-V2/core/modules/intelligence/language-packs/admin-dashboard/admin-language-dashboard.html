@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CozyOS — Admin Language Dashboard</title>
+<link rel="stylesheet" href="../../../../ui/cozy-tokens.css">
+<link rel="stylesheet" href="../../../../ui/cozy-components.css">
+<link rel="stylesheet" href="admin-language-dashboard.css">
+</head>
+<body>
+<h1 class="cozy-text-page-title" style="padding:16px 16px 0;">Admin Language Dashboard</h1>
+<div id="admin-language-dashboard-root"></div>
+
+<!-- RP-029-A/B/C -->
+<script src="../../knowledge/cozy-knowledge-ingestion.js"></script>
+<script src="../../knowledge/cozy-knowledge-community.js"></script>
+<script src="../../knowledge/cozy-knowledge-review.js"></script>
+<!-- RP-027 language modules (Rule 82 gate depends on these) -->
+<script src="../../language/cozy-language-templates.js"></script>
+<script src="../../language/cozy-language-registry.js"></script>
+<!-- Cozy Offline Hotspot -->
+<script src="../../../../engines/collaboration/live-hotspot-engine.js"></script>
+<!-- RP-029-C Phase 4/5 safety + quarantine admin + hotspot bridge -->
+<script src="../../knowledge/ui/cozy-knowledge-safety-gate.js"></script>
+<script src="../../knowledge/ui/cozy-knowledge-review-hotspot-bridge.js"></script>
+<script src="../../knowledge/ui/cozy-knowledge-contribution-core.js"></script>
+<script src="../../knowledge/ui/cozy-knowledge-review-dashboard-core.js"></script>
+<script src="../../knowledge/ui/cozy-knowledge-quarantine-admin-core.js"></script>
+<!-- RP-030 language pack registry -->
+<script src="../cozy-language-pack-registry.js"></script>
+<!-- RP-031 Phase 1 acquisition pipeline (Hearing Mode) -->
+<script src="../cozy-language-acquisition-pipeline.js"></script>
+<!-- RP-031-B Increments 1-5 -->
+<script src="cozy-admin-language-dashboard-core.js"></script>
+<script src="cozy-admin-language-dashboard-term-explorer.js"></script>
+<script src="cozy-admin-language-dashboard-domain-community.js"></script>
+<script src="cozy-admin-language-dashboard-quarantine-hotspot.js"></script>
+<script src="cozy-admin-language-dashboard-ui.js"></script>
+<script>
+  // Demo/test-only seed: submits real contributions and registers real
+  // regional contexts through the real pipelines so the dashboard has
+  // something real to show. Never fabricates a record directly.
+  (function seedDemoData() {
+    var registry = window.CozyOS.CozyLanguagePacks;
+    var community = window.CozyOS.CozyKnowledgeCommunity;
+    if (!registry || !community) return;
+    registry.registerRegionalContext('sw', { country: 'TZ', region: 'Dar es Salaam' });
+    registry.registerRegionalContext('ki', { country: 'KE', region: 'Kiambu', dialect: 'Kiambu Gikuyu' });
+    registry.submitExpression({ languageId: 'sw', region: 'Dar es Salaam', expression: 'Habari', meaning: 'Greeting / how are things', contributorPseudonym: 'demo-1', sourceType: 'COMMUNITY', meaningConfidence: 0.6 });
+    registry.submitExpression({ languageId: 'ki', region: 'Kiambu', dialect: 'Kiambu Gikuyu', expression: 'Wĩ mwega', meaning: 'You are well (greeting)', contributorPseudonym: 'demo-2', sourceType: 'COMMUNITY' });
+    community.submitContribution({ contributionType: 'WORD', statement: 'jambo', contributorId: 'demo-3', language: 'sw' });
+    var gate = window.CozyOS.CozyKnowledgeSafetyGate;
+    if (gate) gate.quarantine({ expression: 'nude', language: 'sw', contributionType: 'WORD' }, { classification: 'UNCERTAIN', category: 'AMBIGUOUS_SINGLE_TERM' }, 'demo-4');
+  })();
+
+  // DEMO-ONLY authorization stub, never real identity management.
+  // Reached only via an explicit ?demoRole=admin|reviewer|community
+  // query param — default page load (no param) honestly behaves as an
+  // unauthorized/no-auth-backend visitor.
+  (function demoAuth() {
+    var params = new URLSearchParams(window.location.search);
+    var role = params.get('demoRole');
+    if (role === 'admin') {
+      window.CozyOS.AuthCoordinator = { getCurrentIdentity: function () { return { userId: 'demo-admin', roles: ['platform-admin'] }; } };
+    } else if (role === 'reviewer') {
+      window.CozyOS.AuthCoordinator = { getCurrentIdentity: function () { return { userId: 'demo-reviewer', roles: [] }; } };
+    } else if (role === 'community') {
+      window.CozyOS.AuthCoordinator = { getCurrentIdentity: function () { return { userId: 'demo-community', roles: [] }; } };
+    }
+  })();
+
+  window.CozyOS.CozyAdminLanguageDashboardUI.init(
+    document.getElementById('admin-language-dashboard-root'),
+    { authConfig: { reviewerUserIds: ['demo-reviewer'] } }
+  );
+</script>
+</body>
+</html>

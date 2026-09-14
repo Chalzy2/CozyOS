@@ -1,0 +1,2 @@
+0eab2944b585b3a6d5295f070385dbeabc96e24354b6e58d594acdb8012836cd  core/modules/intelligence/providers/rule-based-conversational-provider.js
+3721cde5be7be0b836f6218e039e6aa9055b4ea2c002b6724f942b197e11ef98  core/modules/intelligence/providers/tests/rule-based-conversational-provider-rp037-context-followup.test.js

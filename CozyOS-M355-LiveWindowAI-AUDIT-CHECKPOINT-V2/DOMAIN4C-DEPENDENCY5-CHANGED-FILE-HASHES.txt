@@ -1,0 +1,2 @@
+2f8c66337d5e35e48fbd6cd92471bc9898d03f14f84d4f922210c3036632cdbe  admin-workspace.html
+6e3f05f4eca3c267808c4244f23604b86bd2c52e4dfee3d286c630d51f65c6c6  core/tests/browser/admin-workspace-translation-chain-browser.test.js

@@ -1,0 +1,44 @@
+{
+  "generated_by": "Cozy Builder Observation Engine",
+  "workspace": "CozyOS-M372-RememberMe-Fix.zip",
+  "files_total": 641,
+  "js_files_scanned": 479,
+  "js_files_with_documented_header": 278,
+  "js_files_undocumented_header": 201,
+  "modules_core": 66,
+  "engines_core": 12,
+  "plugins_core": 23,
+  "applications_wired": 3,
+  "applications_code_present_not_wired": 4,
+  "syntax_errors": 4,
+  "syntax_error_files": [
+    "modules/quarry/quarry-contants.js",
+    "core/ai/cozy-ai-memory.js",
+    "core/connectivity/compression.js",
+    "core/connectivity/bandwidth.js"
+  ],
+  "duplicate_engines_confirmed": [
+    "CozyQuarryManager (modules/quarry/index.js, core/modules/QuarryOS/quarry-index.js)",
+    "InternalEventBus (modules/live/cozy-live.js, core/modules/identity/cozy-identity.js)"
+  ],
+  "diverging_duplicate_files_confirmed": [
+    "core/cozy-shell.html vs core/shell/cozy-shell.html"
+  ],
+  "competing_general_purpose_systems": [
+    "core/audit.js vs core/business/audit.js (audit loggers)"
+  ],
+  "malformed_filenames_confirmed": [
+    "core/bridge/test/media integration test.js",
+    "core/docs/CERTIFICATION REPORT md",
+    "modules/quarry/ quarry.html`"
+  ],
+  "orphaned_subsystems_confirmed": [
+    "core/kernel.js + bootstrap.js + compatibility.js + diagnostics.js + lifecycle.js (ES modules, no HTML include found)"
+  ],
+  "events_catalogued": 55,
+  "coordinators_api_catalogued": 5,
+  "master_rules_extracted": 24,
+  "file_hygiene_rules_extracted": 6,
+  "architecture_score_note": "Not computed as a single number this pass \u2014 would require weighting decisions (e.g. how much a syntax error costs vs a duplicate engine) that should be a human or Layer-3 Analysis Engine call, not fabricated by Observation.",
+  "risk_score_note": "Same as above \u2014 flagging inputs (4 syntax errors, 2 duplicate engines, 1 orphaned subsystem) rather than inventing a composite score without agreed weights."
+}

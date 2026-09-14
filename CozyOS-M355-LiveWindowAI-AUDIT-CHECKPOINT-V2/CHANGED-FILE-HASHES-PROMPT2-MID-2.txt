@@ -1,0 +1,8 @@
+fcfb50cd3fc3d19dfda65fd97b0ac6e776532f6cc3ceee0be0f12b90dfa3897f  core/shell/dashboard-community-summary-core.js
+59704f340e6bc956c9246cb3d03584cf90e492d661d2dc9f56211cb4d762fdb8  core/shell/tests/dashboard-community-summary-core.test.js
+017f35711a7e7673d0b7ec9dee518865d3c43e9d938e8d2bccdb5e3de768adfc  core/shell/dashboard-settings-admin-boundary-core.js
+f74180fcee5c512843d2722c431a8f0cb7e1a647459b93753d373bfaff50d21c  core/shell/tests/dashboard-settings-admin-boundary-core.test.js
+6ff29b9403e384c5ac0b6d87d5445d9f906dd77a14112b2d5897d9bd058cec21  core/shell/dashboard-navigation-core.js
+a6ed6d05c58566534f9e5a248b33864bd41b8f7c6c58e9d84f1c24da21f5d962  core/shell/tests/dashboard-navigation-core.test.js
+290a3747da39a71594cb02ec708e6e930fe396a8b8ef39129cfdf59802e49676  core/shell/user-dashboard.js
+cda5fb52b4281423c1a4724148eef05c1b710d452386635c79fe475244cbdb0e  index.html

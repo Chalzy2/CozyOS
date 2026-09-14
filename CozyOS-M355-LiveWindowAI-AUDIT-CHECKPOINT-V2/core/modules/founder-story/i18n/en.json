@@ -1,0 +1,29 @@
+{
+  "language": "en",
+  "direction": "ltr",
+  "strings": {
+    "panel.title": "Founder Story Vault",
+    "panel.subtitle": "Your private autobiography, protected and yours to share.",
+    "panel.newStory": "New Story",
+    "panel.noStories": "No stories yet. Start your first chapter.",
+    "field.title": "Title",
+    "field.subtitle": "Subtitle",
+    "field.language": "Language",
+    "field.category": "Category",
+    "field.chapters": "Chapters",
+    "status.draft": "Draft",
+    "status.archived": "Archived",
+    "visibility.only-me": "🔒 Only Me",
+    "visibility.selected": "👥 Selected People",
+    "visibility.family": "👨‍👩‍👧 Family",
+    "visibility.mentors": "🤝 Mentors",
+    "visibility.public": "🌍 Public",
+    "private.badge": "🔒 Private Founder Content",
+    "private.message": "This story is private.",
+    "action.view": "View",
+    "action.edit": "Edit",
+    "action.share": "Share",
+    "action.addChapter": "Add Chapter",
+    "action.requestPublish": "Request Publish (coming soon)"
+  }
+}

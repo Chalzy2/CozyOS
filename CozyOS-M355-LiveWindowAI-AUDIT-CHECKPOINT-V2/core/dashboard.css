@@ -1,0 +1,129 @@
+/* core/dashboard.css */
+:root {
+    --bg-primary: #0a0a0a;
+    --bg-surface: #121212;
+    --accent-gold: #d4af37;
+    --accent-gold-hover: #f3e5ab;
+    --accent-emerald: #0f5132;
+    --emerald-glow: #198754;
+    --text-primary: #ffffff;
+    --text-secondary: #a0a0a0;
+    --border-color: #262626;
+}
+
+body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+}
+
+/* Base Mobile-First Layout Grid */
+.dashboard-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    min-height: 100vh;
+}
+
+/* Automatically transforms to a two-column workspace on desktops */
+@media (min-width: 768px) {
+    .dashboard-container {
+        grid-template-columns: 280px 1fr;
+    }
+}
+
+/* Left Sidebar Component */
+.workspace-sidebar {
+    background-color: var(--bg-surface);
+    border-bottom: 1px solid var(--border-color);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+@media (min-width: 768px) {
+    .workspace-sidebar {
+        border-bottom: none;
+        border-right: 1px solid var(--border-color);
+        height: 100vh;
+        position: sticky;
+        top: 0;
+    }
+}
+
+.brand-title {
+    color: var(--accent-gold);
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    margin: 0;
+}
+
+/* Main Content Control Block */
+.main-content {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.control-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 16px;
+}
+
+.control-title {
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+/* Flexible Matrix Card Containers */
+.status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+}
+
+.status-card {
+    background: linear-gradient(145deg, #161616, #0f0f0f);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    position: relative;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.status-card:hover {
+    border-color: var(--accent-gold);
+    transform: translateY(-2px);
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #198754;
+    box-shadow: 0 0 8px var(--emerald-glow);
+    display: inline-block;
+    margin-right: 6px;
+}
+
+.card-title {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+}
+
+.card-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+}

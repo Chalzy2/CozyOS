@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChurchOS — CozyOS Business Application</title>
+</head>
+<body>
+<!--
+  CozyOS — ChurchOS End-User Module (Phase 1)
+  Real fix (Level 2B repair): no application destination existed at all
+  for ChurchOS as a business application (confirmed by audit — no
+  applications/ChurchOS/ directory, no ModuleRegistry entry). This is
+  distinct from Live Worship (core/modules/ChurchOS/living-worship-
+  player.js), which is real, already working, and already surfaced
+  through the dashboard's own separate Live Video surface — that
+  capability is not duplicated or moved here.
+  This is the smallest real destination for ChurchOS's own, separate
+  Phase 1 capabilities as registered in core/plugins/churchOS-core.js:
+  a real Setup Wizard (creates a real Organization via the existing
+  OrganizationRegistry) and real Membership Management
+  (createMember/listMembers). Every other capability referenced in that
+  file's registration description is explicitly disclosed there as not
+  yet built (see CHURCHOS_ENGINE_AUDIT.md) — none of it is fabricated
+  here. Renders only inside #cozy-app-root, same real pattern as
+  ShopOS/PharmacyOS/WholesaleOS/QuarryOS.
+-->
+<div class="cos-app" id="cos-app-root">
+
+    <div class="cos-topbar">
+        <div class="cos-brand-cluster">
+            <div class="cos-brand-badge">⛪</div>
+            <div>
+                <div class="cos-brand-name">ChurchOS</div>
+                <div class="cos-brand-sub">CozyOS Business Application</div>
+            </div>
+        </div>
+        <span class="cos-status-pill" id="cos-engine-status">● Ready</span>
+    </div>
+
+    <section class="cos-section" id="cos-no-org-section" style="display:none;">
+        <div class="cos-empty-state">
+            <p>No church is set up yet.</p>
+            <input type="text" id="cos-setup-name" placeholder="Church name" />
+            <button class="cos-btn cos-btn-primary" id="cos-setup-btn">Set up Church</button>
+            <p id="cos-setup-result" class="cos-note"></p>
+        </div>
+    </section>
+
+    <section class="cos-section" id="cos-members-section" style="display:none;">
+        <h3>Membership</h3>
+        <div class="cos-form-row">
+            <input type="text" id="cos-member-first" placeholder="First name" />
+            <input type="text" id="cos-member-last" placeholder="Last name (optional)" />
+            <button class="cos-btn cos-btn-primary" id="cos-member-create-btn">Add Member</button>
+        </div>
+        <p id="cos-member-create-result" class="cos-note"></p>
+        <table class="cos-table" id="cos-member-table">
+            <thead><tr><th>First name</th><th>Last name</th><th>Category</th></tr></thead>
+            <tbody id="cos-member-table-body"></tbody>
+        </table>
+        <p id="cos-member-list-note" class="cos-note"></p>
+    </section>
+
+    <footer class="cos-footer">ChurchOS Application (Phase 1) · CozyOS</footer>
+</div>
+<script src="../../core/organization/organization-registry.js"></script>
+<script src="../../core/plugins/churchOS-core.js"></script>
+<script>
+(function () {
+    "use strict";
+    // Real, minimal UI wiring — no fake data, no second business-logic
+    // layer. Every action below calls the real, unmodified
+    // window.CozyOS.ChurchOS methods directly.
+    let currentOrgId = null;
+
+    function renderMembers() {
+        const church = window.CozyOS.ChurchOS;
+        const tbody = document.getElementById("cos-member-table-body");
+        const note = document.getElementById("cos-member-list-note");
+        if (!currentOrgId) return;
+        const members = church.listMembers({ orgId: currentOrgId });
+        tbody.innerHTML = "";
+        members.forEach((m) => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<td>${m.firstName}</td><td>${m.lastName || "—"}</td><td>${m.category || "—"}</td>`;
+            tbody.appendChild(tr);
+        });
+        note.textContent = members.length === 0 ? "No members yet." : "";
+    }
+
+    function init() {
+        const church = window.CozyOS.ChurchOS;
+        const statusEl = document.getElementById("cos-engine-status");
+        if (!church) { statusEl.textContent = "● ChurchOS core not loaded"; return; }
+
+        document.getElementById("cos-no-org-section").style.display = "block";
+
+        document.getElementById("cos-setup-btn").addEventListener("click", () => {
+            const name = document.getElementById("cos-setup-name").value.trim();
+            const resultEl = document.getElementById("cos-setup-result");
+            try {
+                const setup = church.setupChurch({ name });
+                currentOrgId = setup.organization.orgId;
+                resultEl.textContent = `Church "${name}" set up.`;
+                document.getElementById("cos-no-org-section").style.display = "none";
+                document.getElementById("cos-members-section").style.display = "block";
+                renderMembers();
+            } catch (err) {
+                resultEl.textContent = "Setup failed: " + err.message;
+            }
+        });
+
+        document.getElementById("cos-member-create-btn").addEventListener("click", () => {
+            const firstName = document.getElementById("cos-member-first").value.trim();
+            const lastName = document.getElementById("cos-member-last").value.trim();
+            const resultEl = document.getElementById("cos-member-create-result");
+            try {
+                church.createMember({ orgId: currentOrgId, firstName, lastName });
+                resultEl.textContent = `"${firstName}" added.`;
+                document.getElementById("cos-member-first").value = "";
+                document.getElementById("cos-member-last").value = "";
+                renderMembers();
+            } catch (err) {
+                resultEl.textContent = "Could not add member: " + err.message;
+            }
+        });
+    }
+
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+    else init();
+})();
+</script>
+</body>
+</html>

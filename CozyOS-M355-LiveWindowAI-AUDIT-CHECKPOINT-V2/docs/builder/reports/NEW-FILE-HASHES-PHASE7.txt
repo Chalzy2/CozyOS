@@ -1,0 +1,3 @@
+fe08651ee1fec304f3efa07622d9c091349f4cb4f9527d37b2e18e2ba8f31261  ./PHASE7-IMPLEMENTATION-REPORT.md
+fdf5340cf47fe448c5312cab363289d2ec598bf645cbd69ddc219f75972eb2d0  ./core/modules/builder/capability-knowledge-acquisition.js
+7a972101502771888a38e69c2f3309f0a8ae9cb66fdf77944dc76590acf8f093  ./core/modules/builder/tests/capability-knowledge-acquisition.test.js

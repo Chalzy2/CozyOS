@@ -1,0 +1,179 @@
+{
+  "_comment": "Declared intent, not current reality. As of this version, none of these vendors have real files present anywhere in this deployment \u2014 verified by direct search, not assumed. VendorRegistry cross-references this manifest against the live page to report the honest difference, the same real Manifest-vs-Runtime pattern already used by PlatformDiscovery (Rule 39).",
+  "jszip": {
+    "version": "3.10.1",
+    "license": "MIT/GPLv3",
+    "globalName": "JSZip",
+    "owner": "Archive Engine (planned)",
+    "ownerEngine": "ProjectRefactor",
+    "offline": true,
+    "status": "referenced directly by project-refactor.js today \u2014 a known, disclosed violation of Rule 57, not yet wrapped",
+    "scriptPath": "core/vendor/jszip/jszip.min.js",
+    "wrapperFilePath": null
+  },
+  "tesseract": {
+    "version": "unknown",
+    "license": "Apache-2.0",
+    "globalName": "Tesseract",
+    "owner": "OCR Engine (planned)",
+    "ownerEngine": "OCR",
+    "offline": true,
+    "status": "referenced directly by cozy-ocr.js today \u2014 a known, disclosed violation of Rule 57, not yet wrapped",
+    "scriptPath": "core/vendor/tesseract/tesseract.min.js",
+    "wrapperFilePath": null
+  },
+  "jspdf": {
+    "version": "unknown",
+    "license": "MIT",
+    "globalName": "jsPDF",
+    "owner": "Document Engine (planned)",
+    "ownerEngine": null,
+    "offline": true,
+    "status": "not present anywhere in this deployment",
+    "scriptPath": "core/vendor/jspdf/jspdf.min.js",
+    "wrapperFilePath": null
+  },
+  "pdf-lib": {
+    "version": "unknown",
+    "license": "MIT",
+    "globalName": "PDFLib",
+    "owner": "Document Engine (planned)",
+    "ownerEngine": null,
+    "offline": true,
+    "status": "not present anywhere in this deployment",
+    "scriptPath": "core/vendor/pdf-lib/pdf-lib.min.js",
+    "wrapperFilePath": null
+  },
+  "pdfjs": {
+    "version": "unknown",
+    "license": "Apache-2.0",
+    "globalName": "pdfjsLib",
+    "owner": "Document Engine (planned)",
+    "ownerEngine": null,
+    "offline": true,
+    "status": "not present anywhere in this deployment",
+    "scriptPath": "core/vendor/pdfjs/pdfjs.min.js",
+    "wrapperFilePath": null
+  },
+  "mammoth": {
+    "version": "unknown",
+    "license": "BSD-2-Clause",
+    "globalName": "mammoth",
+    "owner": "Document Engine (planned)",
+    "ownerEngine": null,
+    "offline": true,
+    "status": "not present anywhere in this deployment",
+    "scriptPath": "core/vendor/mammoth/mammoth.min.js",
+    "wrapperFilePath": null
+  },
+  "xlsx": {
+    "version": "unknown",
+    "license": "Apache-2.0",
+    "globalName": "XLSX",
+    "owner": "Document Engine (planned)",
+    "ownerEngine": null,
+    "offline": true,
+    "status": "not present anywhere in this deployment",
+    "scriptPath": "core/vendor/xlsx/xlsx.min.js",
+    "wrapperFilePath": null
+  },
+  "onnx": {
+    "version": "unknown",
+    "license": "MIT",
+    "globalName": "ort",
+    "owner": "AI Engine (planned)",
+    "ownerEngine": null,
+    "offline": true,
+    "status": "not present anywhere in this deployment",
+    "scriptPath": "core/vendor/onnx/onnx.min.js",
+    "wrapperFilePath": null
+  },
+  "opencv": {
+    "version": "unknown",
+    "license": "Apache-2.0",
+    "globalName": "cv",
+    "owner": "Vision Engine (planned)",
+    "ownerEngine": null,
+    "offline": true,
+    "status": "not present anywhere in this deployment",
+    "scriptPath": "core/vendor/opencv/opencv.min.js",
+    "wrapperFilePath": null
+  },
+  "sqlite": {
+    "version": "unknown",
+    "license": "MIT (sql.js) / Public Domain (SQLite itself)",
+    "globalName": "SQL",
+    "owner": "Storage Engine (planned)",
+    "ownerEngine": null,
+    "offline": true,
+    "status": "not present anywhere in this deployment",
+    "scriptPath": "core/vendor/sqlite/sqlite.min.js",
+    "wrapperFilePath": null
+  },
+  "ffmpeg": {
+    "version": "unknown",
+    "license": "LGPL/GPL",
+    "globalName": "FFmpeg",
+    "owner": "Media Engine (planned)",
+    "ownerEngine": null,
+    "offline": true,
+    "status": "not present anywhere in this deployment",
+    "scriptPath": "core/vendor/ffmpeg/ffmpeg.min.js",
+    "wrapperFilePath": null
+  },
+  "chartjs": {
+    "version": "unknown",
+    "license": "MIT",
+    "globalName": "Chart",
+    "owner": "Reporting Engine (planned)",
+    "ownerEngine": null,
+    "offline": true,
+    "status": "not present anywhere in this deployment",
+    "scriptPath": "core/vendor/chartjs/chartjs.min.js",
+    "wrapperFilePath": null
+  },
+  "markdown": {
+    "version": "unknown",
+    "license": "unknown",
+    "globalName": "markdownit",
+    "owner": "Content Engine (planned)",
+    "ownerEngine": null,
+    "offline": true,
+    "status": "not present anywhere in this deployment",
+    "scriptPath": "core/vendor/markdown/markdown.min.js",
+    "wrapperFilePath": null
+  },
+  "diff": {
+    "version": "unknown",
+    "license": "BSD-3-Clause",
+    "globalName": "Diff",
+    "owner": "Analysis Engine (planned)",
+    "ownerEngine": null,
+    "offline": true,
+    "status": "not present anywhere in this deployment",
+    "scriptPath": "core/vendor/diff/diff.min.js",
+    "wrapperFilePath": null
+  },
+  "mermaid": {
+    "version": "unknown",
+    "license": "MIT",
+    "globalName": "mermaid",
+    "owner": "Architecture Engine (planned)",
+    "ownerEngine": null,
+    "offline": true,
+    "status": "not present anywhere in this deployment",
+    "scriptPath": "core/vendor/mermaid/mermaid.min.js",
+    "wrapperFilePath": null
+  },
+  "monaco": {
+    "version": "unknown",
+    "license": "MIT",
+    "globalName": "monaco",
+    "owner": "Code Editor (future)",
+    "ownerEngine": null,
+    "offline": true,
+    "status": "not present anywhere in this deployment",
+    "scriptPath": "core/vendor/monaco/monaco.min.js",
+    "wrapperFilePath": null
+  }
+}

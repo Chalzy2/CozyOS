@@ -1,0 +1,218 @@
+"""
+CozyOS Church Language Pack
+Kiswahili church-context normalization and interpretation.
+"""
+
+CHURCH_PHRASES = {
+    # Greetings
+    "habari ya leo?":
+        "How are you today?",
+
+    "habari za leo?":
+        "How are you today?",
+
+    "habari zenu siku ya leo?":
+        "How are you today?",
+
+    "habar ya leo?":
+        "How are you today?",
+
+    # Christian greetings
+    "bwana yesu asifiwe":
+        "Praise the Lord Jesus!",
+
+    "bwana yesu asifiwe!":
+        "Praise the Lord Jesus!",
+
+    "bwana asifiwe":
+        "Praise the Lord!",
+
+    "bwana asifiwe!":
+        "Praise the Lord!",
+
+    # Blessings
+    "mungu awabariki":
+        "May God bless you.",
+
+    "mungu awabariki sana":
+        "May God richly bless you.",
+
+    # Congregation
+    "ndugu zangu":
+        "My brethren.",
+
+    "karibu katika ibada ya leo":
+        "Welcome to today's service.",
+
+    "karibuni katika ibada ya leo":
+        "Welcome to today's service.",
+
+    "karibuni katika ibada":
+        "Welcome to the service.",
+
+    # Worship
+    "leo tunamshukuru mungu kwa wema wake.":
+        "Today we are grateful to God for His goodness.",
+
+    "amen":
+        "Amen.",
+
+    "haleluya":
+        "Hallelujah!",
+
+    "hallelujah":
+        "Hallelujah!",
+}
+
+
+WORD_CORRECTIONS = {
+    # Common speech-recognition errors
+    "habar": "habari",
+    "zenyu": "zenu",
+    "Kar8buni": "Karibuni",
+
+    # OCR/STT-like number substitutions
+    "kar8buni": "karibuni",
+    "kar8buni": "karibuni",
+
+    # Church vocabulary
+    "kaniani": "kanisani",
+}
+
+
+def normalize_words(text):
+
+    result = text.strip()
+
+    for wrong, right in WORD_CORRECTIONS.items():
+        result = result.replace(wrong, right)
+
+    return result
+
+
+def lookup_phrase(text):
+
+    key = text.strip().lower()
+
+    return CHURCH_PHRASES.get(key)
+
+
+def normalize(text):
+
+    normalized = normalize_words(text)
+
+    # IMPORTANT:
+    # phrase lookup happens AFTER normalization.
+    interpretation = lookup_phrase(normalized)
+
+    return {
+        "original": text,
+        "normalized": normalized,
+        "interpretation": interpretation,
+        "matched": interpretation is not None,
+    }
+
+# ============================================================
+# DYNAMIC CHURCH SEMANTIC INTERPRETATION
+# ============================================================
+
+import re
+
+
+def interpret_church_sentence(text):
+    """
+    Interprets church phrases that contain variable names,
+    locations, ministries, or organizations.
+
+    Example:
+        Karibuni kanisani Mavueni Newlife Kilifi
+        ->
+        Welcome to our church, Mavueni Newlife Kilifi
+    """
+
+    normalized = normalize_words(text).strip()
+
+    # Normalize whitespace
+    normalized = re.sub(r"\s+", " ", normalized)
+
+    lowered = normalized.lower()
+
+    # --------------------------------------------------------
+    # WELCOME TO OUR CHURCH
+    # --------------------------------------------------------
+    # Standalone church welcome
+    if lowered in ("karibuni kanisani", "karibu kanisani"):
+        return "Welcome to our church."
+
+    prefixes = (
+        "karibuni kanisani ",
+        "karibuni kanisani, ",
+        "karibu kanisani ",
+        "karibu kanisani, ",
+    )
+
+    for prefix in prefixes:
+
+        if lowered.startswith(prefix):
+            names = normalized[len(prefix):].strip()
+
+            if names:
+                return f"Welcome to our church, {names}."
+
+            return "Welcome to our church."
+
+    # --------------------------------------------------------
+    # WELCOME TO THE SERVICE
+    # --------------------------------------------------------
+    if lowered == "karibuni katika ibada":
+        return "Welcome to the service."
+
+    if lowered == "karibuni katika ibada ya leo":
+        return "Welcome to today's service."
+
+    # --------------------------------------------------------
+    # COMMON CHURCH EXPRESSIONS
+    # --------------------------------------------------------
+    if lowered == "habari ya leo?":
+        return "How are you today?"
+
+    if lowered == "habari za leo?":
+        return "How are you today?"
+
+    if lowered == "habari zenu siku ya leo?":
+        return "How are you today?"
+
+    if lowered == "bwana yesu asifiwe!":
+        return "Praise the Lord Jesus!"
+
+    if lowered == "bwana yesu asifiwe":
+        return "Praise the Lord Jesus!"
+
+    if lowered == "bwana asifiwe!":
+        return "Praise the Lord!"
+
+    if lowered == "bwana asifiwe":
+        return "Praise the Lord!"
+
+    if lowered == "mungu awabariki":
+        return "May God bless you."
+
+    if lowered == "mungu awabariki sana":
+        return "May God richly bless you."
+
+    if lowered == "ndugu zangu":
+        return "My brethren."
+
+    if lowered == "leo tunamshukuru mungu kwa wema wake.":
+        return "Today we are grateful to God for His goodness."
+
+    if lowered == "mungu akubariki":
+        return "May God bless you."
+
+    if lowered == "tumsifu mungu":
+        return "Let us praise God."
+
+    if lowered == "tuombe":
+        return "Let us pray."
+
+    return None

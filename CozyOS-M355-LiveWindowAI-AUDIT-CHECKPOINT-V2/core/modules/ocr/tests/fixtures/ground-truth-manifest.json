@@ -1,0 +1,86 @@
+[
+  {
+    "lang": "fra",
+    "file": "fra_smoke.png",
+    "groundTruth": "Bonjour, comment allez-vous ?",
+    "font": "FreeSerif.ttf",
+    "fontSizePt": 46,
+    "direction": "ltr",
+    "note": "French greeting",
+    "canvas": "780x180",
+    "mode": "L (8-bit grayscale)",
+    "renderer": "Python Pillow (PIL) ImageDraw.text, layout_engine=RAQM (HarfBuzz+FriBidi shaping)"
+  },
+  {
+    "lang": "ara",
+    "file": "ara_smoke.png",
+    "groundTruth": "صباح الخير",
+    "font": "FreeSerif.ttf",
+    "fontSizePt": 50,
+    "direction": "rtl",
+    "note": "Arabic: 'sabah al-khayr' (good morning)",
+    "canvas": "780x180",
+    "mode": "L (8-bit grayscale)",
+    "renderer": "Python Pillow (PIL) ImageDraw.text, layout_engine=RAQM (HarfBuzz+FriBidi shaping)"
+  },
+  {
+    "lang": "rus",
+    "file": "rus_smoke.png",
+    "groundTruth": "Доброе утро",
+    "font": "FreeSerif.ttf",
+    "fontSizePt": 46,
+    "direction": "ltr",
+    "note": "Russian: good morning",
+    "canvas": "780x180",
+    "mode": "L (8-bit grayscale)",
+    "renderer": "Python Pillow (PIL) ImageDraw.text, layout_engine=RAQM (HarfBuzz+FriBidi shaping)"
+  },
+  {
+    "lang": "chi_sim",
+    "file": "chi_sim_smoke.png",
+    "groundTruth": "早上好",
+    "font": "NotoSansCJK-Bold.ttc",
+    "fontSizePt": 52,
+    "direction": "ltr",
+    "note": "Simplified Chinese: good morning",
+    "canvas": "780x180",
+    "mode": "L (8-bit grayscale)",
+    "renderer": "Python Pillow (PIL) ImageDraw.text, layout_engine=RAQM (HarfBuzz+FriBidi shaping)"
+  },
+  {
+    "lang": "yor",
+    "file": "yor_smoke.png",
+    "groundTruth": "Ẹ kú àárọ̀",
+    "font": "FreeSerif.ttf",
+    "fontSizePt": 46,
+    "direction": "ltr",
+    "note": "Yoruba: good morning (with tone marks)",
+    "canvas": "780x180",
+    "mode": "L (8-bit grayscale)",
+    "renderer": "Python Pillow (PIL) ImageDraw.text, layout_engine=RAQM (HarfBuzz+FriBidi shaping)"
+  },
+  {
+    "lang": "amh",
+    "file": "amh_smoke.png",
+    "groundTruth": "ሰላም እንደምን አለህ",
+    "font": "FreeSerif.ttf",
+    "fontSizePt": 46,
+    "direction": "ltr",
+    "note": "Amharic: hello, how are you (Ge'ez script)",
+    "canvas": "780x180",
+    "mode": "L (8-bit grayscale)",
+    "renderer": "Python Pillow (PIL) ImageDraw.text, layout_engine=RAQM (HarfBuzz+FriBidi shaping)"
+  },
+  {
+    "lang": "hin",
+    "file": "hin_smoke.png",
+    "groundTruth": "नमस्ते आप कैसे हैं",
+    "font": "FreeSerif.ttf",
+    "fontSizePt": 46,
+    "direction": "ltr",
+    "note": "Hindi: hello, how are you (Devanagari)",
+    "canvas": "780x180",
+    "mode": "L (8-bit grayscale)",
+    "renderer": "Python Pillow (PIL) ImageDraw.text, layout_engine=RAQM (HarfBuzz+FriBidi shaping)"
+  }
+]

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WholesaleOS — CozyOS Business Application</title>
+</head>
+<body>
+<!--
+  CozyOS — WholesaleOS End-User Module (Phase 1)
+  Real fix (Level 2B repair): no application destination existed at all
+  for WholesaleOS before this file - confirmed by audit (no
+  applications/WholesaleOS/ directory, no ModuleRegistry entry). This is
+  the smallest real destination for the one real, existing Phase 1
+  capability core/plugins/wholesaleOS-core.js actually implements today:
+  WholesaleOS.getSharedCatalog() — a read-only view of the real, existing
+  ShopOS product catalog with each product's real wholesalePrice
+  surfaced. Every other capability named in that file's own registration
+  description (wholesaler directory, chat/community, offline receipts,
+  debt reminders, customer management, phone book, notes, goals,
+  budgets, planning, ShopOS/RetailOS/HawkerOS integration) is explicitly
+  disclosed there as real but not yet built — none of it is fabricated
+  here. Renders only inside #cozy-app-root, same real pattern as
+  ShopOS/PharmacyOS/QuarryOS.
+-->
+<div class="wos-app" id="wos-app-root">
+
+    <div class="wos-topbar">
+        <div class="wos-brand-cluster">
+            <div class="wos-brand-badge">📦</div>
+            <div>
+                <div class="wos-brand-name">WholesaleOS</div>
+                <div class="wos-brand-sub">CozyOS Business Application</div>
+            </div>
+        </div>
+        <span class="wos-status-pill" id="wos-engine-status">● Ready</span>
+    </div>
+
+    <section class="wos-section" id="wos-catalog-section">
+        <h3>Shared Catalog (Wholesale Pricing)</h3>
+        <p class="wos-note">Real, existing ShopOS product catalog, viewed with wholesale pricing. This is not a second catalog — adding or editing products happens in ShopOS.</p>
+        <table class="wos-table" id="wos-catalog-table">
+            <thead><tr><th>Name</th><th>Category</th><th>Unit</th><th>Wholesale Price</th><th>Retail Price</th><th>Status</th></tr></thead>
+            <tbody id="wos-catalog-table-body"></tbody>
+        </table>
+        <p id="wos-catalog-note" class="wos-note"></p>
+    </section>
+
+    <footer class="wos-footer">WholesaleOS Application (Phase 1) · CozyOS</footer>
+</div>
+<script src="../../core/plugins/shopOS-product.js"></script>
+<script src="../../core/plugins/wholesaleOS-core.js"></script>
+<script>
+(function () {
+    "use strict";
+    // Real, minimal UI wiring — no fake data, no second business-logic
+    // layer. The only call this file makes is the real, unmodified
+    // window.CozyOS.WholesaleOS.getSharedCatalog().
+    function renderCatalog() {
+        const wholesale = window.CozyOS.WholesaleOS;
+        const statusEl = document.getElementById("wos-engine-status");
+        const tbody = document.getElementById("wos-catalog-table-body");
+        const note = document.getElementById("wos-catalog-note");
+        if (!wholesale) { statusEl.textContent = "● WholesaleOS core not loaded"; return; }
+
+        const result = wholesale.getSharedCatalog({});
+        if (!result.available) {
+            note.textContent = result.reason;
+            return;
+        }
+        tbody.innerHTML = "";
+        result.products.forEach((p) => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<td>${p.name}</td><td>${p.category || "—"}</td><td>${p.unit || "—"}</td><td>${typeof p.wholesalePrice === "number" ? p.wholesalePrice : "—"}</td><td>${typeof p.retailPrice === "number" ? p.retailPrice : "—"}</td><td>${p.status || "—"}</td>`;
+            tbody.appendChild(tr);
+        });
+        note.textContent = result.products.length === 0 ? "No products in the shared catalog yet (add products in ShopOS)." : "";
+    }
+
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", renderCatalog);
+    else renderCatalog();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+--- /home/claude/work/pristine/cos-step4d-live-ui-patch-2/core/shell/live/tests/live-join-console-controller.test.js	2026-08-20 23:42:13.000000000 +0000
++++ core/shell/live/tests/live-join-console-controller.test.js	2026-08-21 00:00:45.092007815 +0000
+@@ -177,3 +177,11 @@
+     const src = fs.readFileSync(path.join(__dirname, '..', 'ui', 'cozy-live-join-console-controller.js'), 'utf8');
+     assert.doesNotMatch(src, /CozyLiveSession\./);
+ });
++
++// N (PART C, TASK 5-J): no living-worship-player dependency is introduced
++test('N: controller module and join console HTML never reference living-worship-player', () => {
++    const controllerSrc = fs.readFileSync(path.join(__dirname, '..', 'ui', 'cozy-live-join-console-controller.js'), 'utf8');
++    assert.doesNotMatch(controllerSrc, /living-worship-player/);
++    const htmlSrc = fs.readFileSync(path.join(__dirname, '..', 'ui', 'cozy-live-join-console.html'), 'utf8');
++    assert.doesNotMatch(htmlSrc, /living-worship-player/);
++});

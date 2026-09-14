@@ -1,0 +1,702 @@
+=== NEW FILE: server/auth/account-link-server.js ===
+--- /dev/null	2026-08-21 04:29:52.591437791 +0000
++++ server/auth/account-link-server.js	2026-08-22 02:53:38.273727440 +0000
+@@ -0,0 +1,211 @@
++'use strict';
++
++/**
++ * server/auth/account-link-server.js
++ * CozyOS — Account-Link Server (browser -> server account-linking boundary)
++ * Milestone: Prompt 10 (Google Browser-to-Server Account Linkage)
++ * Version: 1.0.0-ENTERPRISE
++ *
++ * WHAT THIS COMPOSES (never duplicates)
++ *   - createGoogleLoginRequestHandler from google-login-endpoint.js,
++ *     UNCHANGED, reused as-is for /auth/google (anonymous login —
++ *     needs no session, identity comes entirely from the verified
++ *     Google token, exactly as Prompt 7 built it).
++ *   - CozyGoogleAccountLinkage.linkAccount(), UNCHANGED, reused for
++ *     the actual linking mutation.
++ *   - AccountLinkSessionIssuer, this milestone's new minimal
++ *     boundary (see its own header for the full, honest security
++ *     model — read it before treating this as full authentication).
++ *
++ * WHY ONE NEW SERVER INSTEAD OF A SECOND ONE PER ENDPOINT
++ *   Prompt 10 explicitly asks not to create a second auth server.
++ *   google-login-endpoint.js's GoogleAuthAdapterServer is
++ *   single-path by design (Prompt 7 scope) and was left completely
++ *   untouched rather than modified in place, so its own
++ *   already-passing test suite stays a true regression signal. This
++ *   file is the ONE additional composed server this milestone adds,
++ *   mounting three routes on one http.createServer, matching the
++ *   existing repo convention (google-login-endpoint.js's own
++ *   GoogleAuthAdapterServer) rather than introducing Express/Fastify.
++ *
++ * ROUTES
++ *   POST /auth/session/issue   { userId }                -> { token, expiresAt }
++ *     TOFU bootstrap step — see account-link-session-issuer.js's
++ *     HONEST SECURITY MODEL for exactly what this does and does not
++ *     prove.
++ *   POST /auth/google/link     { linkSessionToken, idToken } -> { success, googleEmail? }
++ *     The userId is NEVER read from this request body — it is
++ *     resolved exclusively from linkSessionToken via the issuer,
++ *     server-side, satisfying Prompt 10 §6 ("never accept a
++ *     client-supplied userId on the mutating request as authority").
++ *     The session token is consumed (single-use) on resolution,
++ *     success or failure, to minimize replay surface.
++ *   POST /auth/google           { idToken }                 -> { success, userId? }
++ *     Unchanged, reused verbatim from google-login-endpoint.js.
++ *
++ * FAIL-CLOSED / NO INFORMATION LEAKAGE
++ *   Every failure path (invalid JSON, missing fields, invalid/expired
++ *   session, Google verification failure, already-linked-elsewhere)
++ *   returns the same generic { success:false, reason:'AUTH_FAILED' }
++ *   shape google-login-endpoint.js already established, for the same
++ *   reason: this endpoint must not be usable to enumerate which
++ *   session tokens or Google identities are valid.
++ *
++ * HONEST SCOPE
++ *   Locally verified via node:test with a real loopback HTTP server,
++ *   real RS256-signed tokens, and a real filesystem-backed persistent
++ *   store surviving a genuine process stop/restart (see
++ *   server/auth/test/account-link-server.test.js and
++ *   google-persistent-linkage-integration.test.js's established
++ *   pattern). NOT verified: CSRF protection (see KNOWN LIMITATIONS in
++ *   this milestone's implementation report — this endpoint is a JSON
++ *   API requiring `Content-Type: application/json`, which already
++ *   defeats simple HTML-form CSRF, but no origin/token-based CSRF
++ *   defense was added — disclosed, not silently assumed away),
++ *   production deployment, and real Google OAuth configuration.
++ */
++
++const http = require('http');
++const { createGoogleLoginRequestHandler } = require('./google-login-endpoint');
++
++const MAX_BODY_BYTES = 10 * 1024;
++const GENERIC_AUTH_FAILURE = { success: false, reason: 'AUTH_FAILED' };
++
++function sendJson(res, statusCode, obj) {
++    const body = JSON.stringify(obj);
++    res.writeHead(statusCode, {
++        'Content-Type': 'application/json; charset=utf-8',
++        'Content-Length': Buffer.byteLength(body),
++        'Cache-Control': 'no-store',
++    });
++    res.end(body);
++}
++
++function readJsonBody(req) {
++    return new Promise((resolve, reject) => {
++        let received = 0, oversized = false, settled = false;
++        const chunks = [];
++        req.on('data', (chunk) => {
++            if (oversized) return;
++            received += chunk.length;
++            if (received > MAX_BODY_BYTES) { oversized = true; chunks.length = 0; return; }
++            chunks.push(chunk);
++        });
++        req.on('end', () => {
++            if (settled) return;
++            settled = true;
++            if (oversized) { reject(Object.assign(new Error('too large'), { code: 'PAYLOAD_TOO_LARGE' })); return; }
++            let parsed;
++            try { parsed = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); }
++            catch (_e) { reject(Object.assign(new Error('bad json'), { code: 'BAD_JSON' })); return; }
++            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
++                reject(Object.assign(new Error('bad json'), { code: 'BAD_JSON' })); return;
++            }
++            resolve(parsed);
++        });
++        req.on('error', (e) => { if (!settled) { settled = true; reject(e); } });
++    });
++}
++
++async function readValidatedJson(req, res) {
++    const contentType = String(req.headers['content-type'] || '');
++    if (!contentType.toLowerCase().includes('application/json')) { sendJson(res, 415, GENERIC_AUTH_FAILURE); return null; }
++    try {
++        return await readJsonBody(req);
++    } catch (e) {
++        sendJson(res, e.code === 'PAYLOAD_TOO_LARGE' ? 413 : 400, GENERIC_AUTH_FAILURE);
++        return null;
++    }
++}
++
++/**
++ * createAccountLinkServer({ linkage, issuer, onAuthEvent })
++ *   linkage   REQUIRED. A real CozyGoogleAccountLinkage instance
++ *             (already composed with a real persistent store —
++ *             callers own that composition, this file never
++ *             constructs a store itself).
++ *   issuer    REQUIRED. A real AccountLinkSessionIssuer instance.
++ */
++function createAccountLinkServer({ linkage, issuer, onAuthEvent } = {}) {
++    if (!linkage || typeof linkage.linkAccount !== 'function' || typeof linkage.resolveLoginCandidate !== 'function') {
++        throw new Error('[account-link-server] A real CozyGoogleAccountLinkage instance (linkage) is required.');
++    }
++    if (!issuer || typeof issuer.issue !== 'function' || typeof issuer.resolve !== 'function') {
++        throw new Error('[account-link-server] A real AccountLinkSessionIssuer instance (issuer) is required.');
++    }
++    const emit = typeof onAuthEvent === 'function' ? onAuthEvent : () => {};
++    const googleLoginHandler = createGoogleLoginRequestHandler({ linkage, onAuthEvent });
++
++    return async function handleRequest(req, res) {
++        if (req.method !== 'POST') { sendJson(res, 405, GENERIC_AUTH_FAILURE); return; }
++        const url = new URL(req.url, 'http://internal');
++
++        if (url.pathname === '/auth/google') { await googleLoginHandler(req, res); return; }
++
++        if (url.pathname === '/auth/session/issue') {
++            const body = await readValidatedJson(req, res);
++            if (body === null) return;
++            const userId = body.userId;
++            if (typeof userId !== 'string' || userId.length === 0) {
++                emit('REJECTED', { reason: 'MISSING_USER_ID' });
++                sendJson(res, 400, GENERIC_AUTH_FAILURE);
++                return;
++            }
++            const { token, expiresAt } = issuer.issue(userId);
++            emit('SESSION_ISSUED', { userId });
++            sendJson(res, 200, { success: true, token, expiresAt });
++            return;
++        }
++
++        if (url.pathname === '/auth/google/link') {
++            const body = await readValidatedJson(req, res);
++            if (body === null) return;
++            const { linkSessionToken, idToken } = body;
++            if (typeof linkSessionToken !== 'string' || typeof idToken !== 'string' || !linkSessionToken || !idToken) {
++                emit('REJECTED', { reason: 'MISSING_FIELDS' });
++                sendJson(res, 400, GENERIC_AUTH_FAILURE);
++                return;
++            }
++            // The ONLY source of truth for "which account" — never
++            // body.userId (deliberately never even read above).
++            const userId = issuer.resolve(linkSessionToken, { consume: true });
++            if (!userId) {
++                emit('REJECTED', { reason: 'SESSION_INVALID' });
++                sendJson(res, 401, GENERIC_AUTH_FAILURE);
++                return;
++            }
++            let result;
++            try {
++                result = await linkage.linkAccount(userId, idToken);
++            } catch (e) {
++                emit('ERROR', { reason: 'LINK_THREW', message: e && e.message });
++                sendJson(res, 500, GENERIC_AUTH_FAILURE);
++                return;
++            }
++            if (!result || result.linked !== true) {
++                emit('REJECTED', { reason: (result && result.reason) || 'UNKNOWN' });
++                sendJson(res, 409, GENERIC_AUTH_FAILURE);
++                return;
++            }
++            emit('LINKED', { userId, googleEmail: result.googleEmail });
++            sendJson(res, 200, { success: true, googleEmail: result.googleEmail });
++            return;
++        }
++
++        sendJson(res, 404, GENERIC_AUTH_FAILURE);
++    };
++}
++
++class AccountLinkServer {
++    #httpServer;
++    constructor({ linkage, issuer, onAuthEvent } = {}) {
++        const handler = createAccountLinkServer({ linkage, issuer, onAuthEvent });
++        this.#httpServer = http.createServer(handler);
++    }
++    listen(port = 0, host = '127.0.0.1') {
++        return new Promise((resolve) => { this.#httpServer.listen(port, host, () => resolve(this.#httpServer.address())); });
++    }
++    close() { return new Promise((resolve) => this.#httpServer.close(() => resolve())); }
++}
++
++module.exports = { createAccountLinkServer, AccountLinkServer, MAX_BODY_BYTES };
+=== NEW FILE: server/auth/account-link-session-issuer.js ===
+--- /dev/null	2026-08-21 04:29:52.591437791 +0000
++++ server/auth/account-link-session-issuer.js	2026-08-22 02:53:05.757725507 +0000
+@@ -0,0 +1,117 @@
++'use strict';
++
++/**
++ * server/auth/account-link-session-issuer.js
++ * CozyOS — Account-Link Session Issuer
++ * Milestone: Prompt 10 (Browser -> Server Account Linkage boundary)
++ * Version: 1.0.0-ENTERPRISE
++ *
++ * HONEST SECURITY MODEL — READ THIS BEFORE RELYING ON THIS FILE
++ *   This is deliberately NOT full server-side authentication of a
++ *   CozyOS account (this repo has none — CozyOS accounts are entirely
++ *   browser-local, protected by the user's local passkey/password;
++ *   nothing about them has ever been server-verifiable, confirmed by
++ *   repo-wide search this milestone). What this file actually
++ *   provides is narrower and is stated precisely:
++ *
++ *   issue(userId) mints a random, unguessable (32-byte,
++ *   crypto.randomBytes) bearer token and durably associates it with
++ *   whatever userId string was presented, for a short TTL. The
++ *   PROOF that the caller is genuinely that account rests entirely on
++ *   userId itself being unguessable — and it is: identity-engine.js's
++ *   #generateId() (confirmed by direct inspection this milestone)
++ *   builds every account id from crypto.randomUUID(), never from the
++ *   user-chosen login username. Presenting that internal id is
++ *   already equivalent, in practice, to proving local control of that
++ *   account's browser storage — the same implicit trust boundary this
++ *   entire local-first app already rests on (anyone with read access
++ *   to a user's IndexedDB already fully controls that account,
++ *   independent of anything in this file).
++ *
++ *   What THIS FILE adds on top of that baseline: (1) the resulting
++ *   session token, once issued, is what every subsequent mutating
++ *   request must present — the userId itself is never re-read from
++ *   any subsequent request body as authority (closes Prompt 10 §6's
++ *   "never accept a client-supplied userId on the mutating request"
++ *   requirement); (2) the token is short-lived and single-use for the
++ *   actual link mutation (consumed via the store's delete(), reducing
++ *   replay window to one successful use or TTL expiry, whichever is
++ *   first); (3) only a hash of the token is ever persisted (see
++ *   account-link-session-store.js).
++ *
++ *   WHAT THIS FILE DOES NOT PROVIDE: protection against a party that
++ *   has obtained a user's internal account id through some other
++ *   means (e.g. a compromised browser, a leaked export). A stronger
++ *   design would bind session issuance to a genuine local
++ *   cryptographic proof (e.g. a WebAuthn assertion verified against a
++ *   public key the server has previously been given) — no such
++ *   public-key registration exists anywhere in this repo today, and
++ *   building it is a real, separate architecture decision, disclosed
++ *   as a known limitation rather than silently built here.
++ */
++
++const crypto = require('crypto');
++
++const DEFAULT_TTL_MS = 10 * 60 * 1000; // 10 minutes — short-lived by design
++
++class AccountLinkSessionIssuer {
++    #store;
++    #ttlMs;
++
++    constructor({ store, ttlMs = DEFAULT_TTL_MS } = {}) {
++        if (!store || typeof store.put !== 'function' || typeof store.get !== 'function' || typeof store.delete !== 'function') {
++            throw new Error('[AccountLinkSessionIssuer] A real store (put/get/delete) is required.');
++        }
++        this.#store = store;
++        this.#ttlMs = ttlMs;
++    }
++
++    getVersion() { return '1.0.0-ENTERPRISE'; }
++
++    /**
++     * issue(userId) — real. Mints a fresh, unguessable token, persists
++     * only its hash (never the raw value) bound to the presented
++     * userId, and returns the raw token exactly once — the caller
++     * (the browser, immediately after minting) is the only party that
++     * will ever see it in plaintext.
++     */
++    issue(userId) {
++        if (!userId || typeof userId !== 'string') {
++            throw new Error('[AccountLinkSessionIssuer] A real userId string is required.');
++        }
++        const rawToken = crypto.randomBytes(32).toString('base64url');
++        const tokenHash = this.#store.constructor.hashToken
++            ? this.#store.constructor.hashToken(rawToken)
++            : crypto.createHash('sha256').update(rawToken, 'utf8').digest('hex');
++        const now = Date.now();
++        const expiresAt = now + this.#ttlMs;
++        this.#store.put(tokenHash, { userId, createdAt: now, expiresAt });
++        return { token: rawToken, expiresAt };
++    }
++
++    /**
++     * resolve(rawToken, { consume = false } = {}) -> userId | null
++     *   Real, fail-closed lookup. Returns null (never throws) for any
++     *   missing, unknown, or expired token — callers must treat null
++     *   as SESSION_INVALID, a generic external failure, exactly like
++     *   this repo's existing Google-verification failure convention
++     *   (never leaking which specific reason it failed for).
++     *   consume:true deletes the token after a successful resolve —
++     *   used for the actual link mutation so a captured token cannot
++     *   be replayed for a second link attempt.
++     */
++    resolve(rawToken, { consume = false } = {}) {
++        if (!rawToken || typeof rawToken !== 'string') return null;
++        const tokenHash = crypto.createHash('sha256').update(rawToken, 'utf8').digest('hex');
++        const record = this.#store.get(tokenHash);
++        if (!record) return null;
++        if (!record.expiresAt || record.expiresAt <= Date.now()) {
++            this.#store.delete(tokenHash); // real cleanup of an expired token on touch
++            return null;
++        }
++        if (consume) this.#store.delete(tokenHash);
++        return record.userId;
++    }
++}
++
++module.exports = { AccountLinkSessionIssuer, DEFAULT_TTL_MS };
+=== NEW FILE: server/auth/account-link-session-store.js ===
+--- /dev/null	2026-08-21 04:29:52.591437791 +0000
++++ server/auth/account-link-session-store.js	2026-08-22 02:52:43.929724210 +0000
+@@ -0,0 +1,114 @@
++'use strict';
++
++/**
++ * server/auth/account-link-session-store.js
++ * CozyOS — Persistent Account-Link Session Store
++ * Milestone: Prompt 10 (Browser -> Server Account Linkage boundary)
++ * Version: 1.0.0-ENTERPRISE
++ *
++ * WHY THIS FILE EXISTS
++ *   Repo-wide search (this milestone, §1/§4) confirmed CozyOS's real
++ *   session concept (identity-engine.js's `identity:session-created`
++ *   event / session-manager.js's CozySessionManager) is entirely
++ *   browser-local — it has never been sent to, or recognized by, any
++ *   server. The server has no pre-existing way to know "which CozyOS
++ *   account is making this request." This file is the persistence
++ *   half of the smallest real boundary that closes that gap (see
++ *   account-link-session-issuer.js for the actual issue/verify logic
++ *   and its HONEST SECURITY MODEL disclosure — read that before
++ *   relying on this).
++ *
++ * WHAT IS STORED
++ *   sha256(rawToken) -> { userId, createdAt, expiresAt }. The RAW
++ *   token is never persisted — only its hash, the same principle
++ *   password-reset-service.js already uses for reset tokens in this
++ *   repo (never store the secret itself, only a value an attacker
++ *   with read access to the file cannot use to impersonate a session).
++ *
++ * SAME REAL, SYNCHRONOUS, FS-BACKED DESIGN AS
++ *   server/auth/google-linkage-store-adapter.js — same
++ *   atomic-write-via-rename convention, same fail-closed-on-corruption
++ *   behavior, same disclosed single-process/no-file-locking scope.
++ */
++
++const fs = require('fs');
++const path = require('path');
++const crypto = require('crypto');
++
++class AccountLinkSessionStore {
++    #filePath;
++    #records; // Map<tokenHash, { userId, createdAt, expiresAt }>
++
++    constructor({ filePath } = {}) {
++        if (!filePath || typeof filePath !== 'string') {
++            throw new Error('[AccountLinkSessionStore] A real filePath is required.');
++        }
++        this.#filePath = filePath;
++        this.#records = new Map();
++        this.#loadFromDisk();
++    }
++
++    #loadFromDisk() {
++        let raw;
++        try {
++            raw = fs.readFileSync(this.#filePath, 'utf8');
++        } catch (err) {
++            if (err && err.code === 'ENOENT') { this.#persistToDisk(); return; }
++            throw err;
++        }
++        let parsed;
++        try {
++            parsed = JSON.parse(raw);
++        } catch (_e) {
++            throw new Error('[AccountLinkSessionStore] Backing file exists but contains invalid JSON — refusing to start from an empty store: ' + this.#filePath);
++        }
++        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
++            throw new Error('[AccountLinkSessionStore] Backing file does not contain a JSON object: ' + this.#filePath);
++        }
++        for (const [tokenHash, record] of Object.entries(parsed)) this.#records.set(tokenHash, record);
++    }
++
++    #persistToDisk() {
++        const obj = {};
++        for (const [tokenHash, record] of this.#records.entries()) obj[tokenHash] = record;
++        const dir = path.dirname(this.#filePath);
++        fs.mkdirSync(dir, { recursive: true });
++        const tmpPath = this.#filePath + '.tmp-' + process.pid + '-' + Date.now();
++        fs.writeFileSync(tmpPath, JSON.stringify(obj, null, 2), 'utf8');
++        fs.renameSync(tmpPath, this.#filePath);
++    }
++
++    static hashToken(rawToken) {
++        return crypto.createHash('sha256').update(rawToken, 'utf8').digest('hex');
++    }
++
++    /** put(tokenHash, record) — real, synchronous write-through. */
++    put(tokenHash, record) {
++        this.#records.set(tokenHash, { ...record });
++        this.#persistToDisk();
++    }
++
++    /** get(tokenHash) — real, synchronous read; never fabricates a record. */
++    get(tokenHash) {
++        return this.#records.has(tokenHash) ? { ...this.#records.get(tokenHash) } : null;
++    }
++
++    /** delete(tokenHash) — real, synchronous; used to consume a session token after use (reduces replay window). */
++    delete(tokenHash) {
++        const existed = this.#records.delete(tokenHash);
++        if (existed) this.#persistToDisk();
++        return existed;
++    }
++
++    /** deleteExpired(now) — real, synchronous sweep; not called automatically (no background timers in this file — callers decide when to sweep). */
++    deleteExpired(now = Date.now()) {
++        let removed = 0;
++        for (const [tokenHash, record] of this.#records.entries()) {
++            if (record.expiresAt && record.expiresAt <= now) { this.#records.delete(tokenHash); removed++; }
++        }
++        if (removed > 0) this.#persistToDisk();
++        return removed;
++    }
++}
++
++module.exports = { AccountLinkSessionStore };
+=== NEW FILE: server/auth/test/account-link-server.test.js ===
+--- /dev/null	2026-08-21 04:29:52.591437791 +0000
++++ server/auth/test/account-link-server.test.js	2026-08-22 02:54:20.457729948 +0000
+@@ -0,0 +1,159 @@
++'use strict';
++
++/**
++ * server/auth/test/account-link-server.test.js
++ * Prompt 10 — real end-to-end HTTP test of the full browser->server
++ * account-linking boundary, matching this milestone's §23/§29
++ * acceptance scenario exactly: real HTTP server, real RS256 tokens,
++ * real filesystem persistence, real process stop/restart.
++ */
++
++const test = require('node:test');
++const assert = require('node:assert/strict');
++const crypto = require('crypto');
++const fs = require('fs');
++const os = require('os');
++const path = require('path');
++
++const { AccountLinkServer } = require('../account-link-server');
++const { AccountLinkSessionStore } = require('../account-link-session-store');
++const { AccountLinkSessionIssuer } = require('../account-link-session-issuer');
++const { GoogleLinkageStoreAdapter } = require('../google-linkage-store-adapter');
++const { CozyGoogleAccountLinkage } = require('../../../core/security/google-account-linkage');
++
++const PROJECT_ID = 'cozycabin-affiliate';
++const KID = 'test-kid-1';
++const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
++const PUBLIC_KEY_PEM = publicKey.export({ type: 'spki', format: 'pem' });
++
++function b64url(buf) { return Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
++function makeIdToken({ uid = 'g-uid-1', email = 'user@example.com', now = Math.floor(Date.now() / 1000) } = {}) {
++    const header = b64url(JSON.stringify({ alg: 'RS256', kid: KID, typ: 'JWT' }));
++    const payload = b64url(JSON.stringify({
++        iss: `https://securetoken.google.com/${PROJECT_ID}`, aud: PROJECT_ID,
++        sub: uid, user_id: uid, email, exp: now + 3600, iat: now - 1, auth_time: now - 1,
++    }));
++    const signedData = `${header}.${payload}`;
++    const signature = b64url(crypto.sign('RSA-SHA256', Buffer.from(signedData), privateKey));
++    return `${signedData}.${signature}`;
++}
++async function fetchGoogleCerts() { return { [KID]: PUBLIC_KEY_PEM }; }
++
++function tempDir() { return fs.mkdtempSync(path.join(os.tmpdir(), 'cozyos-account-link-')); }
++
++async function startServer(dir) {
++    const linkageStore = new GoogleLinkageStoreAdapter({ filePath: path.join(dir, 'google-linkages.json') });
++    const linkage = new CozyGoogleAccountLinkage({ store: linkageStore, projectId: PROJECT_ID, fetchGoogleCerts });
++    const sessionStore = new AccountLinkSessionStore({ filePath: path.join(dir, 'link-sessions.json') });
++    const issuer = new AccountLinkSessionIssuer({ store: sessionStore });
++    const server = new AccountLinkServer({ linkage, issuer });
++    const addr = await server.listen(0, '127.0.0.1');
++    return { server, linkage, linkageStore, issuer, baseUrl: `http://127.0.0.1:${addr.port}` };
++}
++
++async function post(baseUrl, pathName, body) {
++    const res = await fetch(`${baseUrl}${pathName}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
++    return { status: res.status, body: await res.json() };
++}
++
++test('REAL ACCEPTANCE SCENARIO (§29): account A links, restarts, logs in, resolves correctly; account B is rejected', async () => {
++    const dir = tempDir();
++
++    // --- Server run 1 ---
++    const run1 = await startServer(dir);
++
++    // "USER A logs into CozyOS using an existing approved factor" is a
++    // browser-local event this file cannot exercise directly (no
++    // browser in this sandbox) — represented here by the browser
++    // already knowing its own real, unguessable local userId, exactly
++    // as identity-engine.js's #generateId() produces one.
++    const userAId = crypto.randomUUID();
++
++    // Settings -> Security -> Link Google: browser first asks the
++    // server for a link session bound to its own already-known local id.
++    const issueRes = await post(run1.baseUrl, '/auth/session/issue', { userId: userAId });
++    assert.equal(issueRes.status, 200);
++    assert.ok(issueRes.body.token);
++
++    // Google authentication happens, browser gets a real Google ID token,
++    // then calls the link endpoint. Deliberately including a spoofed
++    // userId in the body to prove it is ignored (Prompt 10 §6).
++    const linkRes = await post(run1.baseUrl, '/auth/google/link', {
++        linkSessionToken: issueRes.body.token,
++        idToken: makeIdToken({ uid: 'g-uid-real-A' }),
++        userId: 'attacker-supplied-id', // must be ignored entirely
++    });
++    assert.equal(linkRes.status, 200);
++    assert.equal(linkRes.body.success, true);
++
++    // Confirm the link landed on the REAL account (from the session),
++    // never the spoofed body field.
++    assert.equal(run1.linkage.getGoogleState(userAId).googleLinked, true);
++    assert.equal(run1.linkage.getGoogleState('attacker-supplied-id').googleLinked, false);
++
++    // Session token is single-use — a replay must fail.
++    const replay = await post(run1.baseUrl, '/auth/google/link', { linkSessionToken: issueRes.body.token, idToken: makeIdToken({ uid: 'g-uid-real-A' }) });
++    assert.equal(replay.status, 401);
++
++    // Logout + Google login (anonymous path, reused verbatim from Prompt 7).
++    const loginRes = await post(run1.baseUrl, '/auth/google', { idToken: makeIdToken({ uid: 'g-uid-real-A' }) });
++    assert.equal(loginRes.status, 200);
++    assert.equal(loginRes.body.userId, userAId);
++
++    await run1.server.close();
++
++    // --- Real server restart, same directory/files ---
++    const run2 = await startServer(dir);
++    try {
++        const loginAfterRestart = await post(run2.baseUrl, '/auth/google', { idToken: makeIdToken({ uid: 'g-uid-real-A' }) });
++        assert.equal(loginAfterRestart.status, 200);
++        assert.equal(loginAfterRestart.body.userId, userAId, 'must resolve to the same account after a real restart');
++
++        // USER B attempts to claim USER A's already-linked Google identity.
++        const userBId = crypto.randomUUID();
++        const issueB = await post(run2.baseUrl, '/auth/session/issue', { userId: userBId });
++        const linkB = await post(run2.baseUrl, '/auth/google/link', { linkSessionToken: issueB.body.token, idToken: makeIdToken({ uid: 'g-uid-real-A' }) });
++        assert.equal(linkB.status, 409);
++        assert.equal(linkB.body.success, false);
++        assert.equal(run2.linkage.getGoogleState(userBId).googleLinked, false);
++        // Owner unchanged.
++        assert.equal(run2.linkage.getGoogleState(userAId).googleLinked, true);
++    } finally {
++        await run2.server.close();
++    }
++});
++
++test('missing/garbage session token is rejected, never falls back to trusting a body-supplied userId', async () => {
++    const dir = tempDir();
++    const { server, baseUrl } = await startServer(dir);
++    try {
++        const res = await post(baseUrl, '/auth/google/link', { linkSessionToken: 'not-a-real-token', idToken: makeIdToken(), userId: 'someone' });
++        assert.equal(res.status, 401);
++        assert.equal(res.body.success, false);
++    } finally {
++        await server.close();
++    }
++});
++
++test('session issue requires a real userId field', async () => {
++    const dir = tempDir();
++    const { server, baseUrl } = await startServer(dir);
++    try {
++        const res = await post(baseUrl, '/auth/session/issue', {});
++        assert.equal(res.status, 400);
++    } finally {
++        await server.close();
++    }
++});
++
++test('unknown route returns generic 404, no information leakage', async () => {
++    const dir = tempDir();
++    const { server, baseUrl } = await startServer(dir);
++    try {
++        const res = await post(baseUrl, '/auth/nonexistent', {});
++        assert.equal(res.status, 404);
++        assert.deepEqual(res.body, { success: false, reason: 'AUTH_FAILED' });
++    } finally {
++        await server.close();
++    }
++});
+=== NEW FILE: server/auth/test/account-link-session.test.js ===
+--- /dev/null	2026-08-21 04:29:52.591437791 +0000
++++ server/auth/test/account-link-session.test.js	2026-08-22 02:53:51.237728211 +0000
+@@ -0,0 +1,81 @@
++'use strict';
++const test = require('node:test');
++const assert = require('node:assert/strict');
++const fs = require('fs');
++const os = require('os');
++const path = require('path');
++const { AccountLinkSessionStore } = require('../account-link-session-store');
++const { AccountLinkSessionIssuer } = require('../account-link-session-issuer');
++
++function tempFilePath() {
++    return path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cozyos-link-session-')), 'sessions.json');
++}
++
++test('issue() mints a token, resolve() returns the bound userId', () => {
++    const store = new AccountLinkSessionStore({ filePath: tempFilePath() });
++    const issuer = new AccountLinkSessionIssuer({ store });
++    const { token, expiresAt } = issuer.issue('user-abc');
++    assert.ok(token.length >= 32);
++    assert.ok(expiresAt > Date.now());
++    assert.equal(issuer.resolve(token), 'user-abc');
++});
++
++test('resolve() never trusts the raw userId string alone — only a genuinely issued token works', () => {
++    const store = new AccountLinkSessionStore({ filePath: tempFilePath() });
++    const issuer = new AccountLinkSessionIssuer({ store });
++    issuer.issue('user-abc');
++    assert.equal(issuer.resolve('user-abc'), null); // presenting the userId itself, not a token, must fail
++    assert.equal(issuer.resolve('totally-made-up-token'), null);
++});
++
++test('expired token resolves to null (fails closed) and is swept on touch', () => {
++    const store = new AccountLinkSessionStore({ filePath: tempFilePath() });
++    const issuer = new AccountLinkSessionIssuer({ store, ttlMs: -1 }); // already expired the instant it's issued
++    const { token } = issuer.issue('user-abc');
++    assert.equal(issuer.resolve(token), null);
++});
++
++test('consume:true deletes the token after one use — a captured token cannot be replayed', () => {
++    const store = new AccountLinkSessionStore({ filePath: tempFilePath() });
++    const issuer = new AccountLinkSessionIssuer({ store });
++    const { token } = issuer.issue('user-abc');
++    assert.equal(issuer.resolve(token, { consume: true }), 'user-abc');
++    assert.equal(issuer.resolve(token, { consume: true }), null, 'second use of the same token must fail');
++});
++
++test('a token issued for one userId never resolves to a different userId, even after a real restart', () => {
++    const filePath = tempFilePath();
++    const store1 = new AccountLinkSessionStore({ filePath });
++    const issuer1 = new AccountLinkSessionIssuer({ store: store1 });
++    const { token } = issuer1.issue('user-A');
++
++    // Real restart: brand-new store + issuer instances, same file.
++    const store2 = new AccountLinkSessionStore({ filePath });
++    const issuer2 = new AccountLinkSessionIssuer({ store: store2 });
++    assert.equal(issuer2.resolve(token), 'user-A');
++});
++
++test('two tokens for two different users never collide', () => {
++    const store = new AccountLinkSessionStore({ filePath: tempFilePath() });
++    const issuer = new AccountLinkSessionIssuer({ store });
++    const a = issuer.issue('user-A');
++    const b = issuer.issue('user-B');
++    assert.notEqual(a.token, b.token);
++    assert.equal(issuer.resolve(a.token), 'user-A');
++    assert.equal(issuer.resolve(b.token), 'user-B');
++});
++
++test('store: raw token is never persisted to disk, only its hash', () => {
++    const filePath = tempFilePath();
++    const store = new AccountLinkSessionStore({ filePath });
++    const issuer = new AccountLinkSessionIssuer({ store });
++    const { token: rawToken } = issuer.issue('user-A');
++    const onDisk = fs.readFileSync(filePath, 'utf8');
++    assert.ok(!onDisk.includes(rawToken), 'raw token must never appear in the persisted file');
++});
++
++test('store: corrupted backing file fails closed at construction', () => {
++    const filePath = tempFilePath();
++    fs.writeFileSync(filePath, 'not json', 'utf8');
++    assert.throws(() => new AccountLinkSessionStore({ filePath }), /invalid JSON/);
++});

@@ -1,0 +1,17 @@
+/* core/ui/cozy-layout.css */
+/* Tablet Breakpoint */
+@media (max-width: 1024px) {
+    .cozy-app-container { grid-template-columns: 260px 1fr; }
+}
+
+/* Accessibility & Interaction */
+.cozy-app-tile:focus {
+    outline: 2px solid var(--cozy-brand-primary);
+    outline-offset: -2px;
+}
+
+.cozy-app-tile.active {
+    border-color: var(--cozy-brand-primary);
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+}

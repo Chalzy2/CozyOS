@@ -1,0 +1,7 @@
+core/tests/browser/cozy-browser.js
+core/modules/ChurchOS/test/video-assist-coexistence-browser.test.js
+core/modules/ChurchOS/test/live-expanded-workspace-browser.test.js
+core/modules/ChurchOS/test/live-fullscreen-browser.test.js
+core/modules/ChurchOS/test/live-minimized-floating-browser.test.js
+core/modules/ChurchOS/test/live-move-pin-browser.test.js
+core/modules/ChurchOS/test/live-chat-workspace-browser.test.js

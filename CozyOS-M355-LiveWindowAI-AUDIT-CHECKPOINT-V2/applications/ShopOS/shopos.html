@@ -1,0 +1,47 @@
+<!--
+  CozyOS — ShopOS End-User Module
+  Renders only inside #cozy-app-root. No shell chrome — matches the same
+  pattern already proven for MpesaOS.
+-->
+<div class="sp-app" id="sp-app-root">
+
+    <div class="sp-topbar">
+        <div class="sp-brand-cluster">
+            <div class="sp-brand-badge">S</div>
+            <div>
+                <div class="sp-brand-name" data-i18n="app_name">ShopOS</div>
+                <div class="sp-brand-sub" data-i18n="app_sub">CozyOS Business Engine</div>
+            </div>
+        </div>
+        <div class="sp-topbar-actions">
+            <span class="sp-status-pill" id="sp-engine-status">● <span data-i18n="engine_ready">Ready</span></span>
+        </div>
+    </div>
+
+    <nav class="sp-tabs" id="sp-tabs">
+        <button class="sp-tab active" data-tab="dashboard" data-i18n="tab_dashboard">Dashboard</button>
+        <button class="sp-tab" data-tab="products" data-i18n="tab_products">Products</button>
+        <button class="sp-tab" data-tab="customers" data-i18n="tab_customers">Customers</button>
+        <button class="sp-tab" data-tab="orders" data-i18n="tab_orders">Orders</button>
+    </nav>
+
+    <!-- Real, guarded extension point — Adaptive Business Profile. -->
+    <section class="sp-section" id="sp-adaptive-profile-section" style="display:none;" aria-label="Business profile">
+        <h3 data-i18n="business_profile">Business Profile</h3>
+        <div id="sp-adaptive-profile-content"></div>
+    </section>
+
+    <!-- No-branch setup state -->
+    <section class="sp-section" id="sp-no-branch-section" style="display:none;">
+        <div class="sp-empty-state">
+            <p data-i18n="no_branch_configured">No branch is configured for this shop yet.</p>
+            <button class="sp-btn sp-btn-primary" id="sp-quick-setup-btn" data-i18n="quick_setup">Quick Setup</button>
+        </div>
+    </section>
+
+    <main id="sp-tab-content"></main>
+
+    <footer class="sp-footer">
+        <span data-i18n="app_shell">ShopOS Application</span> · CozyOS
+    </footer>
+</div>

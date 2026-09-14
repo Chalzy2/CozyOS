@@ -1,0 +1,7 @@
+4f6add5c6acb482c9633ef9df263e3554cab95d0626d6728433cc6c46922e989  core/tests/browser/cozy-browser.js
+5702be102124f0327857d8f45a54ec9dd5d26e2a0af145a5cba877ef1b41d15e  core/modules/ChurchOS/test/video-assist-coexistence-browser.test.js
+7867e00321340f2ab7befc06cc0d6d037a5ba0e47eeb564d3e9960d84acfb650  core/modules/ChurchOS/test/live-expanded-workspace-browser.test.js
+b588db568f4bfc1223aca4fd8086e06c0040dd420a81e3e31b0731f311c8cb42  core/modules/ChurchOS/test/live-fullscreen-browser.test.js
+5cab6d2185615c81886238d3df16b985997d078def40efb62a4943781137067e  core/modules/ChurchOS/test/live-minimized-floating-browser.test.js
+3144ff2dc0d65cc6aecbc0bf2b60b4b3253140620457ebba9150404fa310f7f9  core/modules/ChurchOS/test/live-move-pin-browser.test.js
+8d0d4bbd79f38d154f4eae28d3c3cf7358d644b694379ab3770bf17249480c7b  core/modules/ChurchOS/test/live-chat-workspace-browser.test.js
