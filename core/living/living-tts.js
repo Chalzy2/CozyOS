@@ -183,7 +183,13 @@
             if (result && result.available && result.played) {
                 const kind = classifyKind(result.providerId);
                 emit("living-tts:speak-success", { providerId: result.providerId, kind, context: request.context ?? null });
-                return { available: true, played: true, providerId: result.providerId, kind, reason: null };
+                // VOICE/LANGUAGE/COGNITIVE RESPONSE INTEGRATION —
+                // Section 2/8. Honest pass-through only - never computed
+                // or guessed here. Absent (undefined) for any provider
+                // that doesn't report it (e.g. CharlesVoiceProvider,
+                // which plays a specific person's fixed recording and
+                // has no per-language voice-matching concept at all).
+                return { available: true, played: true, providerId: result.providerId, kind, reason: null, dedicatedVoiceMatched: result.dedicatedVoiceMatched, requestedLanguage: result.requestedLanguage ?? request.language ?? null };
             }
 
             const reason = (result && result.reason) || "No provider could speak this request.";

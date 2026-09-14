@@ -377,6 +377,41 @@
              *   suppresses this call entirely (resolves immediately)
              *   without touching the visual sequence around it.
              */
+            /**
+             * showAutoplayGestureInstruction()
+             *   LOGIN SEQUENCE + SOUND BEHAVIOR correction — real,
+             *   visible fallback for when the browser/device autoplay
+             *   policy blocks the welcome audio entirely (confirmed via
+             *   LivingSounds.play()'s own existing, real
+             *   `blockedByAutoplayPolicy` field - not guessed here).
+             *   Never claims audio played when it didn't. Shown at most
+             *   once per launch (idempotent via the element's own id),
+             *   using the exact same DOM/container convention
+             *   runAboveOnlyStage() above already uses.
+             */
+            function showAutoplayGestureInstruction() {
+                const host = document.getElementById("cozy-launch-screen");
+                if (!host || document.getElementById("cozy-launch-audio-gesture-hint")) return;
+                const el = document.createElement("div");
+                el.id = "cozy-launch-audio-gesture-hint";
+                el.setAttribute("role", "status");
+                el.setAttribute("aria-live", "assertive");
+                el.textContent = "Tap the screen twice to hear the welcome message.";
+                el.style.cssText = "position:absolute;left:50%;bottom:8%;transform:translateX(-50%);color:#e5e7eb;font-size:14px;text-align:center;z-index:50;pointer-events:none;";
+                host.appendChild(el);
+                const remove = () => { if (el.parentNode) el.parentNode.removeChild(el); host.removeEventListener("pointerdown", onTap); };
+                let taps = 0;
+                function onTap() {
+                    taps += 1;
+                    if (taps >= 2) { playStartupVoice().catch(() => {}); remove(); }
+                }
+                host.addEventListener("pointerdown", onTap);
+                // Never leaves a stale hint on screen indefinitely if the
+                // user never taps - matches the rest of this file's
+                // pattern of always cleaning up its own transient nodes.
+                setTimeout(remove, 15000);
+            }
+
             async function playStartupVoice() {
                 if (!STARTUP_VOICE_ENABLED || LAUNCH_AUDIO_MUTED) return;
                 if (IS_OWNER_VOICE) {
@@ -384,6 +419,10 @@
                     if (sounds && typeof sounds.play === "function") {
                         const result = await sounds.play("welcome").catch(() => null);
                         if (result && result.success) return; // real voice pack phrase played - done, no TTS fallback needed
+                        if (result && result.blockedByAutoplayPolicy) {
+                            showAutoplayGestureInstruction();
+                            return; // honest: do not also attempt TTS, which the same browser policy would equally block
+                        }
                     }
                 }
                 // Honest fallback (Owner Voice, no real asset registered)
@@ -423,17 +462,27 @@
                         const result = await sounds.play("motto").catch(() => null);
                         if (result && result.success) return;
                     }
-                    // AUTHORIZED REBUILD (spec section 11 / 3 — voice identity
-                    // rule): the Owner has no real recorded motto phrase today.
-                    // This used to fall through to browser TTS synthesized
-                    // "as" the Owner voice, which is exactly the fabrication
-                    // the spec forbids ("do not substitute browser TTS ...
-                    // report the exact missing asset"). Fail silently on the
-                    // AUDIO — the falling-letters/green->gold visual motto
-                    // sequence is completely unaffected and still plays in
-                    // full — and report the gap honestly instead of masking
-                    // it with a synthesized stand-in.
-                    console.warn("[CozyOS Login Gate] Missing Owner Voice asset: no recorded phrase registered for \"motto\" (\"" + SLOGAN + "\"). Visual motto sequence is unaffected; narration skipped until a real recording is added.");
+                    // LOGIN SEQUENCE + SOUND BEHAVIOR correction: the
+                    // Owner has no real recorded motto phrase today, and
+                    // the prior AUTHORIZED REBUILD (spec section 11/3)
+                    // correctly forbids using browser TTS to IMPERSONATE
+                    // the Owner's voice. But silently skipping the
+                    // motto's audio entirely also violates this pass's
+                    // own explicit requirement ("Ready for the world"
+                    // must actually be heard - never silently skipped).
+                    // The real, honest resolution: speak it through
+                    // CozySpeech/VoiceManager's OWN resolved default
+                    // provider (the exact same call the non-Owner branch
+                    // below already makes) - a real, disclosed fallback
+                    // VOICE, not a fabricated Owner Voice recording. The
+                    // console.warn below still discloses the missing
+                    // asset for the record; audio now also actually
+                    // plays instead of only logging the gap.
+                    console.warn("[CozyOS Login Gate] Missing Owner Voice asset: no recorded phrase registered for \"motto\" (\"" + SLOGAN + "\"). Visual motto sequence is unaffected; falling back to the default synthesized voice (not Owner Voice) so the phrase is still actually heard.");
+                    const fallbackSpeech = window.CozyOS && window.CozyOS.CozySpeech;
+                    if (fallbackSpeech && typeof fallbackSpeech.previewVoice === "function") {
+                        try { await fallbackSpeech.previewVoice({ text: SLOGAN, context: "motto" }); } catch (_err) { /* honest no-op - genuinely nothing available */ }
+                    }
                     return;
                 }
                 const speech = window.CozyOS && window.CozyOS.CozySpeech;
@@ -782,18 +831,17 @@
                         setTimeout(() => {
                             if (!slogan) return;
                             // M370 — Authoritative Startup Timing Spec:
-                            // Stage 5 (motto TEXT, fall-bounce) now
-                            // completes BEFORE Stage 6 (voice) begins -
-                            // corrects the prior order, where the
-                            // "Welcome to CozyOS" voice line played
-                            // first and the motto text only appeared
-                            // partway through/after it. Same two real
-                            // methods (playStartupVoice/playMottoVoice),
-                            // now chained sequentially so they read as
-                            // one continuous greeting ("Welcome to
-                            // CozyOS. Built for Africa. Ready for the
-                            // World.") rather than overlapping with the
-                            // text animation.
+                            // Stage 5 (voice) and Stage 6 (motto TEXT,
+                            // fall-bounce) now run CONCURRENTLY (updated
+                            // by the FINAL AUDIO ↔ FALLING ANIMATION
+                            // SYNCHRONIZATION correction below) - not
+                            // sequentially. "Built for Africa. Ready for
+                            // the world." is spoken WHILE the motto text
+                            // is falling/bouncing into place, not before
+                            // or after it, so the spoken line and the
+                            // visual motion genuinely feel like one
+                            // coordinated event rather than two separate
+                            // clips played back to back.
                             //
                             // M373 — "ABOVE ONLY" is inserted exactly
                             // here: after the title has settled, strictly
@@ -805,17 +853,35 @@
                             // only structural change to the existing
                             // sequence's call order.
                             runAboveOnlyStage(() => {
-                            fallBounceSplitColorText(slogan, SLOGAN, SLOGAN_SPLIT_INDEX, () => {
-                                voiceStartedAt = Date.now();
-                                // REAL TIMING FIX: playStartupVoice() now
-                                // fires at the logo reveal (Stage 2)
-                                // instead of here — see that call site's
-                                // own comment. Only the motto's own voice
-                                // plays at this point now; it is no
-                                // longer chained after a second "Welcome
-                                // to CozyOS" replay.
-                                playMottoVoice().then(() => {
-                                    voiceDurationMs = Date.now() - voiceStartedAt;
+                            // FINAL AUDIO ↔ FALLING ANIMATION SYNCHRONIZATION
+                            // correction: playMottoVoice() previously only
+                            // started INSIDE fallBounceSplitColorText()'s
+                            // own onComplete callback - i.e. the voice
+                            // began only AFTER the falling-text animation
+                            // had already finished falling, not while it
+                            // was still falling/moving. The animation
+                            // itself (fallBounceSplitColorText, its
+                            // computed staggerMs/durationMs, its visual
+                            // style) is completely UNCHANGED below - only
+                            // the voice's START time moves to begin
+                            // concurrently with it, so "Built for Africa."
+                            // and "Ready for the world." are genuinely
+                            // heard WHILE the letters are falling, not
+                            // after they have already settled. The next
+                            // stage still waits for whichever finishes
+                            // LAST (Promise.all) - protecting "Ready for
+                            // the world" from ever being cut off if the
+                            // real voice duration runs longer than the
+                            // animation's own fixed duration, exactly the
+                            // same protection the prior sequential
+                            // structure already gave the voice alone.
+                            voiceStartedAt = Date.now();
+                            const mottoVoicePromise = playMottoVoice();
+                            const mottoFallPromise = new Promise((resolveFall) => {
+                                fallBounceSplitColorText(slogan, SLOGAN, SLOGAN_SPLIT_INDEX, resolveFall);
+                            });
+                            Promise.all([mottoFallPromise, mottoVoicePromise]).then(() => {
+                                voiceDurationMs = Date.now() - voiceStartedAt;
                                     // M351: "Logo animation completes" -
                                     // real top-center + scale-down
                                     // transition, applied once the full
@@ -947,8 +1013,7 @@
                                     );
                                     if (bus && typeof bus.emit === "function") bus.emit("cozy:launch-sequence-complete", {});
                                     }, holdDurationMs); // M370.1 — derived from config: STARTUP_TIMING.TOTAL_DURATION_MS minus real elapsed time, floored at STARTUP_TIMING.BACKGROUND_FADE_MS
-                                });
-                            });
+                                }); // closes Promise.all([mottoFallPromise, mottoVoicePromise]).then(() => { ... }) - the falling-text animation and the "Built for Africa. Ready for the World." voice now both started together, above; this gate waits for whichever finishes last.
                             }); // M373 — closes runAboveOnlyStage(() => { ... }) opened above; the existing motto/voice chain above only ever runs inside this callback, i.e. only after ABOVE ONLY has genuinely finished.
                         }, TITLE_HOLD_MS);
                     }

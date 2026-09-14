@@ -385,6 +385,48 @@
      *   repository during the corrected audit — its contents are
      *   never fabricated here.
      */
+    const LIVE_OS_ENTRY = Object.freeze({
+        humanPurpose: "There is no single \"LiveOS\" application in CozyOS. What exists are three real, separate, registered Live capabilities: Live Camera Capture (real camera preview/photo/recording, capture only, no image enhancement), Live Session (a bounded peer live session composing camera capture, clarity, connectivity, and identity - unlimited one-to-many broadcast is not implemented), and Live/Connectivity (real offline queue, local device discovery, and pairing). Together they let two or more CozyOS users see and connect with each other directly, honestly disclosing what real-time video/connectivity is and is not possible today.",
+        humanPurposeSw: "Hakuna programu moja ya \"LiveOS\" katika CozyOS. Kilichopo ni uwezo halisi, tofauti, tatu vilivyosajiliwa chini ya mwavuli wa Live: Live Camera Capture (mwoneko halisi wa kamera/picha/kurekodi, kunasa tu, hakuna uboreshaji wa picha), Live Session (kipindi cha moja kwa moja kilichofungwa kati ya watu kikijumuisha kunasa kamera, uwazi, muunganisho, na utambulisho - matangazo yasiyo na kikomo ya mtu mmoja kwenda wengi hayajatekelezwa), na Live/Connectivity (foleni halisi ya nje ya mtandao, ugunduzi wa vifaa vya karibu, na uunganishaji). Kwa pamoja huwawezesha watumiaji wawili au zaidi wa CozyOS kuonana na kuunganika moja kwa moja, wakieleza kwa uwazi ni nini hasa kinachowezekana leo katika video/muunganisho wa moja kwa moja.",
+        realLifeProblems: Object.freeze([
+            "no honest, single place explaining what real-time video/connectivity actually works in CozyOS today versus what is planned",
+            "needing to see or reach another CozyOS user directly without a separate, third-party video app"
+        ]),
+        realLifeProblemsSw: Object.freeze([
+            "hakuna mahali pamoja pa uwazi panapoeleza ni nini kweli kinachofanya kazi katika video/muunganisho wa moja kwa moja wa CozyOS leo dhidi ya kilichopangwa",
+            "kuhitaji kuona au kufikia mtumiaji mwingine wa CozyOS moja kwa moja bila programu tofauti ya video ya nje"
+        ]),
+        whoBenefits: Object.freeze(["two CozyOS users who want to see/connect with each other directly", "any application that needs real camera capture or offline-aware connectivity"]),
+        whoBenefitsSw: Object.freeze(["watumiaji wawili wa CozyOS wanaotaka kuonana/kuunganika moja kwa moja", "programu yoyote inayohitaji kunasa kamera halisi au muunganisho unaotambua hali ya nje ya mtandao"]),
+        humanBenefits: Object.freeze([
+            "real camera capture without needing a separate app",
+            "a bounded, honest peer live session rather than a claimed unlimited broadcast capability",
+            "real offline queueing and local pairing instead of a connection that just fails with no explanation"
+        ]),
+        humanBenefitsSw: Object.freeze([
+            "kunasa kamera halisi bila kuhitaji programu tofauti",
+            "kipindi cha moja kwa moja cha watu kilichofungwa na cha uwazi badala ya uwezo wa matangazo usio na kikomo uliodaiwa",
+            "foleni halisi ya nje ya mtandao na uunganishaji wa karibu badala ya muunganisho unaoshindwa tu bila maelezo"
+        ]),
+        currentVerifiedCapabilities: Object.freeze([
+            "Live Camera Capture: real camera preview/photo/recording capture (capture only, no enhancement)",
+            "Live Session: bounded peer live session composing capture + clarity + connectivity + identity",
+            "Live/Connectivity: real offline queue, local device discovery, and pairing"
+        ]),
+        currentVerifiedCapabilitiesSw: Object.freeze([
+            "Live Camera Capture: kunasa halisi kwa mwoneko wa kamera/picha/kurekodi (kunasa tu, hakuna uboreshaji)",
+            "Live Session: kipindi cha moja kwa moja cha watu kilichofungwa kikijumuisha kunasa + uwazi + muunganisho + utambulisho",
+            "Live/Connectivity: foleni halisi ya nje ya mtandao, ugunduzi wa vifaa vya karibu, na uunganishaji"
+        ]),
+        visionCapabilities: Object.freeze([
+            "unlimited one-to-many broadcast (SFU/CDN) - explicitly documented as CAPABILITY_UNAVAILABLE, not implemented anywhere in this repository"
+        ]),
+        visionCapabilitiesSw: Object.freeze([
+            "matangazo yasiyo na kikomo ya mtu mmoja kwenda wengi (SFU/CDN) - yameainishwa waziwazi kama CAPABILITY_UNAVAILABLE, hayajatekelezwa popote katika hazina hii"
+        ]),
+        visionSourceNote: "Drawn directly from three real, separate registerApplication() calls and file headers: core/engines/video/ui/cozy-live-camera-capture-app.js, core/shell/live/cozy-live-session.js, and core/connectivity/ui/cozy-live-connectivity-app.js. No single 'LiveOS' application exists - this entry honestly discloses that rather than fabricating one."
+    });
+
     const APPLICATION_HUMAN_PURPOSE_DATA = Object.freeze({
         pharmacyos: Object.freeze({
             humanPurpose: "PharmacyOS exists to give a pharmacy a real, structured record of its organization and medicine catalog, with controlled substances genuinely gated behind real authorization — so ordinary medicines are easy to record and find, while controlled substances are never accessible to someone without a real, granted permission.",
@@ -900,7 +942,109 @@
                 "tafsiri halisi ya AI ya maagizo, zaidi ya mbinu ya sasa iliyofichuliwa ya maneno muhimu/regex"
             ]),
             visionSourceNote: "Drawn directly from InterestOS's own real, committed manifest/description text in core/plugins/interestOS-core.js (registerApplication() call and file header) — not inferred from the application's name."
-        })
+        }),
+
+        // Real, grounded in core/modules/Cozy-Authenticator/authenticator.js —
+        // the file's own header ("Never fabricates a status: every badge
+        // reflects an engine's actual loaded/real state") and its real,
+        // implemented auth-factor display names (Face Unlock, Fingerprint,
+        // Voice, Passkey/security-key, RFC6238 TOTP OTP).
+        authenticator: Object.freeze({
+            humanPurpose: "Authenticator exists to give a CozyOS user one real, honest place to see and manage how they prove who they are — Face Unlock, Fingerprint, Voice, Passkey, or a standards-based (RFC6238) one-time code — rather than scattering that decision across every application separately, and to show only what is actually enrolled and working, never a fabricated status badge.",
+            humanPurposeSw: "Authenticator ipo ili kumpa mtumiaji wa CozyOS mahali pamoja halisi pa kuona na kusimamia jinsi anavyothibitisha ni nani — Kufungua kwa Uso, Alama ya Kidole, Sauti, Passkey, au msimbo wa mara moja unaotegemea kiwango (RFC6238) — badala ya uamuzi huo kutawanywa kwenye kila programu kando kando, na kuonyesha tu kile kilichosajiliwa na kinachofanya kazi kikweli, kamwe si alama ya hali iliyobuniwa.",
+            realLifeProblems: Object.freeze([
+                "having to set up and remember a different sign-in method for every separate CozyOS application",
+                "not knowing whether a security method (fingerprint, passkey, OTP) is actually enrolled and working versus just displayed",
+                "losing access when a single authentication method fails, with no other real enrolled option to fall back on"
+            ]),
+            realLifeProblemsSw: Object.freeze([
+                "kulazimika kusanidi na kukumbuka njia tofauti ya kuingia kwa kila programu tofauti ya CozyOS",
+                "kutokujua kama njia ya usalama (alama ya kidole, passkey, OTP) kweli imesajiliwa na inafanya kazi badala ya kuonyeshwa tu",
+                "kupoteza ufikiaji wakati njia moja ya uthibitishaji imeshindwa, bila chaguo lingine halisi lililosajiliwa la kurudi"
+            ]),
+            whoBenefits: Object.freeze(["any CozyOS user managing sign-in security", "administrators relying on real (not assumed) authentication status"]),
+            whoBenefitsSw: Object.freeze(["mtumiaji yeyote wa CozyOS anayesimamia usalama wa kuingia", "wasimamizi wanaotegemea hali halisi (si iliyodhaniwa) ya uthibitishaji"]),
+            humanBenefits: Object.freeze([
+                "one real, honest dashboard for every enrolled sign-in method",
+                "several real methods available (Face Unlock, Fingerprint, Voice, Passkey, TOTP) instead of being locked into one",
+                "no fabricated status — a badge only shows a method as active when it genuinely is"
+            ]),
+            humanBenefitsSw: Object.freeze([
+                "dashibodi moja halisi na ya kuaminika kwa kila njia iliyosajiliwa ya kuingia",
+                "njia kadhaa halisi zinazopatikana (Kufungua kwa Uso, Alama ya Kidole, Sauti, Passkey, TOTP) badala ya kufungiwa kwenye moja",
+                "hakuna hali iliyobuniwa — alama inaonyesha njia kuwa hai tu pale ambapo kweli iko hivyo"
+            ]),
+            currentVerifiedCapabilities: Object.freeze([
+                "real display of enrolled auth factors composing the existing AuthFactorRegistry (Face Unlock, Fingerprint, Voice, Passkey/security-key, OTP)",
+                "real RFC6238 TOTP status display via the existing OtpProvider",
+                "delegates entirely to the platform's already-loaded IdentityEngine/AuthCoordinator/AuthorizationCoordinator - no duplicate authentication logic"
+            ]),
+            currentVerifiedCapabilitiesSw: Object.freeze([
+                "onyesho halisi la njia za uthibitishaji zilizosajiliwa likitumia AuthFactorRegistry iliyopo (Kufungua kwa Uso, Alama ya Kidole, Sauti, Passkey, OTP)",
+                "onyesho halisi la hali ya RFC6238 TOTP kupitia OtpProvider iliyopo",
+                "hukabidhi kikamilifu kwa IdentityEngine/AuthCoordinator/AuthorizationCoordinator ya jukwaa iliyopakiwa tayari - hakuna mantiki ya nakala ya uthibitishaji"
+            ]),
+            visionCapabilities: Object.freeze([]),
+            visionCapabilitiesSw: Object.freeze([]),
+            visionSourceNote: "Drawn directly from core/modules/Cozy-Authenticator/authenticator.js's own file header and its real, displayed auth-factor list — not inferred from the application's name. No unimplemented/vision capability is documented in that file to report here."
+        }),
+
+        // HONEST FINDING: no single "LiveOS" application is registered
+        // anywhere in this repository. What actually exists are THREE
+        // separate, real, registered applications under the Live
+        // umbrella - each drawn directly from its own registerApplication()
+        // call and file header (see LIVE_OS_ENTRY above). "liveos" and
+        // "livevideo" both resolve to the SAME real entry - not two
+        // separately-maintained copies - so a user asking about either
+        // honestly gets the real picture rather than a fabricated
+        // single-app description.
+        liveos: LIVE_OS_ENTRY,
+        livevideo: LIVE_OS_ENTRY,
+
+        // Real, discovered via repository-wide registerApplication()
+        // inventory (not previously in this table) - grounded in
+        // core/modules/intelligence/media/cozy-media-intelligence.js's
+        // own file header and its real, disclosed keyword-matching
+        // implementation (explicitly NOT face recognition/ASR/OCR/
+        // embeddings/semantic NLU - the file's own "NO FABRICATION"
+        // section).
+        mediaintelligence: Object.freeze({
+            humanPurpose: "Media Intelligence exists to let an authorized person search indexed testimony/evidence media by person reference, research type, or language, using real, disclosed keyword matching against already-indexed content — not to guess or generate an answer when nothing indexed actually matches.",
+            humanPurposeSw: "Media Intelligence ipo ili kumwezesha mtu mwenye ruhusa kutafuta maudhui ya ushahidi/utambuzi yaliyoorodheshwa kwa kutumia rejeleo la mtu, aina ya utafiti, au lugha, akitumia ulinganishaji halisi na wa wazi wa maneno dhidi ya maudhui yaliyokwisha orodheshwa — si kubashiri au kutengeneza jibu wakati hakuna kilichoorodheshwa kinacholingana kikweli.",
+            realLifeProblems: Object.freeze([
+                "no fast way to find which indexed media/testimony actually mentions a specific person, topic, or language",
+                "risk of a search tool guessing or fabricating a match when nothing indexed genuinely corresponds"
+            ]),
+            realLifeProblemsSw: Object.freeze([
+                "hakuna njia ya haraka ya kupata ni maudhui gani ya ushahidi/utambuzi yaliyoorodheshwa yanayomtaja mtu, mada, au lugha fulani",
+                "hatari ya zana ya utafutaji kubashiri au kutengeneza mlinganisho wakati hakuna kilichoorodheshwa kinacholingana kikweli"
+            ]),
+            whoBenefits: Object.freeze(["authorized researchers/administrators searching indexed media", "anyone needing to confirm whether specific testimony/evidence exists before relying on it"]),
+            whoBenefitsSw: Object.freeze(["watafiti/wasimamizi wenye ruhusa wanaotafuta maudhui yaliyoorodheshwa", "yeyote anayehitaji kuthibitisha kama ushahidi/utambuzi fulani upo kabla ya kuutegemea"]),
+            humanBenefits: Object.freeze([
+                "real search by person reference, research type, or language over already-indexed content",
+                "an honest \"NOT_AVAILABLE\" result when no indexed evidence matches, instead of a guessed answer"
+            ]),
+            humanBenefitsSw: Object.freeze([
+                "utafutaji halisi kwa rejeleo la mtu, aina ya utafiti, au lugha juu ya maudhui yaliyokwisha orodheshwa",
+                "matokeo ya uwazi ya \"NOT_AVAILABLE\" wakati hakuna ushahidi ulioorodheshwa unaolingana, badala ya jibu la kubashiri"
+            ]),
+            currentVerifiedCapabilities: Object.freeze([
+                "search by person reference, research type, and language over indexed media (composes the existing CozyResearchSearch/CozyResearchIntelligence/CozyMediaEvidence engines only)",
+                "real, disclosed deterministic keyword matching - not semantic/LLM understanding"
+            ]),
+            currentVerifiedCapabilitiesSw: Object.freeze([
+                "utafutaji kwa rejeleo la mtu, aina ya utafiti, na lugha juu ya maudhui yaliyoorodheshwa (hutumia injini zilizopo za CozyResearchSearch/CozyResearchIntelligence/CozyMediaEvidence tu)",
+                "ulinganishaji halisi, wa wazi wa maneno muhimu - si uelewa wa kisemantiki/LLM"
+            ]),
+            visionCapabilities: Object.freeze([
+                "face recognition, automatic speech recognition (ASR), OCR, embeddings, or semantic NLU - explicitly none of these is implemented or claimed anywhere in this application today"
+            ]),
+            visionCapabilitiesSw: Object.freeze([
+                "utambuzi wa uso, utambuzi wa hotuba kiotomatiki (ASR), OCR, embeddings, au uelewa wa kisemantiki (NLU) - hakuna hata mojawapo ya haya iliyotekelezwa au kudaiwa mahali popote katika programu hii leo"
+            ]),
+            visionSourceNote: "Drawn directly from core/modules/intelligence/media/cozy-media-intelligence.js's own file header, including its explicit 'NO FABRICATION' section."
+        }),
     });
 
     /**
@@ -1086,6 +1230,60 @@
      *   NOT_FOUND rather than silently handing back English content
      *   under a Kiswahili request.
      */
+    /**
+     * UNIVERSAL HUMAN-IMPORTANCE ARCHITECTURE — cross-application
+     * capability search.
+     *
+     * Reuses APPLICATION_HUMAN_PURPOSE_DATA (the SAME table
+     * getApplicationHumanPurposeFact() below already reads) as the
+     * real, existing "Capability Registry -> Human Importance" layer —
+     * no second registry, no per-app hardcoded routing. Answers "which
+     * CozyOS application can help me do X?" by real keyword-overlap
+     * search over each app's own already-VERIFIED humanPurpose/
+     * realLifeProblems/humanBenefits text, in the requested language.
+     * A new application automatically becomes discoverable the moment
+     * a real entry for it exists in that one table — no new question
+     * patterns required per app, matching the architecture requirement
+     * that new applications should not need "another manual collection
+     * of special question patterns."
+     *
+     * Returns real, evidence-carrying matches only. An empty
+     * `matches` array is the honest result when no registered
+     * application's verified data mentions the concept - this
+     * function never invents a plausible-sounding match.
+     */
+    function searchApplicationsByCapability(query, lang) {
+        const q = (typeof query === "string" ? query : "").toLowerCase();
+        const words = Array.from(new Set((q.match(/[a-z]+/g) || []).filter((w) => w.length >= 4)));
+        if (words.length === 0) return { evidence: "NOT_FOUND", matches: [] };
+
+        const results = [];
+        for (const appKey of Object.keys(APPLICATION_HUMAN_PURPOSE_DATA)) {
+            const data = APPLICATION_HUMAN_PURPOSE_DATA[appKey];
+            const resolved = resolvePurposeForLanguage(data, lang);
+            if (!resolved) continue;
+            const haystackParts = [resolved.humanPurpose]
+                .concat(Array.isArray(resolved.realLifeProblems) ? resolved.realLifeProblems : [])
+                .concat(Array.isArray(resolved.humanBenefits) ? resolved.humanBenefits : [])
+                .concat(Array.isArray(resolved.currentVerifiedCapabilities) ? resolved.currentVerifiedCapabilities : []);
+            const haystack = haystackParts.join(" ").toLowerCase();
+            const hits = words.filter((w) => haystack.includes(w) || (w.endsWith("s") && w.length > 4 && haystack.includes(w.slice(0, -1))));
+            if (hits.length === 0) continue;
+            // Pull the single most relevant real sentence/phrase as
+            // disclosed evidence, rather than dumping the entire entry.
+            const evidenceSnippet = haystackParts.find((part) => hits.some((w) => part.toLowerCase().includes(w))) || resolved.humanPurpose;
+            results.push({
+                application: appKey,
+                matchedKeywords: hits,
+                score: hits.length,
+                evidenceSnippet,
+                verified: true
+            });
+        }
+        results.sort((a, b) => b.score - a.score);
+        return { evidence: results.length > 0 ? "VERIFIED" : "NOT_FOUND", matches: results };
+    }
+
     function getApplicationHumanPurposeFact(name, lang) {
         // M363.1 real-device fix — normalize away spacing/case
         // variation ("Church OS", "church os", "ChurchOS", "churchos")
@@ -1197,6 +1395,7 @@
         lookupLexiconTermFact,
         getApplicationFact,
         getApplicationHumanPurposeFact,
+        searchApplicationsByCapability,
         getCapabilityHumanPurposeFact
     });
 

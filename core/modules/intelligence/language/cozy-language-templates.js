@@ -423,6 +423,31 @@
             so: "Weli ma haysto jawaab la xaqiijiyay oo ku saabsan sababta qof u rabi karo inuu isticmaalo CozyOS."
         }),
 
+        // PHASE 6C — real, honest reply for the Universal Semantic
+        // Engine's PURCHASE_INTENT/PURCHASE_CONSIDERATION. EN/SW
+        // human-authored (this file's own established discipline);
+        // fr/ar/so intentionally omitted rather than guessed — the
+        // default "unsupported" fallback covers those languages until
+        // a real translation is added, exactly as this file already
+        // does for "unsupported-clarify" above.
+        "purchase-intent:not_found": Object.freeze({
+            en: "I understand you're interested in purchasing CozyOS, but I don't have verified purchase or pricing information to share yet — and I can't start a purchase for you through this conversation.",
+            sw: "Nimeelewa unavutiwa kununua CozyOS, lakini sina bado taarifa zilizothibitishwa za manunuzi au bei za kushiriki — na siwezi kuanzisha ununuzi kupitia mazungumzo haya."
+        }),
+
+        // UNIVERSAL HUMAN-IMPORTANCE ARCHITECTURE — cross-application
+        // capability discovery replies. found(displayName, evidenceSnippet)
+        // always cites the real, existing verified evidence text it
+        // matched on, never a fabricated summary.
+        "app-capability-search:found": Object.freeze({
+            en: (name, evidence) => `${name} looks like the right fit — its verified purpose includes: "${evidence}"`,
+            sw: (name, evidence) => `${name} inaonekana kuwa chaguo sahihi — madhumuni yake yaliyothibitishwa ni pamoja na: "${evidence}"`
+        }),
+        "app-capability-search:not_found": Object.freeze({
+            en: "I couldn't find a currently registered CozyOS application with verified information matching that need.",
+            sw: "Sikuweza kupata programu ya CozyOS iliyosajiliwa kwa sasa yenye taarifa zilizothibitishwa zinazolingana na uhitaji huo."
+        }),
+
         "differentiation:verified": Object.freeze({
             en: (answer) => `${answer}`,
             sw: (answer) => `Kwa Kiingereza (bado hatuna tafsiri iliyothibitishwa ya maandishi haya kwa Kiswahili): ${answer}`,

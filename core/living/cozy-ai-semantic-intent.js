@@ -248,7 +248,11 @@
         },
         [INTENTS.APP_IDENTITY]: {
             sw: [/\bni\s+nini\b/i, /\bni\s+ya\s+nini\b/i],
-            en: [/\bwhat\s+is\b/i]
+            // PHASE 6C real-device fix — "What Cozyos for" (a genuine,
+            // live, screenshot-confirmed user message) drops "is"
+            // entirely, an extremely common casual/mobile-typing
+            // ellipsis this engine had no pattern for at all.
+            en: [/\bwhat\s+is\b/i, /\bwhat(?:'s)?\s+(?:is\s+)?\w+\s+for\b/i]
         },
         [INTENTS.APP_SETUP]: {
             sw: [/\bnawezaje\s+kuanza\b/i, /\bnaanzaje\b/i, /\bnataka\s+kuanza\b/i, /\bnijiunge\b/i],
@@ -461,12 +465,45 @@
         // original, unsubstituted text is still what is reported back
         // as normalizedText below - substitution is classification-only.
         let cozyLearnApplied = [];
+        let provisionalCorrections = [];
         if (context.applyCozyLearnSynonyms && window.CozyOS && window.CozyOS.CozyLearn && raw) {
             const preLanguage = detectLanguages(raw).primary;
             const substitution = window.CozyOS.CozyLearn.applySynonyms(raw, preLanguage, context.cozyLearnScopes ? { scopes: context.cozyLearnScopes } : undefined);
             if (substitution.applied.length > 0) {
                 raw = substitution.text;
                 cozyLearnApplied = substitution.applied;
+            }
+            // PHASE 6C / Phase 6B Section 24 — "if surrounding context
+            // makes the likely meaning extremely strong, Cozy AI may use
+            // a provisional interpretation for the current response
+            // while asking for confirmation." A real, common, single-
+            // letter typo ("inasaida" for "inasaidia" - the spec's own
+            // running example) should not silently defeat classification
+            // just because no one has TAUGHT/PROMOTED it yet. This is
+            // deliberately separate from cozyLearnApplied above: nothing
+            // here is TRUSTED, nothing is stored, nothing is promoted -
+            // it only affects THIS turn's classification, and is
+            // disclosed via provisionalCorrections (never silently
+            // merged into normalizedText) so a caller can choose to
+            // still ask "did you mean X?" even when the guess was used.
+            //
+            // SEPARATE opt-in flag (context.allowProvisionalCorrections)
+            // - deliberately NOT bundled into applyCozyLearnSynonyms -
+            // so a caller that only wants TRUSTED/promoted substitutions
+            // (e.g. Phase 6B's own "before teaching, this must be
+            // genuinely unknown" acceptance test) keeps that exact,
+            // narrower contract, while a live conversational caller
+            // (Phase 6C's provider integration) can opt into both.
+            if (context.allowProvisionalCorrections && typeof window.CozyOS.CozyLearn.suggestCorrection === "function") {
+                const words = raw.match(/[a-zA-Z]+/g) || [];
+                for (const word of words) {
+                    if (word.length < 5) continue; // same safety floor CozyLearn's own detector uses
+                    const suggestion = window.CozyOS.CozyLearn.suggestCorrection(word);
+                    if (suggestion && suggestion.distance <= 1) {
+                        raw = raw.replace(new RegExp(`\\b${word}\\b`, "i"), suggestion.candidate);
+                        provisionalCorrections.push({ observed: word, candidate: suggestion.candidate, distance: suggestion.distance });
+                    }
+                }
             }
         }
         if (!raw) {
@@ -624,7 +661,8 @@
             ambiguity: { detected: ambiguityDetected, reasons: ambiguityReasons, clarificationRequired: ambiguityDetected },
             relationship,
             clarificationQuestion,
-            cozyLearnApplied
+            cozyLearnApplied,
+            provisionalCorrections
         }, raw);
     }
 
@@ -654,6 +692,7 @@
             },
             evidence: [], // reserved - which specific pattern(s) fired; not surfaced in v1 to keep the public shape small
             cozyLearnApplied: fields.cozyLearnApplied || [], // Phase 6B - real, disclosed list of {observed, canonical} substitutions actually applied before classification (empty unless the caller opted in and a TRUSTED mapping existed)
+            provisionalCorrections: fields.provisionalCorrections || [], // Phase 6C - real, disclosed, UNTRUSTED single-turn typo guesses (Section 24) - never stored, never promoted, never silently merged into normalizedText
             provenance: { source: "semantic-intent-engine", version: ENGINE_VERSION }
         };
     }

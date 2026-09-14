@@ -177,6 +177,75 @@
     const PROVIDER_NAME = "rule-based-conversational";
 
     /**
+     * SEMANTIC_TO_LEGACY_INTENT — PHASE 6C.
+     *
+     * The ONLY place a Universal Semantic Engine primaryIntent is
+     * translated into one of this file's own, pre-existing, real
+     * execution paths. Deliberately narrow: an entry only exists here
+     * when a REAL downstream case already exists to execute it - this
+     * is the "consumer, not competitor" boundary the architecture
+     * directive requires. Any semantic primaryIntent NOT listed here
+     * (APP_SETUP, REMINDER_REQUEST, TROUBLESHOOTING, etc.) simply falls
+     * through to this file's own classifyIntent() unchanged - the
+     * semantic engine does not yet have a mapped legacy executor for
+     * those, and this file does not pretend otherwise.
+     *
+     * APP_BENEFITS/APP_CAPABILITIES/APP_IDENTITY route to "why-use-
+     * cozyos"/"what-is-cozyos" when the semantically-resolved entity IS
+     * CozyOS itself (a different real knowledge source -
+     * getWhyUseCozyOSFact() - than named applications' getApplication-
+     * HumanPurposeFact()), and to "app-importance"/"app-info" for any
+     * other real, named application. When entity is null (the semantic
+     * engine could not resolve a subject at all), this returns null -
+     * no override happens, and classifyIntent() gets its normal chance,
+     * rather than guessing CozyOS by default.
+     */
+    const SEMANTIC_TO_LEGACY_INTENT = Object.freeze({
+        APP_BENEFITS: (entity) => !entity ? null : (entity === "CozyOS" ? "why-use-cozyos" : "app-importance"),
+        APP_CAPABILITIES: (entity) => !entity ? null : (entity === "CozyOS" ? "why-use-cozyos" : "app-importance"),
+        APP_IDENTITY: (entity) => !entity ? null : (entity === "CozyOS" ? "what-is-cozyos" : "app-info"),
+        PURCHASE_INTENT: () => "purchase-intent",
+        PURCHASE_CONSIDERATION: () => "purchase-intent"
+    });
+
+    /**
+     * normalizeUserText(text) — Swahili & General Question Understanding
+     * Repair (this dependency).
+     *
+     * Real, narrow, disclosed input normalization applied ONCE at the
+     * very top of think(), before classification/extraction — NOT a new
+     * NLU/semantic engine, NOT a growing pile of "if text.includes(...)"
+     * special cases. A small, fixed table of harmless, well-defined
+     * spelling/spacing corrections (a genuinely common Swahili typo —
+     * a dropped "a" in "insaidia"/"inasaidia" — and app-name spacing
+     * variants), applied BEFORE every regex in this file gets a chance
+     * to run, so every existing and new pattern below benefits from it
+     * automatically instead of needing its own copy of the same fix.
+     *
+     * Deliberately does NOT touch: capitalization of proper nouns a
+     * user typed (e.g. a person's name for record-church-member),
+     * anything outside this fixed table, or low-confidence fuzzy
+     * guessing — per this dependency's own explicit instruction ("do
+     * not silently change important entities or names when confidence
+     * is low"), this only ever applies exact, known-safe substitutions.
+     */
+    function normalizeUserText(text) {
+        if (typeof text !== "string" || !text) return text;
+        let out = text;
+        // App-name spacing/hyphenation variants -> one canonical token,
+        // so every existing "cozyos ..." pattern in this file matches
+        // regardless of how the user actually spaced/typed it.
+        out = out.replace(/\bcoz[\s-]?yos\b/gi, "cozyos");
+        out = out.replace(/\bcozy[\s-]os\b/gi, "cozyos");
+        // Real, common Swahili typos — one dropped letter each, the
+        // exact class this dependency's own examples name ("insaidia"
+        // for "inasaidia", "nni" for "nini").
+        out = out.replace(/\binsaidia/gi, "inasaidia");
+        out = out.replace(/\bnni\b/gi, "nini");
+        return out;
+    }
+
+    /**
      * APP_IMPORTANCE_PATTERN — M363.1 real-device fix.
      *
      * Single, shared source of truth for every "why does this
@@ -193,7 +262,7 @@
      * below is the one place that reads whichever group matched, so
      * every call site stays in sync automatically.
      */
-    const APP_IMPORTANCE_PATTERN = /\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+important\b|\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+useful\b|\bwhy\s+does\s+([a-z][\w' -]{1,40}?)\s+exist\b|\bwhy\s+([a-z][\w' -]{1,40}?)\s+matters\b|\bwhat\s+(?:can|does|will)\s+([a-z][\w' -]{1,40}?)\s+(?:do\s+for|become|help)\b|\bwhat\s+does\s+([a-z][\w' -]{1,40}?)\s+do\b|\bhow\s+(?:does|can)\s+([a-z][\w' -]{1,40}?)\s+help\b|\bwho\s+benefits\s+from\s+([a-z][\w' -]{1,40}?)\b|\bwhat\s+problem\s+does\s+([a-z][\w' -]{1,40}?)\s+solve\b|\bwhat\s+benefits?\s+(?:is|does|has)\s+([a-z][\w' -]{1,40}?)\s*(?:provide|have)?\s*\??\s*$|\bhow\s+does\s+([a-z][\w' -]{1,40}?)\s+fit\s+into\s+cozyos\b|\bkwa\s+nini\s+([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\b|\b([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+ilianzishwa\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+inalenga\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+ina\s+faida\s+gani\b|\bnani\s+atanufaika\s+na\s+([a-z][\w' -]{1,40}?)\b|\b([a-z][\w' -]{1,40}?)\s+(?:ina|ita)nisaidia(?:je)?(?:\s+nini)?\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kunisaidiaje\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kusaidia\b|\btatizo\s+gani\s+([a-z][\w' -]{1,40}?)\s+inatatua\b|\b([a-z][\w' -]{1,40}?)\s+inatatua\s+tatizo\s+gani\b|\b(?:programu\s+ya\s+)?([a-z][\w' -]{1,40}?)\s+inasaidia(?:\s+mtu)?\s+aje\b|\b([a-z][\w' -]{1,40}?)\s+iko\s+wapi\s+ndani\s+ya\s+cozyos\b/i;
+    const APP_IMPORTANCE_PATTERN = /\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+important\b|\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+useful\b|\bwhy\s+does\s+([a-z][\w' -]{1,40}?)\s+exist\b|\bwhy\s+([a-z][\w' -]{1,40}?)\s+matters\b|\bwhat\s+(?:can|does|will)\s+(?!you\b|i\b|we\b)([a-z][\w' -]{1,40}?)\s+(?:do\s+for|become|help)\b|\bwhat\s+does\s+([a-z][\w' -]{1,40}?)\s+do\b|\bhow\s+(?:does|can)\s+([a-z][\w' -]{1,40}?)\s+help\b|\bwho\s+benefits\s+from\s+([a-z][\w' -]{1,40}?)\b|\bwhat\s+problem\s+does\s+([a-z][\w' -]{1,40}?)\s+solve\b|\bwhat\s+benefits?\s+(?:is|does|has)\s+([a-z][\w' -]{1,40}?)\s*(?:provide|have)?\s*\??\s*$|\bhow\s+does\s+([a-z][\w' -]{1,40}?)\s+fit\s+into\s+cozyos\b|\bkwa\s+nini\s+([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\b|\b([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+ilianzishwa\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+inalenga\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+ina\s+faida\s+gani\b|\bnani\s+atanufaika\s+na\s+([a-z][\w' -]{1,40}?)\b|\b([a-z][\w' -]{1,40}?)\s+(?:ina|ita)nisaidia(?:je)?(?:\s+nini)?\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kunisaidiaje\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kusaidia\b|\btatizo\s+gani\s+([a-z][\w' -]{1,40}?)\s+inatatua\b|\b([a-z][\w' -]{1,40}?)\s+inatatua\s+tatizo\s+gani\b|\b(?:programu\s+ya\s+)?([a-z][\w' -]{1,40}?)\s+inasaidia(?:\s+mtu)?\s+aje\b|\b([a-z][\w' -]{1,40}?)\s+iko\s+wapi\s+ndani\s+ya\s+cozyos\b|\bwhat\s+is\s+([a-z][\w' -]{1,40}?)\s+helping\s+(?:humans?|people|us)\s+with\b|\bwhat\s+does\s+([a-z][\w' -]{1,40}?)\s+mean\b|\bwhat\s+can\s+(?!you\b|i\b|we\b)([a-z][\w' -]{1,40}?)\s+do\b(?!\s+for)|\b(?!you\b|i\b|we\b)([a-z][\w' -]{1,40}?)\s+can\s+do\s+what\b|\bwhat\s+features\s+does\s+([a-z][\w' -]{1,40}?)\s+have\b|\bwhat\s+can\s+i\s+use\s+([a-z][\w' -]{1,40}?)\s+for\b|\bwhat\s+services\s+does\s+([a-z][\w' -]{1,40}?)\s+provide\b|\bwhat\s+can\s+my\s+\w+\s+do\s+with\s+([a-z][\w' -]{1,40}?)\b|\bhow\s+can\s+my\s+\w+\s+benefit\s+from\s+([a-z][\w' -]{1,40}?)\b|\bwhat\s+do\s+we\s+gain\s+from\s+(?:using\s+)?([a-z][\w' -]{1,40}?)\b|\bwhy\s+would\s+(?:an?\s+)?\w+\s+use\s+([a-z][\w' -]{1,40}?)\b|\bwhat\s+is\s+the\s+advantage\s+of\s+([a-z][\w' -]{1,40}?)\b|\bwhat\s+makes\s+([a-z][\w' -]{1,40}?)\s+(?:important|useful|different)\b|\bwhat\s+was\s+([a-z][\w' -]{1,40}?)\s+created\s+to\s+do\b|\bwhat\s+problem\s+is\s+([a-z][\w' -]{1,40}?)\s+solving\b|\bwho\s+is\s+([a-z][\w' -]{1,40}?)\s+for\b|\bwhat\s+need\s+does\s+([a-z][\w' -]{1,40}?)\s+address\b|\bwhat\s+challenges\s+can\s+([a-z][\w' -]{1,40}?)\s+help\s+with\b|\bhow\s+can\s+([a-z][\w' -]{1,40}?)\s+make\s+\w+\s+work\s+easier\b|\bwhat\s+does\s+([a-z][\w' -]{1,40}?)\s+solve\s+for\s+people\b|\bwhy\s+([a-z][\w' -]{1,40}?)\s+instead\s+of\s+another\b|\bhow\s+is\s+([a-z][\w' -]{1,40}?)\s+different\b|\bwhy\s+use\s+([a-z][\w' -]{1,40}?)\s+rather\s+than\s+another\b|\bhow\s+\w+\s+benefit\s+from\s+([a-z][\w' -]{1,40}?)\b|^([a-z][\w' -]{1,40}?)\s+benefits\??$|^([a-z][\w' -]{1,40}?)\s+use\??$|^([a-z][\w' -]{1,40}?)\s+purpose\??$|^benefits\s+of\s+([a-z][\w' -]{1,40}?)\??$|^what\s+about\s+([a-z][\w' -]{1,40}?)\??$|\bhow\s+(?:does|can)\s+([a-z][\w' -]{1,40}?)\s+benefit\s+(?:us|me|people)\b|\bwhat\s+are\s+the\s+benefits\s+of\s+([a-z][\w' -]{1,40}?)\b|\bwhy\s+should\s+(?:i|we|\w+)\s+use\s+([a-z][\w' -]{1,40}?)\b|\bwhy\s+does\s+([a-z][\w' -]{1,40}?)\s+matter\b|\bwhat\s+is\s+([a-z][\w' -]{1,40}?)\s+(?:used|made)\s+for\b|\bhow\s+can\s+i\s+benefit\s+from\s+([a-z][\w' -]{1,40}?)\b|\bwhat\s+do\s+i\s+gain\s+from\s+(?:using\s+)?([a-z][\w' -]{1,40}?)\b|\bwhat\s+(?:\w+\s+)?problems?\s+does\s+([a-z][\w' -]{1,40}?)\s+solve\b|\bwhat\s+does\s+([a-z][\w' -]{1,40}?)\s+offer\b|\bnaweza\s+kufaidika\s+vipi\s+na\s+([a-z][\w' -]{1,40}?)\b|\b([a-z][\w' -]{1,40}?)\s+inatupatia\s+faida\s+gani\b|\btutapata\s+nini\s+kutokana\s+na\s+([a-z][\w' -]{1,40}?)\b|\b([a-z][\w' -]{1,40}?)\s+ina\s+umuhimu\s+gani\s+kwetu\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kutusaidiaje\b|\b([a-z][\w' -]{1,40}?)\s+ni\s+nzuri\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+inatatua\s+matatizo\s+gani\b|\bnani\s+anafaidika\s+na\s+([a-z][\w' -]{1,40}?)\b|\b([a-z][\w' -]{1,40}?)\s+ilijengwa\s+kwa\s+nini\b|\bkwa\s+nini\s+([a-z][\w' -]{1,40}?)\s+ilijengwa\b/i;
 
     /**
      * APP_IMPORTANCE_PRONOUNS — M363.1 real-device fix.
@@ -292,9 +361,28 @@
         // what about CozyOS — a real, natural way to switch the topic
         // of conversation explicitly back to the platform itself after
         // discussing a specific application) also had no trigger.
-        { id: "why-use-cozyos", pattern: /\bwhy\s+(?:should|would)\s+(?:i|someone|you)\s+use\s+cozyos\b|\bwhy\s+use\s+cozyos\b|\bbenefits?\s+of\s+cozyos\b|\bwhy\s+cozyos\b|\bwhy\s+is\s+cozyos\s+benefits?\b|\bkwa\s+nini\s+nitumie(?:\s+cozyos)?\b|\bkwa\s+nini\s+(?:ni)?tumie\s+cozyos\b|\bfaida\s+za\s+cozyos\b|\bcozyos\s+itanisaidia\s+nini\b|\bcozyos\s+inanisaidia\s+nini\b|\bmtumiaji\s+anapata\s+faida\s+gani\b|\bkwa\s+nini\s+cozyos\s+ni\s+nzuri\s+kwa\s+afrika\b|\bcozyos\s+inabadilisha\s+maisha\s+(?:ya\s+mtu\s+)?kwa\s+njia\s+gani\b|\bna\s+cozyos\s+je\b/i },
+        // Swahili & General Question Understanding Repair — real,
+        // natural benefit/capability phrasings found failing in real
+        // conversation: "inasaidia na nini" (helps with what),
+        // "inatusaidia na faida gani (kwetu)" (what benefit does it
+        // give US), "nitanufaika vipi" (how will I benefit),
+        // "tutapata nini tukitumia" (what will we get if we use it),
+        // "ni ya nini" (what is it for), bare "inasaidiaje"/"inasaidia
+        // nini" (helps how / helps what, no object pronoun — a real,
+        // different, more generic phrasing than the existing "ni"
+        // ["me"] object-pronoun forms below). Same existing
+        // why-use-cozyos answer — only recognizing more real ways
+        // people ask for it.
+        { id: "why-use-cozyos", pattern: /\bwhy\s+(?:should|would)\s+(?:i|someone|you)\s+use\s+cozyos\b|\bwhy\s+use\s+cozyos\b|\bbenefits?\s+of\s+cozyos\b|\bwhy\s+cozyos\b|\bwhy\s+is\s+cozyos\s+benefits?\b|\bkwa\s+nini\s+nitumie(?:\s+cozyos)?\b|\bkwa\s+nini\s+(?:ni)?tumie\s+cozyos\b|\bfaida\s+za\s+cozyos\b|\bcozyos\s+itanisaidia\s+nini\b|\bcozyos\s+inanisaidia\s+nini\b|\bmtumiaji\s+anapata\s+faida\s+gani\b|\bkwa\s+nini\s+cozyos\s+ni\s+nzuri\s+kwa\s+afrika\b|\bcozyos\s+inabadilisha\s+maisha\s+(?:ya\s+mtu\s+)?kwa\s+njia\s+gani\b|\bna\s+cozyos\s+je\b|\bcozyos\s+inasaidiaje\b|\bcozyos\s+inasaidia(?:\s+na)?\s+nini\b|\bcozyos\s+inatusaidia\s+na\s+(?:faida\s+gani|nini)(?:\s+kwetu)?\b|\bnitanufaika\s+vipi\s+(?:na|nikitumia)\s+cozyos\b|\btutapata\s+nini\s+tukitumia\s+cozyos\b|\bcozyos\s+ni\s+ya\s+nini\b/i },
         { id: "differentiation", pattern: /\bhow\s+is\s+cozyos\s+different\b|\bwhat\s+makes\s+cozyos\s+different\b|\bhow\s+does\s+cozyos\s+differ\b|\bcozyos\s+vs\.?\s|\bcompared\s+to\s+other\s+apps?\b|\binatofautianaje\b|\btofauti\s+(?:ya|na)\s+cozyos\b|\bcozyos\s+inatofautiana(?:naje)?\b/i },
-        { id: "language-support-list", pattern: /\bwhich\s+languages?\s+(?:does\s+)?cozyos\s+support\b|\bwhat\s+languages?\s+(?:does\s+)?cozyos\s+support\b|\blanguage\s+support\b|\bsupported\s+languages\b|\blugha\s+(?:zipi|gani)\s+(?:zinazoungwa\s+mkono|zinazotumika)\b|\bcozyos\s+inaunga\s+mkono\s+lugha\s+gani\b|\b(?:do|does|can)\s+(?:you|cozyos)\s+(?:speak|understand)\s+[a-z\u00c0-\u024f]+\b|\b(?:una\s*(?:jua|elewa|zungumza)|(?:je,?\s*)?cozyos\s+in(?:aweza|ajua|azungumza))\s+(?:ki)?[a-z]+\b/i },
+        // Real-device fix — the "cozyos inaweza X" alternative below had
+        // (?:ki)? OPTIONAL, so it matched ANY "CozyOS inaweza <word>"
+        // sentence, not just real language-capability questions
+        // ("CozyOS inaweza Kiswahili?"). "CozyOS inaweza kutusaidiaje?"
+        // (a benefits question) was being misclassified here. Kiswahili
+        // language names are genuinely always "ki"-prefixed (Kiswahili,
+        // Kiingereza, Kifaransa, Kiarabu) - made required, not optional.
+        { id: "language-support-list", pattern: /\bwhich\s+languages?\s+(?:does\s+)?cozyos\s+support\b|\bwhat\s+languages?\s+(?:does\s+)?cozyos\s+support\b|\blanguage\s+support\b|\bsupported\s+languages\b|\blugha\s+(?:zipi|gani)\s+(?:zinazoungwa\s+mkono|zinazotumika)\b|\bcozyos\s+inaunga\s+mkono\s+lugha\s+gani\b|\b(?:do|does|can)\s+(?:you|cozyos)\s+(?:speak|understand)\s+[a-z\u00c0-\u024f]+\b|\b(?:una\s*(?:jua|elewa|zungumza)|(?:je,?\s*)?cozyos\s+in(?:aweza|ajua|azungumza))\s+ki[a-z]+\b/i },
 
         // Domain 4D (Intent Understanding discovery) — real, disclosed
         // fix for a genuine classifier gap: no "translate this" intent
@@ -347,7 +435,21 @@
         { id: "meta-verified-vs-planned", pattern: /\bverified\s+(?:vs\.?|versus|and|or)\s+planned\b|\bplanned\s+(?:vs\.?|versus|and|or)\s+verified\b|\bdifference\s+between\s+verified\s+and\s+planned\b|\bverified\s+vs\.?\s+vision\b|\bkilicho\s*thibitishwa\s+na\s+kilicho\s*pangwa\b|\bthibitishwa\s+dhidi\s+ya\s+(?:kilicho)?pangwa\b/i },
         // M363.1 real-device fix — "What's ChurchOs" (contraction)
         // had no trigger; only literal "what is X" matched.
-        { id: "app-info", pattern: /\bwhat(?:'s|\s+is)\s+([a-z][\w' -]{1,40}?)\??\s*$|\btell\s+me\s+about\s+([a-z][\w' -]{1,40}?)\.?\s*$|\b([a-z][\w' -]{1,40}?)\s+ni\s+nini[.!?]*\s*$|\bni\s+nini\s+([a-z][\w' -]{1,40}?)\??\s*$/i },
+        // NATURAL USER QUESTION UNDERSTANDING & INTENT COVERAGE UPGRADE
+        // — moved app-importance to just before app-info (was after it).
+        // app-info's "what is X" is end-anchored ($) and swallows any
+        // trailing words as part of the application name — a real,
+        // confirmed bug: "What is ChurchOS helping humans with?" was
+        // extracting the candidate "ChurchOS helping humans with" (the
+        // whole remainder) instead of "ChurchOS", producing "I don't
+        // have any registered application called 'ChurchOS helping
+        // humans with'." app-importance's own patterns for this exact
+        // shape are more specific (require a real trailing benefit/
+        // capability verb phrase), so checking it first resolves the
+        // real entity correctly; a genuine bare "What is ChurchOS?"
+        // still falls through to app-importance without matching (no
+        // alternative there fires without a trailing benefit word),
+        // then correctly reaches app-info unaffected.
         // ChurchOS human-purpose/importance dependency — recognizes
         // "why does X matter to people" phrasing, distinct from
         // app-info's "what is X" (technical identity only). Reuses the
@@ -384,7 +486,10 @@
         // already used elsewhere in this same file's own sw templates)
         // is included alongside "application" since a real Kiswahili
         // speaker is at least as likely to use it.
-        { id: "list-apps", pattern: /\b(?:what|which)\s+apps?\b|\bshow\s+me\s+the\s+apps\b|\bapplications?\s+(?:are\s+)?(?:available|installed)\b|\bwant\s+to\s+see\s+the\s+apps\b|\bfind\s+an?\s+app\b|\bcozyos\s+ina\s+(?:application|programu)\s+gani\b|\bkuna\s+(?:application|programu)\s+gani\b|\bnionyeshe\s+programu\b|\bkuna\s+(?:application|programu)\s+ngapi\b|\b(?:application|programu)\s+ngapi\b/i },
+        { id: "app-capability-search", pattern: /\bwhich\s+(?:cozyos\s+)?app(?:lication)?s?\s+(?:can|could|would)\s+help\s+me\s+(?:to\s+)?([a-z][\w' -]{1,60}?)\??\s*$|\bwhich\s+(?:cozyos\s+)?app(?:lication)?s?\s+(?:is|are)\s+(?:useful|good)\s+for\s+([a-z][\w' -]{1,60}?)\??\s*$|\bwhat\s+application\s+can\s+help\s+me\s+(?:to\s+)?([a-z][\w' -]{1,60}?)\??\s*$|\bprogramu\s+(?:gani|ipi)\s+(?:ya\s+cozyos\s+)?inaweza\s+kunisaidia\s+([a-z][\w' -]{1,60}?)\??\s*$|\bapp\s+gani\s+inafaa\s+kwa\s+([a-z][\w' -]{1,60}?)\??\s*$/i },
+        { id: "list-apps", pattern: /\b(?:what|which)\s+apps?\b|\bshow\s+me\s+the\s+apps\b|\bapplications?\s+(?:are\s+)?(?:available|installed)\b|\bwant\s+to\s+see\s+the\s+apps\b|\bfind\s+an?\s+app\b|\bcozyos\s+ina\s+(?:application|programu)\s+gani\b|\bkuna\s+(?:application|programu)\s+gani\b|\bnionyeshe\s+programu\b|\bkuna\s+(?:application|programu)\s+ngapi\b|\b(?:application|programu)\s+ngapi\b|\bwhat\s+applications\s+are\s+in\s+cozyos\b|\bwhat\s+programs\s+does\s+cozyos\s+have\b|\bwhat\s+can\s+i\s+use\s+in\s+cozyos\b/i },
+        { id: "app-importance", pattern: APP_IMPORTANCE_PATTERN },
+        { id: "app-info", pattern: /\bwhat(?:'s|\s+is)\s+([a-z][\w' -]{1,40}?)\??\s*$|\btell\s+me\s+about\s+([a-z][\w' -]{1,40}?)\.?\s*$|\bwhat\s+do\s+you\s+know\s+about\s+([a-z][\w' -]{1,40}?)\??\s*$|\b([a-z][\w' -]{1,40}?)\s+ni\s+nini[.!?]*\s*$|\bni\s+nini\s+([a-z][\w' -]{1,40}?)\??\s*$/i },
         // M363.1 real-device fix — several natural EN/SW human-value
         // phrasings ("What's ChurchOS", "ChurchOS inasaidia mtu aje",
         // "What benefits is ChurchOS", "who benefits from X", "what
@@ -395,7 +500,7 @@
         // capture group here). Same existing app-importance answer
         // (getApplicationHumanPurposeFact(), unchanged) — only
         // recognizing more real ways people ask for it.
-        { id: "app-importance", pattern: APP_IMPORTANCE_PATTERN },
+        // (a full, self-contained paraphrase — not a bare pronoun
         // Natural Human Record Capture dependency (first slice) —
         // recognizes a narrow, disclosed "add a new church member"
         // statement. Not general NLU: a specific, honestly-scoped
@@ -507,7 +612,29 @@
         { id: "greeting-generic", pattern: /\b(hi|hello|hey|greetings)\b|\bhabari\b|\bhujambo\b|\bmambo\b/i },
         { id: "thanks", pattern: /\b(thanks|thank\s?you|appreciate\s+it)\b|\basante\b/i },
         { id: "identity", pattern: /\bwho\s+are\s+you\b|\bwhat\s+are\s+you\b|\bwewe\s+ni\s+nani\b/i },
-        { id: "help", pattern: /\bhelp\b|\bwhat\s+can\s+you\s+do\b|\bnisaidie\b|\bmsaada\b|\bunaweza\s+kufanya\s+nini\b/i }
+        // Swahili & General Question Understanding Repair — real
+        // "what can you answer/help with" phrasings (ASSISTANT_
+        // CAPABILITIES in the dependency's own terms) found failing:
+        // "unaweza kujibu maswali gani", "naweza kukuuliza nini",
+        // "unaweza kunisaidia na nini", "ni mambo gani unaweza
+        // kunisaidia", "hayo maswali (ni gani) unaweza kuulizwa/kujibu"
+        // (a full, self-contained paraphrase — not a bare pronoun
+        // needing conversation-context resolution), plus the English
+        // equivalents. Same existing "help" answer — reused, not a
+        // new intent/engine, since this file's own existing help
+        // answer already IS a concise capabilities list.
+        //
+        // ORDERING NOTE: kept in its original position (checked AFTER
+        // app-importance/nav-*, same as before this dependency) — an
+        // earlier attempt to move it before app-importance broke real,
+        // existing questions like "How does ChurchOS help me?" and
+        // "Can you help me find AI providers?" (bare "help" and "what
+        // can you help" are too generic to check first). The real fix
+        // for "What can you help me with?" (a genuine ambiguity between
+        // this intent and app-importance's own "what can X help"
+        // shape) is the pronoun exclusion on APP_IMPORTANCE_PATTERN
+        // itself, above — not reordering this array.
+        { id: "help", pattern: /\bhelp\b|\bwhat\s+can\s+you\s+(?:do|help\s+me\s+with)\b|\bwhat\s+can\s+i\s+ask\s+you\b|\bwhat\s+questions\s+can\s+you\s+answer\b|\bnisaidie\b|\bmsaada\b|\bunaweza\s+kufanya\s+nini\b|\bunaweza\s+kujibu\s+maswali\s+gani\b|\bnaweza\s+kukuuliza\s+nini\b|\bunaweza\s+kunisaidia\s+na\s+nini\b|\bni\s+mambo\s+gani\s+unaweza\s+kunisaidia\b|\bhayo\s+maswali\s*(?:ni\s+gani\s+)?unaweza\s+(?:kuulizwa|kujibu)\b|\b(?:hayo\s+)?maswali\s+unaweza\s+kujibu\s+ni\s+gani\b/i }
     ]);
 
     /**
@@ -1020,6 +1147,19 @@
                 }
                 return template("why-use-cozyos:not_found", lang);
             }
+            // PHASE 6C — real, minimal, honest downstream execution for
+            // the Universal Semantic Engine's PURCHASE_INTENT/
+            // PURCHASE_CONSIDERATION. No purchase/pricing/registration
+            // capability with verified data exists anywhere in this
+            // repository (confirmed repeatedly across this session -
+            // Google login itself remains a disclosed, disabled
+            // placeholder) - this case states that honestly rather than
+            // inventing a checkout flow, and critically NEVER executes
+            // or authorizes anything (Section 15/18 of the directive):
+            // it is a reply, not an action.
+            case "purchase-intent": {
+                return template("purchase-intent:not_found", lang);
+            }
             case "differentiation": {
                 const fact = knowledge && typeof knowledge.getDifferentiationFact === "function" ? safeCall(() => knowledge.getDifferentiationFact()) : null;
                 if (fact && fact.evidence === "VERIFIED") {
@@ -1151,7 +1291,14 @@
                     return typeof frame === "function" ? frame() : frame;
                 }
                 try {
-                    const member = church.createMember({ orgId, firstName, lastName: lastName || null });
+                    // NEXT DEPENDENCY (Verify Existing Record Authorization)
+                    // — actorId now threaded through so
+                    // ChurchOS.createMember()'s own real
+                    // OrganizationMembership.isAuthorized() check has
+                    // what it needs. This is the SAME actorId already
+                    // used just above to resolve orgId via session
+                    // membership — not a new/second identity signal.
+                    const member = church.createMember({ orgId, firstName, lastName: lastName || null, actorId: options && options.actorId });
                     const frame = template("record-church-member:created", lang);
                     return typeof frame === "function" ? frame(member.firstName, member.lastName, member.memberId) : frame;
                 } catch (err) {
@@ -1161,6 +1308,33 @@
                     const frame = template("record-church-member:failed", lang);
                     return typeof frame === "function" ? frame(err && err.message ? err.message : "unknown error") : frame;
                 }
+            }
+            // UNIVERSAL HUMAN-IMPORTANCE ARCHITECTURE — real,
+            // centralized cross-application discovery. Calls the SAME
+            // APPLICATION_HUMAN_PURPOSE_DATA table every other
+            // application-aware case already reads (via
+            // searchApplicationsByCapability(), a real keyword-overlap
+            // search over each app's own VERIFIED humanPurpose/
+            // realLifeProblems/humanBenefits text) — never a second
+            // registry, never a hardcoded "if query contains X, answer
+            // AppY" list. A newly-registered application with a real
+            // human-purpose entry becomes discoverable here immediately,
+            // with no new pattern required for it specifically.
+            case "app-capability-search": {
+                const searchMatch = /\bhelp\s+me\s+(?:to\s+)?([a-z][\w' -]{1,60}?)\??\s*$|\bfor\s+([a-z][\w' -]{1,60}?)\??\s*$|\bkunisaidia\s+([a-z][\w' -]{1,60}?)\??\s*$|\bkwa\s+([a-z][\w' -]{1,60}?)\??\s*$/i.exec(rawText || "");
+                const query = searchMatch ? (searchMatch[1] || searchMatch[2] || searchMatch[3] || searchMatch[4] || "").trim() : "";
+                const knowledge = window.CozyOS && window.CozyOS.CozyKnowledge;
+                const searchResult = query && knowledge && typeof knowledge.searchApplicationsByCapability === "function"
+                    ? knowledge.searchApplicationsByCapability(query, lang)
+                    : { evidence: "NOT_FOUND", matches: [] };
+                if (searchResult.evidence === "VERIFIED" && searchResult.matches.length > 0) {
+                    const top = searchResult.matches[0];
+                    const resolvedApp = (typeof resolveApplicationByName === "function") ? resolveApplicationByName(top.application) : null;
+                    const displayName = (resolvedApp && resolvedApp.name) || top.application;
+                    const frame = template("app-capability-search:found", lang);
+                    if (typeof frame === "function") return frame(displayName, top.evidenceSnippet);
+                }
+                return template("app-capability-search:not_found", lang);
             }
             case "app-importance": {
                 // ChurchOS human-purpose dependency — real,
@@ -1189,6 +1363,44 @@
                 // nothing, so an explicitly-named question is never
                 // overridden by stale context.
                 const candidate = freshCandidate || ((options && options.contextualAppImportanceName) || "");
+                // HUMAN-PURPOSE / BENEFITS SEMANTIC INTENT CORRECTION —
+                // real root cause found by testing live examples
+                // directly: APP_IMPORTANCE_PATTERN (shared with
+                // "app-importance" precisely so named applications like
+                // ChurchOS/ShopOS work) is generic enough to also match
+                // several natural CozyOS-benefit phrasings ("Why is
+                // CozyOS useful?", "Why does CozyOS matter?") that
+                // "why-use-cozyos" (checked earlier in this array) does
+                // NOT yet have a pattern for — so they fell through to
+                // HERE, extracted the literal candidate "cozyos", and
+                // asked getApplicationHumanPurposeFact("cozyos") — a
+                // table that has never contained CozyOS itself (CozyOS's
+                // own verified benefit knowledge lives in the separate,
+                // real getWhyUseCozyOSFact() source the "why-use-cozyos"
+                // case below already calls). Every such phrasing
+                // therefore always reported "I don't have human-purpose
+                // information registered for 'cozyos' yet" — a real,
+                // permanent NOT_FOUND, never a fluke.
+                //
+                // Rather than chase every future natural phrasing into
+                // "why-use-cozyos"'s own trigger list (fragile, requires
+                // manual sync forever — the exact drift this file's own
+                // M363.1 fix eliminated for named apps), the centralized
+                // fix lives HERE: whenever app-importance's own candidate
+                // resolves to CozyOS itself, delegate to the SAME real
+                // getWhyUseCozyOSFact()/template pair "why-use-cozyos"
+                // uses — one knowledge source for CozyOS-level benefit
+                // questions, regardless of which trigger phrase or which
+                // intent id got there.
+                if (candidate && /^cozyos\b/i.test(candidate.trim())) {
+                    const cozyOsKnowledge = window.CozyOS && window.CozyOS.CozyKnowledge;
+                    const cozyOsFact = cozyOsKnowledge && typeof cozyOsKnowledge.getWhyUseCozyOSFact === "function" ? safeCall(() => cozyOsKnowledge.getWhyUseCozyOSFact()) : null;
+                    if (cozyOsFact && cozyOsFact.evidence === "VERIFIED") {
+                        const cozyOsFrame = template("why-use-cozyos:verified", lang);
+                        if (typeof cozyOsFrame === "function") return cozyOsFrame(cozyOsFact.answer);
+                    }
+                    return template("why-use-cozyos:not_found", lang);
+                }
                 const knowledge = window.CozyOS && window.CozyOS.CozyKnowledge;
                 // lang is forwarded so the KNOWLEDGE layer (not this
                 // provider, not the language-template frame) resolves
@@ -1258,8 +1470,22 @@
                 // Never fabricates an application, never claims
                 // capabilities/features the registry does not
                 // genuinely carry.
-                const m = /\bwhat(?:'s|\s+is)\s+([a-z][\w' -]{1,40}?)\??\s*$|\btell\s+me\s+about\s+([a-z][\w' -]{1,40}?)\.?\s*$|\b([a-z][\w' -]{1,40}?)\s+ni\s+nini[.!?]*\s*$|\bni\s+nini\s+([a-z][\w' -]{1,40}?)\??\s*$/i.exec(rawText || "");
-                const candidate = m ? (m[1] || m[2] || m[3] || m[4] || "").trim() : "";
+                const m = /\bwhat(?:'s|\s+is)\s+([a-z][\w' -]{1,40}?)\??\s*$|\btell\s+me\s+about\s+([a-z][\w' -]{1,40}?)\.?\s*$|\bwhat\s+do\s+you\s+know\s+about\s+([a-z][\w' -]{1,40}?)\??\s*$|\b([a-z][\w' -]{1,40}?)\s+ni\s+nini[.!?]*\s*$|\bni\s+nini\s+([a-z][\w' -]{1,40}?)\??\s*$/i.exec(rawText || "");
+                const candidate = m ? (m[1] || m[2] || m[3] || m[4] || m[5] || "").trim() : "";
+                // HUMAN-PURPOSE / BENEFITS SEMANTIC INTENT CORRECTION —
+                // same real root cause and same centralized fix as
+                // "app-importance" above: a generic "what do you know
+                // about X"/"tell me about X" phrasing can extract the
+                // literal candidate "cozyos", but getApplicationFact()
+                // only ever holds OTHER, named registered applications
+                // — CozyOS itself is never in that registry (it is the
+                // platform, not an installed application). Redirect to
+                // the same real "what-is-cozyos" case's own knowledge
+                // composition instead of reporting a false "not
+                // registered" for the platform asking about itself.
+                if (candidate && /^cozyos\b/i.test(candidate.trim())) {
+                    return composeReply("what-is-cozyos", lang, rawText, options);
+                }
                 const knowledge = window.CozyOS && window.CozyOS.CozyKnowledge;
                 const fact = candidate && knowledge && typeof knowledge.getApplicationFact === "function"
                     ? knowledge.getApplicationFact(candidate)
@@ -1465,6 +1691,14 @@
      */
     const ruleBasedProvider = {
         async think(text, options = {}) {
+            // Swahili & General Question Understanding Repair — real
+            // input normalization applied once, here, before anything
+            // else (classification, extraction, the cognitive pipeline
+            // call) so every existing and new pattern in this file
+            // benefits automatically. See normalizeUserText()'s own
+            // header comment for exactly what this does and does not
+            // do.
+            text = normalizeUserText(text);
             // Real pipeline call first — same entry point
             // reasoningPipelineProvider (cozy-living-ai.js) already
             // uses, so Memory/Policy/Interpretation/Thinking/Reasoning/
@@ -1482,15 +1716,112 @@
                     pipelineResult = null; // honest: this composer still answers even if the pipeline itself failed
                 }
             }
-            let intent = classifyIntent(text);
 
-            // RP-037 — conversation state propagation + reference
-            // resolution (see REFERENCE_FOLLOWUP_PATTERN doc comment
-            // above). The incoming state is caller-supplied and opaque;
-            // an absent/malformed value is treated as "no prior turn"
-            // rather than an error, so a caller that hasn't adopted this
-            // yet sees no behavior change at all.
+            // RP-037 — conversation state propagation (moved ahead of
+            // classifyIntent() in PHASE 6C so the Universal Semantic
+            // Engine integration below can use previousState too). The
+            // incoming state is caller-supplied and opaque; an absent/
+            // malformed value is treated as "no prior turn" rather than
+            // an error, so a caller that hasn't adopted this yet sees no
+            // behavior change at all.
             const previousState = (options && typeof options.conversationState === "object" && options.conversationState) ? options.conversationState : null;
+
+            // ============================================================
+            // PHASE 6C — Universal Semantic Authority integration.
+            //
+            // window.CozyOS.SemanticIntentEngine (core/living/
+            // cozy-ai-semantic-intent.js) is consulted FIRST, before this
+            // file's own classifyIntent() runs, exactly as the
+            // architecture directive requires: "the old provider becomes
+            // a downstream consumer/executor," never a second,
+            // independently-deciding classifier for the cases the
+            // semantic engine has already resolved.
+            //
+            // COMPLETE NO-OP WHEN THE ENGINE ISN'T LOADED — every one of
+            // the 577 pre-Phase-6C tests that never load
+            // cozy-ai-semantic-intent.js sees byte-identical behavior
+            // (semanticResult stays null, every branch below is skipped).
+            //
+            // Two, and only two, real effects when the engine IS loaded:
+            //   1. A genuinely COMPETING interpretation (e.g. "Nataka
+            //      kununua CozyOS inasaidia aje?") short-circuits
+            //      classifyIntent() entirely and returns the semantic
+            //      engine's own natural clarification question —
+            //      classifyIntent() never gets a chance to confidently
+            //      (and wrongly) pick one side.
+            //   2. A clear, resolved primaryIntent the legacy provider
+            //      already has a REAL execution path for (see
+            //      SEMANTIC_TO_LEGACY_INTENT below) overrides whatever
+            //      classifyIntent() would have produced for THIS turn,
+            //      and — critically — supplies the semantically-resolved
+            //      entity through the SAME contextualAppImportanceName
+            //      channel the M363 contextual-followup fix already
+            //      uses, so a sentence with no textual entity at all
+            //      ("Kwanza nataka kujua inanisaidia nini.") still
+            //      resolves via real conversation context, not a fresh
+            //      regex re-extraction that would find nothing.
+            // Any primaryIntent NOT in SEMANTIC_TO_LEGACY_INTENT (or a
+            // null/low-confidence result) falls through unchanged to
+            // classifyIntent() below — the semantic engine is authoritative
+            // only for what it has a real, mapped downstream execution
+            // for, never a blanket override.
+            let semanticResult = null;
+            let semanticOverrideIntent = null;
+            let semanticOverrideEntity = null;
+            const semanticEngine = window.CozyOS && window.CozyOS.SemanticIntentEngine;
+            if (semanticEngine && typeof semanticEngine.analyze === "function" && typeof text === "string" && text.trim()) {
+                try {
+                    semanticResult = semanticEngine.analyze(text, {
+                        previousEntity: previousState ? previousState.lastDiscussedApplication : null,
+                        applyCozyLearnSynonyms: true,
+                        allowProvisionalCorrections: true,
+                        cozyLearnScopes: ["GLOBAL"]
+                    });
+                } catch (_err) {
+                    semanticResult = null; // fail closed to legacy behavior — never lets a semantic-engine bug block a reply
+                }
+            }
+
+            if (semanticResult && semanticResult.ambiguity && semanticResult.ambiguity.clarificationRequired && semanticResult.relationship === "COMPETING") {
+                // Section 5/24 — the live assistant must ask, never guess
+                // between two materially different goals (e.g. buy now
+                // vs. learn first). This is the semantic engine's own
+                // real, disclosed clarification text — never fabricated
+                // here, and never answered by the legacy provider's own
+                // (potentially over-confident) pattern match.
+                const resolvedLang = semanticResult.language === "sw" ? "sw" : "en";
+                return {
+                    success: true,
+                    result: {
+                        text: (semanticResult.clarification && semanticResult.clarification.question) || (resolvedLang === "sw" ? "Unamaanisha nini hasa?" : "What do you mean, exactly?"),
+                        intent: "unsupported",
+                        language: resolvedLang,
+                        requestedLanguage: (options && options.language) || null,
+                        languageFallback: false,
+                        needsClarification: true,
+                        semanticSource: "universal-semantic-engine", // PHASE 6C — discloses which layer produced this reply, for the duplicate-audit trail Section 26 requires
+                        conversationState: {
+                            lastIntent: "unsupported",
+                            lastApplication: null,
+                            lastDiscussedApplication: (semanticResult.entity && semanticResult.entity.value) || (previousState ? previousState.lastDiscussedApplication : null) || null,
+                            lastLanguage: resolvedLang
+                        },
+                        pipeline: pipelineResult
+                    }
+                };
+            }
+
+            if (semanticResult && !semanticResult.ambiguity.clarificationRequired && semanticResult.primaryIntent && SEMANTIC_TO_LEGACY_INTENT[semanticResult.primaryIntent]) {
+                const mapping = SEMANTIC_TO_LEGACY_INTENT[semanticResult.primaryIntent];
+                const entityValue = semanticResult.entity && semanticResult.entity.value;
+                const resolvedLegacyIntent = (typeof mapping === "function") ? mapping(entityValue) : mapping;
+                if (resolvedLegacyIntent) {
+                    semanticOverrideIntent = resolvedLegacyIntent;
+                    semanticOverrideEntity = entityValue || null;
+                }
+            }
+
+            let intent = semanticOverrideIntent || classifyIntent(text);
             let contextResolved = false;
             let contextualApplication = null;
             // Checked unconditionally (not only when intent === "unsupported"):
@@ -1536,6 +1867,18 @@
                     // asking about a literal "it".
                     contextualAppImportanceName = previousState.lastDiscussedApplication;
                 }
+            }
+            // PHASE 6C — when the Universal Semantic Engine itself
+            // resolved this turn's intent+entity (semanticOverrideEntity,
+            // set above), that resolution is at least as authoritative as
+            // the legacy contextual-followup path above and is used
+            // whenever the legacy path didn't already supply one — e.g.
+            // "Kwanza nataka kujua inanisaidia nini." carries no entity of
+            // its own at all textually; only the semantic engine's own
+            // context resolution (which ran BEFORE classifyIntent) knows
+            // it means CozyOS.
+            if (!contextualAppImportanceName && semanticOverrideEntity) {
+                contextualAppImportanceName = semanticOverrideEntity;
             }
 
             // RP-037 dependency #2 — correction handling (see

@@ -78,7 +78,23 @@
     ]);
 
     class CozyLivingSounds {
-        #enabled = true;
+        // VOICE/LANGUAGE/COGNITIVE RESPONSE INTEGRATION — Section 1
+        // (background audio mute persistence). #enabled already WAS the
+        // real, working mute/unmute flag (see enable()/disable()/
+        // isEnabled() below, unchanged) - it just had no persistence and
+        // no clearly-named mute()/unmute() surface. Real, existing
+        // localStorage convention this repo already uses elsewhere
+        // (cozy-workspace.js's "cozy.workspace.*" keys,
+        // user-dashboard.js's "cozy.userdashboard.*") - no new
+        // persistence mechanism, no CozyMemory duplication, no settings
+        // registry invented. Loaded once at construction; every
+        // mute()/unmute()/disable()/enable() call re-persists.
+        #enabled = (() => {
+            try {
+                const stored = window.localStorage.getItem("cozy.livingSounds.muted");
+                return stored === null ? true : stored !== "1";
+            } catch (_err) { return true; } // honest default when localStorage is unavailable (private browsing, etc.)
+        })();
         #masterVolume = 1;
         #categoryVolumes = { ui: 1, nature: 1, notification: 1 };
         #registry = new Map(); // event -> {url, audioEl}
@@ -370,9 +386,31 @@
             return { success: true };
         }
 
-        enable() { this.#enabled = true; return { success: true }; }
-        disable() { this.#enabled = false; return { success: true }; }
+        // VOICE/LANGUAGE/COGNITIVE RESPONSE INTEGRATION — Section 1.
+        // enable()/disable()/isEnabled() remain the real, single source
+        // of truth (unchanged names, unchanged callers, if any exist)
+        // — now persisting to the SAME localStorage key #enabled's
+        // initializer reads above. mute()/unmute()/isMuted() are clear,
+        // documented aliases for the exact same state - not a second
+        // flag, not a competing mute system. This mute is scoped to
+        // LivingSounds (background/ambient/UI sound) only - it has no
+        // connection to and never touches VoiceManager/LivingTTS
+        // (assistant speech), which remain entirely separate real
+        // systems with their own, independent playback path. Muting
+        // background sound can never unintentionally silence the
+        // assistant's spoken answer, and vice versa.
+        #persistEnabled() {
+            try { window.localStorage.setItem("cozy.livingSounds.muted", this.#enabled ? "0" : "1"); } catch (_err) { /* ignore - honest best-effort persistence, matches this repo's existing convention */ }
+        }
+        enable() { this.#enabled = true; this.#persistEnabled(); return { success: true }; }
+        disable() { this.#enabled = false; this.#persistEnabled(); return { success: true }; }
         isEnabled() { return this.#enabled; }
+        /** mute() — clear alias for disable(). Background/ambient sound only; never touches assistant speech. */
+        mute() { return this.disable(); }
+        /** unmute() — clear alias for enable(). */
+        unmute() { return this.enable(); }
+        /** isMuted() — clear alias for !isEnabled(). */
+        isMuted() { return !this.#enabled; }
         getActivePack() { return this.#activePack; }
         getDiagnostics() { return { ...this.#diagnostics, registeredEvents: this.#registry.size }; }
 

@@ -4704,9 +4704,43 @@
                 }
             } catch (_err) { /* honest no-op — Applications group simply shows none */ }
 
+            // Small additive UX grouping — splits the SAME real,
+            // existing dynamicAppItems (from getApplicationCenterData(),
+            // itself reading the existing ServiceRegistry/Certification
+            // registries — no new registry, no new data) into two
+            // labeled sections using each application's own real,
+            // already-registered `category` field. Every app still
+            // appears exactly once; nothing is duplicated. Any
+            // application whose category doesn't clearly match either
+            // bucket falls through to the original, unchanged
+            // "Applications" section below it - safe by construction
+            // for any future/unknown application category.
+            const businessAppItems = [];
+            const liveMediaAppItems = [];
+            const otherAppItems = [];
+            try {
+                const registryApps = window.CozyOS && window.CozyOS.ServiceRegistry ? window.CozyOS.ServiceRegistry.listApplications() : [];
+                const categoryById = new Map(registryApps.map(a => [a.id, (a.category || "")]));
+                for (const item of dynamicAppItems) {
+                    const [navId, label] = item;
+                    const realAppId = navId.slice(4); // strip "app:" prefix
+                    const category = (categoryById.get(realAppId) || "").toLowerCase();
+                    if (category.includes("business")) businessAppItems.push(item);
+                    else if (category.includes("media") || category.includes("connectivity")) liveMediaAppItems.push(item);
+                    else otherAppItems.push(item);
+                }
+            } catch (_err) {
+                // Honest fallback: if categorization fails for any
+                // reason, every app still appears (unsplit, original
+                // behavior) rather than silently disappearing.
+                otherAppItems.push(...dynamicAppItems);
+            }
+
             const NAV_SECTIONS = [
                 { label: "Overview", items: [["dashboard", "Dashboard"], ["applications", "Application Center"], ["applicationKnowledge", "Application Knowledge"], ["modules", "Module Manager"], ["founderStory", "Founder Story"]] },
-                { label: "Applications", items: dynamicAppItems },
+                { label: "Application Center", items: businessAppItems },
+                { label: "Live & Media", items: liveMediaAppItems },
+                { label: "Applications", items: otherAppItems },
                 { label: "Certification", items: [["certification", "Certification Center"], ["releases", "Release Center"], ["upgrades", "Upgrade Center"], ["dependencies", "Dependency Viewer"]] },
                 { label: "Operations", items: [["diagnostics", "Diagnostics Center"], ["aiProviders", "AI Providers"], ["events", "Event Monitor"], ["notifications", "Notification Center"], ["search", "Enterprise Search"], ["platformDiscovery", "Platform Discovery"], ["platformAudit", "Audit Center"], ["platformOperations", "Operations Center"], ["platformResources", "Resource Center"], ["referenceIntegrityCenter", "Reference Integrity Center"], ["vendorStatusCenter", "Vendor Status"]] },
                 { label: "Design Studio", items: [["themeStudio", "Theme Studio"], ["livingThemeEngine", "Living Theme Engine"], ["livingMessageEngine", "Living Message Engine"], ["modeEngine", "Mode Engine"], ["livingButtonEngine", "Living Button Engine"], ["accessibilityCenter", "Accessibility Studio"], ["contentStudio", "Content Studio"]] },

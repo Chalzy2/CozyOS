@@ -3,6 +3,15 @@
 /**
  * core/tests/browser/admin-sidebar-collapse-browser.test.js
  * Master sidebar collapse/mobile-drawer dependency - real browser test.
+ *
+ * UPDATED (dashboard nav grouping UX pass): the mocked PharmacyOS app
+ * (category: "Business Application") now renders under the real,
+ * existing accordion's new "Application Center" section label instead
+ * of the old flat "Applications" label - a small, additive grouping
+ * change in core/shell/cozy-workspace.js's NAV_SECTIONS construction,
+ * splitting the SAME dynamic app list by each app's own already-real
+ * `category` field. No route, permission, or app data changed - only
+ * which section label this test's selector targets.
  */
 
 const { withBrowser, makeRunner } = require('./cozy-browser');
@@ -67,7 +76,7 @@ async function main() {
         await loadMountedShell(page);
         await page.click('#cozy-sidebar-toggle');
         await page.click('#cozy-sidebar-toggle');
-        await page.evaluate(() => document.querySelector('[data-nav-section="Applications"]').click());
+        await page.evaluate(() => document.querySelector('[data-nav-section="Application Center"]').click());
         const open = await page.evaluate(() => !!document.querySelector('.cozy-nav-section.open'));
         if (!open) throw new Error('expected the Level-1 accordion to still open correctly');
         await page.close();
@@ -76,7 +85,7 @@ async function main() {
       await test('8/9. Dynamic Applications links still render and still open the real application-health view', async () => {
         const { page } = await openPage();
         await loadMountedShell(page);
-        await page.evaluate(() => document.querySelector('[data-nav-section="Applications"]').click());
+        await page.evaluate(() => document.querySelector('[data-nav-section="Application Center"]').click());
         const linkExists = await page.evaluate(() => !!document.querySelector('[data-app-id="pharmacyos_core_001"]'));
         if (!linkExists) throw new Error('expected the real dynamic PharmacyOS link');
         await page.evaluate(() => document.querySelector('[data-app-id="pharmacyos_core_001"]').click());

@@ -289,7 +289,12 @@
                     if (result && result.available && result.played) {
                         this.#lastSpokenProviderId = providerId;
                         if (isFallback) this.#logAudit("fallback-succeeded", { providerId });
-                        return { available: true, played: true, providerId, reason: null };
+                        // VOICE/LANGUAGE/COGNITIVE RESPONSE INTEGRATION —
+                        // Section 2/8. Honest pass-through of whatever the
+                        // real provider itself reported - never computed
+                        // here. undefined for providers with no such
+                        // concept (e.g. Charles's fixed recordings).
+                        return { available: true, played: true, providerId, reason: null, dedicatedVoiceMatched: result.dedicatedVoiceMatched, requestedLanguage: result.requestedLanguage };
                     }
                     return null;
                 } catch (err) {
@@ -318,7 +323,7 @@
                 this.#logAudit("fallback-to-browser", { from: requestedProviderId });
                 try {
                     const result = await browserAdapter.speakPreview({ text: request.text, settingsId: request.settingsId, language: request.language });
-                    if (result.played) { this.#lastSpokenProviderId = "browser"; return { available: true, played: true, providerId: "browser", reason: "Fell back to this browser's generic system voice — not Charles." }; }
+                    if (result.played) { this.#lastSpokenProviderId = "browser"; return { available: true, played: true, providerId: "browser", reason: "Fell back to this browser's generic system voice — not Charles.", dedicatedVoiceMatched: result.dedicatedVoiceMatched, requestedLanguage: result.requestedLanguage }; }
                 } catch (_err) { /* falls through to honest unavailable below */ }
             }
 

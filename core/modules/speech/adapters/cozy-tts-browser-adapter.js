@@ -104,9 +104,18 @@
             // voice-selection path.
             const resolvedLanguage = settings?.language || config.language || null;
 
+            // VOICE/LANGUAGE/COGNITIVE RESPONSE INTEGRATION — Section 2.
+            // Real, disclosed signal for whether an actually-installed
+            // voice matched the requested language, so a caller (or a
+            // future settings UI) can honestly tell the user "no
+            // dedicated Kiswahili voice is available on this device"
+            // instead of silently sounding like a mispronounced English
+            // voice with no explanation. Never fabricates a voice -
+            // findVoiceForLanguage() itself is completely unchanged.
+            let dedicatedVoiceMatched = false;
             if (resolvedLanguage) {
                 const matchedVoice = findVoiceForLanguage(synth, resolvedLanguage);
-                if (matchedVoice) utterance.voice = matchedVoice;
+                if (matchedVoice) { utterance.voice = matchedVoice; dedicatedVoiceMatched = true; }
                 utterance.lang = resolvedLanguage;
             }
             // Real Web Speech API ranges: rate/pitch 0.1–10 (1 = normal),
@@ -119,7 +128,7 @@
                 if (typeof settings.volume === "number") utterance.volume = Math.min(1, Math.max(0, settings.volume));
             }
 
-            utterance.onend = () => resolve({ played: true });
+            utterance.onend = () => resolve({ played: true, dedicatedVoiceMatched, requestedLanguage: resolvedLanguage });
             utterance.onerror = (evt) => resolve({ played: false, reason: `Speech synthesis error: ${evt.error || "unknown"}` });
 
             try {

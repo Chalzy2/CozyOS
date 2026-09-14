@@ -1463,7 +1463,10 @@
     <script src="core/modules/intelligence/knowledge/cozy-knowledge-registry.js"></script>
 <!-- M363 fix: this real, complete, previously-written file (registers window.CozyOS.CozyPublicKnowledge, the owner-approved vision/why-use/language-support-list facts) was never actually loaded on any real page - confirmed by a real Playwright/Chromium run showing why-use-cozyos/differentiation/language-support-list always resolving to NOT_FOUND live. Composed by cozy-knowledge-registry.js at CALL time only (see that file's own header), so exact placement order does not matter, only that it is present. -->
 <script src="core/modules/intelligence/knowledge/cozy-public-knowledge-source.js"></script>
-    <script src="core/modules/intelligence/providers/rule-based-conversational-provider.js"></script>
+    <!-- PHASE 6C fix: cozy-ai-semantic-intent.js (Universal Semantic Engine) and cozy-learn.js (CozyLearn) were real, fully tested files that were NEVER actually loaded on any real page - the same class of bug found in M363 for cozy-public-knowledge-source.js. Confirmed live via a real screenshot: the browser Live Window was still hitting the old path only. Both must load before the provider below, since the provider checks window.CozyOS.SemanticIntentEngine at call time. -->
+<script src="core/living/cozy-learn.js"></script>
+<script src="core/living/cozy-ai-semantic-intent.js"></script>
+<script src="core/modules/intelligence/providers/rule-based-conversational-provider.js"></script>
     <script src="core/modules/ChurchOS/multi-branch-coordinator.js"></script>
     <!-- ChurchOS C003 — genuine new feature (real camera/mic capture).
          Loaded after WorshipModeCoordinator so its updated recording
