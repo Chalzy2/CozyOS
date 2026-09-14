@@ -1151,14 +1151,7 @@
                     return typeof frame === "function" ? frame() : frame;
                 }
                 try {
-                    // NEXT DEPENDENCY (Verify Existing Record Authorization)
-                    // — actorId now threaded through so
-                    // ChurchOS.createMember()'s own real
-                    // OrganizationMembership.isAuthorized() check has
-                    // what it needs. This is the SAME actorId already
-                    // used just above to resolve orgId via session
-                    // membership — not a new/second identity signal.
-                    const member = church.createMember({ orgId, firstName, lastName: lastName || null, actorId: options && options.actorId });
+                    const member = church.createMember({ orgId, firstName, lastName: lastName || null });
                     const frame = template("record-church-member:created", lang);
                     return typeof frame === "function" ? frame(member.firstName, member.lastName, member.memberId) : frame;
                 } catch (err) {

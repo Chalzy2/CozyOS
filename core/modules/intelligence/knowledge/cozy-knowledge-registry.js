@@ -1087,7 +1087,20 @@
      *   under a Kiswahili request.
      */
     function getApplicationHumanPurposeFact(name, lang) {
-        const needle = (typeof name === "string" ? name : "").trim().toLowerCase();
+        // M363.1 real-device fix — normalize away spacing/case
+        // variation ("Church OS", "church os", "ChurchOS", "churchos")
+        // AND a leading/trailing filler word a real speaker naturally
+        // adds ("programu ya ChurchOS", "progmu ya ChurchOS" — a real,
+        // observed typo, "app ya ChurchOS", "ChurchOS app") to the same
+        // lookup key. The data table itself is unchanged; this only
+        // corrects how a caller's raw text is matched against it,
+        // mirroring the identical fix applied to getApplicationFact()
+        // and resolveApplicationByName() below/elsewhere for the same
+        // real gap.
+        const needle = (typeof name === "string" ? name : "").trim().toLowerCase()
+            .replace(/^(?:pro\w*|application|app)\s+(?:ya\s+)?/i, "")
+            .replace(/\s+app$/i, "")
+            .replace(/\s+/g, "");
         const data = needle && APPLICATION_HUMAN_PURPOSE_DATA[needle];
         if (!data) return { evidence: "NOT_FOUND", purpose: null, source: null };
         const resolved = resolvePurposeForLanguage(data, lang);
@@ -1111,13 +1124,20 @@
             (window.CozyOS && typeof window.CozyOS.listApplications === "function" && window.CozyOS.listApplications) ||
             (window.CozyOS && window.CozyOS.ServiceRegistry && typeof window.CozyOS.ServiceRegistry.listApplications === "function" && (() => window.CozyOS.ServiceRegistry.listApplications()));
         if (!lister) return { evidence: "NOT_FOUND", application: null, source: null };
-        const needle = (typeof name === "string" ? name : "").trim().toLowerCase();
+        const needle = (typeof name === "string" ? name : "").trim().toLowerCase()
+            .replace(/^(?:pro\w*|application|app)\s+(?:ya\s+)?/i, "")
+            .replace(/\s+app$/i, "")
+            .replace(/\s+/g, "");
         if (!needle) return { evidence: "NOT_FOUND", application: null, source: null };
         const list = safeCall(() => lister());
         if (!Array.isArray(list)) return { evidence: "NOT_FOUND", application: null, source: null };
+        // M363.1 real-device fix — same space/case normalization as
+        // getApplicationHumanPurposeFact() above, applied to both sides
+        // of the comparison so "Church OS" matches a real registered
+        // "ChurchOS" entry.
         const match = list.find((app) => app && (
-            (typeof app.name === "string" && app.name.trim().toLowerCase() === needle) ||
-            (typeof app.id === "string" && app.id.trim().toLowerCase() === needle)
+            (typeof app.name === "string" && app.name.trim().toLowerCase().replace(/\s+/g, "") === needle) ||
+            (typeof app.id === "string" && app.id.trim().toLowerCase().replace(/\s+/g, "") === needle)
         ));
         if (!match) return { evidence: "NOT_FOUND", application: null, source: null };
         return {
