@@ -787,7 +787,21 @@ function resolvePostLoginDestination() {
  *   change to the ordinary-user login path.
  */
 function resolveDestinationForLoginResult(result) {
-  if (result && result.isPlatformAdmin === true) return "/chalzydashboard";
+  // DETERMINISTIC MAIN ADMINISTRATOR HANDOFF — the smallest safe
+  // correction: a genuinely server-verified administrator
+  // (result.isPlatformAdmin === true, already established exclusively
+  // through AuthCoordinator.loginWithServerPassword()'s real POST
+  // /auth/login call - never inferred from username/client state) now
+  // lands on admin-workspace.html, the current main Administrator
+  // dashboard, instead of the legacy /chalzydashboard gate+redirect
+  // page. This changes ONLY the destination string; the authorization
+  // decision itself (isPlatformAdmin, set exclusively by the real
+  // server response) is completely untouched. /chalzydashboard.html
+  // still exists and still works as its own real, independent
+  // server-verified entry point (its own gate performs the identical
+  // GET /webauthn/session + AdminGateCore check) - this only stops
+  // treating it as the fresh-login destination.
+  if (result && result.isPlatformAdmin === true) return "admin-workspace.html";
   return resolvePostLoginDestination();
 }
 

@@ -128,7 +128,7 @@ async function withStack(fn) {
   }
 }
 
-test('browser E2E: an administrator navigating directly to login.html (no ?return= param, Administrator section hidden as designed) signs in via the real, visible ordinary login form and is sent to /chalzydashboard, not the ordinary destination — the exact reported bug, now fixed', async () => {
+test('browser E2E: an administrator navigating directly to login.html (no ?return= param, Administrator section hidden as designed) signs in via the real, visible ordinary login form and is sent to admin-workspace.html, the current main Administrator dashboard — updated per the Deterministic Main Administrator Handoff correction', async () => {
   await withStack(async ({ frontOrigin, backend }) => {
     const email = 'real-admin@example.com';
     const password = 'correct horse battery staple 1';
@@ -157,7 +157,7 @@ test('browser E2E: an administrator navigating directly to login.html (no ?retur
       await page.waitForURL((url) => url.pathname !== '/login.html', { timeout: 15000 });
 
       const finalUrl = new URL(page.url());
-      assert.equal(finalUrl.pathname, '/chalzydashboard', `a real, server-confirmed platform administrator signing in through the ordinary form must be navigated to /chalzydashboard, not ${finalUrl.pathname}`);
+      assert.equal(finalUrl.pathname, '/admin-workspace.html', `a real, server-confirmed platform administrator signing in through the ordinary form must be navigated to admin-workspace.html (the current main Administrator dashboard), not ${finalUrl.pathname}`);
     } finally {
       await page.close();
       await browser.close();
@@ -165,7 +165,7 @@ test('browser E2E: an administrator navigating directly to login.html (no ?retur
   });
 });
 
-test('browser E2E: an ordinary (non-admin) user signing in via the same ordinary form is NOT sent to /chalzydashboard — the fix does not grant admin routing to non-admins', async () => {
+test('browser E2E: an ordinary (non-admin) user signing in via the same ordinary form is NOT sent to admin-workspace.html — the fix does not grant admin routing to non-admins', async () => {
   await withStack(async ({ frontOrigin }) => {
     const email = 'ordinary-user@example.com';
     const password = 'correct horse battery staple 1';
@@ -184,7 +184,7 @@ test('browser E2E: an ordinary (non-admin) user signing in via the same ordinary
       await page.waitForURL((url) => url.pathname !== '/login.html', { timeout: 15000 });
 
       const finalUrl = new URL(page.url());
-      assert.notEqual(finalUrl.pathname, '/chalzydashboard', 'a non-admin account must never be routed to /chalzydashboard');
+      assert.notEqual(finalUrl.pathname, '/admin-workspace.html', 'a non-admin account must never be routed to the Administrator dashboard');
       assert.match(finalUrl.pathname, /index\.html$/, 'an ordinary user must still reach the exact same ordinary destination as before this fix');
     } finally {
       await page.close();
@@ -193,7 +193,7 @@ test('browser E2E: an ordinary (non-admin) user signing in via the same ordinary
   });
 });
 
-test('browser E2E: an administrator arriving via a real ?return=/chalzydashboard parameter (e.g. bounced here by chalzydashboard.html\'s own gate) sees the now-visible Administrator form and still correctly reaches /chalzydashboard — confirming no regression to this already-working path', async () => {
+test('browser E2E: an administrator arriving via a real ?return=/chalzydashboard parameter (e.g. bounced here by chalzydashboard.html\'s own gate) sees the now-visible Administrator form and reaches admin-workspace.html — updated per the Deterministic Main Administrator Handoff correction: the legacy /chalzydashboard destination is never used for a fresh login, even when arriving via a return= parameter that names it', async () => {
   await withStack(async ({ frontOrigin, backend }) => {
     const email = 'gate-admin@example.com';
     const password = 'correct horse battery staple 1';
@@ -216,7 +216,7 @@ test('browser E2E: an administrator arriving via a real ?return=/chalzydashboard
       await page.waitForURL((url) => url.pathname !== '/login.html', { timeout: 15000 });
 
       const finalUrl = new URL(page.url());
-      assert.equal(finalUrl.pathname, '/chalzydashboard');
+      assert.equal(finalUrl.pathname, '/admin-workspace.html', `a real, server-confirmed platform administrator must be navigated to admin-workspace.html (the current main Administrator dashboard) even when arriving via a ?return=/chalzydashboard parameter, not ${finalUrl.pathname}`);
     } finally {
       await page.close();
       await browser.close();
@@ -262,7 +262,7 @@ async function registerRealPasskeyForAdmin(page, email) {
   }, email);
 }
 
-test('browser E2E: a real administrator using the standalone, first-factor "Sign in with Passkey" button (no password at all) is sent to /chalzydashboard, not the ordinary destination — the second, independent occurrence of the reported bug, confirmed and fixed', async () => {
+test('browser E2E: a real administrator using the standalone, first-factor "Sign in with Passkey" button (no password at all) is sent to admin-workspace.html, the current main Administrator dashboard', async () => {
   await withStack(async ({ frontOrigin, backend }) => {
     const email = 'passkey-admin@example.com';
     const password = 'correct horse battery staple 1';
@@ -298,7 +298,7 @@ test('browser E2E: a real administrator using the standalone, first-factor "Sign
       await page.waitForURL((url) => url.pathname !== '/login.html', { timeout: 15000 });
 
       const finalUrl = new URL(page.url());
-      assert.equal(finalUrl.pathname, '/chalzydashboard', `a real, server-confirmed platform administrator using the standalone Passkey button must be navigated to /chalzydashboard, not ${finalUrl.pathname}`);
+      assert.equal(finalUrl.pathname, '/admin-workspace.html', `a real, server-confirmed platform administrator using the standalone Passkey button must be navigated to admin-workspace.html (the current main Administrator dashboard), not ${finalUrl.pathname}`);
     } finally {
       await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId }).catch(() => {});
       await page.close();
@@ -307,7 +307,7 @@ test('browser E2E: a real administrator using the standalone, first-factor "Sign
   });
 });
 
-test('browser E2E: an ordinary (non-admin) user using the same standalone Passkey button still goes to the ordinary destination, not /chalzydashboard — the fix does not grant admin routing to non-admins here either', async () => {
+test('browser E2E: an ordinary (non-admin) user using the same standalone Passkey button still goes to the ordinary destination, not admin-workspace.html — the fix does not grant admin routing to non-admins here either', async () => {
   await withStack(async ({ frontOrigin }) => {
     const email = 'passkey-ordinary@example.com';
     const password = 'correct horse battery staple 1';
@@ -337,7 +337,7 @@ test('browser E2E: an ordinary (non-admin) user using the same standalone Passke
       await page.waitForURL((url) => url.pathname !== '/login.html', { timeout: 15000 });
 
       const finalUrl = new URL(page.url());
-      assert.notEqual(finalUrl.pathname, '/chalzydashboard');
+      assert.notEqual(finalUrl.pathname, '/admin-workspace.html', 'a non-admin account must never be routed to the Administrator dashboard');
     } finally {
       await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId }).catch(() => {});
       await page.close();
