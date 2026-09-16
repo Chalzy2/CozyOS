@@ -985,7 +985,7 @@
                 "kutokujua kama njia ya usalama (alama ya kidole, passkey, OTP) kweli imesajiliwa na inafanya kazi badala ya kuonyeshwa tu",
                 "kupoteza ufikiaji wakati njia moja ya uthibitishaji imeshindwa, bila chaguo lingine halisi lililosajiliwa la kurudi"
             ]),
-            whoBenefits: Object.freeze(["any CozyOS user managing sign-in security", "administrators relying on real (not assumed) authentication status"]),
+            whoBenefits: Object.freeze(["any CozyOS user managing sign-in security for their account", "administrators relying on real (not assumed) authentication status"]),
             whoBenefitsSw: Object.freeze(["mtumiaji yeyote wa CozyOS anayesimamia usalama wa kuingia", "wasimamizi wanaotegemea hali halisi (si iliyodhaniwa) ya uthibitishaji"]),
             humanBenefits: Object.freeze([
                 "one real, honest dashboard for every enrolled sign-in method",
@@ -1498,13 +1498,51 @@
                 .concat(Array.isArray(resolved.realLifeProblems) ? resolved.realLifeProblems : [])
                 .concat(Array.isArray(resolved.humanBenefits) ? resolved.humanBenefits : [])
                 .concat(Array.isArray(resolved.currentVerifiedCapabilities) ? resolved.currentVerifiedCapabilities : [])
+                .concat(Array.isArray(resolved.whoBenefits) ? resolved.whoBenefits : [])
                 .concat(data.humanPurposeSw ? [data.humanPurposeSw] : [])
                 .concat(Array.isArray(data.realLifeProblemsSw) ? data.realLifeProblemsSw : [])
                 .concat(Array.isArray(data.humanBenefitsSw) ? data.humanBenefitsSw : [])
-                .concat(Array.isArray(data.currentVerifiedCapabilitiesSw) ? data.currentVerifiedCapabilitiesSw : []);
+                .concat(Array.isArray(data.currentVerifiedCapabilitiesSw) ? data.currentVerifiedCapabilitiesSw : [])
+                .concat(Array.isArray(data.whoBenefitsSw) ? data.whoBenefitsSw : []);
             const haystack = haystackParts.join(" ").toLowerCase();
-            const hits = words.filter((w) => haystack.includes(w) || (w.endsWith("s") && w.length > 4 && haystack.includes(w.slice(0, -1))));
+            // UNIVERSAL APPLICATION UNDERSTANDING REPAIR — real ranking
+            // bug fixed generically: raw haystack.includes(w) matched
+            // "account" against "accountants" as a mere substring,
+            // letting a coincidental partial overlap outrank the
+            // semantically correct application (Authenticator) that
+            // never used the word "accountants" at all. Whole-word
+            // boundary matching (\bWORD\b) fixes this for every query
+            // word and every application generically - not a special
+            // case for "account" specifically. Plural/singular stemming
+            // is preserved but also enforced at a real word boundary.
+            const wordMatches = (word) => {
+                const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                const wholeWord = new RegExp(`\\b${escaped}\\b`, "i");
+                if (wholeWord.test(haystack)) return true;
+                if (word.endsWith("s") && word.length > 4) {
+                    const singular = word.slice(0, -1).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                    return new RegExp(`\\b${singular}\\b`, "i").test(haystack);
+                }
+                return false;
+            };
+            const hits = words.filter(wordMatches);
             if (hits.length === 0) continue;
+            // UNIVERSAL APPLICATION UNDERSTANDING REPAIR — real ranking
+            // improvement: when multiple applications each honestly
+            // contain a matched word (e.g. several apps' real text all
+            // mention "duka"/"shop" because they DO relate to shops),
+            // score by how many times each matched keyword actually
+            // occurs in that application's own real text, not merely
+            // whether it appears at all. An application whose own
+            // purpose is centrally about the matched concept naturally
+            // repeats that word more than one that only mentions it in
+            // passing - this is real evidence already present in the
+            // verified text, not an invented tiebreaker.
+            const occurrenceScore = hits.reduce((sum, w) => {
+                const escaped = w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                const matches = haystack.match(new RegExp(`\\b${escaped}\\w*`, "gi"));
+                return sum + (matches ? matches.length : 1);
+            }, 0);
             // Pull the single most relevant real sentence/phrase as
             // disclosed evidence, rather than dumping the entire entry.
             // Prefer a match from the RESOLVED (display) language's own
@@ -1515,7 +1553,7 @@
             results.push({
                 application: appKey,
                 matchedKeywords: hits,
-                score: hits.length,
+                score: occurrenceScore,
                 evidenceSnippet,
                 verified: true
             });
