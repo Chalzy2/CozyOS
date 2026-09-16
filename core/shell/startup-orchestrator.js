@@ -329,26 +329,44 @@
                 "logo-chime": "assets/audio/logo-chime.mp3",
                 "login-success": "assets/audio/login-success.mp3",
                 "notification": "assets/audio/notification.mp3",
-                // M373 — real, uploaded launch-gate recordings (not
-                // placeholders like the paths above, which still don't
-                // exist on disk yet). The user supplied one combined
-                // ~16.7s clip (assets/audio/above-only-and-welcome-
-                // source.m4a, kept here unmodified as the source of
-                // truth) named "Above_only___welcome_.m4a". No
-                // transcription/speech-recognition was run - word
-                // content is unverified, exactly like Charles's own two
-                // samples (see charles-voice-provider.js's header). It
-                // was split into these two real files using ffmpeg
-                // silencedetect (noise=-30dB, min duration 0.3s), at the
-                // one gap clearly longer (~2.0s) than every other
-                // pause in the clip (~9.27s-11.30s) - the midpoint,
-                // 10.28s, is a disclosed heuristic cut point, not a
-                // verified word boundary. If it's wrong, the two clips
-                // can be re-cut or replaced without touching any other
-                // file - only these two paths matter to the rest of the
-                // launch sequence.
+                // OWNER VOICE LOGIN-SEQUENCE RECORDING (2026-09-15) — the
+                // prior M373 recording above (below-only.m4a/welcome-
+                // launch.m4a, cut from above-only-and-welcome-source.m4a
+                // with an UNVERIFIED word boundary) has been REPLACED by
+                // a new owner recording, explicitly confirmed by the
+                // person who provided it after listening to 6 separately
+                // extracted diagnostic clips (ffmpeg silencedetect,
+                // noise=-30dB) — this is a real, human-verified
+                // transcript, not a heuristic guess:
+                //   segment 01 (3.76-4.14s) -> no sound/not a phrase, unused
+                //   segment 02 (5.29-7.79s) -> "Welcome to CozyOS"
+                //   segment 03 (10.75-12.52s) -> "Above"
+                //   segment 04 (13.11-14.18s) -> "Only"
+                //   segment 05 (19.58-21.88s) -> "Built for Africa"
+                //     (confirmed wording - NOT "Built in Africa")
+                //   segment 06 (23.24-25.43s) -> "Ready for the World"
+                // welcome-launch.m4a = segment 02 alone.
+                // above-only.m4a = ONE continuous cut spanning segments
+                //   03+04 together (10.70s-14.23s of the original
+                //   recording), preserving the real, natural ~0.59s
+                //   pause between "Above" and "Only" exactly as recorded
+                //   - not two separately-cut clips concatenated, and no
+                //   synthesized pause.
+                // motto.m4a (NEW - no real recording existed for this
+                //   event before) = ONE continuous cut spanning segments
+                //   05+06 together (19.53s-25.48s), preserving the real,
+                //   natural ~1.36s pause between "Built for Africa" and
+                //   "Ready for the World" exactly as recorded, same
+                //   technique as above-only.m4a.
+                // The complete, unmodified new source recording is
+                // preserved unchanged at owner-voice-source-20260915.m4a
+                // (the authoritative provenance file, mirroring how
+                // above-only-and-welcome-source.m4a was kept for the
+                // prior recording - neither source file is deleted).
+                // Segment 01 is never registered/played anywhere.
                 "above-only": "assets/audio/above-only.m4a",
                 "welcome": "assets/audio/welcome-launch.m4a",
+                "motto": "assets/audio/motto.m4a",
             });
         }
 

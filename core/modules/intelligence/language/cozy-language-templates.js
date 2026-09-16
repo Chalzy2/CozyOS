@@ -448,6 +448,11 @@
             sw: "Sikuweza kupata programu ya CozyOS iliyosajiliwa kwa sasa yenye taarifa zilizothibitishwa zinazolingana na uhitaji huo."
         }),
 
+        "app-detailed-info:not_found": Object.freeze({
+            en: "I don't have a currently registered CozyOS application with verified detailed information matching that name.",
+            sw: "Sina programu ya CozyOS iliyosajiliwa kwa sasa yenye taarifa za kina zilizothibitishwa zinazolingana na jina hilo."
+        }),
+
         "differentiation:verified": Object.freeze({
             en: (answer) => `${answer}`,
             sw: (answer) => `Kwa Kiingereza (bado hatuna tafsiri iliyothibitishwa ya maandishi haya kwa Kiswahili): ${answer}`,

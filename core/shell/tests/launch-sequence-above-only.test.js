@@ -607,7 +607,7 @@ function registerFakeAiProvider(sandbox, providerId = 'ai-voice-test') {
   return calls;
 }
 
-test('Single-Voice: Owner Voice (default, no override) speaks welcome/above-only via the real recordings; motto has no real recording and now falls back to the default synthesized voice (not faked AS Owner Voice) rather than being silently skipped', async (t) => {
+test('Single-Voice: Owner Voice (default, no override) speaks welcome/above-only/motto ALL via the real recordings — never reaching CozySpeech/TTS for any of the three owner phrases', async (t) => {
   mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'] });
   t.after(() => mock.timers.reset());
 
@@ -625,25 +625,20 @@ test('Single-Voice: Owner Voice (default, no override) speaks welcome/above-only
 
   await advanceTimers(60000);
 
-  // Owner Voice (charles) is the default: "welcome" and "above-only" are
-  // real, uploaded recordings, served directly by LivingSounds — never
-  // reaching CozySpeech at all. "motto" has no real recording.
-  //
-  // UPDATED (LOGIN SEQUENCE + SOUND BEHAVIOR correction): the prior
-  // AUTHORIZED REBUILD (spec section 11/3) correctly forbade using
-  // browser TTS to IMPERSONATE the Owner's voice, but a later, explicit
-  // requirement supersedes the "skip silently" half of that decision:
-  // the phrase must actually be heard, never silently dropped. The
-  // fallback below speaks through CozySpeech WITHOUT a providerId
-  // override (i.e. NOT claiming to be "charles"/Owner Voice) - a real,
-  // disclosed, non-impersonating fallback voice, not a fabricated
-  // recording. This is exactly the honest middle ground the correction
-  // requires: heard, but never presented as an Owner Voice recording.
+  // OWNER VOICE LOGIN-SEQUENCE RECORDING (2026-09-15): a real motto.m4a
+  // now exists (the new, human-verified owner recording of "Built for
+  // Africa. Ready for the World."), registered exactly like "welcome"
+  // and "above-only" already were. The hard requirement is now "Do NOT
+  // use TTS even if an audio asset fails to load" for the owner
+  // introduction, so all three phrases must be served by LivingSounds
+  // and NONE of them may ever reach CozySpeech/TTS in the Owner Voice
+  // path - superseding the prior (now removed) disclosed-fallback
+  // behavior from when no real motto recording existed yet.
   assert.ok(livingSoundsCalls.includes('welcome'));
   assert.ok(livingSoundsCalls.includes('above-only'));
+  assert.ok(livingSoundsCalls.includes('motto'), 'motto must now also be served by the real LivingSounds recording, not CozySpeech');
   const mottoCall = speechCalls.find((c) => c.context === 'motto');
-  assert.ok(mottoCall, 'motto must now actually be spoken via the fallback voice when no real Owner recording exists — never silently skipped');
-  assert.notEqual(mottoCall.providerId, 'charles', 'the fallback must not claim to be Owner Voice - no providerId override, a real disclosed default voice instead');
+  assert.ok(!mottoCall, 'motto must NOT reach CozySpeech/TTS now that a real Owner recording exists - no TTS fallback for the owner introduction, ever');
 });
 
 test('Single-Voice: when an AI voice is selected, it speaks the COMPLETE startup sequence — the Owner Voice recordings are skipped entirely, never mixed in', async (t) => {

@@ -415,20 +415,31 @@
             async function playStartupVoice() {
                 if (!STARTUP_VOICE_ENABLED || LAUNCH_AUDIO_MUTED) return;
                 if (IS_OWNER_VOICE) {
+                    // OWNER VOICE LOGIN-SEQUENCE RECORDING (2026-09-15)
+                    // hard requirement: "Do NOT use TTS even if an audio
+                    // asset fails to load." Real welcome-launch.m4a now
+                    // exists (the new, human-verified owner recording),
+                    // so this branch never falls through to CozySpeech/
+                    // TTS below for ANY reason - a missing/corrupt asset
+                    // fails honestly (logged, autoplay handled via the
+                    // existing gesture instruction) rather than being
+                    // silently replaced by a synthesized voice.
                     const sounds = window.CozyOS && window.CozyOS.LivingSounds;
                     if (sounds && typeof sounds.play === "function") {
                         const result = await sounds.play("welcome").catch(() => null);
-                        if (result && result.success) return; // real voice pack phrase played - done, no TTS fallback needed
+                        if (result && result.success) return; // real owner recording played
                         if (result && result.blockedByAutoplayPolicy) {
                             showAutoplayGestureInstruction();
-                            return; // honest: do not also attempt TTS, which the same browser policy would equally block
+                            return;
                         }
+                        console.warn("[CozyOS Login Gate] Owner Voice \"welcome\" asset did not play (" + (result && result.reason ? result.reason : "unknown reason") + "). Per the owner-voice-only rule, no TTS/synthesized fallback is used for this phrase.");
                     }
+                    return; // honest no-op - never reaches CozySpeech/TTS below for the Owner Voice introduction
                 }
-                // Honest fallback (Owner Voice, no real asset registered)
-                // OR the deliberate Single-Voice path for a non-Owner
-                // resolved voice — either way, the SAME resolved
-                // provider speaks it, never a silently different one.
+                // Non-Owner resolved voice (a user's own post-registration
+                // Cozy AI voice choice, NOT the first-registration owner
+                // introduction) - CozySpeech/TTS is the correct, real
+                // behavior here, same as it always was.
                 const speech = window.CozyOS && window.CozyOS.CozySpeech;
                 if (!speech || typeof speech.previewVoice !== "function") return; // honest no-op if not loaded yet
                 // M364.1 fix: this used to also speak the motto in the
@@ -457,33 +468,26 @@
             async function playMottoVoice() {
                 if (!STARTUP_VOICE_ENABLED || LAUNCH_AUDIO_MUTED) return;
                 if (IS_OWNER_VOICE) {
+                    // OWNER VOICE LOGIN-SEQUENCE RECORDING (2026-09-15)
+                    // supersedes the prior TTS-fallback correction: a
+                    // real motto.m4a now exists (the new, human-verified
+                    // owner recording of "Built for Africa. Ready for
+                    // the World."), and the current hard requirement is
+                    // "Do NOT use TTS even if an audio asset fails to
+                    // load." So this branch now never falls through to
+                    // CozySpeech/TTS for any reason - only the real
+                    // recording, or an honest silent failure.
                     const sounds = window.CozyOS && window.CozyOS.LivingSounds;
                     if (sounds && typeof sounds.play === "function") {
                         const result = await sounds.play("motto").catch(() => null);
-                        if (result && result.success) return;
+                        if (result && result.success) return; // real owner recording played
+                        if (result && result.blockedByAutoplayPolicy) {
+                            showAutoplayGestureInstruction();
+                            return;
+                        }
+                        console.warn("[CozyOS Login Gate] Owner Voice \"motto\" asset did not play (" + (result && result.reason ? result.reason : "unknown reason") + "). Per the owner-voice-only rule, no TTS/synthesized fallback is used for this phrase - the visual motto animation is unaffected.");
                     }
-                    // LOGIN SEQUENCE + SOUND BEHAVIOR correction: the
-                    // Owner has no real recorded motto phrase today, and
-                    // the prior AUTHORIZED REBUILD (spec section 11/3)
-                    // correctly forbids using browser TTS to IMPERSONATE
-                    // the Owner's voice. But silently skipping the
-                    // motto's audio entirely also violates this pass's
-                    // own explicit requirement ("Ready for the world"
-                    // must actually be heard - never silently skipped).
-                    // The real, honest resolution: speak it through
-                    // CozySpeech/VoiceManager's OWN resolved default
-                    // provider (the exact same call the non-Owner branch
-                    // below already makes) - a real, disclosed fallback
-                    // VOICE, not a fabricated Owner Voice recording. The
-                    // console.warn below still discloses the missing
-                    // asset for the record; audio now also actually
-                    // plays instead of only logging the gap.
-                    console.warn("[CozyOS Login Gate] Missing Owner Voice asset: no recorded phrase registered for \"motto\" (\"" + SLOGAN + "\"). Visual motto sequence is unaffected; falling back to the default synthesized voice (not Owner Voice) so the phrase is still actually heard.");
-                    const fallbackSpeech = window.CozyOS && window.CozyOS.CozySpeech;
-                    if (fallbackSpeech && typeof fallbackSpeech.previewVoice === "function") {
-                        try { await fallbackSpeech.previewVoice({ text: SLOGAN, context: "motto" }); } catch (_err) { /* honest no-op - genuinely nothing available */ }
-                    }
-                    return;
+                    return; // honest no-op - never reaches CozySpeech/TTS below for the Owner Voice motto
                 }
                 const speech = window.CozyOS && window.CozyOS.CozySpeech;
                 if (!speech || typeof speech.previewVoice !== "function") return;
@@ -497,28 +501,34 @@
 
             /**
              * playAboveOnlyVoice()
-             *   M373 addition — same real, honest pattern as
-             *   playStartupVoice()/playMottoVoice() above: when Owner
-             *   Voice is the resolved startup voice, tries LivingSounds'
-             *   registered "above-only" event first (the real, uploaded
-             *   recording — see core/living/cozy-living-sounds.js's
-             *   REAL_SOUND_EVENTS), then CozySpeech/VoiceManager via
-             *   context "above-only". For a non-Owner resolved voice
-             *   (Single-Voice Startup Integration), the pre-recorded
-             *   Owner Voice clip is skipped entirely so this phrase is
-             *   spoken by the SAME provider as the other two, never
-             *   mixed. Charles has no real TTS-fallback recording under
-             *   this phrase key today (only "startup"/"welcome" exist -
-             *   see charles-voice-provider.js's own PHRASE_MAP), so the
-             *   Owner Voice TTS-fallback path honestly resolves to the
-             *   generic browser TTS fallback (if available) or to a
-             *   genuine { available:false } - never a fabricated
-             *   playback. Honors LAUNCH_AUDIO_MUTED exactly like the
-             *   other two voice functions.
+             *   OWNER VOICE LOGIN-SEQUENCE RECORDING (2026-09-15) —
+             *   when Owner Voice is the resolved startup voice, plays
+             *   LivingSounds' registered "above-only" event (the real,
+             *   new, human-verified owner recording joining "Above" +
+             *   "Only" with their real natural pause) ONLY. No TTS/
+             *   CozySpeech fallback exists for this branch at all -
+             *   per the hard "no TTS even if the asset fails to load"
+             *   rule, a missing/corrupt asset fails honestly (logged,
+             *   autoplay handled via the existing gesture instruction)
+             *   rather than being silently replaced by a synthesized
+             *   voice. For a non-Owner resolved voice (the general,
+             *   unrelated post-login Cozy AI voice-selection system),
+             *   CozySpeech/VoiceManager remains the correct, real
+             *   behavior, unchanged.
              */
             async function playAboveOnlyVoice() {
                 if (!STARTUP_VOICE_ENABLED || LAUNCH_AUDIO_MUTED) return { attempted: false, reason: "muted" };
                 if (IS_OWNER_VOICE) {
+                    // OWNER VOICE LOGIN-SEQUENCE RECORDING (2026-09-15):
+                    // a real above-only.m4a now exists (the new,
+                    // human-verified owner recording of "Above" +
+                    // "Only" joined with their real, natural pause).
+                    // Hard requirement: "Do NOT use TTS even if an
+                    // audio asset fails to load." This branch therefore
+                    // never falls through to CozySpeech/TTS below for
+                    // any reason when Owner Voice is the resolved
+                    // startup voice - only the real recording, or an
+                    // honest, disclosed failure.
                     const sounds = window.CozyOS && window.CozyOS.LivingSounds;
                     if (sounds && typeof sounds.play === "function") {
                         const result = await sounds.play("above-only").catch(() => null);
@@ -529,7 +539,13 @@
                         // real audio length instead of a fixed guess. null
                         // if genuinely unavailable — never estimated here.
                         if (result && result.success) return { attempted: true, played: true, via: "living-sounds", durationMs: result.durationMs || null };
+                        if (result && result.blockedByAutoplayPolicy) {
+                            showAutoplayGestureInstruction();
+                            return { attempted: true, played: false, reason: "blocked by autoplay policy", durationMs: null };
+                        }
+                        console.warn("[CozyOS Login Gate] Owner Voice \"above-only\" asset did not play (" + (result && result.reason ? result.reason : "unknown reason") + "). Per the owner-voice-only rule, no TTS/synthesized fallback is used for this phrase.");
                     }
+                    return { attempted: true, played: false, reason: "Owner Voice asset unavailable - no TTS fallback used for the owner introduction.", durationMs: null };
                 }
                 const speech = window.CozyOS && window.CozyOS.CozySpeech;
                 if (!speech || typeof speech.previewVoice !== "function") return { attempted: true, played: false, reason: "AUDIO ASSET REQUIRED — IMPLEMENTATION BLOCKED FOR REAL VOICE PLAYBACK: CozySpeech not loaded.", durationMs: null };

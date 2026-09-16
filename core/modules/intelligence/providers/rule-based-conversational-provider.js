@@ -242,6 +242,12 @@
         // for "inasaidia", "nni" for "nini").
         out = out.replace(/\binsaidia/gi, "inasaidia");
         out = out.replace(/\bnni\b/gi, "nini");
+        // UNIVERSAL USER QUESTION UNDERSTANDING — real, common English
+        // typos found in live conversation ("knowore" for "know more",
+        // "inwhich" for "in which") — same fixed-table discipline as
+        // the Swahili fixes above, not a fuzzy/guessing normalizer.
+        out = out.replace(/\bknowore\b/gi, "know more");
+        out = out.replace(/\binwhich\b/gi, "in which");
         return out;
     }
 
@@ -262,7 +268,7 @@
      * below is the one place that reads whichever group matched, so
      * every call site stays in sync automatically.
      */
-    const APP_IMPORTANCE_PATTERN = /\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+important\b|\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+useful\b|\bwhy\s+does\s+([a-z][\w' -]{1,40}?)\s+exist\b|\bwhy\s+([a-z][\w' -]{1,40}?)\s+matters\b|\bwhat\s+(?:can|does|will)\s+(?!you\b|i\b|we\b)([a-z][\w' -]{1,40}?)\s+(?:do\s+for|become|help)\b|\bwhat\s+does\s+([a-z][\w' -]{1,40}?)\s+do\b|\bhow\s+(?:does|can)\s+([a-z][\w' -]{1,40}?)\s+help\b|\bwho\s+benefits\s+from\s+([a-z][\w' -]{1,40}?)\b|\bwhat\s+problem\s+does\s+([a-z][\w' -]{1,40}?)\s+solve\b|\bwhat\s+benefits?\s+(?:is|does|has)\s+([a-z][\w' -]{1,40}?)\s*(?:provide|have)?\s*\??\s*$|\bhow\s+does\s+([a-z][\w' -]{1,40}?)\s+fit\s+into\s+cozyos\b|\bkwa\s+nini\s+([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\b|\b([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+ilianzishwa\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+inalenga\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+ina\s+faida\s+gani\b|\bnani\s+atanufaika\s+na\s+([a-z][\w' -]{1,40}?)\b|\b([a-z][\w' -]{1,40}?)\s+(?:ina|ita)nisaidia(?:je)?(?:\s+nini)?\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kunisaidiaje\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kusaidia\b|\btatizo\s+gani\s+([a-z][\w' -]{1,40}?)\s+inatatua\b|\b([a-z][\w' -]{1,40}?)\s+inatatua\s+tatizo\s+gani\b|\b(?:programu\s+ya\s+)?([a-z][\w' -]{1,40}?)\s+inasaidia(?:\s+mtu)?\s+aje\b|\b([a-z][\w' -]{1,40}?)\s+iko\s+wapi\s+ndani\s+ya\s+cozyos\b|\bwhat\s+is\s+([a-z][\w' -]{1,40}?)\s+helping\s+(?:humans?|people|us)\s+with\b|\bwhat\s+does\s+([a-z][\w' -]{1,40}?)\s+mean\b|\bwhat\s+can\s+(?!you\b|i\b|we\b)([a-z][\w' -]{1,40}?)\s+do\b(?!\s+for)|\b(?!you\b|i\b|we\b)([a-z][\w' -]{1,40}?)\s+can\s+do\s+what\b|\bwhat\s+features\s+does\s+([a-z][\w' -]{1,40}?)\s+have\b|\bwhat\s+can\s+i\s+use\s+([a-z][\w' -]{1,40}?)\s+for\b|\bwhat\s+services\s+does\s+([a-z][\w' -]{1,40}?)\s+provide\b|\bwhat\s+can\s+my\s+\w+\s+do\s+with\s+([a-z][\w' -]{1,40}?)\b|\bhow\s+can\s+my\s+\w+\s+benefit\s+from\s+([a-z][\w' -]{1,40}?)\b|\bwhat\s+do\s+we\s+gain\s+from\s+(?:using\s+)?([a-z][\w' -]{1,40}?)\b|\bwhy\s+would\s+(?:an?\s+)?\w+\s+use\s+([a-z][\w' -]{1,40}?)\b|\bwhat\s+is\s+the\s+advantage\s+of\s+([a-z][\w' -]{1,40}?)\b|\bwhat\s+makes\s+([a-z][\w' -]{1,40}?)\s+(?:important|useful|different)\b|\bwhat\s+was\s+([a-z][\w' -]{1,40}?)\s+created\s+to\s+do\b|\bwhat\s+problem\s+is\s+([a-z][\w' -]{1,40}?)\s+solving\b|\bwho\s+is\s+([a-z][\w' -]{1,40}?)\s+for\b|\bwhat\s+need\s+does\s+([a-z][\w' -]{1,40}?)\s+address\b|\bwhat\s+challenges\s+can\s+([a-z][\w' -]{1,40}?)\s+help\s+with\b|\bhow\s+can\s+([a-z][\w' -]{1,40}?)\s+make\s+\w+\s+work\s+easier\b|\bwhat\s+does\s+([a-z][\w' -]{1,40}?)\s+solve\s+for\s+people\b|\bwhy\s+([a-z][\w' -]{1,40}?)\s+instead\s+of\s+another\b|\bhow\s+is\s+([a-z][\w' -]{1,40}?)\s+different\b|\bwhy\s+use\s+([a-z][\w' -]{1,40}?)\s+rather\s+than\s+another\b|\bhow\s+\w+\s+benefit\s+from\s+([a-z][\w' -]{1,40}?)\b|^([a-z][\w' -]{1,40}?)\s+benefits\??$|^([a-z][\w' -]{1,40}?)\s+use\??$|^([a-z][\w' -]{1,40}?)\s+purpose\??$|^benefits\s+of\s+([a-z][\w' -]{1,40}?)\??$|^what\s+about\s+([a-z][\w' -]{1,40}?)\??$|\bhow\s+(?:does|can)\s+([a-z][\w' -]{1,40}?)\s+benefit\s+(?:us|me|people)\b|\bwhat\s+are\s+the\s+benefits\s+of\s+([a-z][\w' -]{1,40}?)\b|\bwhy\s+should\s+(?:i|we|\w+)\s+use\s+([a-z][\w' -]{1,40}?)\b|\bwhy\s+does\s+([a-z][\w' -]{1,40}?)\s+matter\b|\bwhat\s+is\s+([a-z][\w' -]{1,40}?)\s+(?:used|made)\s+for\b|\bhow\s+can\s+i\s+benefit\s+from\s+([a-z][\w' -]{1,40}?)\b|\bwhat\s+do\s+i\s+gain\s+from\s+(?:using\s+)?([a-z][\w' -]{1,40}?)\b|\bwhat\s+(?:\w+\s+)?problems?\s+does\s+([a-z][\w' -]{1,40}?)\s+solve\b|\bwhat\s+does\s+([a-z][\w' -]{1,40}?)\s+offer\b|\bnaweza\s+kufaidika\s+vipi\s+na\s+([a-z][\w' -]{1,40}?)\b|\b([a-z][\w' -]{1,40}?)\s+inatupatia\s+faida\s+gani\b|\btutapata\s+nini\s+kutokana\s+na\s+([a-z][\w' -]{1,40}?)\b|\b([a-z][\w' -]{1,40}?)\s+ina\s+umuhimu\s+gani\s+kwetu\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kutusaidiaje\b|\b([a-z][\w' -]{1,40}?)\s+ni\s+nzuri\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+inatatua\s+matatizo\s+gani\b|\bnani\s+anafaidika\s+na\s+([a-z][\w' -]{1,40}?)\b|\b([a-z][\w' -]{1,40}?)\s+ilijengwa\s+kwa\s+nini\b|\bkwa\s+nini\s+([a-z][\w' -]{1,40}?)\s+ilijengwa\b/i;
+    const APP_IMPORTANCE_PATTERN = /\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+important\b|\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+useful\b|\bwhy\s+does\s+([a-z][\w' -]{1,40}?)\s+exist\b|\bwhy\s+([a-z][\w' -]{1,40}?)\s+matters\b|\bwhat\s+(?:can|does|will)\s+(?!you\b|i\b|we\b)([a-z][\w' -]{1,40}?)\s+(?:do\s+for|become|help)\b|\bwhat\s+does\s+([a-z][\w' -]{1,40}?)\s+do\b|\bhow\s+(?:does|can)\s+([a-z][\w' -]{1,40}?)\s+help\b|\bwho\s+benefits\s+from\s+([a-z][\w' -]{1,40}?)\b|\bwhat\s+problem\s+does\s+([a-z][\w' -]{1,40}?)\s+solve\b|\bwhat\s+benefits?\s+(?:is|does|has)\s+([a-z][\w' -]{1,40}?)\s*(?:provide|have)?\s*\??\s*$|\bhow\s+does\s+([a-z][\w' -]{1,40}?)\s+fit\s+into\s+cozyos\b|\bkwa\s+nini\s+([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\b|\b([a-z][\w' -]{1,40}?)\s+ni\s+muhimu\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+ilianzishwa\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+inalenga\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+ina\s+faida\s+gani\b|\bnani\s+atanufaika\s+na\s+([a-z][\w' -]{1,40}?)\b|\b([a-z][\w' -]{1,40}?)\s+(?:ina|ita)nisaidia(?:je)?(?:\s+nini)?\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kunisaidiaje\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kusaidia\b|\btatizo\s+gani\s+([a-z][\w' -]{1,40}?)\s+inatatua\b|\b([a-z][\w' -]{1,40}?)\s+inatatua\s+tatizo\s+gani\b|\b(?:programu\s+ya\s+)?([a-z][\w' -]{1,40}?)\s+inasaidia(?:\s+mtu)?\s+aje\b|\b([a-z][\w' -]{1,40}?)\s+iko\s+wapi\s+ndani\s+ya\s+cozyos\b|\bwhat\s+is\s+([a-z][\w' -]{1,40}?)\s+helping\s+(?:humans?|people|us)\s+with\b|\bwhat\s+does\s+([a-z][\w' -]{1,40}?)\s+mean\b|\bwhat\s+can\s+(?!you\b|i\b|we\b)([a-z][\w' -]{1,40}?)\s+do\b(?!\s+for)|\b(?!you\b|i\b|we\b)([a-z][\w' -]{1,40}?)\s+can\s+do\s+what\b|\bwhat\s+features\s+does\s+([a-z][\w' -]{1,40}?)\s+have\b|\bwhat\s+can\s+i\s+use\s+([a-z][\w' -]{1,40}?)\s+for\b|\bwhat\s+services\s+does\s+([a-z][\w' -]{1,40}?)\s+provide\b|\bwhat\s+can\s+my\s+\w+\s+do\s+with\s+([a-z][\w' -]{1,40}?)\b|\bhow\s+can\s+my\s+\w+\s+benefit\s+from\s+([a-z][\w' -]{1,40}?)\b|\bwhat\s+do\s+we\s+gain\s+from\s+(?:using\s+)?([a-z][\w' -]{1,40}?)\b|\bwhy\s+would\s+(?:an?\s+)?\w+\s+use\s+([a-z][\w' -]{1,40}?)\b|\bwhat\s+is\s+the\s+advantage\s+of\s+([a-z][\w' -]{1,40}?)\b|\bwhat\s+makes\s+([a-z][\w' -]{1,40}?)\s+(?:important|useful|different)\b|\bwhat\s+was\s+([a-z][\w' -]{1,40}?)\s+created\s+to\s+do\b|\bwhat\s+problem\s+is\s+([a-z][\w' -]{1,40}?)\s+solving\b|\bwho\s+is\s+([a-z][\w' -]{1,40}?)\s+for\b|\bwhat\s+need\s+does\s+([a-z][\w' -]{1,40}?)\s+address\b|\bwhat\s+challenges\s+can\s+([a-z][\w' -]{1,40}?)\s+help\s+with\b|\bhow\s+can\s+([a-z][\w' -]{1,40}?)\s+make\s+\w+\s+work\s+easier\b|\bwhat\s+does\s+([a-z][\w' -]{1,40}?)\s+solve\s+for\s+people\b|\bwhy\s+([a-z][\w' -]{1,40}?)\s+instead\s+of\s+another\b|\bhow\s+is\s+([a-z][\w' -]{1,40}?)\s+different\b|\bwhy\s+use\s+([a-z][\w' -]{1,40}?)\s+rather\s+than\s+another\b|\bhow\s+\w+\s+benefit\s+from\s+([a-z][\w' -]{1,40}?)\b|^([a-z][\w' -]{1,40}?)\s+benefits\??$|^([a-z][\w' -]{1,40}?)\s+use\??$|^([a-z][\w' -]{1,40}?)\s+purpose\??$|^benefits\s+of\s+([a-z][\w' -]{1,40}?)\??$|^what\s+about\s+([a-z][\w' -]{1,40}?)\??$|\bhow\s+(?:does|can)\s+([a-z][\w' -]{1,40}?)\s+benefit\s+(?:us|me|people)\b|\bwhat\s+are\s+the\s+benefits\s+of\s+([a-z][\w' -]{1,40}?)\b|\bwhy\s+should\s+(?:i|we|\w+)\s+use\s+([a-z][\w' -]{1,40}?)\b|\bwhy\s+does\s+([a-z][\w' -]{1,40}?)\s+matter\b|\bwhat\s+is\s+([a-z][\w' -]{1,40}?)\s+(?:used|made)\s+for\b|\bhow\s+can\s+i\s+benefit\s+from\s+([a-z][\w' -]{1,40}?)\b|\bwhat\s+do\s+i\s+gain\s+from\s+(?:using\s+)?([a-z][\w' -]{1,40}?)\b|\bwhat\s+(?:\w+\s+)?problems?\s+does\s+([a-z][\w' -]{1,40}?)\s+solve\b|\bwhat\s+does\s+([a-z][\w' -]{1,40}?)\s+offer\b|\bnaweza\s+kufaidika\s+vipi\s+na\s+([a-z][\w' -]{1,40}?)\b|\b([a-z][\w' -]{1,40}?)\s+inatupatia\s+faida\s+gani\b|\btutapata\s+nini\s+kutokana\s+na\s+([a-z][\w' -]{1,40}?)\b|\b([a-z][\w' -]{1,40}?)\s+ina\s+umuhimu\s+gani\s+kwetu\b|\b([a-z][\w' -]{1,40}?)\s+inaweza\s+kutusaidiaje\b|\b([a-z][\w' -]{1,40}?)\s+ni\s+nzuri\s+kwa\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+inatatua\s+matatizo\s+gani\b|\bnani\s+anafaidika\s+na\s+([a-z][\w' -]{1,40}?)\b|\b([a-z][\w' -]{1,40}?)\s+ilijengwa\s+kwa\s+nini\b|\bkwa\s+nini\s+([a-z][\w' -]{1,40}?)\s+ilijengwa\b|\b([a-z][\w' -]{1,40}?)\s+help(?:s)?\s+\w+\s+with\s+what\b|\b([a-z][\w' -]{1,40}?)\s+helps?\s+in\s+(?:in\s*)?which\s+way\b|\bwhy\s+is\s+([a-z][\w' -]{1,40}?)\s+(?:not|different\s+(?:from|than))\s+other\s+applications\b|\b([a-z][\w' -]{1,40}?)\s+ni\s+ya\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+inafanya\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+inasaidia\s+\w+\s+vipi\b|\bnani\s+anaweza\s+kutumia\s+([a-z][\w' -]{1,40}?)\b|\b([a-z][\w' -]{1,40}?)\s+inasaidia\s+watu\s+vipi(?:\s+katika\s+maisha\s+halisi)?\b|\bbiashara\s+(?:ya\s+\w+\s+)?inaweza\s+kutumia\s+([a-z][\w' -]{1,40}?)\s+kufanya\s+nini\b|\b([a-z][\w' -]{1,40}?)\s+inafaa\s+kwa\s+nani\b|\b([a-z][\w' -]{1,40}?)\s+inasaidia\s+biashara\s+ya\s+\w+\s+vipi\b|\b([a-z][\w' -]{1,40}?)\s+inatumika\s+vipi\s+katika\s+maisha\s+halisi\b|\b([a-z][\w' -]{1,40}?)\s+inam(?:m|w)?saidiaje\s+\w+(?:\s+wa\s+\w+)?\b|\b([a-z][\w' -]{1,40}?)\s+inasaidiaje\s+katika\s+maisha\s+halisi\b/i;
 
     /**
      * APP_IMPORTANCE_PRONOUNS — M363.1 real-device fix.
@@ -486,10 +492,30 @@
         // already used elsewhere in this same file's own sw templates)
         // is included alongside "application" since a real Kiswahili
         // speaker is at least as likely to use it.
-        { id: "app-capability-search", pattern: /\bwhich\s+(?:cozyos\s+)?app(?:lication)?s?\s+(?:can|could|would)\s+help\s+me\s+(?:to\s+)?([a-z][\w' -]{1,60}?)\??\s*$|\bwhich\s+(?:cozyos\s+)?app(?:lication)?s?\s+(?:is|are)\s+(?:useful|good)\s+for\s+([a-z][\w' -]{1,60}?)\??\s*$|\bwhat\s+application\s+can\s+help\s+me\s+(?:to\s+)?([a-z][\w' -]{1,60}?)\??\s*$|\bprogramu\s+(?:gani|ipi)\s+(?:ya\s+cozyos\s+)?inaweza\s+kunisaidia\s+([a-z][\w' -]{1,60}?)\??\s*$|\bapp\s+gani\s+inafaa\s+kwa\s+([a-z][\w' -]{1,60}?)\??\s*$/i },
-        { id: "list-apps", pattern: /\b(?:what|which)\s+apps?\b|\bshow\s+me\s+the\s+apps\b|\bapplications?\s+(?:are\s+)?(?:available|installed)\b|\bwant\s+to\s+see\s+the\s+apps\b|\bfind\s+an?\s+app\b|\bcozyos\s+ina\s+(?:application|programu)\s+gani\b|\bkuna\s+(?:application|programu)\s+gani\b|\bnionyeshe\s+programu\b|\bkuna\s+(?:application|programu)\s+ngapi\b|\b(?:application|programu)\s+ngapi\b|\bwhat\s+applications\s+are\s+in\s+cozyos\b|\bwhat\s+programs\s+does\s+cozyos\s+have\b|\bwhat\s+can\s+i\s+use\s+in\s+cozyos\b/i },
+        // DEEP APPLICATION CAPABILITY AUDIT — a real, generic "give me
+        // the full picture" intent, checked BEFORE app-capability-search
+        // so it isn't accidentally swallowed by that broader pattern.
+        // Composes getApplicationDetailedInfoFact() (VERIFIED_END_TO_END
+        // / IMPLEMENTED_AWAITING_CONNECTION / PARTIALLY_IMPLEMENTED /
+        // PLANNED_NOT_IMPLEMENTED, never collapsed) - never a per-app
+        // hardcoded answer.
+        // APPLICATION_COMPARISON — checked BEFORE app-detailed-info/
+        // app-importance so a genuine two-application comparison
+        // isn't captured as a single-app question. Composes
+        // compareApplicationsFact() (real, reuses the SAME two
+        // applications' own verified data - no new comparison table).
+        { id: "app-comparison", pattern: /\bwhat\s+is\s+the\s+difference\s+between\s+([a-z][\w' -]{1,30}?)\s+and\s+([a-z][\w' -]{1,30}?)\??\s*$|\b([a-z][\w' -]{1,30}?)\s+(?:vs\.?|versus)\s+([a-z][\w' -]{1,30}?)\b|\btofauti\s+kati\s+ya\s+([a-z][\w' -]{1,30}?)\s+na\s+([a-z][\w' -]{1,30}?)\s+ni\s+nini\b|\b([a-z][\w' -]{1,30}?)\s+na\s+([a-z][\w' -]{1,30}?)\s+zina(?:to)?fautianaje\b|\b([a-z][\w' -]{1,30}?)\s+na\s+([a-z][\w' -]{1,30}?)\s+zina\s+tofauti\s+gani\b/i },
+        { id: "app-detailed-info", pattern: /\btell\s+me\s+(?:everything|more)\s+about\s+([a-z][\w' -]{1,40}?)[.?!]?\s*$|\bgive\s+me\s+detailed\s+information\s+about\s+([a-z][\w' -]{1,40}?)[.?!]?\s*$|\bexplain\s+([a-z][\w' -]{1,40}?)\s+in\s+detail\b|\bwhat\s+can\s+([a-z][\w' -]{1,40}?)\s+do\s+in\s+real\s+life\b|\bwhich\s+([a-z][\w' -]{1,40}?)\s+(?:features|capabilities)\s+are\s+(?:already\s+)?connected\b|\bwhich\s+([a-z][\w' -]{1,40}?)\s+(?:features|capabilities)\s+are\s+waiting\s+for\s+(?:integration|connection)\b|\bnieleze\s+([a-z][\w' -]{1,40}?)\s+kwa\s+undani\b/i },
+        { id: "app-capability-search", pattern: /\bwhich\s+(?:cozyos\s+)?app(?:lication)?s?\s+(?:can|could|would)\s+help\s+me\s+(?:to\s+)?([a-z][\w' -]{1,60}?)\??\s*$|\bwhich\s+(?:cozyos\s+)?app(?:lication)?s?\s+(?:is|are)\s+(?:useful|good)\s+for\s+([a-z][\w' -]{1,60}?)\??\s*$|\bwhat\s+application\s+can\s+help\s+me\s+(?:to\s+)?([a-z][\w' -]{1,60}?)\??\s*$|\bprogramu\s+(?:gani|ipi)\s+(?:ya\s+cozyos\s+)?inaweza\s+kunisaidia\s+([a-z][\w' -]{1,60}?)\??\s*$|\bapp\s+gani\s+inafaa\s+kwa\s+([a-z][\w' -]{1,60}?)\??\s*$|\bni\s+(?:application|app)\s+gani\s+(?:ya\s+kusaidia|inaweza\s+kusaidia|inaweza\s+kunisaidia(?:\s+na)?)\s+([a-z][\w' -]{1,60}?)\??\s*$|\bnitatumia\s+application\s+gani\s+kusimamia\s+([a-z][\w' -]{1,60}?)\??\s*$/i },
+        // ALL_APPLICATIONS_DETAILED — checked BEFORE list-apps so a
+        // genuine "what do all the applications do" question isn't
+        // swallowed by the bare app-name-list intent. Composes
+        // getAllApplicationsDetailedFact() (real, loops the same
+        // APPLICATION_HUMAN_PURPOSE_DATA table - no per-app handler).
+        { id: "all-apps-detailed", pattern: /\bwhat\s+do\s+all\s+(?:the\s+|cozyos\s+)?applications?\s+do\b|\bexplain\s+all\s+cozyos\s+applications?\b|\btell\s+me\s+what\s+every\s+application\s+is\s+used\s+for\b|\bgive\s+me\s+(?:two\s+)?examples?\s+for\s+each\s+application\b|\bhow\s+do\s+cozyos\s+applications?\s+help\s+people\s+in\s+real\s+life\b|\btell\s+me\s+about\s+every\s+application\s+in\s+cozyos\b|\bapplications?\s+zote\s+za\s+cozyos\s+zinafanya\s+nini\b|\bniambie\s+applications?\s+zote\b|\bnieleze\s+(?:applications?|apps)\s+zote(?:\s+za\s+cozyos)?\b|\bnipe\s+mifano\s+(?:miwili\s+)?ya\s+matumizi\s+ya\s+kila\s+application\b|\bapplications?\s+(?:za\s+cozyos\s+)?zinasaidia\s+watu\s+vipi\s+katika\s+maisha\s+halisi\b/i },
+        { id: "list-apps", pattern: /\b(?:what|which)\s+apps?\b|\bshow\s+me\s+the\s+apps\b|\bapplications?\s+(?:are\s+)?(?:available|installed)\b|\bwant\s+to\s+see\s+the\s+apps\b|\bfind\s+an?\s+app\b|\bcozyos\s+ina\s+(?:application|programu)\s+gani\b|\bkuna\s+(?:application|programu)\s+gani\b|\bnionyeshe\s+programu\b|\bkuna\s+(?:application|programu)\s+ngapi\b|\b(?:application|programu)\s+ngapi\b|\bwhat\s+applications\s+are\s+in\s+cozyos\b|\bwhat\s+programs\s+does\s+cozyos\s+have\b|\bwhat\s+can\s+i\s+use\s+in\s+cozyos\b|\bwhat\s+(?:are\s+)?the\s+applications?\s+helping\s+(?:us|people|me)\s+with\b/i },
         { id: "app-importance", pattern: APP_IMPORTANCE_PATTERN },
-        { id: "app-info", pattern: /\bwhat(?:'s|\s+is)\s+([a-z][\w' -]{1,40}?)\??\s*$|\btell\s+me\s+about\s+([a-z][\w' -]{1,40}?)\.?\s*$|\bwhat\s+do\s+you\s+know\s+about\s+([a-z][\w' -]{1,40}?)\??\s*$|\b([a-z][\w' -]{1,40}?)\s+ni\s+nini[.!?]*\s*$|\bni\s+nini\s+([a-z][\w' -]{1,40}?)\??\s*$/i },
+        { id: "app-info", pattern: /\bwhat(?:'s|\s+is)\s+([a-z][\w' -]{1,40}?)\??\s*$|\btell\s+me\s+about\s+([a-z][\w' -]{1,40}?)\.?\s*$|\bwhat\s+do\s+you\s+know\s+about\s+([a-z][\w' -]{1,40}?)\??\s*$|\bi\s+want\s+to\s+know\s+(?:more\s+)?about\s+([a-z][\w' -]{1,40}?)\??\s*$|\bcan\s+you\s+explain\s+([a-z][\w' -]{1,40}?)\??\s*$|\bnaomba\s+unieleze\s+([a-z][\w' -]{1,40}?)\.?\s*$|\bnataka\s+kujua\s+zaidi\s+kuhusu\s+([a-z][\w' -]{1,40}?)\.?\s*$|\b([a-z][\w' -]{1,40}?)\s+ni\s+nini[.!?]*\s*$|\bni\s+nini\s+([a-z][\w' -]{1,40}?)\??\s*$/i },
         // M363.1 real-device fix — several natural EN/SW human-value
         // phrasings ("What's ChurchOS", "ChurchOS inasaidia mtu aje",
         // "What benefits is ChurchOS", "who benefits from X", "what
@@ -1320,9 +1346,51 @@
             // AppY" list. A newly-registered application with a real
             // human-purpose entry becomes discoverable here immediately,
             // with no new pattern required for it specifically.
+            // DEEP APPLICATION CAPABILITY AUDIT — real, generic detailed
+            // explanation for any registered application, composed
+            // entirely from getApplicationDetailedInfoFact() (which
+            // itself only reads the SAME real APPLICATION_HUMAN_PURPOSE_
+            // DATA table every other application-aware case reads).
+            // ALL_APPLICATIONS_DETAILED — real, generic overview of
+            // every registered application, composed entirely from
+            // getAllApplicationsDetailedFact() (loops the SAME real
+            // APPLICATION_HUMAN_PURPOSE_DATA table - no per-app
+            // handler, no duplicated knowledge).
+            case "all-apps-detailed": {
+                const knowledge = window.CozyOS && window.CozyOS.CozyKnowledge;
+                const allResult = knowledge && typeof knowledge.getAllApplicationsDetailedFact === "function"
+                    ? knowledge.getAllApplicationsDetailedFact(lang)
+                    : { evidence: "NOT_FOUND", answer: null };
+                if (allResult.evidence === "VERIFIED") return allResult.answer;
+                return template("app-detailed-info:not_found", lang);
+            }
+            // APPLICATION_COMPARISON — real, generic side-by-side using
+            // the SAME two named applications' own real verified data.
+            case "app-comparison": {
+                const compMatch = /\bbetween\s+([a-z][\w' -]{1,30}?)\s+and\s+([a-z][\w' -]{1,30}?)\??\s*$|\b([a-z][\w' -]{1,30}?)\s+(?:vs\.?|versus)\s+([a-z][\w' -]{1,30}?)\b|\bkati\s+ya\s+([a-z][\w' -]{1,30}?)\s+na\s+([a-z][\w' -]{1,30}?)\s+ni\s+nini\b|\b([a-z][\w' -]{1,30}?)\s+na\s+([a-z][\w' -]{1,30}?)\s+zina(?:to)?fautianaje\b|\b([a-z][\w' -]{1,30}?)\s+na\s+([a-z][\w' -]{1,30}?)\s+zina\s+tofauti\s+gani\b/i.exec(rawText || "");
+                const nameA = compMatch ? (compMatch[1] || compMatch[3] || compMatch[5] || compMatch[7] || compMatch[9] || "").trim() : "";
+                const nameB = compMatch ? (compMatch[2] || compMatch[4] || compMatch[6] || compMatch[8] || compMatch[10] || "").trim() : "";
+                const knowledge = window.CozyOS && window.CozyOS.CozyKnowledge;
+                const compResult = nameA && nameB && knowledge && typeof knowledge.compareApplicationsFact === "function"
+                    ? knowledge.compareApplicationsFact(nameA.toLowerCase().replace(/[^a-z0-9]/g, ""), nameB.toLowerCase().replace(/[^a-z0-9]/g, ""), lang)
+                    : { evidence: "NOT_FOUND", answer: null };
+                if (compResult.evidence === "VERIFIED") return compResult.answer;
+                return template("app-detailed-info:not_found", lang);
+            }
+            case "app-detailed-info": {
+                const detailMatch = /\babout\s+([a-z][\w' -]{1,40}?)[.?!]?\s*$|\bexplain\s+([a-z][\w' -]{1,40}?)\s+in\s+detail\b|\bwhat\s+can\s+([a-z][\w' -]{1,40}?)\s+do\s+in\s+real\s+life\b|\bwhich\s+([a-z][\w' -]{1,40}?)\s+(?:features|capabilities)\b|\bnieleze\s+([a-z][\w' -]{1,40}?)\s+kwa\s+undani\b/i.exec(rawText || "");
+                const appCandidate = detailMatch ? (detailMatch[1] || detailMatch[2] || detailMatch[3] || detailMatch[4] || detailMatch[5] || "").trim() : "";
+                const key = appCandidate.toLowerCase().replace(/[^a-z0-9]/g, "");
+                const knowledge = window.CozyOS && window.CozyOS.CozyKnowledge;
+                const detailResult = key && knowledge && typeof knowledge.getApplicationDetailedInfoFact === "function"
+                    ? knowledge.getApplicationDetailedInfoFact(key, lang)
+                    : { evidence: "NOT_FOUND", answer: null };
+                if (detailResult.evidence === "VERIFIED") return detailResult.answer;
+                return template("app-detailed-info:not_found", lang);
+            }
             case "app-capability-search": {
-                const searchMatch = /\bhelp\s+me\s+(?:to\s+)?([a-z][\w' -]{1,60}?)\??\s*$|\bfor\s+([a-z][\w' -]{1,60}?)\??\s*$|\bkunisaidia\s+([a-z][\w' -]{1,60}?)\??\s*$|\bkwa\s+([a-z][\w' -]{1,60}?)\??\s*$/i.exec(rawText || "");
-                const query = searchMatch ? (searchMatch[1] || searchMatch[2] || searchMatch[3] || searchMatch[4] || "").trim() : "";
+                const searchMatch = /\bhelp\s+me\s+(?:to\s+)?([a-z][\w' -]{1,60}?)\??\s*$|\bkunisaidia\s+([a-z][\w' -]{1,60}?)\??\s*$|\bkusaidia\s+([a-z][\w' -]{1,60}?)\??\s*$|\bkusimamia\s+([a-z][\w' -]{1,60}?)\??\s*$|\bkwa\s+([a-z][\w' -]{1,60}?)\??\s*$|\bfor\s+([a-z][\w' -]{1,60}?)\??\s*$/i.exec(rawText || "");
+                const query = searchMatch ? (searchMatch[1] || searchMatch[2] || searchMatch[3] || searchMatch[4] || searchMatch[5] || searchMatch[6] || "").trim() : "";
                 const knowledge = window.CozyOS && window.CozyOS.CozyKnowledge;
                 const searchResult = query && knowledge && typeof knowledge.searchApplicationsByCapability === "function"
                     ? knowledge.searchApplicationsByCapability(query, lang)
@@ -1470,8 +1538,8 @@
                 // Never fabricates an application, never claims
                 // capabilities/features the registry does not
                 // genuinely carry.
-                const m = /\bwhat(?:'s|\s+is)\s+([a-z][\w' -]{1,40}?)\??\s*$|\btell\s+me\s+about\s+([a-z][\w' -]{1,40}?)\.?\s*$|\bwhat\s+do\s+you\s+know\s+about\s+([a-z][\w' -]{1,40}?)\??\s*$|\b([a-z][\w' -]{1,40}?)\s+ni\s+nini[.!?]*\s*$|\bni\s+nini\s+([a-z][\w' -]{1,40}?)\??\s*$/i.exec(rawText || "");
-                const candidate = m ? (m[1] || m[2] || m[3] || m[4] || m[5] || "").trim() : "";
+                const m = /\bwhat(?:'s|\s+is)\s+([a-z][\w' -]{1,40}?)\??\s*$|\btell\s+me\s+about\s+([a-z][\w' -]{1,40}?)\.?\s*$|\bwhat\s+do\s+you\s+know\s+about\s+([a-z][\w' -]{1,40}?)\??\s*$|\bi\s+want\s+to\s+know\s+(?:more\s+)?about\s+([a-z][\w' -]{1,40}?)\??\s*$|\bcan\s+you\s+explain\s+([a-z][\w' -]{1,40}?)\??\s*$|\bnaomba\s+unieleze\s+([a-z][\w' -]{1,40}?)\.?\s*$|\bnataka\s+kujua\s+zaidi\s+kuhusu\s+([a-z][\w' -]{1,40}?)\.?\s*$|\b([a-z][\w' -]{1,40}?)\s+ni\s+nini[.!?]*\s*$|\bni\s+nini\s+([a-z][\w' -]{1,40}?)\??\s*$/i.exec(rawText || "");
+                const candidate = m ? (m[1] || m[2] || m[3] || m[4] || m[5] || m[6] || m[7] || m[8] || m[9] || "").trim() : "";
                 // HUMAN-PURPOSE / BENEFITS SEMANTIC INTENT CORRECTION —
                 // same real root cause and same centralized fix as
                 // "app-importance" above: a generic "what do you know

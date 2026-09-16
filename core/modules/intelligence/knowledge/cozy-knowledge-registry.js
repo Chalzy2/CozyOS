@@ -840,6 +840,26 @@
                 "country-filtered member listing",
                 "membership reporting (publishMembershipReport())"
             ]),
+            // DEEP APPLICATION CAPABILITY AUDIT (repository-verified,
+            // not assumed) — the 3-way distinction the architecture
+            // correction requires: an underlying capability existing
+            // elsewhere in CozyOS is NOT the same as it being connected
+            // to ChurchOS, and neither is the same as an idea that has
+            // no real implementation anywhere yet.
+            implementedAwaitingConnection: Object.freeze([
+                "Testimony/media search by person name: core/modules/intelligence/media/cozy-media-intelligence.js's real, working searchByPersonReference() (deterministic keyword matching, NOT face/voice recognition - see its own file header) exists and is fully functional today, but churchOS-core.js contains zero reference to it - no code currently lets a church search testimony media through ChurchOS. Connecting the two is a real, achievable integration (Media Intelligence already accepts a person-reference string), not new invention.",
+                "Kiswahili<->English live translation: core/modules/translate/translation-service.js's real NLLB-based translation engine exists and is functional, as does a real per-user language preference in identity-engine.js, but neither is referenced anywhere in core/shell/live/cozy-live-session.js or churchOS-core.js - no code currently applies translation to any church live-session content."
+            ]),
+            implementedAwaitingConnectionSw: Object.freeze([
+                "Utafutaji wa ushuhuda/media kwa jina la mtu: kazi halisi na inayofanya kazi ya searchByPersonReference() katika core/modules/intelligence/media/cozy-media-intelligence.js (ulinganishaji wa maneno muhimu ulio wazi, SIYO utambuzi wa uso/sauti - angalia kichwa cha faili yenyewe) ipo na inafanya kazi leo, lakini churchOS-core.js haina rejeleo lolote kwake - hakuna msimbo unaomruhusu kanisa kutafuta maudhui ya ushuhuda kupitia ChurchOS kwa sasa. Kuunganisha hizo mbili ni uunganishaji halisi, unaowezekana (Media Intelligence tayari inakubali maandishi ya rejeleo la mtu), si uvumbuzi mpya.",
+                "Tafsiri ya moja kwa moja Kiswahili<->Kiingereza: injini halisi ya tafsiri inayotegemea NLLB katika core/modules/translate/translation-service.js ipo na inafanya kazi, vilevile mapendeleo halisi ya lugha ya kila mtumiaji katika identity-engine.js, lakini hakuna inayorejelewa popote katika core/shell/live/cozy-live-session.js au churchOS-core.js - hakuna msimbo unaotumia tafsiri kwa maudhui yoyote ya kikao cha moja kwa moja cha kanisa kwa sasa."
+            ]),
+            partiallyImplemented: Object.freeze([
+                "\"Same person\" automatic testimony matching: the searchByPersonReference() connection above could let a church search by a person's NAME, but the desired behavior of automatically recognizing/matching a specific person's FACE or VOICE across video (\"scan and produce the same person in seconds\") requires face/voice recognition, which this repository's Media Intelligence explicitly does not implement anywhere (\"NO FABRICATION\" section, cozy-media-intelligence.js) - only the name-based search half of this idea has a real implementation to connect to."
+            ]),
+            partiallyImplementedSw: Object.freeze([
+                "Ulinganishaji wa kiotomatiki wa \"mtu yuleyule\" katika ushuhuda: muunganiko wa searchByPersonReference() hapo juu unaweza kuruhusu kanisa kutafuta kwa JINA la mtu, lakini tabia inayotakiwa ya kutambua/kulinganisha kiotomatiki USO au SAUTI ya mtu fulani katika video (\"kuchanganua na kutoa mtu yuleyule kwa sekunde\") inahitaji utambuzi wa uso/sauti, ambao Media Intelligence ya hazina hii haitekelezi popote waziwazi (sehemu ya \"NO FABRICATION\", cozy-media-intelligence.js) - ni nusu ya wazo hili inayotegemea jina pekee ndiyo ina utekelezaji halisi wa kuunganisha."
+            ]),
             currentVerifiedCapabilitiesSw: Object.freeze([
                 "setupChurch() — hutumia tena OrganizationRegistry halisi iliyopo, hakuna mfumo wa pili wa shirika",
                 "uundaji, upatikanaji, na uorodheshaji wa wanachama",
@@ -859,7 +879,10 @@
                 "church analytics",
                 "continuity between live church activity and preserved, searchable knowledge",
                 "human decision support for church leaders",
-                "privacy-aware separation of physical-attendee-only content from public/online audiences"
+                "privacy-aware separation of physical-attendee-only content from public/online audiences",
+                "private, selective-audience audio during a live session (e.g. a pastor speaking to only present members while online viewers do not hear it) - no multi-participant/selective-audio-channel architecture exists in core/shell/live/cozy-live-session.js today (it supports one bounded peer connection, not audience-scoped audio routing)",
+                "private real-time leadership/security communication during an ongoing live session - no messaging/private-channel system exists anywhere in this repository (the only related module, living-message-engine.js, is a single-field UI text display, not a communication channel)",
+                "one-to-many live video broadcast to all joined members - core/shell/live/cozy-live-session.js supports one bounded peer connection only; unlimited one-to-many broadcast (SFU/CDN) is explicitly documented elsewhere in this codebase as CAPABILITY_UNAVAILABLE and not implemented anywhere in this repository"
             ]),
             visionCapabilitiesSw: Object.freeze([
                 "uhifadhi na utafutaji wa maarifa ya mahubiri/ushuhuda",
@@ -1045,6 +1068,65 @@
             ]),
             visionSourceNote: "Drawn directly from core/modules/intelligence/media/cozy-media-intelligence.js's own file header, including its explicit 'NO FABRICATION' section."
         }),
+
+        // DEEP APPLICATION AUDIT (2026-09-15) — HONEST FINDING:
+        // HospitalOS and SchoolOS are NOT part of the ServiceRegistry/
+        // registerApplication() architecture every other entry in this
+        // table is drawn from. They exist only as keyword-triggered
+        // MOCK/PLACEHOLDER handlers in a separate, older plugin
+        // subsystem (window.CozyOS.PluginManager/KernelPlugins -
+        // core/plugins/hospitalOS.js, core/ai/schoolHandler.js). Their
+        // own source code explicitly labels its sample data as mock
+        // ("MOCK_DATA_STRING", "sandbox_test_tenant", a hardcoded fake
+        // attendance percentage) - there is no real patient record
+        // system, no real triage logic, no real school administration,
+        // no real attendance tracking anywhere behind these handlers.
+        // Recording this honestly here (rather than either omitting
+        // them or fabricating real capabilities for them) is the
+        // correct application of the "do not fabricate" rule to a
+        // capability that is genuinely closer to a demo stub than to
+        // any of VERIFIED_END_TO_END / IMPLEMENTED_AWAITING_CONNECTION
+        // / PARTIALLY_IMPLEMENTED / PLANNED_NOT_IMPLEMENTED - it is
+        // real CODE, but the capability itself does not exist.
+        hospitalos: Object.freeze({
+            humanPurpose: "There is no real, functional HospitalOS in CozyOS today. What exists is a keyword-triggered mock/placeholder handler (core/plugins/hospitalOS.js) that returns canned text for words like \"triage\"/\"emergency\"/\"encrypt\" and writes an explicitly-labeled mock chart record - it does not implement real patient records, real triage logic, or real medical data encryption.",
+            humanPurposeSw: "Hakuna HospitalOS halisi, inayofanya kazi katika CozyOS leo. Kilichopo ni kishikilizi cha maneno muhimu (core/plugins/hospitalOS.js) kinachotoa maandishi yaliyotayarishwa kwa maneno kama \"triage\"/\"emergency\"/\"encrypt\" na kuandika rekodi ya chati iliyoainishwa waziwazi kuwa ni mfano - hakitekelezi rekodi halisi za wagonjwa, mantiki halisi ya triage, au usimbaji halisi wa data ya kitabibu.",
+            realLifeProblems: Object.freeze([]),
+            realLifeProblemsSw: Object.freeze([]),
+            whoBenefits: Object.freeze([]),
+            whoBenefitsSw: Object.freeze([]),
+            humanBenefits: Object.freeze([]),
+            humanBenefitsSw: Object.freeze([]),
+            currentVerifiedCapabilities: Object.freeze([]),
+            currentVerifiedCapabilitiesSw: Object.freeze([]),
+            visionCapabilities: Object.freeze([
+                "real patient records, triage workflows, and medical data handling - none of this exists today; the current module is a mock/demo stub only, registered through a separate plugin subsystem (PluginManager/KernelPlugins), not the main ServiceRegistry every other real CozyOS application uses"
+            ]),
+            visionCapabilitiesSw: Object.freeze([
+                "rekodi halisi za wagonjwa, taratibu za triage, na usimamizi wa data ya kitabibu - hakuna kati ya hizi kilichopo leo; moduli ya sasa ni kishikilizi cha mfano/onyesho tu, kilichosajiliwa kupitia mfumo tofauti wa plugin (PluginManager/KernelPlugins), si ServiceRegistry kuu inayotumiwa na kila programu halisi nyingine ya CozyOS"
+            ]),
+            visionSourceNote: "Drawn directly from core/plugins/hospitalOS.js's own source, which explicitly labels its own sample data as mock (\"MOCK_DATA_STRING\", \"sandbox_test_tenant\")."
+        }),
+
+        schoolos: Object.freeze({
+            humanPurpose: "There is no real, functional SchoolOS in CozyOS today. What exists is a keyword-triggered mock/placeholder handler (core/ai/schoolHandler.js) that returns canned wellbeing/study-habit text and a hardcoded, fabricated attendance percentage - it does not implement real student records, real attendance tracking, or real school administration.",
+            humanPurposeSw: "Hakuna SchoolOS halisi, inayofanya kazi katika CozyOS leo. Kilichopo ni kishikilizi cha maneno muhimu (core/ai/schoolHandler.js) kinachotoa maandishi yaliyotayarishwa kuhusu ustawi/tabia za masomo na asilimia ya mahudhurio iliyowekwa moja kwa moja katika msimbo (siyo ya kweli) - hakitekelezi rekodi halisi za wanafunzi, ufuatiliaji halisi wa mahudhurio, au usimamizi halisi wa shule.",
+            realLifeProblems: Object.freeze([]),
+            realLifeProblemsSw: Object.freeze([]),
+            whoBenefits: Object.freeze([]),
+            whoBenefitsSw: Object.freeze([]),
+            humanBenefits: Object.freeze([]),
+            humanBenefitsSw: Object.freeze([]),
+            currentVerifiedCapabilities: Object.freeze([]),
+            currentVerifiedCapabilitiesSw: Object.freeze([]),
+            visionCapabilities: Object.freeze([
+                "real student records, real attendance tracking, real school administration and fee/payment handling - none of this exists today; the current module returns a hardcoded, non-live attendance percentage and generic canned wellbeing text, registered through a separate mechanism from the main ServiceRegistry every other real CozyOS application uses"
+            ]),
+            visionCapabilitiesSw: Object.freeze([
+                "rekodi halisi za wanafunzi, ufuatiliaji halisi wa mahudhurio, usimamizi halisi wa shule na malipo/ada - hakuna kati ya hizi kilichopo leo; moduli ya sasa inarudisha asilimia ya mahudhurio iliyowekwa moja kwa moja (siyo ya wakati halisi) na maandishi ya jumla ya ustawi, iliyosajiliwa kupitia njia tofauti na ServiceRegistry kuu inayotumiwa na kila programu halisi nyingine ya CozyOS"
+            ]),
+            visionSourceNote: "Drawn directly from core/ai/schoolHandler.js's own source, which returns a hardcoded attendance figure (\"94.2%\") rather than any real, live data source."
+        }),
     });
 
     /**
@@ -1222,6 +1304,143 @@
     }
 
     /**
+     * getApplicationDetailedInfo(name, lang)
+     *   DEEP APPLICATION CAPABILITY AUDIT — composes a structured,
+     *   multi-section explanation from the SAME real data
+     *   getApplicationHumanPurposeFact()/searchApplicationsByCapability()
+     *   already read - no duplicate knowledge, no new registry.
+     *   Explicitly separates VERIFIED_END_TO_END (currentVerified-
+     *   Capabilities) from IMPLEMENTED_AWAITING_CONNECTION
+     *   (implementedAwaitingConnection - real code exists elsewhere,
+     *   just not wired to this application) from PARTIALLY_IMPLEMENTED
+     *   (partiallyImplemented - part of an idea is real, part is not)
+     *   from PLANNED_NOT_IMPLEMENTED (visionCapabilities) - never
+     *   collapsing these into one bucket. Real-life examples are drawn
+     *   directly from realLifeProblems (already-verified data), capped
+     *   at 2 per the requested "give 2 concrete examples" behavior -
+     *   never invented beyond what that array already contains.
+     */
+    /**
+     * compareApplicationsFact(nameA, nameB, lang)
+     *   APPLICATION_COMPARISON — real, generic comparison built entirely
+     *   from the SAME two applications' own real getApplicationDetailedInfo()
+     *   data. Never makes an unsupported "X is better" claim - only
+     *   states each application's own real purpose and current
+     *   capabilities side by side, so the person can judge fit
+     *   themselves. Honestly reports when one or both names aren't
+     *   registered, rather than guessing.
+     */
+    function compareApplicationsFact(nameA, nameB, lang) {
+        const a = getApplicationDetailedInfo(nameA, lang);
+        const b = getApplicationDetailedInfo(nameB, lang);
+        if (a.evidence !== "VERIFIED" || b.evidence !== "VERIFIED") return { evidence: "NOT_FOUND", answer: null };
+        const isSw = lang === "sw";
+        const describe = (key, detail) => {
+            const capLabel = isSw ? "Uwezo ulioidhinishwa" : "Verified capabilities";
+            const caps = detail.currentVerifiedCapabilities.length > 0 ? `${capLabel}: ${detail.currentVerifiedCapabilities.join("; ")}.` : "";
+            return [`${key}`, detail.humanPurpose, caps].filter(Boolean).join("\n");
+        };
+        const intro = isSw
+            ? `Hapa kuna tofauti halisi kati ya ${a.detail.application} na ${b.detail.application}, kulingana na uwezo uliothibitishwa wa kila moja - si dai la "bora zaidi".`
+            : `Here is the real difference between ${a.detail.application} and ${b.detail.application}, based on each one's own verified purpose and capabilities - not an unsupported "better" claim.`;
+        return { evidence: "VERIFIED", answer: [intro, describe(a.detail.application, a.detail), describe(b.detail.application, b.detail)].join("\n\n") };
+    }
+
+    function getApplicationDetailedInfo(name, lang) {
+        const key = String(name || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+        const data = APPLICATION_HUMAN_PURPOSE_DATA[key];
+        if (!data) return { evidence: "NOT_FOUND", detail: null };
+        const resolved = resolvePurposeForLanguage(data, lang);
+        if (!resolved) return { evidence: "NOT_FOUND", detail: null };
+        const isSw = lang === "sw";
+        const pick = (base) => (isSw && Array.isArray(data[base + "Sw"]) && data[base + "Sw"].length > 0) ? data[base + "Sw"] : (Array.isArray(data[base]) ? data[base] : []);
+        return {
+            evidence: "VERIFIED",
+            detail: {
+                application: key,
+                humanPurpose: resolved.humanPurpose,
+                whoBenefits: resolved.whoBenefits || [],
+                realLifeExamples: (resolved.realLifeProblems || []).slice(0, 2),
+                currentVerifiedCapabilities: resolved.currentVerifiedCapabilities || [],
+                implementedAwaitingConnection: pick("implementedAwaitingConnection"),
+                partiallyImplemented: pick("partiallyImplemented"),
+                visionCapabilities: resolved.visionCapabilities || []
+            }
+        };
+    }
+
+    /**
+     * getApplicationDetailedInfoFact(name, lang)
+     *   Turns the structured object above into one real, plain-language
+     *   answer string, same "VERIFIED"/"NOT_FOUND" evidence contract as
+     *   the other fact functions - the conversational provider composes
+     *   the final template around this text, it does not build the
+     *   structure itself.
+     */
+    function getApplicationDetailedInfoFact(name, lang) {
+        const result = getApplicationDetailedInfo(name, lang);
+        if (result.evidence !== "VERIFIED") return { evidence: "NOT_FOUND", answer: null };
+        const d = result.detail;
+        const isSw = lang === "sw";
+        const sections = [];
+        sections.push(d.humanPurpose);
+        if (d.realLifeExamples.length > 0) {
+            const label = isSw ? "Mifano halisi ya matumizi" : "Real-life examples";
+            sections.push(`${label}: ${d.realLifeExamples.join("; ")}.`);
+        }
+        if (d.currentVerifiedCapabilities.length > 0) {
+            const label = isSw ? "Uwezo ulioidhinishwa leo" : "Verified today";
+            sections.push(`${label}: ${d.currentVerifiedCapabilities.join("; ")}.`);
+        }
+        if (d.implementedAwaitingConnection.length > 0) {
+            const label = isSw ? "Zipo lakini hazijaunganishwa bado" : "Already implemented but not yet connected";
+            sections.push(`${label}: ${d.implementedAwaitingConnection.join(" | ")}`);
+        }
+        if (d.partiallyImplemented.length > 0) {
+            const label = isSw ? "Zimetekelezwa kwa sehemu" : "Partially implemented";
+            sections.push(`${label}: ${d.partiallyImplemented.join(" | ")}`);
+        }
+        if (d.visionCapabilities.length > 0) {
+            const label = isSw ? "Vision/yajayo (bado hayajatekelezwa)" : "Vision/planned (not implemented yet)";
+            sections.push(`${label}: ${d.visionCapabilities.join("; ")}.`);
+        }
+        return { evidence: "VERIFIED", answer: sections.join("\n\n") };
+    }
+
+    /**
+     * getAllApplicationsDetailedFact(lang)
+     *   ALL_APPLICATIONS_DETAILED — real, generic "what do all the
+     *   applications do" overview. Loops the SAME real
+     *   APPLICATION_HUMAN_PURPOSE_DATA table every other function in
+     *   this file reads (no second registry, no per-application
+     *   handler) and composes ONE combined answer: for every real
+     *   entry, a one-line purpose plus up to 2 real-life examples drawn
+     *   directly from realLifeProblems - never invented to force a
+     *   "two examples" count. An application with zero real
+     *   realLifeProblems entries (e.g. the honest HospitalOS/SchoolOS
+     *   mock-stub disclosures) still appears, with its real, honest
+     *   humanPurpose text standing in for the missing examples rather
+     *   than a fabricated pair.
+     */
+    function getAllApplicationsDetailedFact(lang) {
+        const keys = Object.keys(APPLICATION_HUMAN_PURPOSE_DATA).sort();
+        if (keys.length === 0) return { evidence: "NOT_FOUND", answer: null };
+        const blocks = keys.map((key) => {
+            const resolved = resolvePurposeForLanguage(APPLICATION_HUMAN_PURPOSE_DATA[key], lang);
+            if (!resolved) return null;
+            const examples = (resolved.realLifeProblems || []).slice(0, 2);
+            const lines = [`${key}`];
+            lines.push(resolved.humanPurpose);
+            if (examples.length > 0) {
+                examples.forEach((ex, i) => lines.push(`  ${i + 1}. ${ex}`));
+            }
+            return lines.join("\n");
+        }).filter(Boolean);
+        if (blocks.length === 0) return { evidence: "NOT_FOUND", answer: null };
+        return { evidence: "VERIFIED", answer: blocks.join("\n\n") };
+    }
+
+    /**
      * getApplicationHumanPurposeFact(name, lang)
      *   lang is optional for backward compatibility ("en" behavior when
      *   omitted - unchanged from before this dependency). When
@@ -1262,15 +1481,36 @@
             const data = APPLICATION_HUMAN_PURPOSE_DATA[appKey];
             const resolved = resolvePurposeForLanguage(data, lang);
             if (!resolved) continue;
+            // UNIVERSAL USER QUESTION UNDERSTANDING — Kiswahili-first
+            // requirement: a Kiswahili query word (e.g. "kanisa") must
+            // be able to match this data even when the RESOLVED display
+            // language for this particular request is English (or vice
+            // versa) - the search haystack therefore includes BOTH the
+            // resolved language's real fields AND the raw Sw-suffixed
+            // fields directly from `data` when they exist, rather than
+            // only whichever single language resolvePurposeForLanguage()
+            // picked for rendering. This only ever ADDS candidate text
+            // to search against - it never changes what is actually
+            // rendered back to the user (still resolved/lang-appropriate),
+            // and never invents a translation that doesn't already
+            // exist in the real, verified data.
             const haystackParts = [resolved.humanPurpose]
                 .concat(Array.isArray(resolved.realLifeProblems) ? resolved.realLifeProblems : [])
                 .concat(Array.isArray(resolved.humanBenefits) ? resolved.humanBenefits : [])
-                .concat(Array.isArray(resolved.currentVerifiedCapabilities) ? resolved.currentVerifiedCapabilities : []);
+                .concat(Array.isArray(resolved.currentVerifiedCapabilities) ? resolved.currentVerifiedCapabilities : [])
+                .concat(data.humanPurposeSw ? [data.humanPurposeSw] : [])
+                .concat(Array.isArray(data.realLifeProblemsSw) ? data.realLifeProblemsSw : [])
+                .concat(Array.isArray(data.humanBenefitsSw) ? data.humanBenefitsSw : [])
+                .concat(Array.isArray(data.currentVerifiedCapabilitiesSw) ? data.currentVerifiedCapabilitiesSw : []);
             const haystack = haystackParts.join(" ").toLowerCase();
             const hits = words.filter((w) => haystack.includes(w) || (w.endsWith("s") && w.length > 4 && haystack.includes(w.slice(0, -1))));
             if (hits.length === 0) continue;
             // Pull the single most relevant real sentence/phrase as
             // disclosed evidence, rather than dumping the entire entry.
+            // Prefer a match from the RESOLVED (display) language's own
+            // text when one exists, so the evidence shown matches the
+            // response language; fall back to whichever real text
+            // actually matched otherwise.
             const evidenceSnippet = haystackParts.find((part) => hits.some((w) => part.toLowerCase().includes(w))) || resolved.humanPurpose;
             results.push({
                 application: appKey,
@@ -1395,6 +1635,10 @@
         lookupLexiconTermFact,
         getApplicationFact,
         getApplicationHumanPurposeFact,
+        getApplicationDetailedInfo,
+        getApplicationDetailedInfoFact,
+        getAllApplicationsDetailedFact,
+        compareApplicationsFact,
         searchApplicationsByCapability,
         getCapabilityHumanPurposeFact
     });
