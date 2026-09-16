@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<!--
+  core/tests/browser/kiswahili-dep2-voice-language-harness.html
+
+  Kiswahili Capability Dependency #2 test fixture only - not a shipped
+  application entry point, not referenced from index.html/dashboard.html.
+  Loads the exact same real, unmodified files index.html already loads
+  for this chain, in the same order, and mounts LivingAssistant
+  directly - bypassing the real (but, for this fixture's purpose,
+  irrelevant) 30-second launch sequence and login-gated flow that
+  index.html's own visible UI requires before its Assistant button
+  becomes clickable. window.CozyOS.LivingAI/LivingAssistant themselves
+  are the same real, unmodified objects either way.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Kiswahili Dependency #2 - voice/language wiring test fixture</title>
+<link rel="stylesheet" href="/core/ui/cozy-tokens.css">
+<link rel="stylesheet" href="/core/living/cozy-living.css">
+<style>html,body{margin:0;height:100%;background:#0a1a12;}</style>
+</head>
+<body>
+<script>window.CozyOS = window.CozyOS || {}; window.CozyOS.Modules = window.CozyOS.Modules || {};</script>
+<script src="/core/shell/window-manager.js"></script>
+<script src="/core/modules/speech/cozy-speech.js"></script>
+<script src="/core/modules/speech/adapters/speech-language-adapter.js"></script>
+<script src="/core/modules/speech/adapters/speech-recognition-adapter.js"></script>
+<script src="/core/living/cozy-living-ai.js"></script>
+<script src="/core/modules/intelligence/language/cozy-language-registry.js"></script>
+<script src="/core/modules/intelligence/language/cozy-language-templates.js"></script>
+<script src="/core/modules/intelligence/knowledge/cozy-knowledge-registry.js"></script>
+<script src="/core/modules/intelligence/cozy-ai.js"></script>
+<script src="/core/modules/knowledge/cozyos-identity-faq-router.js"></script>
+<script src="/core/modules/intelligence/answer/cozy-answer-engine.js"></script>
+<script src="/core/modules/intelligence/advisor/cozy-advisor.js"></script>
+<script src="/core/modules/intelligence/providers/rule-based-conversational-provider.js"></script>
+<script src="/core/living/cozy-living-assistant.js"></script>
+<script>
+  window.CozyOS.LivingAssistant.mount();
+</script>
+</body>
+</html>

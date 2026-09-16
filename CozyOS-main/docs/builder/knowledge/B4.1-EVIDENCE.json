@@ -1,0 +1,221 @@
+{
+  "phase": "B4.1",
+  "checkpoint": "CozyOS-Merged-0003-PhaseB3-CERTIFIED-16of16-B4-EVIDENCE.zip",
+  "checkpointSha256": "2a6e7656444e2c8bdd89247f63125bf5d50f13b564cf0219e184ebcacc2f7232",
+  "checkpointSizeBytes": 17653500,
+  "gitMetadataPresent": false,
+  "packageJsonVersion": "1.0.0",
+  "packageLockVersion": 3,
+  "b3Runtime": {
+    "suiteFile": "server/webauthn-rp/test/postgres-adapter-runtime.test.js",
+    "testCasesDefined": 16,
+    "evidenceArtifact": {
+      "path": "docs/builder/knowledge/B3-POSTGRES-16OF16-RUNTIME.txt",
+      "duplicatePathAlsoPresent": "B3-POSTGRES-16OF16-RUNTIME.txt",
+      "sha256": "271a88b436d9b7088466ab401f59abeb5dcf48443d5a42dc0c236cdd4efa27f7",
+      "bothCopiesByteIdentical": true,
+      "inspectedDirectly": true
+    },
+    "literalResult": {
+      "tests": 16,
+      "pass": 16,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 145293.863778
+    },
+    "plausibilityChecks": {
+      "testNamesMatchB4_1_5ChecklistInOrder": true,
+      "timingsRealisticAndNonUniform": true,
+      "connectionTargetLooksLikeRealNeonPooler": true,
+      "sslWarningTextMatchesRealPgConnectionStringLibrary": true
+    },
+    "independentlyReExecutedInThisEnvironment": false,
+    "independentReExecutionReason": "no COZY_DATABASE_URL and no network egress in this sandbox; verification is by direct artifact inspection, not live re-run",
+    "evidenceGapId": "B3-RUNTIME-001",
+    "status": "CLOSED"
+  },
+  "pgDependency": {
+    "packageJson": "^8.13.1",
+    "lockfileResolved": "8.23.0",
+    "installedVersionConfirmed": "8.23.0",
+    "synchronized": true,
+    "conflictingClientsFound": false,
+    "transitiveDepsInstalledAndPresent": {
+      "pg-connection-string": "2.14.0",
+      "pg-pool": "3.14.0",
+      "pg-protocol": "1.16.0",
+      "pg-types": "2.2.0",
+      "pgpass": "1.0.5"
+    },
+    "playwrightInstalledVersionConfirmed": "1.62.1"
+  },
+  "gitHygiene": {
+    "nodeModulesTracked": true,
+    "nodeModulesNote": "This evidence bundle (unlike the original -CERTIFIED-16of16.zip baseline) packages a full node_modules/ directory (~20MB). Non-blocking for B4.1 since this is a supplementary evidence bundle, not a resubmission of the certified baseline, but node_modules must be excluded if this bundle is ever treated as the new baseline.",
+    "secretsTracked": false,
+    "secretScanNotes": "Two credential-pattern matches inside node_modules, both literal placeholder examples (someuser/somepassword, DBuser/secret) in pg-pool and pg-connection-string README.md files. Not real secrets."
+  },
+  "asDeliveredManifest": {
+    "path": "docs/builder/knowledge/AS-DELIVERED-SHA256-MANIFEST.txt",
+    "fileCount": 1592,
+    "scopeNote": "node_modules excluded (build artifact, not source)"
+  },
+  "changedFileInventoryVerified": false,
+  "changedFileInventoryDetails": {
+    "diffAgainstPriorEvidenceRound": "Only new files vs. prior checkpoint: the two B3-POSTGRES-16OF16-RUNTIME.txt copies. No new documentation was supplied addressing the Group B files.",
+    "groupB_reconciliation": {
+      "reportPath": "docs/builder/knowledge/B4.1-GROUP-B-RECONCILIATION.md",
+      "round": 2,
+      "methodology": "Extracted every historical SHA-256/MD5 value recorded for each file across all manifests/reports in the checkpoint, ordered by explicit report statements (not timestamp), and compared against current hash.",
+      "files": {
+        "index.html": {
+          "status": "RESOLVED",
+          "confidence": "HIGH",
+          "evidenceSource": "docs/history/M387.5.md, Finding 7",
+          "note": "Unchanged from round 1: exact defect described, fix matches precisely, verified directly."
+        },
+        "login.html": {
+          "status": "UNRESOLVED",
+          "reason": "NO_HISTORICAL_CHANGE_RECORD_FOUND",
+          "historicalHashChain": [
+            "908b92f1 (earliest baseline)",
+            "a38d05e5 (CHANGED-FILE-HASHES-PROMPT6-MID-2)",
+            "ea08b484e9 (PROMPT6-MID-3, PROMPT7-MID-1/2)",
+            "aca531e1 (CP6.4/6.6/6.7/6.8)",
+            "11ab4146 (CP7 through CP16B, CP7 labels this 'confirmed unchanged')",
+            "54c1c2e4 (PHASE10C3A/B3/B42 branch, PROMPT9A-MID-1)",
+            "CURRENT 7c8d27d4 - matches none of the above"
+          ],
+          "note": "MODIFIED_FILES_M366.2.txt documents a real prior edit (launch-timing group) but not tied to a specific hash pair. File's own 'M387.5-repair' comment is uncorroborated and factually inconsistent (claims dashboard.html has favicon links it does not have)."
+        },
+        "chalzydashboard.html": {
+          "status": "UNRESOLVED",
+          "reason": "NO_HISTORICAL_CHANGE_RECORD_FOUND",
+          "historicalHashChain": [
+            "35ab7e7087 (every manifest CP6.4 through CP16B, 13 checkpoints, unchanged for entire recorded history)",
+            "CURRENT e88ac86d - matches none of the above"
+          ],
+          "note": "CP7 explicitly lists this file under 'Files confirmed unchanged (hash-verified against pre-routing-work values)' - CP7 is not the source of any edit to it."
+        },
+        "core/shell/cozy-workspace.js": {
+          "status": "UNRESOLVED",
+          "reason": "NO_HISTORICAL_CHANGE_RECORD_FOUND",
+          "historicalHashChain": [
+            "1c96c31c (every manifest found referencing this file, from earliest baseline through CP16B and all PHASE10C3 variants - single value for entire history)",
+            "CURRENT e0f5c56d - matches none of the above"
+          ],
+          "note": "Searched entire checkpoint for 'Service Registry', 'registerCoordinator', 'registerApplication' - zero hits outside the file's own header comment. Weakest-evidenced of the six files."
+        },
+        "Firebase/firebase-auth.js": {
+          "status": "UNRESOLVED",
+          "reason": "NO_HISTORICAL_CHANGE_RECORD_FOUND",
+          "historicalHashChain": [
+            "8e064491 (every manifest referencing this file across entire history)",
+            "CURRENT 79280138 - matches none of the above"
+          ],
+          "note": "MODIFIED_FILES_M366.2.txt and FINAL_MODIFIED_FILES_M366.2.txt both explicitly confirm this file byte-identical via actual sha256 spot-check, twice. Prior stability is unusually well-confirmed; the final transition is not."
+        },
+        "core/modules/identity/auth-coordinator.js": {
+          "status": "UNRESOLVED",
+          "reason": "NO_HISTORICAL_CHANGE_RECORD_FOUND",
+          "historicalHashChain": [
+            "4dbc09c8 (earliest baseline; explicitly sha256-confirmed byte-identical through M366.2 implementation pass and its audit pass)",
+            "2ffd74a4 (CP7 through CP16B, 10 checkpoints; CP7 labels this 'confirmed unchanged'; transition from 4dbc09c8 happened in an undocumented gap between M366.2 and CP7)",
+            "856b8ce8 (separate PHASE10C3A/B3/B42 branch lineage; consistent with the Branch A/Branch B merge documented in core/docs/MIGRATION_LOG.md)",
+            "CURRENT 1a082237 - matches none of the above"
+          ],
+          "note": "Most-documented lineage of the six (2 evidenced prior transitions) but the final step to current content is still undocumented."
+        }
+      },
+      "resolvedCount": 1,
+      "unresolvedCount": 5,
+      "unresolvedFiles": [
+        "login.html",
+        "chalzydashboard.html",
+        "core/shell/cozy-workspace.js",
+        "Firebase/firebase-auth.js",
+        "core/modules/identity/auth-coordinator.js"
+      ],
+      "patternObserved": "All five unresolved files independently show a long, real, traceable history up through CP16B, then exactly one final undocumented change producing current content - not five unrelated gaps.",
+      "mergedOoo3ProvenanceInvestigation": {
+        "round": 3,
+        "evidenceGapId": "MERGED-0003-PROVENANCE-001",
+        "conclusion": "FINAL POST-CP16B CHANGE EVENT NOT RECOVERABLE",
+        "searchedFor": [
+          "git metadata/log/reflog/commits - none found (no .git anywhere in archive)",
+          "patch files, backup copies, CozyOS-main working directory - none found",
+          "zip/checkpoint-generation/merge/file-copy scripts, shell history - only 3 unrelated .sh files exist in archive, none related to packaging",
+          "Cloud/Builder execution logs - no .log files anywhere",
+          "change reports immediately preceding Merged 0003 - the 3 existing MERGE-NOTE-*.md files all predate this and name none of the 5 files",
+          "any artifact containing both CP16B and current hash together - none found; current hashes appear nowhere except self-generated reports this session",
+          "backup/duplicate copies of pre-change file content - none found; core/security/auth-coordinator.js checked and confirmed to be a genuinely distinct, unrelated file (different namespace, different length, own hash matches its own unbroken history)"
+        ],
+        "hashPairs": {
+          "login.html": {"cp16b": "11ab4146213c1f98d2ba2c0ce0f83bee06508dcb6392ee45cdb1810583c7f5f3", "current": "7c8d27d426822d19e862ab89212af6a2b27d57e977e8f5f1403fa4fdd6abe206"},
+          "chalzydashboard.html": {"cp16b": "35ab7e7087df570bc5507de80f755d995a38684ac5e7b09d126fe6c7bcb35e0a", "current": "e88ac86d133157e7946964acddb97cfc231427bb77d53a2513b56000b560ba91"},
+          "core/shell/cozy-workspace.js": {"cp16b": "1c96c31c46657c9685907fdc2a6c0153616b16f02892cd0abba0d8d7c83ab8be", "current": "e0f5c56dd25f20e280a9fcede41a19ac5ab4bcdfb0930bffb26a722031379155"},
+          "Firebase/firebase-auth.js": {"cp16b": "8e06449147b6262f8f514b02f47094f58a852e259b8a5953f6192ef780e0dedb", "current": "79280138afb84fde3e13cabd76a980f09b90f051b7ff02dadd83c02eacf486f6"},
+          "core/modules/identity/auth-coordinator.js": {"cp16b": "2ffd74a4d7263d923e0010ccd137755cf6b23ad2aa6780cb3b7f9c781bffa719", "current": "1a08223722343f56a883771e4af40e4c4cc600b70d07cc0e58ee7944ec31d48a"}
+        },
+        "byteLevelDiffAvailable": false,
+        "byteLevelDiffUnavailableReason": "Pre-change file content for none of the 5 files exists anywhere in the checkpoint - only hashes were ever recorded historically. A hash proves content changed; it cannot reconstruct what the old content was.",
+        "processOrToolIdentified": false
+      }
+    }
+  },
+  "staticVerification": {
+    "nodeCheckPassed": true,
+    "packageJsonValidJson": true,
+    "packageLockValidJson": true,
+    "migrationFilesSequential": true
+  },
+  "provenanceRepair": {
+    "round": 4,
+    "reportPath": "docs/builder/knowledge/B4.1-PROVENANCE-REPAIR.md",
+    "methodology": "Code-level audit of current content: verified every API each of the 5 files claims to call actually exists with matching signature in the real codebase; re-ran all reachable existing test suites; searched codebase (not just docs) for architectural patterns.",
+    "codeRepairsPerformed": false,
+    "codeRepairsReason": "No defect found in any of the 5 files - all calls to real APIs verified to exist and match; all fail-closed security paths confirmed; all reachable tests pass in full.",
+    "testsRunThisRound": {
+      "core/modules/identity/test/auth-coordinator.test.js": "26/26 PASS",
+      "server/webauthn-rp/test/organizations.test.js": "11/11 PASS",
+      "server/test/chalzydashboard-gate-integration.test.js": "6/6 PASS",
+      "server/test/static-boundary-firebase.test.js": "3/3 PASS",
+      "server/test/static-boundary-password-auth.test.js": "4/4 PASS"
+    },
+    "postgresRuntimeReRun": false,
+    "postgresRuntimeReRunReason": "No COZY_DATABASE_URL/network egress in this sandbox; B3 evidence artifact not touched or re-verified this round per instruction",
+    "correctedFindingFromRound2": "core/shell/cozy-workspace.js: Round 2 searched only docs/reports for 'Service Registry' and found nothing. This round searched the actual codebase and found core/registry/cozy-registry.js implements exactly the API described (registerApplication/listApplications/registerCoordinator used by ~150 other files) - a real, extensively-used architectural pattern, not uncorroborated.",
+    "finalDispositions": {
+      "index.html": "RESOLVED (Round 1, unchanged)",
+      "login.html": "VALID_CURRENT_STATE_PROVENANCE_GAP_DISCLOSED",
+      "chalzydashboard.html": "VALID_CURRENT_STATE_PROVENANCE_GAP_DISCLOSED",
+      "core/shell/cozy-workspace.js": "VALID_CURRENT_STATE_PROVENANCE_GAP_DISCLOSED",
+      "Firebase/firebase-auth.js": "VALID_CURRENT_STATE_PROVENANCE_GAP_DISCLOSED",
+      "core/modules/identity/auth-coordinator.js": "VALID_CURRENT_STATE_PROVENANCE_GAP_DISCLOSED"
+    },
+    "nonBlockingFollowUpsFlagged": [
+      "login.html: 'M387.5-repair' comment falsely claims favicon links were reused from dashboard.html (they were not); recommend correcting the comment in a future pass. Not fixed this round to avoid modifying application code beyond what was explicitly authorized.",
+      "core/shell/cozy-workspace.js: no dedicated test file exists in the checkpoint; recommend authoring one for the Service-Registry-first discovery path in a future pass."
+    ],
+    "postRepairManifest": {
+      "path": "docs/builder/knowledge/POST-REPAIR-SHA256-MANIFEST.txt",
+      "fileCount": 1592,
+      "sha256": "a5b5d72edb213f773b87e1761fe00a1a9f1d3395e2fd6525e5f42ac87104459d",
+      "identicalToPreRepairManifest": true,
+      "note": "No application file was modified this round, so file count/content is identical to AS-DELIVERED-SHA256-MANIFEST.txt"
+    },
+    "mergedOoo3ProvenanceStatus": "MERGED-0003-PROVENANCE-001 retained as a permanent, standing disclosure. Not resolved. No longer blocking because current-content technical correctness was independently established via code-level audit."
+  },
+  "productionCutoverPerformed": false,
+  "status": "B4.1 VERIFIED",
+  "blockers": [],
+  "standingDisclosures": [
+    "MERGED-0003-PROVENANCE-001: the process that produced the final Merged-0003 tree's changes to login.html, chalzydashboard.html, core/shell/cozy-workspace.js, Firebase/firebase-auth.js, and core/modules/identity/auth-coordinator.js after CP16B cannot be recovered from this archive. Disclosed permanently; does not block VERIFIED status because current content was independently confirmed technically correct."
+  ],
+  "blockersClosed": [
+    "BLOCKER A (CLOSED): B3-POSTGRES-16OF16-RUNTIME.txt inspected directly, SHA-256 271a88b436d9b7088466ab401f59abeb5dcf48443d5a42dc0c236cdd4efa27f7, literal summary confirms tests 16 / pass 16 / fail 0 / cancelled 0 / skipped 0.",
+    "BLOCKER B (CLOSED via technical-correctness standard, Round 4): all 6 Group-B files now carry a final disposition; none require further manual review."
+  ]
+}

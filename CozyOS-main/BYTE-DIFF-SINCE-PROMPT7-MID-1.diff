@@ -1,0 +1,46 @@
+--- orig/COS-DASHBOARD-PROMPT7-MID-1/core/modules/identity/identity-engine.js	2026-08-21 10:13:48.000000000 +0000
++++ /home/claude/work/extracted/COS-DASHBOARD-PROMPT7-MID-1/core/modules/identity/identity-engine.js	2026-08-21 10:38:14.857575016 +0000
+@@ -45,7 +45,7 @@
+ (function () {
+     "use strict";
+     window.CozyOS = window.CozyOS || {};
+-    const IE_VERSION = "1.3.0-ENTERPRISE"; // Milestone 375: getUserIdByUsername()/loginWithVerifiedPasskey() — real seam connecting the existing WebAuthnProvider (security-key factor) to login.html, following the exact #createRealSession(auditLabel) precedent already proven by login()/completeLoginWithOtp()
++    const IE_VERSION = "1.4.0-ENTERPRISE"; // Milestone 375: getUserIdByUsername()/loginWithVerifiedPasskey() — real seam connecting the existing WebAuthnProvider (security-key factor) to login.html, following the exact #createRealSession(auditLabel) precedent already proven by login()/completeLoginWithOtp(). Prompt 7: loginWithVerifiedGoogle() — same precedent, for core/security/google-account-linkage.js's real, verified Google login candidates.
+     const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+ 
+     class CozyOSIdentityEngine {
+@@ -1094,6 +1094,34 @@
+         }
+ 
+         /**
++         * loginWithVerifiedGoogle(userId) — Prompt 7 (Google authenticator
++         * dependency), real, additive. Composes the exact same
++         * #createRealSession() this file already uses for
++         * login()/completeLoginWithOtp()/loginWithVerifiedPasskey() —
++         * never a second session-creation path. Does NOT verify the
++         * Google identity itself — that is
++         * GoogleAccountLinkage.resolveLoginCandidate()'s real, separate
++         * job (core/security/google-account-linkage.js), itself composing
++         * the real Firebase ID-token signature check
++         * (server/live-relay/firebase-identity-issuer.js). This method's
++         * only responsibility is turning an already-genuinely-resolved
++         * Google login candidate into a real CozyOS session, with its own
++         * honest audit label so this path is never confused with a
++         * password or passkey login in the audit log. Fails closed on an
++         * unknown/removed userId and on a locked account, mirroring
++         * loginWithVerifiedPasskey()'s own checks exactly.
++         */
++        loginWithVerifiedGoogle(userId) {
++            const user = this.#users.get(userId);
++            if (!user) return { available: false, reason: `No real user found with id "${userId}" — cannot establish a session.` };
++            if (user.lockedUntil && Date.now() < new Date(user.lockedUntil).getTime()) {
++                this.#logAudit("LOGIN_BLOCKED_LOCKED", user.username);
++                return { available: false, locked: true, reason: `Account locked until ${user.lockedUntil}.` };
++            }
++            return this.#createRealSession(user, "LOGIN_SUCCESS_WITH_GOOGLE", user.username);
++        }
++
++        /**
+          * setLanguagePreference(userId, code) / getLanguagePreference(userId)
+          *   Real (Milestone 212 addition, integrated alongside M211's
+          *   login language selector). Reuses the existing "users"

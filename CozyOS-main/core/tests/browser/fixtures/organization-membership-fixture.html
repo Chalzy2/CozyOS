@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<!--
+  core/tests/browser/fixtures/organization-membership-fixture.html
+
+  NOT a dashboard, NOT a redesign of any real UI. OrganizationMembership
+  (core/organization/organization-membership.js) has no dedicated end-user
+  page anywhere in the repository today — it is a headless platform
+  service loaded by other real pages via <script src>. To satisfy NEXT
+  MILESTONE section 4 ("Browser Runtime Verified = actual CozyOS ... was
+  executed in a REAL browser"), this fixture loads the three REAL,
+  unmodified source files the service depends on (see the ownership audit
+  at the top of organization-membership.js) with real <script src> tags —
+  exactly the same loading mechanism admin-workspace.html and every other
+  real CozyOS page uses. It adds no business logic of its own; the actual
+  test assertions run against window.CozyOS.OrganizationMembership from
+  the Node side via page.evaluate().
+-->
+<html>
+<head><meta charset="utf-8"><title>CozyOS OrganizationMembership — browser fixture</title></head>
+<body>
+  <script src="/core/shell/platform-event-bus.js"></script>
+  <script src="/core/organization/organization-registry.js"></script>
+  <script src="/core/organization/organization-membership.js"></script>
+</body>
+</html>

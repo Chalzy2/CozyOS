@@ -1,0 +1,29 @@
+{
+  "language": "sw",
+  "direction": "ltr",
+  "strings": {
+    "panel.title": "Hifadhi ya Hadithi ya Mwanzilishi",
+    "panel.subtitle": "Wasifu wako binafsi, uliolindwa na ni wako kuamua nani aone.",
+    "panel.newStory": "Hadithi Mpya",
+    "panel.noStories": "Bado hakuna hadithi. Anza sura yako ya kwanza.",
+    "field.title": "Kichwa",
+    "field.subtitle": "Kichwa kidogo",
+    "field.language": "Lugha",
+    "field.category": "Aina",
+    "field.chapters": "Sura",
+    "status.draft": "Rasimu",
+    "status.archived": "Iliyohifadhiwa",
+    "visibility.only-me": "🔒 Mimi Pekee",
+    "visibility.selected": "👥 Watu Waliochaguliwa",
+    "visibility.family": "👨‍👩‍👧 Familia",
+    "visibility.mentors": "🤝 Washauri",
+    "visibility.public": "🌍 Hadharani",
+    "private.badge": "🔒 Maudhui Binafsi ya Mwanzilishi",
+    "private.message": "Hadithi hii ni ya faragha.",
+    "action.view": "Tazama",
+    "action.edit": "Hariri",
+    "action.share": "Shiriki",
+    "action.addChapter": "Ongeza Sura",
+    "action.requestPublish": "Omba Uchapishaji (inakuja hivi karibuni)"
+  }
+}

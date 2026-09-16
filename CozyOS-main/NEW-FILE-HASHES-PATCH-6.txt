@@ -1,0 +1,7 @@
+ec3e39e551dd265e27a7364e6c3656338e53f61a8474d6a696d51e2c0e37c25d  core/shell/live/ldce-live-media-coordinator.js
+32709b75893a37b16d712bdaa6c910b1161dc6f4fb3e49eff8805641b4b08871  core/shell/live/tests/ldce-live-media-coordinator.test.js
+72905401a2be96bada6dcca0156edab6fe357cca59b5e2e95d7c64b528b887af  PATCH-F-IMPLEMENTATION-REPORT.md
+2d95dffdd804158b43fb3644c18ef9458b394124e1f6bbd3e4154a0b73fe3cba  core/shell/live/ui/cozy-live-host-console-controller.js
+a4dd3574a4090a43ed5a9a76c21ae4823bf14d4e8553a045b0cf4a09912f19be  core/shell/live/ui/cozy-live-join-console-controller.js
+fc40f9b250a6c0cfdc73a1136b993073bd214757e7b45def9dd9ef64491eebad  core/shell/live/ui/cozy-live-host-console.html
+1463f4d6b7bbba15fba4d1d96ad72aa252802889613c982f00d5bb18ec6c2fbd  core/shell/live/ui/cozy-live-join-console.html

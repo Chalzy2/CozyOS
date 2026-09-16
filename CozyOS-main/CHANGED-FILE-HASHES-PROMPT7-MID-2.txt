@@ -1,0 +1,39 @@
+CozyOS — Prompt 7 MID-2 — Changed File Hashes (SHA-256)
+Generated after edit, before packaging. Baseline: PROMPT7-MID-1 (hash-reverified
+against the actual uploaded checkpoint ZIP this session — see
+IMPLEMENTATION-REPORT-PROMPT7-MID-2.md).
+
+MODIFIED FILES
+32e58567e64a9ee1491ce966162a6ca4d2a75031ac028b21d92c659b361f59dc  core/modules/identity/identity-engine.js
+  (baseline hash, unmodified in MID-1's own manifest, was not separately
+  listed there since MID-1 never touched it — see BYTE-DIFF-SINCE-PROMPT7-MID-1.diff
+  for the full, real, 2-hunk change: IE_VERSION bump + one new additive method)
+
+NEW FILES
+04938de442b3f5ebd90292f95d4a88612946aa2295ca82fab5da1f6690b4671e  core/security/google-account-linkage.js
+aadb41395b4cc2c3e574aa83ae8c121077586b5b06dde7ccd79be58969d60db5  core/security/test/google-account-linkage.test.js
+d6bf4f0ab9784718b9ee9af8ac80dc2fdbff89d4bce22ce38e548c22b9c63054  core/security/test/identity-engine.test.js
+
+PROTECTED FILES — RE-VERIFIED UNCHANGED (hashed for the record, not modified)
+000124d4669b6ab4801ff1010ba942439ec0373482c9fd5de4b57d08b8f7293f  core/modules/founder-story/founder-story-narration.js
+c795b9f69fc155e08bac69b0c8c0bf7819b835048d16d02f276b8f402ed29bf0  core/modules/founder-story/founder-story-seed.js
+1af0abcbf6e8f7a7f24391373ad87551e7a709d05ae2c99e5758d84094b824db  core/modules/founder-story/founder-story-panel.js
+18b8e9a7ab12cb526f9a6472bd3bb3b255c8021792d92e8137dd9d47151b7898  core/modules/founder-story/founder-story-engine.js
+500956363b3cfa92a8b1c6228f93e9fef13dad23c6b9519ec99bdf7d88dec457  core/modules/founder-story/i18n/sw.json
+3fce6b4a15e9373d8775b50ab116527b66051b7b9c6f0bce43939b5f3a16c62f  core/modules/founder-story/i18n/fr.json
+e903a8acbd6b728001f7564fd330b89896525d22206156ed129bae0543529bf8  core/modules/founder-story/i18n/en.json
+69c0c12dc28d2f0103bd65c6c2f05059a37cba1e93b47855492b2d2923a719b0  core/modules/founder-story/i18n/ar.json
+c3f80ef51fee137e0394e201fca81a3213a9fd5c344999fcfbee4522886bcd30  core/shell/cozy-login-gate.js
+
+All nine protected-file hashes are byte-identical to the actual uploaded
+PROMPT7-MID-1.zip (verified this session, not copied forward — see
+IMPLEMENTATION-REPORT-PROMPT7-MID-2.md "MID-1 CHECKPOINT VERIFICATION").
+No protected file was opened for editing this slice.
+
+REFERENCE — RE-VERIFIED UNCHANGED FROM PROMPT7-MID-1 (read/composed, not modified)
+ea08b484e956c782df684fc803d8bb7e65ec92e6fe1cd8d4a94d8304e9ff41d5  login.html
+2349cb631c784a5ae2cc5c296760c77fa73b0b2ff433e31e77d9d048b4446766  server/live-relay/firebase-identity-issuer.js
+caf08546c8f1503ec88626a01dab410a1c8cb240c5e2e0f23a42892d8b5e630c  server/live-relay/identity-assertion.js
+6e3d9ea63696355b87a0d6a103d5ce25945f599d02c5e6f29cd38b47e32e8b40  Firebase/firebase-config.js
+6b054f9e79da2e3995d17889cf1d3f778959cab87bf08e8acd00d73bc0af257f  core/security/phone-account-linkage.js
+ec62c24fc33e25beeb7a26b0dee804cd021ccc4ead5219fa19bf8be669e271ab  core/security/login-decision-engine.js

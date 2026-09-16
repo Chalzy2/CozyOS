@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<!--
+  core/modules/ChurchOS/test/video-assist-coexistence-harness.html
+
+  Item 1 (Video Assist floating button) test fixture only - not a
+  shipped application entry point, not referenced from dashboard.html.
+  Loads the real, unmodified production files (window-manager.js,
+  cozy-living-assistant.js, living-worship-player.js, cozy-living.css)
+  together, exactly as they are both really mounted on dashboard.html/
+  index.html per living-worship-player.js's own header disclosure - so
+  the coexistence tests in video-assist-coexistence-browser.test.js
+  exercise the two real floating buttons together, not a mock of
+  either.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Video Assist coexistence - test harness</title>
+<link rel="stylesheet" href="/core/ui/cozy-tokens.css">
+<link rel="stylesheet" href="/core/living/cozy-living.css">
+<style>html,body{margin:0;height:100%;background:#0a1a12;}</style>
+</head>
+<body>
+<script>window.CozyOS = window.CozyOS || {}; window.CozyOS.Modules = window.CozyOS.Modules || {};</script>
+<script src="/core/shell/window-manager.js"></script>
+<script src="/core/living/cozy-living-assistant.js"></script>
+<script src="/core/modules/ChurchOS/living-worship-player.js"></script>
+<script>
+  window.CozyOS.LivingAssistant.mount();
+  window.CozyOS.LivingWorshipPlayer.mount();
+</script>
+</body>
+</html>

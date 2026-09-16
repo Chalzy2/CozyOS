@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CozyOS \u2014 Quarantine Review</title>
+<link rel="stylesheet" href="../../../../ui/cozy-tokens.css">
+<link rel="stylesheet" href="../../../../ui/cozy-components.css">
+<link rel="stylesheet" href="review-dashboard.css">
+</head>
+<body>
+<h1 class="cozy-text-page-title" style="padding:16px 16px 0;">Quarantine + Admin Safety Review</h1>
+<div id="quarantine-admin-root"></div>
+
+<!-- RP-029-A -->
+<script src="../cozy-knowledge-ingestion.js"></script>
+<!-- RP-029-B -->
+<script src="../cozy-knowledge-community.js"></script>
+<!-- RP-029-C Phase 1 -->
+<script src="../cozy-knowledge-review.js"></script>
+<!-- RP-027 language modules -->
+<script src="../../language/cozy-language-templates.js"></script>
+<script src="../../language/cozy-language-registry.js"></script>
+<!-- Cozy Offline Hotspot -->
+<script src="../../../../engines/collaboration/live-hotspot-engine.js"></script>
+<!-- RP-029-C Phase 4 safety gate -->
+<script src="cozy-knowledge-safety-gate.js"></script>
+<script src="cozy-knowledge-review-hotspot-bridge.js"></script>
+<!-- RP-029-C Phase 2 authorization -->
+<script src="cozy-knowledge-review-dashboard-core.js"></script>
+<!-- RP-029-C Phase 3 (contribution submission, for demo seeding) -->
+<script src="cozy-knowledge-contribution-core.js"></script>
+<!-- RP-029-C Phase 5 -->
+<script src="cozy-knowledge-quarantine-admin-core.js"></script>
+<script src="cozy-knowledge-quarantine-admin-ui.js"></script>
+<script>
+  // Demo/test-only seed: submits a few contributions through the real
+  // pipeline so some land in real quarantine for this page to show.
+  // Never fabricates a quarantine entry directly.
+  (function seedDemoQuarantine() {
+    var cc = window.CozyOS.CozyKnowledgeContributionCore;
+    var samples = [
+      { contributionType: 'TEXT', language: 'luo', expression: 'porn', meaning: 'a real Dholuo expression meaning something unrelated', context: 'used in casual speech', consent: { acknowledged: true } },
+      { contributionType: 'AUDIO_REFERENCE', language: 'ki', phonetic: 'nde-thi', audioReference: 'ref://demo-clip', meaning: 'a greeting', context: 'morning greeting', consent: { acknowledged: true } }
+    ];
+    samples.forEach(function (s) {
+      var d = cc.createDraft(s);
+      cc.submitDraft(d.id);
+    });
+  })();
+
+  // DEMO-ONLY authorization stub, never real identity management.
+  // Reached only via an explicit ?demoRole=admin query param, so the
+  // default page load (no param) honestly behaves as an unauthorized/
+  // no-auth-backend visitor — matching this file's own real
+  // AUTHORIZATION_BACKEND_UNAVAILABLE degrade path, not bypassing it.
+  (function demoAuth() {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('demoRole') === 'admin') {
+      window.CozyOS.AuthCoordinator = {
+        getCurrentIdentity: function () { return { userId: 'demo-admin', roles: ['platform-admin'] }; }
+      };
+    }
+  })();
+
+  window.CozyOS.CozyKnowledgeQuarantineAdminUI.init(
+    document.getElementById("quarantine-admin-root"),
+    { reviewerUserIds: ["demo-reviewer"] }
+  );
+</script>
+</body>
+</html>

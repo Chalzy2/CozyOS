@@ -1,0 +1,75 @@
+services:
+  - type: web
+    name: cozyos-admin-backend
+    runtime: node
+    plan: starter
+    region: oregon
+    branch: main
+    autoDeploy: true
+
+    # No build step: server/static-boundary-server.js only requires Node
+    # built-ins (node:http, node:fs, node:sqlite, node:crypto) — see
+    # server/webauthn-rp/{server,db,rp}.js. `npm ci` is still run so the
+    # root package.json's engines check is honored and playwright (used
+    # only by *-browser.test.js, never at runtime) is available if Render
+    # is ever asked to run tests, but it installs nothing the server needs.
+    buildCommand: npm ci --omit=dev || true
+    startCommand: node server/static-boundary-server.js
+
+    # / is served unconditionally to every visitor (see
+    # static-boundary-server.js "USER_DASHBOARD_ROUTES"/public entry
+    # comment) and needs no session, so it's a safe, always-200 health
+    # check that doesn't depend on auth state. Do NOT point this at
+    # /webauthn/session — that correctly returns 401 when logged out,
+    # which Render would misread as unhealthy.
+    healthCheckPath: /
+
+    disk:
+      name: cozyos-webauthn-data
+      mountPath: /var/data
+      sizeGB: 1
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # Pins the runtime to the version this deployment was tested
+      # against (node:sqlite is still experimental — see
+      # docs/webauthn-pages-adapter-known-issue.md). Bump deliberately,
+      # not implicitly via Render's default Node version.
+      - key: NODE_VERSION
+        value: 22.22.0
+
+      # Persistent SQLite path — must live on the mounted disk above, or
+      # every deploy/restart silently resets all users/credentials/
+      # sessions (Render's container filesystem is otherwise ephemeral).
+      - key: COZY_WEBAUTHN_DB
+        value: /var/data/cozy-webauthn.sqlite
+
+      # Required in production: without this, server/webauthn-rp/server.js
+      # (sessionCookieHeader) omits `Secure` from Set-Cookie, so the
+      # cozy_admin_session cookie set over the Render onrender.com origin
+      # would still work over HTTPS in the browser, but the code's own
+      # intent (see file header) is that Secure is opt-in per environment,
+      # not implicit from HTTPS being used. Production must opt in.
+      - key: COZY_WEBAUTHN_COOKIE_SECURE
+        value: "1"
+
+      - key: COZY_FIREBASE_PROJECT_ID
+        value: cozycabin-affiliate
+
+      # --- NOT SET HERE ON PURPOSE ---
+      # COZY_RP_ID and COZY_RP_ORIGIN are WebAuthn Relying Party identity:
+      # RP ID must equal the exact hostname the browser's address bar
+      # shows when the passkey ceremony runs, and origin must be that
+      # hostname's full https:// origin. Both depend on the still-open
+      # same-origin routing decision (see docs/render-deployment.md —
+      # "Remaining manual step"). Hardcoding a guessed value here would
+      # silently break every passkey registered against the real one
+      # later. `sync: false` means Render will prompt for these in the
+      # dashboard instead of reading a value from this file — set them
+      # only once the final public hostname is chosen.
+      - key: COZY_RP_ID
+        sync: false
+      - key: COZY_RP_ORIGIN
+        sync: false

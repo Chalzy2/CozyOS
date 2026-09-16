@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<!--
+  core/tests/browser/fixtures/business-record-engine-fixture.html
+
+  NOT a dashboard, NOT a redesign of any real UI. BusinessRecordEngine
+  (core/calculation/business-record-engine.js) has no dedicated end-user
+  page anywhere in the repository today — it is a headless platform
+  service. To satisfy this milestone ("BusinessRecordEngine + its REAL
+  dependencies browser-runnable, verified in real Chromium"), this
+  fixture loads the REAL, unmodified source files the service depends on
+  (see the ownership-audit comment at the top of
+  business-record-engine.js) with real <script src> tags — exactly the
+  same loading mechanism every other real CozyOS page uses, and the same
+  pattern already established by organization-membership-fixture.html.
+
+  Load order matters for exactly one reason that is NOT a bug: formula
+  registration in formula-library.js runs synchronously the moment
+  FormulaRegistry already exists (`if (window.CozyOS.FormulaRegistry)
+  register();`), so formula-registry.js must load before it. Every other
+  dependency in BusinessRecordEngine is resolved LAZILY at call time (see
+  its own "DEPENDENCY / LOAD-ORDER NOTE"), so this fixture's order below
+  is a courtesy, not a requirement BusinessRecordEngine itself imposes.
+
+  core/storage.js (window.CozyStorage) is added here with a real <script>
+  tag for the first time anywhere in the repository — this is the
+  disclosed pre-existing gap from the prior milestone's audit. Adding the
+  tag here, in a test fixture, is the smallest legitimate integration:
+  it does not touch core/storage.js itself, does not touch any real
+  production page (admin-workspace.html, dashboard.html, index.html —
+  out of scope per this milestone), and does not create a second storage
+  authority. Whether core/storage.js should also be wired into a real
+  production page is a separate decision outside this milestone's scope.
+
+  REAL DEFECT FOUND WHILE WIRING THIS (disclosed, not hidden — see this
+  milestone's browser-error-collection rule): core/storage.js ends with
+  a top-level `export default CozyStorageGateway;`. That statement is
+  real and load-bearing for its OTHER real consumers (modules/*.js,
+  core/tenant.js, core/services.js, core/business/audit.js, core/api.js,
+  core/language.js all do `import Storage from '.../storage.js'`), so it
+  cannot simply be deleted without breaking those. But `export` is a
+  syntax error in a plain (non-module) <script src> — a normal script
+  tag never even reaches the `window.CozyStorage = ...` line; the whole
+  file fails to parse with "Unexpected token 'export'". This is why
+  core/storage.js could never have gained a plain <script> tag in the
+  first place, and is a real production defect independent of this
+  milestone's own fixture. This fixture loads it with a real
+  `<script type="module">` tag instead — the same, unmodified source
+  file, loaded the way its ES-module `export default` already requires
+  — which is the smallest legitimate integration for the file as it
+  actually exists today.
+
+  No business logic of its own lives here. All test assertions run
+  against window.CozyOS.BusinessRecordEngine (and its real, unmodified
+  dependencies) from the Node side via page.evaluate().
+-->
+<html>
+<head><meta charset="utf-8"><title>CozyOS BusinessRecordEngine — browser fixture</title></head>
+<body>
+  <script src="/core/shell/platform-event-bus.js"></script>
+  <script type="module" src="/core/storage.js"></script>
+  <script src="/core/organization/organization-registry.js"></script>
+  <script src="/core/organization/organization-membership.js"></script>
+  <script src="/core/calculation/formula-registry.js"></script>
+  <script src="/core/calculation/formula-library.js"></script>
+  <script src="/core/calculation/calculation-engine.js"></script>
+  <script src="/core/calculation/business-record-engine.js"></script>
+</body>
+</html>

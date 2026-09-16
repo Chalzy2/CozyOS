@@ -1,0 +1,2226 @@
+[
+ {
+  "path": "cozyos.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "modules/quarry/quarry-contants.js",
+  "layer": "Application (shared reference data, no logic)",
+  "version": "",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "modules/live/cozy-live.js",
+  "layer": "",
+  "version": "1.2.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "Firebase/firebase-config.js",
+  "layer": "",
+  "version": "1.0.0",
+  "global": "",
+  "milestone_introduced": "146",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "Firebase/firebase-session.js",
+  "layer": "",
+  "version": "1.0.0",
+  "global": "",
+  "milestone_introduced": "146",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "Firebase/firebase-provider.js",
+  "layer": "",
+  "version": "1.0.0",
+  "global": "",
+  "milestone_introduced": "146",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "Firebase/firebase-auth.js",
+  "layer": "",
+  "version": "1.0.0",
+  "global": "",
+  "milestone_introduced": "146",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "Firebase/firebase-firestore.js",
+  "layer": "",
+  "version": "1.1.0",
+  "global": "",
+  "milestone_introduced": "146 (base), 362 Stage 1 (real-time listener addition)",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "Firebase/firebase-storage.js",
+  "layer": "",
+  "version": "1.0.0",
+  "global": "",
+  "milestone_introduced": "146",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "Firebase/firebase-bootstrap.js",
+  "layer": "",
+  "version": "1.0.0",
+  "global": "",
+  "milestone_introduced": "146",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "Firebase/firebase-app.js",
+  "layer": "",
+  "version": "1.0.0",
+  "global": "",
+  "milestone_introduced": "146",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/vendor-events.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "A thin, real wrapper over the existing, real `PlatformEventBus` \u2014 not a second pub/sub mechanism. Every vendor lifecycle transition emits a real event through the same bus every ot"
+ },
+ {
+  "path": "core/living-voice-style-engine.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/vendor-manager.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "The single, real entry point for the whole platform's vendor interactions. Applications should call VendorManager, never VendorLoader/VendorRegistry/VendorDiagnostics directly \u2014 th"
+ },
+ {
+  "path": "core/modules/module-registry.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "The Single Source of Truth for CozyOS application discovery. Decouples an application's id (e.g. \"shopos\") from its actual folder/file structure, theme, dashboard type, and permiss"
+ },
+ {
+  "path": "core/modules/ocrstudio/ocr-document.js",
+  "layer": "",
+  "version": "1.0.0-PRODUCTION",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Stores and exposes OCR document descriptors. Never performs OCR, extracts text, edits documents, parses PDFs, preprocesses images, creates OCR results, or executes recognition."
+ },
+ {
+  "path": "core/modules/ocrstudio/ocr-image.js",
+  "layer": "",
+  "version": "1.0.0-PRODUCTION",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Provides deterministic, pure-pixel image preprocessing operations (geometric transforms, matrix filters, tonal adjustments, statistics, and export) for OCR Studio, operating"
+ },
+ {
+  "path": "core/modules/ocrstudio/Ocr-register.js",
+  "layer": "",
+  "version": "1.0.0-PRODUCTION",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Stores immutable, generic registration descriptors for the OCR Studio subsystem without performing OCR recognition, execution, or interpretation of any registered payload."
+ },
+ {
+  "path": "core/modules/ocrstudio/ocr-engine.js",
+  "layer": "",
+  "version": "1.0.0-PRODUCTION",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Orchestrates OCR requests between certified OCR Studio modules using their frozen public APIs. It is NOT an OCR recognizer, image processor, parser, translator, report generator, o"
+ },
+ {
+  "path": "core/modules/ocrstudio/ocr-result.js",
+  "layer": "",
+  "version": "1.0.0-PRODUCTION",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Stores and exposes OCR result descriptors produced by certified OCR engines. Never performs OCR, extracts text, edits recognition output, recalculates confidence, translates,"
+ },
+ {
+  "path": "core/modules/ocrstudio/ocr-language.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE-FROZEN",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Be the single central source of truth for OCR language metadata and configuration. Every OCR engine (Tesseract, PaddleOCR, EasyOCR, Google Vision, Azure OCR, future engines)"
+ },
+ {
+  "path": "core/modules/ocrstudio/exporter.js",
+  "layer": "",
+  "version": "1.0.0-PRODUCTION",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Serialize OCR history into exportable formats (JSON, TEXT). Nothing else."
+ },
+ {
+  "path": "core/modules/ocrstudio/orc-runner.js",
+  "layer": "",
+  "version": "1.0.0-PRODUCTION",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "OCRRunner is responsible only for coordinating certified OCR execution requests using the frozen public APIs of OCRRegistry, OCRDocument, OCRResult, and OCREngine. It is the execut"
+ },
+ {
+  "path": "core/modules/ocrstudio/ocr-cli.js",
+  "layer": "",
+  "version": "1.0.0-PRODUCTION",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Provide a command interface that validates OCR Studio commands and delegates them to frozen OCR Studio public APIs. This module never performs OCR itself."
+ },
+ {
+  "path": "core/modules/ocrstudio/ocr-history.js",
+  "layer": "",
+  "version": "1.0.0-PRODUCTION",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Store and expose immutable OCR history records produced by external OCR execution modules. Nothing else."
+ },
+ {
+  "path": "core/modules/identity/platform-identity-bridge.js",
+  "layer": "Core / Platform Service \u2014 Identity & Access",
+  "version": "1.0.0-ENTERPRISE-M216",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/identity/admin-recovery-policy.js",
+  "layer": "Core / Platform Coordinator \u2014 Identity & Access",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "176C",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/identity/cozy-identity.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/identity/identity-storage.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "A real, generic, reusable persistence layer over IndexedDB \u2014 not IdentityEngine-specific, so any coordinator needing durable browser-local storage can compose it rather than each i"
+ },
+ {
+  "path": "core/modules/identity/identity-engine.js",
+  "layer": "Core / Platform Service \u2014 Identity & Access",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real, local-first identity: PBKDF2 password hashing (Web Crypto, never plaintext), session tokens, roles/permissions, organization isolation, delegation, temporary access, audit lo"
+ },
+ {
+  "path": "core/modules/identity/auth-coordinator.js",
+  "layer": "Core / Platform Coordinator \u2014 Identity & Access",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "120",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/customer/cozy-customer.js",
+  "layer": "Core / Business Domain \u2014 Customer Registry (QuarryOS, reusable platform-wide)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "The single source of truth for every customer who purchases products or services. Quotations, Orders, Invoices, Deliveries, Payments, and Reports are all expected to reference cust"
+ },
+ {
+  "path": "core/modules/aimode/cozy-ai-mode.js",
+  "layer": "Core / Code Generation \u2014 AI Provider Gateway",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "The single, platform-wide source of truth for which AI mode is currently active, and the one gateway any coordinator (CozyBuilder, CozyBugFixer, future ones) goes through if it wan"
+ },
+ {
+  "path": "core/modules/ShopOS/shopos.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/admin/cozy-admin-workspace.js",
+  "layer": "Core / Orchestration Facade \u2014 Milestone 175B",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "window.CozyOS.AdminWorkspace",
+  "milestone_introduced": "",
+  "purpose_snippet": "- administrator workspace bootstrap (dependency presence check) - unified administrative view (getPlatformSummary) - administrative diagnostics (getWorkspaceHealth)"
+ },
+ {
+  "path": "core/modules/duplicate-detection/duplicate-detection.js",
+  "layer": "Shared Platform Coordinator",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/planning/planning-engine.js",
+  "layer": "Core / Code Generation \u2014 Planning & Recommendation Engine",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/document-understanding/document-understanding.js",
+  "layer": "Shared Platform Coordinator",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/reasoning/cozy-reasoning.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "170 \u2014 Cozy Reasoning Engine Platform",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/innovation/innovation-engine.js",
+  "layer": "Core / Code Generation \u2014 Innovation Engine",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/goals/cozy-goals-engine.js",
+  "layer": "Platform Service (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/ChurchOS/living-worship-player.js",
+  "layer": "",
+  "version": "",
+  "global": "",
+  "milestone_introduced": "ChurchOS C004",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/ChurchOS/multi-branch-coordinator.js",
+  "layer": "",
+  "version": "",
+  "global": "",
+  "milestone_introduced": "ChurchOS C006 (Option A, approved)",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/ChurchOS/worship-mode-coordinator.js",
+  "layer": "",
+  "version": "",
+  "global": "",
+  "milestone_introduced": "ChurchOS C002, Stages 2/4/5",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/ChurchOS/church-intelligence-provider.js",
+  "layer": "",
+  "version": "",
+  "global": "",
+  "milestone_introduced": "M367 \u2014 Provider Ecosystem Expansion",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/marketplace/cozy-marketplace-engine.js",
+  "layer": "Platform Service (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/payment-provider/cozy-payment-provider-engine.js",
+  "layer": "Platform Service (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Applications never communicate directly with a payment provider \u2014 everything goes through this engine. This file is a pure delegation fa\u00e7ade over six internal modules (Provider Reg"
+ },
+ {
+  "path": "core/modules/research/cozy-research-engine.js",
+  "layer": "Core / Code Generation \u2014 Research Engine",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Ingests documents (text, code, text-based PDFs, screenshots) into a real, queryable Knowledge Base, and tags entries with engineering principles using a deterministic keyword heuri"
+ },
+ {
+  "path": "core/modules/notification/cozy-notification.js",
+  "layer": "Kernel / Core Service Coordination",
+  "version": "1.0.1-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/automation/cozy-automation.js",
+  "layer": "Kernel / Core Service Coordination",
+  "version": "1.0.4-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/accessibility/cozy-accessibility.js",
+  "layer": "Kernel / Core Service Coordination",
+  "version": "1.0.2-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/developer/cozy-developer.js",
+  "layer": "Core / Orchestration \u2014 Developer Hub",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Pure orchestration. Every method here aggregates or delegates to a real coordinator's real public API \u2014 CozyBuilder, UnderstandingEngine, CozyOCR, CozyCertification, CozyBugFixer, "
+ },
+ {
+  "path": "core/modules/developer/developer-hub.js",
+  "layer": "Core / Orchestration \u2014 Developer Hub UI",
+  "version": "1.0.1-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/policy/policy-engine.js",
+  "layer": "Core / Platform Service \u2014 Policy & Governance",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real, versioned policy/governance registry: company rules, SOPs, approval workflows, compliance checklists \u2014 with a real enforcement hook other engines (Certification, Builder) can"
+ },
+ {
+  "path": "core/modules/policy/policy-decision-engine.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "153 \u2014 Cozy Policy Engine Platform",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/certification/cozy-certification.js",
+  "layer": "Core / Quality Assurance & Enterprise Certification Authority",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/certification/certification-dashboard.js",
+  "layer": "UI / Orchestration layer over the Certification Coordinator",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/intelligence/cozy-ai.js",
+  "layer": "",
+  "version": "",
+  "global": "",
+  "milestone_introduced": "M369 \u2014 Universal AI Learning & Conversation Platform",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/intelligence/ai-bootstrap.js",
+  "layer": "",
+  "version": "",
+  "global": "",
+  "milestone_introduced": "M366.9 \u2014 AI Provider Registration & Intelligence Framework Completion",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/intelligence/cozy-intelligence.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "168 \u2014 Cozy Intelligence Engine Platform",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/intelligence/cozy-intelligence-provider.js",
+  "layer": "",
+  "version": "",
+  "global": "",
+  "milestone_introduced": "M366.3 \u2014 Restore Living Intelligence Registration",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/emergency/cozy-emergency.js",
+  "layer": "Kernel / Core Service Coordination",
+  "version": "1.1.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/media/cozy-media.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/integration/cozy-integration-layer.js",
+  "layer": "Platform Service (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Coordinates the certified engines (Identity, Company, Vault, Payment Provider, and \u2014 where present \u2014 Document Engine / Storage Provider) without moving ownership or duplicating any"
+ },
+ {
+  "path": "core/modules/translate/cozy-translate.js",
+  "layer": "Kernel / Core Service Coordination",
+  "version": "2.2.0-ENTERPRISE-FROZEN",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/vault/cozy-vault-engine.js",
+  "layer": "Platform Service (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Every engine that needs an API key, certificate, encryption key, token, or credential requests it through this fa\u00e7ade \u2014 never storing it internally. This file is a pure delegation "
+ },
+ {
+  "path": "core/modules/sense/cozy-sense.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "169 \u2014 Cozy Sense Engine Platform",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/bugfixer/cozy-bugfixer.js",
+  "layer": "Core / Code Generation \u2014 Repair Engine",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Repairs CozyOS source files \u2014 the smallest safe fix for a known, mechanically-fixable certification finding, never a full rewrite. Every repair is backed by a real backup, a hash-p"
+ },
+ {
+  "path": "core/modules/speech/voice-manager.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "356 \u2014 CozyOS Voice Framework",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/speech/voice-pack-import.js",
+  "layer": "Core / Platform Foundation \u2014 Voice Provider",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "356 \u2014 CozyOS Voice Framework",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/speech/voice-settings-panel.js",
+  "layer": "Application Module (loadModule() contract \u2014 getDashboard/init)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "356 \u2014 CozyOS Voice Framework",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/speech/providers/charles-voice-provider.js",
+  "layer": "Core / Platform Foundation \u2014 Voice Provider",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "356 \u2014 CozyOS Voice Framework",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/speech/providers/stub-voice-providers.js",
+  "layer": "Core / Platform Foundation \u2014 Voice Provider",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "356 \u2014 CozyOS Voice Framework",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/speech/adapters/voice-capability-stub.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "147 (reframed) \u2014 Speech Platform Adapter",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/speech/adapters/speech-capability-adapter.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "148 \u2014 Speech Recognition Provider Integration",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/speech/adapters/speech-language-adapter.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "148 \u2014 Speech Recognition Provider Integration",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/speech/adapters/cozy-tts-browser-adapter.js",
+  "layer": "Core / Platform Foundation \u2014 Speech Adapter",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/speech/adapters/speech-preview-adapter.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "148 \u2014 Speech Recognition Provider Integration",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/speech/adapters/voice-capture-adapter.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "147 (reframed) \u2014 Speech Platform Adapter",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/speech/adapters/speech-translation-provider.js",
+  "layer": "Core / Speech Adapter",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "150",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/speech/adapters/speech-recognition-adapter.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "148 \u2014 Speech Recognition Provider Integration",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/speech/adapters/speech-session-adapter.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "148 \u2014 Speech Recognition Provider Integration",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/speech/adapters/voice-processor-adapter.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "147 (reframed) \u2014 Speech Platform Adapter",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/speech/adapters/voice-security-bridge.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "147 (reframed) \u2014 Speech Platform Adapter",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/speech/adapters/speech-command-adapter.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "148 \u2014 Speech Recognition Provider Integration",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/speech/adapters/speech-translation-adapter.js",
+  "layer": "Core / Speech Adapter",
+  "version": "1.1.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "150 (revised \u2014 see 1.0.0\u21921.1.0 note below)",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/speech/adapters/voice-settings-adapter.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "147 (reframed) \u2014 Speech Platform Adapter",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/founder-story/founder-story-narration.js",
+  "layer": "Core / Platform Module \u2014 Founder Story Experience",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "361 \u2014 Founder Story Experience & Living Narration, Stage 3",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/founder-story/founder-story-seed.js",
+  "layer": "Core / Platform Module \u2014 Bootstrap Data",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "361 \u2014 Founder Story Vault (Foundation), Stage 1",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/founder-story/founder-story-panel.js",
+  "layer": "Application / Dashboard Panel",
+  "version": "2.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "361 \u2014 Founder Story Vault (Foundation), Stage 1 \u2192 Stage 3",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/founder-story/founder-story-engine.js",
+  "layer": "Core / Platform Module \u2014 Data & Authorization Layer",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "361 \u2014 Founder Story Vault (Foundation), Stage 1",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/MpesaOS/mpesaos.js",
+  "layer": "Application UI (renders only inside #cozy-app-root, or",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/session/firebase-session-bridge.js",
+  "layer": "",
+  "version": "1.0.0",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/session/cozy-session-service.js",
+  "layer": "Platform Service (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/session/cozy-session-workspace.js",
+  "layer": "Core / Orchestration Facade \u2014 Milestone 176B",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "window.CozyOS.SessionWorkspace",
+  "milestone_introduced": "",
+  "purpose_snippet": "- session workspace bootstrap (dependency presence check) - unified session summary (getSessionSummary) - aggregated session + device diagnostics (getWorkspaceHealth)"
+ },
+ {
+  "path": "core/modules/storage/cozy-storage.js",
+  "layer": "Core Infrastructure / Storage Coordination Kernel",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/company/cozy-company.js",
+  "layer": "Core / Multi-Tenant Foundation",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "The single source of truth for organization/company profile data across every CozyOS application \u2014 profile, branches, departments, branding, contact info, financial/business settin"
+ },
+ {
+  "path": "core/modules/builder/builder-rules.js",
+  "layer": "Core / Code Generation \u2014 Rules & Standards",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "A pure rules-and-conventions library \u2014 no business logic, no file generation, no build orchestration. Every other CozyBuilder file reads from this one to know what \"Enterprise-qual"
+ },
+ {
+  "path": "core/modules/builder/cozy-builder.js",
+  "layer": "Core / Code Generation \u2014 Build Orchestration",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Coordinates a build: takes a developer request or an explicit build spec, asks BuilderAI for a plan (if needed), asks BuilderTemplates to generate real file content, and returns a "
+ },
+ {
+  "path": "core/modules/builder/requirement-reader.js",
+  "layer": "Core / Code Generation \u2014 Enterprise Requirement Reader",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Turns an uploaded file into a structured, editable Requirement Summary \u2014 the module identity, public interface, internal structure, dependencies, existing quality features, and dev"
+ },
+ {
+  "path": "core/modules/builder/architecture-engine.js",
+  "layer": "Core / Code Generation \u2014 Architecture Engine",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Converts a RequirementAnalyzer analysis into a real, structured Architecture Blueprint: module list, folder structure, data model, integration points \u2014 deterministic rules, never f"
+ },
+ {
+  "path": "core/modules/builder/understanding-engine.js",
+  "layer": "Core / Code Generation \u2014 Requirement Understanding",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Turns raw input (plain text, source code, text-based PDFs, screenshots, uploaded projects) into a structured Understanding \u2014 application type, detected features/entities, requireme"
+ },
+ {
+  "path": "core/modules/builder/project-refactor.js",
+  "layer": "Core / Code Generation \u2014 Refactor & Split",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real, deterministic, text-based refactoring of existing HTML/CSS/JS projects: splitting a single file into separate files, merging separate files back into one distributable HTML f"
+ },
+ {
+  "path": "core/modules/builder/question-engine.js",
+  "layer": "Core / Code Generation \u2014 AI Question Engine",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Turns RequirementAnalyzer's real gap-detection output into concrete clarifying questions, and accepts answers in whatever format the developer already has them in (typed text, or p"
+ },
+ {
+  "path": "core/modules/builder/builder-ai.js",
+  "layer": "Core / Code Generation \u2014 Build Planning",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Turns a developer's plain-language request (\"Build Customer Management Coordinator\") into a structured build plan \u2014 module name, entities, fields, events, dependencies, folder \u2014 th"
+ },
+ {
+  "path": "core/modules/builder/requirement-analyzer.js",
+  "layer": "Core / Code Generation \u2014 Requirement Analyzer",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Converts an unstructured description into a structured requirement record and a real Requirements Book \u2014 the layer between Research Engine and the (not-yet-built) AI Question Engin"
+ },
+ {
+  "path": "core/modules/builder/builder-templates.js",
+  "layer": "Core / Code Generation \u2014 Reusable Templates",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Generates real, complete CozyOS source file content as strings \u2014 coordinators, CRUD entities, HTML dashboards, CSS, application manifests. Every template reads its conventions from"
+ },
+ {
+  "path": "core/modules/sync/cozy-sync.js",
+  "layer": "Kernel / Core Service Coordination",
+  "version": "1.0.2-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/teststudio/test-suite.js",
+  "layer": "Core Infrastructure / Suite Loader",
+  "version": "1.0.0-PRODUCTION",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/teststudio/test-snapshot.js",
+  "layer": "",
+  "version": "1.0.0-PRODUCTION",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Store immutable snapshot records produced by external snapshot generators without comparing, generating, or validating snapshot content."
+ },
+ {
+  "path": "core/modules/teststudio/test-benchmark.js",
+  "layer": "",
+  "version": "1.0.0-PRODUCTION",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Store and expose immutable benchmark records produced by certified benchmark runners without calculating benchmark results itself."
+ },
+ {
+  "path": "core/modules/teststudio/test-environment.js",
+  "layer": "",
+  "version": "1.0.0-PRODUCTION",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Registers, stores, and exposes immutable execution environment descriptors for Test Studio without executing or modifying tests."
+ },
+ {
+  "path": "core/modules/teststudio/test-package.js",
+  "layer": "",
+  "version": "1.0.0-PRODUCTION",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Stores immutable Test Studio package manifests supplied by external producers without loading, installing, validating, executing, resolving, or publishing packages."
+ },
+ {
+  "path": "core/modules/teststudio/test-assert.js",
+  "layer": "Core Infrastructure / Assertion Engine",
+  "version": "1.0.0-PRODUCTION",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/teststudio/test-registry.js",
+  "layer": "Core Infrastructure / Test Architecture Registry Services",
+  "version": "1.0.2-PRODUCTION",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/teststudio/test-scheduler.js",
+  "layer": "",
+  "version": "1.0.0-PRODUCTION",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Schedules certified test execution requests without executing tests itself."
+ },
+ {
+  "path": "core/modules/teststudio/test-coverage.js",
+  "layer": "",
+  "version": "1.0.0-PRODUCTION",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Stores and exposes immutable test coverage records produced by external tools without calculating coverage itself."
+ },
+ {
+  "path": "core/modules/teststudio/test-fixture.js",
+  "layer": "",
+  "version": "1.0.0-PRODUCTION",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Stores immutable test fixture descriptors supplied by external producers without creating, loading, executing, validating, or modifying fixture data."
+ },
+ {
+  "path": "core/modules/teststudio/test-mock.js",
+  "layer": "",
+  "version": "1.0.0-PRODUCTION",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Stores immutable mock descriptors supplied by external producers without creating, executing, injecting, validating, or interpreting mock behavior."
+ },
+ {
+  "path": "core/modules/teststudio/test-runner.js",
+  "layer": "Core Infrastructure / Test Execution Services",
+  "version": "1.0.0-PRODUCTION",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/power/cozy-power-grid.js",
+  "layer": "Core / Business Domain \u2014 Power Management",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "A unified software coordinator for power management during churches, conferences, schools, hospitals, emergency camps, and outdoor events. Tracks power sources (grid, battery bank,"
+ },
+ {
+  "path": "core/modules/communication/ldce-session-engine.js",
+  "layer": "Core / Platform Module \u2014 Shared Platform Service (not app-owned)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "362 \u2014 Living Direct Communication Engine, Stage 1",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/communication/ldce-media-session-engine.js",
+  "layer": "Core / Platform Module \u2014 Shared Platform Service (not app-owned)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "362 \u2014 Living Direct Communication Engine, Stage 2",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/communication/ldce-caption-engine.js",
+  "layer": "Core / Platform Module \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "362 \u2014 Living Direct Communication Engine, Stage 3",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/communication/ldce-reliability-engine.js",
+  "layer": "",
+  "version": "",
+  "global": "",
+  "milestone_introduced": "363 \u2014 LDCE Communication Experience Hardening",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/cognitive/cognitive-coordinator.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "195 \u2014 Cognitive Orchestration & Integration",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/thinking/cozy-thinking.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "167 \u2014 Cozy Thinking Engine Platform",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/conversation/cozy-conversation.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "164 \u2014 Cozy Conversation Intelligence Engine",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/hearing/sound-event-engine.js",
+  "layer": "Core / Platform Foundation \u2014 Event Management Engine",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "159 \u2014 Sound Event Engine Platform",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/hearing/cozy-hearing.js",
+  "layer": "Core / Platform Service \u2014 Sound Understanding",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "157 \u2014 Cozy Hearing Engine",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/hearing/providers/provider-adapter-base.js",
+  "layer": "Core / Platform Foundation \u2014 Provider Template",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "158 \u2014 Sound Classification Provider Platform",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/hearing/providers/browser-signal-provider.js",
+  "layer": "Core / Platform Foundation \u2014 Classifier Provider",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "158 \u2014 Sound Classification Provider Platform",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/deployment/deployment-manager.js",
+  "layer": "Core / Platform Service \u2014 Deployment Manager",
+  "version": "2.1.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real deployment queue, retry, and release history \u2014 orchestration only. Every actual deployment action is delegated to a DeploymentProvider implementing a common 8-method interface"
+ },
+ {
+  "path": "core/modules/payment-channel/cozy-payment-channel-engine.js",
+  "layer": "Platform Service (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real, application-agnostic payment-channel tagging and aggregation. Fixes a genuine, current gap: MpesaOS's ledger records transaction type* (Deposit/Withdrawal/Till Payment/etc.) "
+ },
+ {
+  "path": "core/modules/camera/cozy-camera.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE-FROZEN",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/personal-vault/personal-vault.js",
+  "layer": "",
+  "version": "2.0.0",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/ocr/cozy-ocr.js",
+  "layer": "Core / Code Generation \u2014 Optical Character Recognition",
+  "version": "1.1.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Extracts real text from images and scanned/image-based PDF pages. Backed by Tesseract.js (an optional CDN script, loaded the same way jsPDF/pdf.js are elsewhere in CozyOS) \u2014 this f"
+ },
+ {
+  "path": "core/modules/ocr/document-router.js",
+  "layer": "",
+  "version": "\"1.1.0\",",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/domain/domain-expert-framework.js",
+  "layer": "Core / Code Generation \u2014 Domain Expert Framework",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real, curated domain knowledge packs (keyword checklists) that extend RequirementAnalyzer's generic Gap Detector with domain- specific requirements \u2014 Church, Quarry, Power today; a"
+ },
+ {
+  "path": "core/modules/leaning/learning-engine.js",
+  "layer": "Core / Code Generation \u2014 Learning Engine",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "A thin, real coordinator \u2014 NOT a new storage system. \"Learning\" already happens in UnderstandingEngine (Knowledge Review Queue, Enterprise Pattern Library) and CozyMemory (Builder "
+ },
+ {
+  "path": "core/modules/language/language-engine.js",
+  "layer": "Core / Platform Service \u2014 Language Engine",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real, key-based UI-string translation (menus, buttons, forms, notifications, reports, receipts, invoices, errors, help text, dashboard labels) with English as default and fallback "
+ },
+ {
+  "path": "core/modules/security/authentication-enrollment-history.js",
+  "layer": "Application / Settings Panel",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "360 (Authentication Factor Management & Secure Enrollment) \u2014 Stage 3",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/security/authentication-security-dashboard.js",
+  "layer": "Application / Settings Panel",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "360 (Authentication Factor Management & Secure Enrollment) \u2014 Stage 3",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/security/security-insights-panel.js",
+  "layer": "Application / Settings Panel",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "360 (Authentication Factor Management & Secure Enrollment) \u2014 Stage 4",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/security/authentication-analytics.js",
+  "layer": "Data / Analytics Engine",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "360 (Authentication Factor Management & Secure Enrollment) \u2014 Stage 4",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/security/authentication-enrollment-panel.js",
+  "layer": "Application / Settings Panel",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "359 (Authentication Enrollment UI Enhancement)",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/security/authentication-factor-management-panel.js",
+  "layer": "Application / Settings Panel",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "360 (Authentication Factor Management & Secure Enrollment) \u2014 Stage 2",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/security/authentication-settings-module.js",
+  "layer": "Application / Settings Panel",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "357 (Step 1 \u2014 Framework + Passkey template)",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/documents/cozy-document-engine.js",
+  "layer": "Platform Service (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Promotes CozyOCR from \"OCR + receipt parsing\" into the shared document platform every CozyOS application uses \u2014 one place to scan, classify, validate, and (once real backends exist"
+ },
+ {
+  "path": "core/modules/documents/cozy-document-storage-provider.js",
+  "layer": "Platform Service (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Persists, indexes, retrieves, and manages the lifecycle of documents created by CozyOS applications. This is NOT a second Document Engine \u2014 it extends the existing one by registeri"
+ },
+ {
+  "path": "core/modules/analytics/cozy-analytics.js",
+  "layer": "Kernel / Core Service Coordination",
+  "version": "1.0.2-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/interpretation/cozy-interpretation.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "166 \u2014 Cozy Interpretation Engine Platform",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/modules/memory/cozy-memory-engine.js",
+  "layer": "Core / Platform Service \u2014 Memory & Knowledge Engine",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "A namespaced, versioned, searchable knowledge store used across the Cozy ecosystem \u2014 distinct from any single engine's own local state. Builder Memory, Research Memory, Language Me"
+ },
+ {
+  "path": "core/modules/memory/cozy-memory-lifecycle.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "152 \u2014 Cozy Memory Engine Platform",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/identity/project-history.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "180 \u2014 Developer Identity & African Knowledge Initiative",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/identity/african-knowledge-initiative.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "180 \u2014 Developer Identity & African Knowledge Initiative",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/identity/developer-profile.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "180 \u2014 Developer Identity & African Knowledge Initiative",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/identity/cozyai-identity.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "180 \u2014 Developer Identity & African Knowledge Initiative",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/ui/login-experience-orchestrator.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "M210 \u2014 Login Experience Orchestrator",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/ui/live-animation-engine.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "M206 \u2014 Live Animation Engine (scoped extension)",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/ui/module-dashboard.js",
+  "layer": "Core / Platform Foundation \u2014 Shared UI Component",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "One real, reusable dashboard renderer every CozyOS module (ChurchOS, WholesaleOS, ShopOS, HospitalOS, SchoolOS, QuarryOS, etc.) can call with its own real config, producing the sam"
+ },
+ {
+  "path": "core/ui/mode-engine.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/ui/living-theme-engine.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.1.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/ui/living-message-engine.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Message registry, categories, scheduling, priority, rotation, org-scoped permissions, history, and basic analytics counters. Does NOT render anything to the DOM \u2014 see the honest sc"
+ },
+ {
+  "path": "core/platform/accessibility-engine.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.1.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real, automated checking against the CozyOS Universal UI Readability & Accessibility Standard (Constitution Addendum, Rule 44): minimum font sizes, and real WCAG contrast-ratio mat"
+ },
+ {
+  "path": "core/platform/manifest-registry.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Level 3 of the four-level Discovery model (see cozy-discovery.js header): Level 1 \u2014 Runtime   : what is loaded right now Level 2 \u2014 Registry  : what has been registered (ServiceRegi"
+ },
+ {
+  "path": "core/platform/reference-integrity-engine.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "The proactive layer this project's own history showed was missing: checking that every real `<script>`, `<link rel=\"stylesheet\">`, and `<img>` tag on the current page actually reso"
+ },
+ {
+  "path": "core/platform/application-visibility.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Single source of truth for \"what applications exist, and which ones can this specific user see.\" Neither the Administrator Workspace nor the End User Workspace should hardcode an a"
+ },
+ {
+  "path": "core/platform/platform-operations.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.2.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "The execution layer: Discovery finds, Audit explains, Operations fixes. This engine is an ORCHESTRATOR, not an emulator \u2014 it may only expose operations that delegate to a verified,"
+ },
+ {
+  "path": "core/platform/health-engine.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Assigns the per-file health badge (\ud83d\udfe2 Healthy / \ud83d\udfe1 Warning / \ud83d\udd34 Broken / \u26aa Not Loaded) purely by reading Usage Engine's classification and Dependency Engine's missing/circular reports"
+ },
+ {
+  "path": "core/platform/usage-engine.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Answers \"is this file actually used?\" \u2014 not just \"does it exist?\" \u2014 using File Registry's `loaded` flag (real: set by Discovery cross- referencing live ServiceRegistry/ModuleRegist"
+ },
+ {
+  "path": "core/platform/content-presentation-engine.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Owns scheduled content items (announcements, greetings, educational/ religious/business content, holiday campaigns) shown across CozyOS applications. Does NOT own themes/fonts/colo"
+ },
+ {
+  "path": "core/platform/file-registry.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "The single store of per-file metadata records \u2014 what Discovery finds, this holds. Nothing here decides discovery, health, usage, or dependency logic itself (Rule 1 \u2014 Single Respons"
+ },
+ {
+  "path": "core/platform/dependency-engine.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.1.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Builds a dependency graph from window.CozyOS.FileRegistry. For a file with a Level 3 manifest (record.declaredDependencies !== null), those self-declared ids are authoritative and "
+ },
+ {
+  "path": "core/platform/platform-resource-manager.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Manages ownership, allocation, tracking, and release of shared platform resources. It does NOT discover (reuses PlatformDiscovery/FileRegistry), does NOT execute operations (reuses"
+ },
+ {
+  "path": "core/platform/audit-engine.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Answers diagnostic questions (\"why isn't Builder opening?\", \"which dependency failed?\", \"which application is orphaned?\") by correlating the REAL outputs of the engines that alread"
+ },
+ {
+  "path": "core/platform/vendor-loader.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real, dynamic `<script>` injection for vendor libraries, with genuine success/error tracking \u2014 this is what makes `VendorRegistry`'s \"Error\" state a real, observed outcome rather t"
+ },
+ {
+  "path": "core/platform/vendor-registry.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real, checkable status for every third-party library CozyOS intends to use \u2014 never a fabricated \"loaded\" claim. Reuses the same real Manifest-vs-Runtime pattern already proven in `"
+ },
+ {
+  "path": "core/platform/vendor-diagnostics.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Pure consumer of VendorRegistry and VendorLoader \u2014 discovers nothing itself, checks nothing itself, matches the exact same \"pure consumer/correlation\" pattern already established f"
+ },
+ {
+  "path": "core/engines/voice/voice-engine.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "180B \u2014 Developer Identity Voice Integration (new capability,",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/engines/search/search-engine.js",
+  "layer": "",
+  "version": "1.1.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "180C \u2014 Developer Identity Search Integration (new capability,",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/engines/media/live-capture-engine.js",
+  "layer": "",
+  "version": "",
+  "global": "",
+  "milestone_introduced": "ChurchOS C003 (genuine NEW FEATURE, per explicit scope)",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/engines/media/recording-export-engine.js",
+  "layer": "",
+  "version": "'1.0.0',",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/engines/wakeword/wake-word-engine.js",
+  "layer": "",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "179 \u2014 Wake Word Engine (new capability, no existing owner)",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/shell/platform-event-bus.js",
+  "layer": "Core / Shared Shell Service \u2014 Cross-Platform Communication",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/shell/cozy-admin-recovery-wizard.js",
+  "layer": "Core / Shell UI",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "130",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/shell/user-dashboard.js",
+  "layer": "",
+  "version": "",
+  "global": "",
+  "milestone_introduced": "365.0",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/shell/provider-manager.js",
+  "layer": "",
+  "version": "",
+  "global": "",
+  "milestone_introduced": "M367 \u2014 Provider Ecosystem Expansion",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/shell/startup-orchestrator.js",
+  "layer": "",
+  "version": "",
+  "global": "",
+  "milestone_introduced": "M351 \u2014 Living Startup Completion (reconciled onto M354)",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/shell/cozy-login-gate.js",
+  "layer": "Core / Shell UI",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "121",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/shell/window-manager.js",
+  "layer": "",
+  "version": "",
+  "global": "",
+  "milestone_introduced": "M366.6 \u2014 Platform Requirement (applies to all CozyOS applications)",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/shell/platform-discovery.js",
+  "layer": "Core / Shared Shell Service \u2014 Platform-Wide Discovery",
+  "version": "2.1.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/shell/module-loading-manager.js",
+  "layer": "Core / Shared Shell Service \u2014 Application Load Lifecycle",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/shell/launch-sequence.js",
+  "layer": "",
+  "version": "",
+  "global": "",
+  "milestone_introduced": "364.3 \u2014 Startup/Login Sequencing Correction",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/shell/cozy-workspace.js",
+  "layer": "Shell / Enterprise Orchestration & Visualization",
+  "version": "3.1.1-ENTERPRISE-CONTROL-CENTER",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/connectivity/updateManager.js",
+  "layer": "",
+  "version": "(rollbackVersion !== undefined && rollbackVersion !== null) ? rollbackVersion : null,",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/living/cozy-environment.js",
+  "layer": "",
+  "version": "",
+  "global": "",
+  "milestone_introduced": "M370.5 \u2014 Living World Synchronization",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/living/cozy-living-assistant.js",
+  "layer": "Living Ecosystem \u2014 Composed Living Component",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "364.7.1",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/living/language-badge.js",
+  "layer": "",
+  "version": "",
+  "global": "",
+  "milestone_introduced": "M368",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/output/output-storage.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real localStorage persistence for OutputCenter's artifacts \u2014 the same real pattern already proven in Developer Hub's own Output Center (Rule 54): text content stored as-is, Uint8Ar"
+ },
+ {
+  "path": "core/output/output-export.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real ZIP export for one or more real artifacts. `createZipStore()` below is copied verbatim from Developer Hub's own implementation \u2014 not reimplemented \u2014 because that exact functio"
+ },
+ {
+  "path": "core/output/output-collections.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real, plural collection membership \u2014 an artifact can genuinely belong to more than one collection at once without being moved out of its real category (the same corrected design fr"
+ },
+ {
+  "path": "core/output/output-inbox.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "A real, single arrival point every application calls instead of `OutputCenter.publish()` directly \u2014 `OutputInbox.receive(...)` logs the raw arrival (application, timestamp, whether"
+ },
+ {
+  "path": "core/output/output-history.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real, per-artifact audit trail \u2014 the \"Audit History\" field in the requested metadata schema. Reuses the existing, real `PlatformEventBus` (same pattern already proven in `VendorEve"
+ },
+ {
+  "path": "core/output/output-center.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "The single, real, platform-wide artifact store \u2014 promoted out of Developer Hub, where it previously lived as a private field on `CozyDeveloperHubUI` and was reachable by nothing el"
+ },
+ {
+  "path": "core/output/output-events.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "134 (restored \u2014 genuinely missing file, not a stub)",
+  "purpose_snippet": "A thin, real wrapper over the existing, real `PlatformEventBus` \u2014 not a second pub/sub mechanism. Mirrors the same pattern already proven in `core/vendor-events.js`. Every real Out"
+ },
+ {
+  "path": "core/registry/cozy-registry.js",
+  "layer": "Core / Platform Foundation \u2014 Application & Coordinator Catalog",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "A single, metadata-only catalog of what applications and coordinators exist on this CozyOS install, and how to find/launch/display them. This is the piece that lets the Workspace S"
+ },
+ {
+  "path": "core/collaboration/cozy-share.js",
+  "layer": "",
+  "version": "",
+  "global": "",
+  "milestone_introduced": "M366.4 \u2014 Device Collaboration Session Manager, Roles,",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/calculation/calculation-certification.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real certification of a registered formula against exactly the six checks requested \u2014 every one of them actually executed, not assumed: 1. Formula identifier exists \u2014 real registry"
+ },
+ {
+  "path": "core/calculation/formula-library.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/calculation/calculation-engine.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "The single, real entry point every CozyOS application should call instead of implementing its own formulas \u2014 `calculate(formulaId, inputs)`. Coordinates `FormulaRegistry`/`Calculat"
+ },
+ {
+  "path": "core/calculation/dependency-events.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/calculation/dependency-certification.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real dependency-integrity certification for one formula or the whole graph \u2014 missing references, circular dependencies, deprecated references, self-references, duplicate declaratio"
+ },
+ {
+  "path": "core/calculation/formula-registry.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "The single, real place formula identifiers (e.g. \"Business.VAT\", \"School.GPA\") resolve to an actual function plus real metadata \u2014 required inputs, version, pack name. Every applica"
+ },
+ {
+  "path": "core/calculation/dependency-graph.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real graph construction and traversal, reading exclusively from the real, explicit `dependsOn` metadata every formula registration already carries \u2014 this file never parses JavaScri"
+ },
+ {
+  "path": "core/calculation/formula-library-church.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/calculation/dependency-history.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real, bounded audit trail of dependency changes per formula \u2014 dependency added/removed, deprecation, replacement. Written to by `DependencyEvents.emit()` when a real event carries "
+ },
+ {
+  "path": "core/calculation/dependency-engine.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "The single, real entry point for understanding how formulas relate to each other. This engine does not perform calculations \u2014 `CalculationEngine` already owns that \u2014 it owns depend"
+ },
+ {
+  "path": "core/calculation/calculation-history.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real, optional recording of every calculation \u2014 formula used, real inputs, real result, calling application/user/organization, real timestamp. \"Optional\" is genuine: `calculation-e"
+ },
+ {
+  "path": "core/calculation/packs/conversions.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/calculation/packs/construction.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/calculation/packs/education.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/calculation/packs/healthcare.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/calculation/packs/manufacturing.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/calculation/packs/statistics.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Foundational, general-purpose statistics \u2014 Mean, Median, Mode, Percentage, WeightedScore. These are the real building blocks the Education pack (GPA, class ranking) is built on, ma"
+ },
+ {
+  "path": "core/calculation/packs/finance.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/calculation/packs/engineering.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/calculation/packs/payroll.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/calculation/packs/inventory.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/calculation/packs/accounting.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/calculation/packs/agriculture.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/calculation/packs/logistics.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/organization/organization-role.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/organization/organization-hierarchy.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real validation of the organization's real reporting structure \u2014 circular reporting detection, vacant position reporting, hierarchy tree assembly. Pure consumer of `OrganizationRol"
+ },
+ {
+  "path": "core/organization/organization-registry.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/plugins/shopOS-search.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/plugins/mpesaOS-engine.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered, not a window.CozyOS.<X> coordinator)",
+  "version": "2.1.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/plugins/shopOS-reconciliation.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/plugins/shopOS-sales.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/plugins/wholesaleOS-customer.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Customer identity, contact, and relationship data only \u2014 profile, contacts, credit limit, notes, follow-up reminders, preferred products, delivery locations. Matches the requested "
+ },
+ {
+  "path": "core/plugins/shopOS-purchasing.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/plugins/mpesaOS-float.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real agent float balance tracking \u2014 current float, float purchases, float adjustments, float reconciliation, and full float history \u2014 per (companyId, branchId). This is genuinely M"
+ },
+ {
+  "path": "core/plugins/mpesaOS.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered, not a window.CozyOS.<X> coordinator)",
+  "version": "2.1.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/plugins/wholesaleOS-debt.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real debt tracking only: amount, due date, installments, payment history, balance, customer promises, reminder schedule, partial payments. References customers by `customerId` via "
+ },
+ {
+  "path": "core/plugins/shopOS-dashboard.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/plugins/shopOS-product.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/plugins/shopOS-core.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered, not a window.CozyOS.<X> coordinator)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/plugins/shopOS-payments.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/plugins/wholesaleOS-core.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/plugins/mpesaOS-reporting.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real business reports for MpesaOS: daily transaction totals, float movement, commission earned, till performance, paybill collections, agent activity. Every figure here is computed"
+ },
+ {
+  "path": "core/plugins/shopOS-reporting.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/plugins/mpesaOS-paybill.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real paybill number management \u2014 registration, business mapping, status, and collections. The genuine distinguishing feature from Till (mpesaOS-till.js) is the account number: payb"
+ },
+ {
+  "path": "core/plugins/shopOS-bookkeeping.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/plugins/mpesaOS-till.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real \"Buy Goods\" till number management \u2014 registration, merchant assignment, status (active/suspended/closed), and the accumulated balance from till payments until the merchant wit"
+ },
+ {
+  "path": "core/plugins/churchOS-core.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/plugins/shopOS-inventory.js",
+  "layer": "Business Domain \u2014 Plugin (PluginManager-registered)",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/context/cozy-context-engine.js",
+  "layer": "Core / Shared Shell Service \u2014 Application Context & Personality",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Per the CozyOS Universal Architecture Directive (Section 12): every application has a \"personality\" \u2014 welcome messages, daily content, reminders, widgets \u2014 that changes the CONTENT"
+ },
+ {
+  "path": "core/security/dev-access-service.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "A temporary, explicitly-disclosed development convenience \u2014 Production access continues to require a real, verified `CozyOS.Auth` administrator session with no exception. Developme"
+ },
+ {
+  "path": "core/security/recovery-phrase-manager.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/security/session-manager.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/security/cozy-auth.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.1.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/security/auth-factor-registry.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "The single, real source of truth for \"which authentication factors exist and what can currently verify them.\" `AuthPolicyEngine` asks this registry \"do you have a provider for X\" r"
+ },
+ {
+  "path": "core/security/voice-provider.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/security/fingerprint-provider.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/security/qr-renderer.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "132a",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/security/authentication-enrollment-store.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "358 (Persistent Authentication Enrollment)",
+  "purpose_snippet": "The single, real source of truth for \"has this user enrolled this authentication factor, when, on which device, is it currently enabled, and when was it last used\" \u2014 the enrollment"
+ },
+ {
+  "path": "core/security/webauthn-provider.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "130",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/security/recovery-question-manager.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/security/emergency-recovery-code-manager.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "130",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/security/auth-coordinator.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "window.CozyOS.AuthorizationCoordinator",
+  "milestone_introduced": "",
+  "purpose_snippet": "The one, real entry point callers (Developer Hub, and any future caller needing step-up authorization) should use instead of talking to `CozyOS.Auth`, `AuthPolicyEngine`, and `Auth"
+ },
+ {
+  "path": "core/security/face-capture-module.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "145 \u2014 Face Backend Integration",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/security/auth-policy-engine.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Separates \"which authentication factors are required for a given operation\" (a real, configurable policy) from \"how a factor is verified\" (a real, pluggable provider). This file ow"
+ },
+ {
+  "path": "core/security/factor-provider-base.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "The single, real, shared implementation every authentication factor provider (Face, Fingerprint, Voice, Google Account) composes, instead of each file hand-duplicating the same reg"
+ },
+ {
+  "path": "core/security/recovery-key-manager.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "130",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/security/face-provider.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/security/google-account-provider.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": ""
+ },
+ {
+  "path": "core/security/trusted-device-manager.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "",
+  "purpose_snippet": "Real device registration, trust tracking, and lifecycle management \u2014 30-day trust period, 10-minute auto-lock on inactivity, device removal/replacement/loss, and a real, bounded de"
+ },
+ {
+  "path": "core/security/otp-provider.js",
+  "layer": "Core / Platform Foundation \u2014 Shared Platform Service",
+  "version": "1.0.0-ENTERPRISE",
+  "global": "",
+  "milestone_introduced": "132a",
+  "purpose_snippet": ""
+ }
+]

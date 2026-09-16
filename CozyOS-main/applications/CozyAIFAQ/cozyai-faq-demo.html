@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CozyAI — Identity FAQ (EN / Kiswahili)</title>
+<link rel="stylesheet" href="cozyai-faq-demo.css" />
+</head>
+<body>
+
+  <div class="faq-shell">
+    <div class="faq-header">
+      <div class="title">
+        <span class="dot"></span>
+        <div>
+          <h1>CozyAI — Identity FAQ</h1>
+          <div class="sub">Ask in English or Kiswahili — it answers back in whichever one you used.</div>
+        </div>
+      </div>
+      <div class="lang-toggle">
+        <button data-lang="auto" class="active">Auto</button>
+        <button data-lang="en">EN</button>
+        <button data-lang="sw">SW</button>
+      </div>
+    </div>
+
+    <div class="faq-body" id="faqBody"></div>
+
+    <div class="suggestions" id="faqSuggestions"></div>
+
+    <div class="faq-input">
+      <input id="faqInput" type="text" placeholder="Ask about CozyOS… / Uliza kuhusu CozyOS…" autocomplete="off" />
+      <button id="faqSend">Send</button>
+    </div>
+
+    <div class="status-strip" id="faqStatus"></div>
+  </div>
+
+  <!-- Real, existing public identity data (no private Founder Story Vault files loaded here) -->
+  <script src="../../core/identity/developer-profile.js"></script>
+  <script src="../../core/identity/project-history.js"></script>
+  <script src="../../core/identity/african-knowledge-initiative.js"></script>
+  <script src="../../core/identity/cozyai-identity.js"></script>
+
+  <!-- New: intent router (this milestone) -->
+  <script src="../../core/modules/knowledge/cozyos-identity-faq-router.js"></script>
+
+  <!-- Optional: full CozyAI facade + its pipeline, if present in this checkout.
+       The FAQ demo works without these too — CozyIdentityFAQRouter alone
+       is enough to answer canonical identity questions. -->
+  <script src="../../core/modules/intelligence/cozy-ai.js" onerror="this.remove()"></script>
+
+  <script src="cozyai-faq-demo.js"></script>
+</body>
+</html>

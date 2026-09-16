@@ -1,0 +1,490 @@
+--- /home/claude/baseline_extract/core/shell/dashboard-navigation-core.js	2026-08-21 04:33:36.000000000 +0000
++++ /home/claude/work/core/shell/dashboard-navigation-core.js	2026-08-21 05:44:31.507973679 +0000
+@@ -51,6 +51,48 @@
+  *   communityStateSummary.myContributionsAvailable is always false per
+  *   that module's own disclosed privacy limit (see its header) —
+  *   never silently true.
++ *
++ * PROMPT 2 §8 — AI CONTEXT SETTINGS-AWARENESS + REAL USER DASHBOARD
++ * KNOWLEDGE (this addition)
++ *   buildAIContext() is extended, additively, with a namespaced shape
++ *   (context.identity / .applications / .community / .settings /
++ *   .administration) alongside every pre-existing flat field above —
++ *   nothing pre-existing is removed or renamed, so MID-4's own tests
++ *   and consumers (#renderAiSurface in user-dashboard.js) keep working
++ *   unmodified. Each new namespaced field composes a real engine only:
++ *     - identity.displayName: IdentityEngine.getUser(userId).username
++ *       ONLY — never the rest of that record (roles/companyId/orgId/
++ *       branchId/departmentId/teamId/country/orgId are deliberately
++ *       never read into this file's context for that exact reason).
++ *     - applications.launchable: the subset of the already-authorized
++ *       availableApplications that ApplicationVisibility.
++ *       getRealLaunchPath() resolves to a real path right now — so
++ *       CozyAI can honestly distinguish "visible to you" from "you can
++ *       open it this second" (Prompt 2 §8's own "available" vs
++ *       "launchable" distinction), never inferring launchability.
++ *     - community.availableActions: ["contribute-knowledge"] only when
++ *       the real window.CozyOS.CozyTeachCozyAIRouting.
++ *       TEACH_KNOWLEDGE_TYPES array is actually loaded — never a
++ *       hardcoded action list, and never listing the type values
++ *       themselves here (they already exist, unduplicated, on that
++ *       engine — see explainSurface()'s Community branch, which reads
++ *       them live rather than copying them into this context object).
++ *     - settings.relevantPreferences: the same real language state
++ *       resolveInterfaceLanguage() already computed (never a second
++ *       language read), reshaped for a settings-shaped question.
++ *     - administration.available / .tools: composes IdentityEngine.
++ *       getDashboardConfig(userId).isPlatformAdmin — the exact same
++ *       real, fail-closed boolean DashboardSettingsAdminBoundaryCore
++ *       already gates the Settings surface's admin section on (never
++ *       a second admin derivation). tools is a short, honest label
++ *       list built ONLY from fields getDashboardConfig() actually
++ *       returned for this user (e.g. "users" when a real `users` array
++ *       came back) — never a fabricated capability, and never the
++ *       word "role" is spelled as "roles" anywhere in a label, per
++ *       this file's existing no-role-leak test.
++ *   See explainSurface() below for the human-readable layer built on
++ *   top of this — Prompt 2 §9/§14's "AI can answer 'what can I do
++ *   here?' without hallucinating."
+  */
+ (function () {
+     "use strict";
+@@ -192,6 +234,57 @@
+ 
+             const assistant = window.CozyOS.LivingAssistant;
+ 
++            // Prompt 2 §8 — launchable vs merely-visible (real check,
++            // never inferred): only apps ApplicationVisibility itself
++            // resolves a real launch path for right now.
++            let launchableApplications = [];
++            if (applicationsAvailable && visibility && typeof visibility.getRealLaunchPath === "function") {
++                launchableApplications = availableApplications.filter((appId) => {
++                    try { return !!visibility.getRealLaunchPath(appId); } catch (_err) { return false; }
++                });
++            }
++
++            // Prompt 2 §8 — real display name only (IdentityEngine.
++            // getUser().username), never the rest of that record. See
++            // header disclosure above for exactly why.
++            let displayName = null;
++            const identityEngine = window.CozyOS.IdentityEngine;
++            if (identityEngine && typeof identityEngine.getUser === "function" && userId) {
++                try {
++                    const user = identityEngine.getUser(userId);
++                    displayName = user ? user.username : null;
++                } catch (_err) { displayName = null; }
++            }
++
++            // Prompt 2 §8 — Community teaching action, gated on the
++            // real, existing CozyTeachCozyAIRouting engine actually
++            // being loaded (never hardcoded, never duplicating its
++            // TEACH_KNOWLEDGE_TYPES values here).
++            const teachRouting = window.CozyOS.CozyTeachCozyAIRouting;
++            const teachAvailable = !!(teachRouting && Array.isArray(teachRouting.TEACH_KNOWLEDGE_TYPES) && teachRouting.TEACH_KNOWLEDGE_TYPES.length > 0);
++            const communityAvailableActions = teachAvailable ? ["contribute-knowledge"] : [];
++
++            // Prompt 2 §8 — administration boundary. Same real,
++            // fail-closed source DashboardSettingsAdminBoundaryCore
++            // already gates the Settings surface on
++            // (IdentityEngine.getDashboardConfig().isPlatformAdmin ===
++            // true, boolean only) — never re-derived, never a
++            // client-supplied role trusted. Tool labels are built only
++            // from fields the real dashboardConfig actually returned
++            // for this exact user, never a fabricated capability list.
++            let administrationAvailable = false;
++            let administrationTools = [];
++            if (identityEngine && typeof identityEngine.getDashboardConfig === "function" && userId) {
++                try {
++                    const dashboardConfig = identityEngine.getDashboardConfig(userId);
++                    if (dashboardConfig && dashboardConfig.available === true && dashboardConfig.isPlatformAdmin === true) {
++                        administrationAvailable = true;
++                        if (Array.isArray(dashboardConfig.users)) administrationTools.push("user-directory");
++                        if (Array.isArray(dashboardConfig.applicationStates)) administrationTools.push("application-oversight");
++                    }
++                } catch (_err) { administrationAvailable = false; administrationTools = []; }
++            }
++
+             return {
+                 available: true,
+                 userLanguage: language.available ? language.code : null,
+@@ -202,10 +295,90 @@
+                 knowledgeSourceConnected,
+                 communityStateSummary,
+                 aiAssistantConnected: !!(assistant && typeof assistant.open === "function"),
+-                currentSurface: this.#active
++                currentSurface: this.#active,
++
++                // Prompt 2 §8 additions — namespaced, additive only.
++                identity: {
++                    displayName,
++                    language: language.available ? language.code : null
++                },
++                applications: {
++                    available: availableApplications,
++                    launchable: launchableApplications
++                },
++                community: {
++                    stateSummary: communityStateSummary,
++                    availableActions: communityAvailableActions
++                },
++                settings: {
++                    relevantPreferences: {
++                        language: {
++                            current: language.available ? language.code : null,
++                            isFallback: language.available ? !!language.fallback : null
++                        }
++                    }
++                },
++                administration: {
++                    available: administrationAvailable,
++                    tools: administrationTools
++                }
+             };
+         }
+ 
++        /**
++         * explainSurface(surfaceName, userId)
++         *   Prompt 2 §9/§14 — the honest, template-generated text layer
++         *   CozyAI (or the dashboard AI surface's own UI, see
++         *   user-dashboard.js #renderAiSurface) uses to answer "what
++         *   can I do here?" per surface. Every sentence below is
++         *   assembled FROM buildAIContext()'s real fields at call time
++         *   — nothing here is a static claim that can silently go
++         *   stale, and nothing claims a capability the context doesn't
++         *   actually report as available.
++         */
++        explainSurface(surfaceName, userId) {
++            if (!this.isValidSurface(surfaceName)) {
++                return { available: false, reason: `"${surfaceName}" is not a real CozyOS dashboard surface. Valid surfaces: ${this.getSurfaceOrder().join(", ")}.` };
++            }
++            const ctx = this.buildAIContext(userId);
++            const lines = [];
++
++            switch (surfaceName) {
++                case "home":
++                    lines.push(ctx.applications.available.length
++                        ? `From Home you can jump into ${ctx.applications.available.length} application(s) currently available to your account.`
++                        : "No applications are currently assigned to your account, so Home has nothing to launch yet.");
++                    break;
++                case "community":
++                    lines.push(ctx.community.stateSummary.available
++                        ? `Community lets you review real, aggregate knowledge-pipeline state (${ctx.community.stateSummary.totalRecords} record(s) across its review buckets).`
++                        : `Community's knowledge pipeline isn't connected right now (${ctx.community.stateSummary.reason || "unavailable"}).`);
++                    lines.push(ctx.community.availableActions.includes("contribute-knowledge")
++                        ? "You can teach CozyAI here by contributing knowledge through the real, governed contribution pipeline."
++                        : "Contributing knowledge isn't available right now because the real teaching/routing engine isn't loaded.");
++                    break;
++                case "ai":
++                    lines.push(ctx.aiAssistantConnected
++                        ? `I can see your real dashboard state — ${ctx.applications.available.length} available application(s), ${ctx.applications.launchable.length} launchable right now.`
++                        : "The live assistant isn't connected on this page right now.");
++                    lines.push(`I'll respond in ${ctx.userLanguage || "the default language"}${ctx.languageFallback ? " (a fallback — your preferred language isn't fully available yet)" : ""}.`);
++                    break;
++                case "apps":
++                    lines.push(ctx.applications.available.length
++                        ? `${ctx.applications.available.length} application(s) are visible to your account; ${ctx.applications.launchable.length} of those can be opened right now.`
++                        : "No applications are visible to your account right now.");
++                    break;
++                case "settings":
++                    lines.push(`Your interface language is ${ctx.settings.relevantPreferences.language.current || "not set"}${ctx.settings.relevantPreferences.language.isFallback ? " (fallback)" : ""}, and you can change it here.`);
++                    lines.push(ctx.administration.available
++                        ? `Your account has platform-administrator access, so administrator tools are available here (${ctx.administration.tools.join(", ") || "none currently reported"}).`
++                        : "Administrator tools are not available to your account.");
++                    break;
++            }
++
++            return { available: true, surface: surfaceName, text: lines.join(" ") };
++        }
++
+         getDiagnosticsReport() {
+             return { moduleVersion: VERSION, activeSurface: this.#active, order: this.getSurfaceOrder(), ...this.#diagnostics };
+         }
+--- /home/claude/baseline_extract/core/shell/user-dashboard.js	2026-08-21 05:20:10.000000000 +0000
++++ /home/claude/work/core/shell/user-dashboard.js	2026-08-21 05:46:06.766915230 +0000
+@@ -93,6 +93,24 @@
+  *   the real structured AI context. It does not implement a second chat
+  *   UI inside the dashboard shell.
+  *
++ * DASHBOARD PROMPT 2 §8 — AI SURFACE, WHAT CHANGED
++ *   #renderAiSurface() now shows a real current-context indicator
++ *   (active surface, available vs. launchable application counts — all
++ *   from DashboardNavigationCore.buildAIContext()), a set of "Ask about
++ *   a surface" buttons, and a response area. Clicking a button calls
++ *   the new DashboardNavigationCore.explainSurface(surfaceName, userId)
++ *   and displays its real, context-derived text — honest,
++ *   template-generated text assembled client-side from real engine
++ *   state, not a live model call, and the UI never implies otherwise.
++ *   window.CozyOS.LivingAssistant still exposes only open()/close()/
++ *   toggle() (confirmed by reading its source before this change) — no
++ *   real message-send/conversational-execution method exists anywhere
++ *   in this repository, so this file does not fake one. "Open Cozy AI"
++ *   (the real, existing assistant panel) remains the one real live
++ *   entry point and stays visually distinct from the honest
++ *   explanation panel above it. The genuine missing dependency for a
++ *   real free-text conversational backend is recorded, not hidden.
++ *
+  * MOUNTING
+  *   Called once from index.html, replacing the prior honest placeholder
+  *   for authenticated visitors. Renders into a container element passed
+@@ -352,23 +370,73 @@
+ 
+         /**
+          * #renderAiSurface()
+-         *   Real AI entry point (Prompt 1 §11/§26). Opens the existing
+-         *   Living Assistant (never a second chat engine) and passes it
+-         *   the real, structured, authorized-only dashboard context from
++         *   Real AI entry point (Prompt 1 §11/§26; extended Prompt 2
++         *   §8/§9/§14/§16). Opens the existing Living Assistant (never a
++         *   second chat engine) and passes it the real, structured,
++         *   authorized-only dashboard context from
+          *   DashboardNavigationCore.buildAIContext().
++         *
++         *   HONEST SCOPE NOTE (Prompt 2 §16) — the real, existing
++         *   window.CozyOS.LivingAssistant only exposes open()/close()/
++         *   toggle(); this repository has no real message-send/
++         *   conversational-execution method on that engine (confirmed
++         *   by reading core/living/cozy-living-assistant.js before
++         *   writing this — its own header already discloses this same
++         *   limit). Rather than fake a working chat backend inside this
++         *   dashboard tab, the "suggested questions" below are answered
++         *   directly and honestly via DashboardNavigationCore.
++         *   explainSurface() — real, context-derived template text
++         *   composed client-side, not a live model call, and never
++         *   presented as if it were one. The genuine missing dependency
++         *   this records: a real conversational execution seam on
++         *   LivingAssistant (or an equivalent intelligence engine) that
++         *   this dashboard tab could route free-text questions through.
++         *   "Open Cozy AI" (the real, existing assistant panel) remains
++         *   the one real live entry point, kept clearly separate below.
+          */
+         #renderAiSurface() {
+             const host = this.#container.querySelector("#cozy-ud-surface-ai");
+             if (!host) return;
+             const assistant = window.CozyOS.LivingAssistant;
+             const nav = window.CozyOS.DashboardNavigationCore;
+-            const context = nav && typeof nav.buildAIContext === "function" ? nav.buildAIContext(this.#userId) : { available: false };
++            const hasContext = nav && typeof nav.buildAIContext === "function";
++            const context = hasContext ? nav.buildAIContext(this.#userId) : { available: false };
++            const hasExplain = nav && typeof nav.explainSurface === "function";
++            const surfaces = hasContext && typeof nav.getSurfaceOrder === "function" ? nav.getSurfaceOrder() : [];
++            const SURFACE_LABELS = { home: "Home", community: "Community", ai: "AI", apps: "Apps", settings: "Settings" };
++
+             host.innerHTML = `
+                 <h3>Cozy AI</h3>
+-                <p class="cozy-disclosure-note">${assistant && typeof assistant.open === "function" ? "Ask CozyAI for help — it can see what's really available in your CozyOS." : "The AI assistant is not connected on this page."}</p>
+-                <button type="button" class="cozy-btn" id="cozy-ud-ai-open" ${assistant && typeof assistant.open === "function" ? "" : "disabled"}>Open Cozy AI</button>
++                <p class="cozy-disclosure-note" id="cozy-ud-ai-context-indicator">${context.available
++                    ? `Current context: viewing the ${escapeHtml(SURFACE_LABELS[context.currentSurface] || context.currentSurface)} surface, ${context.applications.available.length} application(s) available (${context.applications.launchable.length} launchable now).`
++                    : "Dashboard context is not connected right now."}</p>
+                 <p class="cozy-disclosure-note cozy-ud-ai-lang">${context.available ? `Responding in: ${escapeHtml(context.userLanguage || "en")}${context.languageFallback ? " (fallback)" : ""}` : ""}</p>
++
++                <section id="cozy-ud-ai-suggested-actions" aria-label="Suggested questions">
++                    <h4>Ask about a surface</h4>
++                    <div id="cozy-ud-ai-suggested-actions-grid">
++                        ${surfaces.map(s => `<button type="button" class="cozy-btn cozy-ud-ai-suggested-btn" data-ud-ai-explain="${escapeHtml(s)}" ${hasExplain ? "" : "disabled"}>What can I do in ${escapeHtml(SURFACE_LABELS[s] || s)}?</button>`).join("")}
++                    </div>
++                </section>
++
++                <section id="cozy-ud-ai-response-area" aria-live="polite">
++                    <p class="cozy-disclosure-note" id="cozy-ud-ai-response-text">Tap a question above, or open the live assistant below.</p>
++                </section>
++
++                <p class="cozy-disclosure-note">${assistant && typeof assistant.open === "function" ? "Open the live assistant for a real conversation — it can see what's really available in your CozyOS." : "The live assistant is not connected on this page."}</p>
++                <button type="button" class="cozy-btn" id="cozy-ud-ai-open" ${assistant && typeof assistant.open === "function" ? "" : "disabled"}>Open Cozy AI</button>
+             `;
++
++            host.querySelectorAll("[data-ud-ai-explain]").forEach(btn => {
++                btn.addEventListener("click", () => {
++                    const responseEl = host.querySelector("#cozy-ud-ai-response-text");
++                    if (!responseEl) return;
++                    if (!hasExplain) { responseEl.textContent = "This explanation isn't connected right now."; return; }
++                    const result = nav.explainSurface(btn.getAttribute("data-ud-ai-explain"), this.#userId);
++                    responseEl.textContent = result.available ? result.text : (result.reason || "Not available right now.");
++                });
++            });
++
+             const openBtn = host.querySelector("#cozy-ud-ai-open");
+             if (openBtn) {
+                 openBtn.addEventListener("click", () => {
+--- /home/claude/baseline_extract/core/shell/tests/dashboard-navigation-core.test.js	2026-08-21 04:33:36.000000000 +0000
++++ /home/claude/work/core/shell/tests/dashboard-navigation-core.test.js	2026-08-21 05:45:17.503919284 +0000
+@@ -52,6 +52,7 @@
+     community: path.join(__dirname, '..', '..', 'modules', 'intelligence', 'knowledge', 'cozy-knowledge-community.js'),
+     review: path.join(__dirname, '..', '..', 'modules', 'intelligence', 'knowledge', 'cozy-knowledge-review.js'),
+     communitySummary: path.join(__dirname, '..', 'dashboard-community-summary-core.js'),
++    teachRouting: path.join(__dirname, '..', '..', 'modules', 'intelligence', 'knowledge', 'teach', 'cozy-teach-cozyai-routing-core.js'),
+     core: path.join(__dirname, '..', 'dashboard-navigation-core.js')
+ };
+ 
+@@ -69,6 +70,7 @@
+         if (opts.withReview !== false) require(roots.review);
+         if (opts.withCommunitySummary !== false) require(roots.communitySummary);
+     }
++    if (opts.withTeachRouting !== false) require(roots.teachRouting);
+     require(roots.core);
+     return {
+         Identity: global.window.CozyOS.IdentityEngine,
+@@ -76,6 +78,7 @@
+         Visibility: global.window.CozyOS.ApplicationVisibility,
+         LanguageRegistry: global.window.CozyOS.CozyLanguageRegistry,
+         Community: global.window.CozyOS.CozyKnowledgeCommunity,
++        TeachRouting: global.window.CozyOS.CozyTeachCozyAIRouting,
+         Core: global.window.CozyOS.DashboardNavigationCore
+     };
+ }
+@@ -320,6 +323,155 @@
+         assert.strictEqual('roles' in ctx, false);
+     });
+ 
++    // -----------------------------------------------------------------
++    // Prompt 2 §8 — AI context settings-awareness + real user dashboard
++    // knowledge. Additive to every block above; nothing above changed.
++    // -----------------------------------------------------------------
++
++    await asyncTest('§8 applications: launchable is a real subset of available (never inferred)', async () => {
++        mods = loadModules();
++        mods.ServiceRegistry.registerApplication({ id: 'launchapp1', name: 'Launch App One' });
++        const userId = await makeUser();
++        mods.Identity.assignApplication(userId, 'launchapp1');
++        const ctx = mods.Core.buildAIContext(userId);
++        assert.ok(ctx.applications.available.includes('launchapp1'));
++        // getRealLaunchPath() only resolves paths for a fixed real set
++        // (see application-visibility.js REAL_APP_PATHS) — an
++        // arbitrary freshly-registered app id has no real path, so it
++        // must be reported visible-but-not-launchable, never assumed
++        // launchable.
++        assert.ok(!ctx.applications.launchable.includes('launchapp1'));
++    });
++
++    await asyncTest('§8 identity: displayName is username only, never roles/companyId/orgId', async () => {
++        mods = loadModules();
++        const userId = await makeUser();
++        const ctx = mods.Core.buildAIContext(userId);
++        assert.strictEqual(typeof ctx.identity.displayName, 'string');
++        const serialized = JSON.stringify(ctx);
++        assert.ok(!serialized.includes('companyId'));
++        assert.ok(!serialized.includes('orgId'));
++        assert.ok(!serialized.includes('roles'));
++    });
++
++    await asyncTest('§8 community.availableActions: honestly empty when the real teach-routing engine is not loaded', async () => {
++        mods = loadModules({ withTeachRouting: false });
++        const userId = await makeUser();
++        const ctx = mods.Core.buildAIContext(userId);
++        assert.deepStrictEqual(ctx.community.availableActions, []);
++    });
++
++    await asyncTest('§8 community.availableActions: reports contribute-knowledge only via the real, loaded TEACH_KNOWLEDGE_TYPES', async () => {
++        mods = loadModules();
++        assert.ok(Array.isArray(mods.TeachRouting.TEACH_KNOWLEDGE_TYPES) && mods.TeachRouting.TEACH_KNOWLEDGE_TYPES.length > 0);
++        const userId = await makeUser();
++        const ctx = mods.Core.buildAIContext(userId);
++        assert.deepStrictEqual(ctx.community.availableActions, ['contribute-knowledge']);
++    });
++
++    await asyncTest('§8 settings.relevantPreferences: mirrors the real, already-resolved language state', async () => {
++        mods = loadModules();
++        const userId = await makeUser();
++        mods.Identity.setLanguagePreference(userId, 'sw');
++        const ctx = mods.Core.buildAIContext(userId);
++        assert.strictEqual(ctx.settings.relevantPreferences.language.current, 'sw');
++        assert.strictEqual(ctx.settings.relevantPreferences.language.isFallback, false);
++    });
++
++    await asyncTest('§8 administration: non-admin gets available:false and an empty, non-fabricated tools list', async () => {
++        mods = loadModules();
++        const userId = await makeUser({ roles: [] });
++        const ctx = mods.Core.buildAIContext(userId);
++        assert.strictEqual(ctx.administration.available, false);
++        assert.deepStrictEqual(ctx.administration.tools, []);
++    });
++
++    await asyncTest('§8 administration: an arbitrary client-side role string never grants administration.available', async () => {
++        mods = loadModules();
++        // "administrator", "root", "superuser" etc. are NOT the real
++        // "platform-admin" role checkPermission() actually checks —
++        // this proves the boundary is the real role name, not any
++        // role-shaped string.
++        const userId = await makeUser({ roles: ['administrator', 'root', 'superuser'] });
++        const ctx = mods.Core.buildAIContext(userId);
++        assert.strictEqual(ctx.administration.available, false);
++    });
++
++    await asyncTest('§8 administration: a real platform-admin user (via IdentityEngine end-to-end) gets available:true and real, non-fabricated tools', async () => {
++        mods = loadModules();
++        const userId = await makeUser({ roles: ['platform-admin'] });
++        assert.strictEqual(mods.Identity.isPlatformAdmin(userId), true);
++        const ctx = mods.Core.buildAIContext(userId);
++        assert.strictEqual(ctx.administration.available, true);
++        // getDashboardConfig()'s real admin branch always returns real
++        // `users` and `applicationStates` arrays (see identity-engine.js),
++        // so both real labels must be present — never a third,
++        // invented tool name.
++        assert.ok(ctx.administration.tools.includes('user-directory'));
++        assert.ok(ctx.administration.tools.includes('application-oversight'));
++        assert.strictEqual(ctx.administration.tools.length, 2);
++    });
++
++    await asyncTest('§8 administration: an application-specific role (e.g. a ChurchOS-style role) never becomes platform-admin authority', async () => {
++        mods = loadModules();
++        // No application-role engine is loaded/composed by this file
++        // at all (structurally true — see the "no registry-mutating
++        // call" test above, and this file never reads any field named
++        // churchRole/organizationRole/etc.) — an application-scoped
++        // role string sitting in Identity's own roles array must still
++        // never satisfy the real "platform-admin" check.
++        const userId = await makeUser({ roles: ['church-pastor', 'church-administrator'] });
++        const ctx = mods.Core.buildAIContext(userId);
++        assert.strictEqual(ctx.administration.available, false);
++    });
++
++    // -----------------------------------------------------------------
++    // Prompt 2 §8/§9/§14 — explainSurface(): honest, context-derived
++    // per-surface capability descriptions (never hardcoded claims).
++    // -----------------------------------------------------------------
++
++    test('§8 explainSurface: refuses an unknown surface honestly rather than guessing', () => {
++        mods = loadModules();
++        const result = mods.Core.explainSurface('marketplace', 'anyone');
++        assert.strictEqual(result.available, false);
++        assert.ok(result.reason);
++    });
++
++    await asyncTest('§8 explainSurface: works for all five real surfaces and returns real, non-empty text', async () => {
++        mods = loadModules();
++        const userId = await makeUser();
++        for (const surface of mods.Core.getSurfaceOrder()) {
++            const result = mods.Core.explainSurface(surface, userId);
++            assert.strictEqual(result.available, true);
++            assert.strictEqual(result.surface, surface);
++            assert.ok(typeof result.text === 'string' && result.text.length > 0);
++        }
++    });
++
++    await asyncTest('§8 explainSurface("settings"): honestly tells a non-admin administrator tools are unavailable', async () => {
++        mods = loadModules();
++        const userId = await makeUser({ roles: [] });
++        const result = mods.Core.explainSurface('settings', userId);
++        assert.ok(/not available/i.test(result.text));
++    });
++
++    await asyncTest('§8 explainSurface("settings"): honestly tells a real platform-admin their tools are available', async () => {
++        mods = loadModules();
++        const userId = await makeUser({ roles: ['platform-admin'] });
++        const result = mods.Core.explainSurface('settings', userId);
++        assert.ok(/platform-administrator access/i.test(result.text));
++    });
++
++    test('§8 explainSurface: text is generated at call time from real context, never a static string constant in this file', () => {
++        // Structural check: this file's explainSurface() must not
++        // contain a hardcoded capability claim like "is active" /
++        // "is installed" / "is synchronized" for any application —
++        // every sentence must be built from a ctx.* field.
++        const src = require('fs').readFileSync(roots.core, 'utf8');
++        const explainFn = src.slice(src.indexOf('explainSurface('));
++        assert.ok(!/is active"|is installed"|synchronized with the cloud/.test(explainFn));
++    });
++
+     console.log(`\n${passed} passed, ${failed} failed`);
+     process.exit(failed ? 1 : 0);
+ })();

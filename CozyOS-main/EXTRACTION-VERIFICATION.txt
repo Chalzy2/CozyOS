@@ -1,0 +1,7 @@
+ZIP: COS-STEP4D-B-PHASE6-PATCH-4.zip
+SHA-256 (1st): a40e03ce63372a2915ce3ede5dee03721a51e49b0af10d854e7fe88d493e89ed
+SHA-256 (2nd): a40e03ce63372a2915ce3ede5dee03721a51e49b0af10d854e7fe88d493e89ed
+MATCH: yes
+unzip -t: clean
+Fresh extraction (server/) byte-for-byte identical to build tree: yes
+Tests re-run from fresh extraction: 132/132 passing, 0 failures
