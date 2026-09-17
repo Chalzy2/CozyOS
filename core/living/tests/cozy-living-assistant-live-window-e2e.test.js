@@ -225,6 +225,22 @@ test('LIVE WINDOW E2E: Kiswahili questions about a real application are understo
     }
 });
 
+test('LIVE WINDOW E2E: additional Kiswahili pronoun forms ("yake", bare "Inafaa kwa nani?") resolve through the real DOM', async () => {
+    const { browser, page } = await openLiveWindow();
+    try {
+        const r1 = await ask(page, 'What does ShopOS do?');
+        assert.match(r1, /ShopOS/i);
+
+        const r2 = await ask(page, 'Faida yake ni zipi?');
+        assert.match(r2, /ShopOS/i);
+
+        const r3 = await ask(page, 'Inafaa kwa nani?');
+        assert.match(r3, /ShopOS/i);
+    } finally {
+        await browser.close();
+    }
+});
+
 test('LIVE WINDOW E2E: platform vs application entity distinction never accidentally falls back to platform-level content', async () => {
     const { browser, page } = await openLiveWindow();
     try {
