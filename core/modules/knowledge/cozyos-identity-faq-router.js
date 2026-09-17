@@ -213,11 +213,31 @@
                 "jina cozyos linamaanisha nini"]
         },
         [INTENTS.COZYOS_FUTURE]: {
+            // LIVE WINDOW NEXT REPAIR — real production gap: "how can
+            // cozyos help communities" (and its Kiswahili counterpart)
+            // shares the exact "how can cozyos help X" shape with
+            // genuinely distinct, more specific practical-benefit
+            // questions this router has no trigger for at all ("How can
+            // CozyOS help churches/schools/businesses?"), which the
+            // word-overlap scorer below then fuzzy-matched onto THIS
+            // long-term-vision intent purely by shape, producing the
+            // African Knowledge Initiative long-term-goal answer for a
+            // question that was actually asking about
+            // getWhyUseCozyOSFact()'s real, concrete "solves practical,
+            // everyday problems for individuals, churches, schools, and
+            // communities" content (see cozy-ai.js's CONTEXT_KNOWLEDGE_
+            // ROUTES, which already, correctly, routes "help" there).
+            // Removed rather than special-cased so the concrete
+            // beneficiary-domain question reaches the correct, more
+            // specific answer instead of being masked by this broader
+            // one — "what future is cozyos trying to build"/"how can
+            // cozyos change people's lives" (still present below) remain
+            // this intent's real, distinct triggers.
             en: ["what future is cozyos trying to build", "what does cozyos want technology to become",
                 "what is the bigger idea behind cozyos", "what is cozyos's role in the future of ai",
-                "how can cozyos change people's lives", "how can cozyos help communities"],
+                "how can cozyos change people's lives"],
             sw: ["cozyos inataka kujenga mustakabali gani wa teknolojia", "wazo kubwa nyuma ya cozyos ni nini",
-                "cozyos itabadilishaje maisha ya watu", "cozyos itasaidiaje jamii"]
+                "cozyos itabadilishaje maisha ya watu"]
         },
         [INTENTS.COZYOS_PURPOSE]: {
             en: ["is cozyos meant to replace existing operating systems", "what is cozyos trying to change in technology",

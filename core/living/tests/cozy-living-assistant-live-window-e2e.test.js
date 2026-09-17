@@ -323,4 +323,86 @@ test('LIVE WINDOW E2E: the real ServiceRegistry that Live Window itself reads re
     }
 });
 
+test('LIVE WINDOW E2E: malformed/natural-language ChurchOS questions resolve to real, verified ChurchOS content (LIVE WINDOW NEXT REPAIR regression guard)', async () => {
+    // Real production report: these exact 5 questions (typo'd verbs,
+    // pluralized "benefits"/"helps" the provider's regex only accepted
+    // as bare "benefit"/"help", and a platform+beneficiary-domain
+    // question naming no specific application) all returned "Some
+    // related context exists, but nothing in it could be honestly
+    // rendered as a verified answer." in production even though
+    // ChurchOS's real, verified human-purpose data (getApplicationHumanPurposeFact)
+    // was present the whole time — a routing gap (intent stayed
+    // "unsupported"/no getContext() route existed for a named
+    // application), never a knowledge gap.
+    const { browser, page } = await openLiveWindow();
+    try {
+        const appSpecific = [
+            'What doe churchos works',
+            'How does one benefits in ChurchOs',
+            'Why doeess ChurchOs do',
+            'How do humans benefits in ChurchOs',
+        ];
+        for (const q of appSpecific) {
+            const r = await ask(page, q);
+            assert.doesNotMatch(r, /nothing in it could be honestly rendered/i, `"${q}" still falls back instead of resolving to real ChurchOS content: "${r}"`);
+            assert.doesNotMatch(r, /I don't have verified information/i, `"${q}" still falls back instead of resolving to real ChurchOS content: "${r}"`);
+            assert.match(r, /ChurchOS/i, `expected "${q}" to answer about ChurchOS specifically, got: "${r}"`);
+            assert.match(r, /church|faith/i, `expected "${q}" to include ChurchOS's real, verified human-purpose content, got: "${r}"`);
+        }
+
+        // Platform + beneficiary-domain question — names no specific
+        // application ("cozyos" is the platform, not a registered app),
+        // so it must resolve via the real, verified getWhyUseCozyOSFact()
+        // platform content, never a fabricated per-app answer and never
+        // an unrelated intent (e.g. the African Knowledge Initiative
+        // long-term-goal answer, a real, separate false-positive this
+        // same pass found and fixed in cozyos-identity-faq-router.js).
+        const domainAnswer = await ask(page, 'How can cozyos helps churches');
+        assert.doesNotMatch(domainAnswer, /nothing in it could be honestly rendered/i, `domain question still falls back: "${domainAnswer}"`);
+        assert.match(domainAnswer, /practical, everyday problems/i, `expected the real getWhyUseCozyOSFact() content, got: "${domainAnswer}"`);
+    } finally {
+        await browser.close();
+    }
+});
+
+test('LIVE WINDOW E2E: "How can CozyOS help churches/schools/businesses?" resolves to the real platform benefit content, not the unrelated African Knowledge Initiative long-term-goal answer', async () => {
+    // Real gap found extending the required test matrix beyond the
+    // reported 5 questions: CozyIdentityFAQRouter's COZYOS_FUTURE
+    // trigger "how can cozyos help communities" shared its shape with
+    // these genuinely distinct, more concrete practical-benefit
+    // questions, so the word-overlap scorer fuzzy-matched them onto the
+    // wrong intent (the long-term African Knowledge Initiative goal)
+    // ahead of the correct, real getWhyUseCozyOSFact() answer.
+    const { browser, page } = await openLiveWindow();
+    try {
+        for (const domain of ['churches', 'schools', 'businesses']) {
+            const r = await ask(page, `How can CozyOS help ${domain}?`);
+            assert.doesNotMatch(r, /community-driven collections of African languages/i, `"How can CozyOS help ${domain}?" still matches the unrelated long-term-goal answer: "${r}"`);
+            assert.match(r, /practical, everyday problems/i, `expected the real getWhyUseCozyOSFact() content for "${domain}", got: "${r}"`);
+        }
+    } finally {
+        await browser.close();
+    }
+});
+
+test('LIVE WINDOW E2E: Kiswahili ChurchOS-specific questions resolve to real, verified ChurchOS content, in Kiswahili', async () => {
+    const { browser, page } = await openLiveWindow();
+    try {
+        const swQuestions = [
+            'ChurchOS inafanya nini?',
+            'ChurchOS inasaidia nani?',
+            'Faida za ChurchOS ni zipi?',
+            'ChurchOS inatatua tatizo gani?',
+            'Kwa nini ChurchOS ni muhimu?',
+        ];
+        for (const q of swQuestions) {
+            const r = await ask(page, q);
+            assert.match(r, /ChurchOS/i, `expected "${q}" to answer about ChurchOS, got: "${r}"`);
+            assert.match(r, /kanisa|makanisa/i, `expected "${q}" to answer in Kiswahili with real ChurchOS content, got: "${r}"`);
+        }
+    } finally {
+        await browser.close();
+    }
+});
+
 console.log('Live Window real-browser end-to-end suite: run complete.');

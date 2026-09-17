@@ -282,6 +282,16 @@
         // remains getApplicationHumanPurposeFact()'s job).
         { keywords: ["benefit", "gain", "useful", "usefulness"], getter: "getWhyUseCozyOSFact" },
         { keywords: ["problem", "solve", "solving", "solves"], getter: "getWhyUseCozyOSFact" },
+        // LIVE WINDOW NEXT REPAIR — real production gap: "How can
+        // cozyos helps churches" names no specific application (unlike
+        // "How does ChurchOS help people?", which _mentionsNamedApplication()
+        // already routes away from this platform-level path), so it
+        // belongs here, but no keyword stem covered "help"/"helps" —
+        // only the already-covered "benefit"/"problem"/"important"
+        // stems did. getWhyUseCozyOSFact() already, honestly, names
+        // churches/schools/communities as real beneficiaries (see the
+        // comment above) — this was a routing gap, not a knowledge gap.
+        { keywords: ["help"], getter: "getWhyUseCozyOSFact" },
         { keywords: ["important", "importance", "matter", "point of cozyos"], getter: "getDifferentiationFact" }
     ]);
 
