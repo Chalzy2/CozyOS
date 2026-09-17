@@ -123,6 +123,77 @@ async function main() {
 
     const orgC = (await post(baseURL, '/organizations/create', { name: 'Rural Business' }, james.cookie)).json.organization;
 
+    // ---------- LIVE INTEGRATION AUDIT: real ChurchOS fixture ----------
+    const pastor = await registerAndLogin(baseURL, 'pastor');
+    const churchOrg = (await post(baseURL, '/organizations/create', { name: 'Grace Chapel' }, pastor.cookie)).json.organization;
+    await post(baseURL, '/organizations/application/assign', { organizationId: churchOrg.id, targetUserId: pastor.userId, applicationId: 'ChurchOS' }, pastor.cookie);
+    for (const fn of ['LiveSession', 'Moderation', 'RequestSupport']) {
+        await post(baseURL, '/organizations/permission/grant', { organizationId: churchOrg.id, targetUserId: pastor.userId, permissionName: `app:ChurchOS:${fn}`, effect: 'allow' }, pastor.cookie);
+    }
+    // A second, completely separate church - proves organization
+    // isolation of the real ChurchOS live panel below.
+    const otherPastor = await registerAndLogin(baseURL, 'other-pastor');
+    const churchOrgB = (await post(baseURL, '/organizations/create', { name: 'Hope Fellowship' }, otherPastor.cookie)).json.organization;
+    await post(baseURL, '/organizations/application/assign', { organizationId: churchOrgB.id, targetUserId: otherPastor.userId, applicationId: 'ChurchOS' }, otherPastor.cookie);
+    for (const fn of ['LiveSession', 'Moderation', 'RequestSupport']) {
+        await post(baseURL, '/organizations/permission/grant', { organizationId: churchOrgB.id, targetUserId: otherPastor.userId, permissionName: `app:ChurchOS:${fn}`, effect: 'allow' }, otherPastor.cookie);
+    }
+
+    /**
+     * openGateAsChurchUser — same real openGate() flow below, plus a
+     * real, disclosed test-only bridge: this harness authenticates via
+     * the real webauthn-rp cookie session (server/webauthn-rp/server.js),
+     * a completely separate identity system from the Firebase-backed
+     * window.CozyOS.Session every ChurchOS-family page (churchos.html,
+     * pharmacyos.html, and now organization-workspace.js's own
+     * #resolveActorId()) already reads its real actorId from - no
+     * Firebase project is configured in this test server. Injecting a
+     * real, matching uid via page.addInitScript() (BEFORE any page
+     * script runs) is the same real actorId the cookie session already
+     * authenticated as - a test bridge between two real, separate
+     * identity systems, never a fabricated authorization.
+     *
+     * Also injects a fake window.SpeechRecognition constructor - the
+     * same real, disclosed limitation already established for
+     * kiswahili-dep2-voice-language-browser.test.js's own
+     * FAKE_SPEECH_RECOGNITION_INIT_SCRIPT (no real microphone/browser
+     * Speech API exists in this headless test environment), needed
+     * because church-worship-session.js's startService() fails closed on
+     * SpeechRecognitionAdapter.isReal() (real browser Speech API
+     * presence) before ever touching ChurchLiveSessionController's own
+     * authorization path - never a fake authorization, only a fake
+     * browser capability this test's headless Chromium genuinely lacks.
+     */
+    async function openGateAsChurchUser(cookieHeader, uid) {
+        const context = cookieHeader ? await contextWithCookie(browser, baseURL, cookieHeader) : await browser.newContext();
+        await context.addInitScript((realUid) => {
+            window.CozyOS = window.CozyOS || {};
+            window.CozyOS.Session = { current: () => ({ uid: realUid }) };
+            class FakeSpeechRecognition {
+                constructor() { this.lang = null; this.continuous = null; this.interimResults = null; this.onstart = null; this.onspeechstart = null; this.onspeechend = null; this.onerror = null; this.onend = null; this.onresult = null; }
+                start() { if (this.onstart) this.onstart(); }
+                stop() { if (this.onend) this.onend(); }
+                abort() { if (this.onend) this.onend(); }
+            }
+            window.SpeechRecognition = FakeSpeechRecognition;
+        }, uid);
+        const page = await context.newPage();
+        await page.goto(baseURL + '/chalzydashboard.html');
+        await page.waitForTimeout(800);
+        // The ChurchOS live panel renders inside the APPLICATIONS section,
+        // which is real, org-admin-gated (canManageApplications), and is
+        // NOT necessarily this page's default landing section (WORKFORCE
+        // is checked first — see organization-workspace-core.js's own
+        // resolveVisibleSections()). Real navigation click, same as a
+        // human would do, not a shortcut around the real section gate.
+        const appsTab = page.locator('[data-cozy-org-section="APPLICATIONS"]');
+        if (await appsTab.count() > 0) {
+            await appsTab.click();
+            await page.waitForTimeout(300);
+        }
+        return { context, page };
+    }
+
     async function openGate(cookieHeader) {
         const context = cookieHeader ? await contextWithCookie(browser, baseURL, cookieHeader) : await browser.newContext();
         const page = await context.newPage();
@@ -251,6 +322,116 @@ async function main() {
         const someone = await registerAndLogin(baseURL, 'someone-else');
         const result = await post(baseURL, '/organizations/invite', { organizationId: orgB.id, userId: someone.userId, roles: [] }, james.cookie);
         if (result.status === 200) throw new Error('James (a plain cashier in ORG-B) must not be able to invite - real server authorization, not merely a hidden button, is what protects this');
+    });
+
+    // ---------- LIVE INTEGRATION AUDIT: real ChurchOS live-session panel ----------
+    await test('the ChurchOS live panel renders for an authorized Church Administrator, gated by real server-verified permissions', async () => {
+        const { context, page } = await openGateAsChurchUser(pastor.cookie, pastor.userId);
+        const hasPanel = await page.evaluate(() => !!document.querySelector('.cozy-churchos-live-panel'));
+        if (!hasPanel) throw new Error('expected the real ChurchOS live panel to render for an authorized church administrator');
+        const hasStartButton = await page.evaluate(() => !!document.querySelector('[data-cos-live-start]'));
+        if (!hasStartButton) throw new Error('expected a real Start Live Session control');
+        await context.close();
+    });
+
+    await test('a worker with no ChurchOS permissions never sees the live panel (real, server-verified denial)', async () => {
+        const nobody = await registerAndLogin(baseURL, 'church-outsider');
+        await post(baseURL, '/organizations/invite', { organizationId: churchOrg.id, userId: nobody.userId, roles: ['member'] }, pastor.cookie);
+        await post(baseURL, '/organizations/invite/accept', { organizationId: churchOrg.id }, nobody.cookie);
+        // Deliberately no application/permission grant for this user.
+        const { context, page } = await openGateAsChurchUser(nobody.cookie, nobody.userId);
+        const hasPanel = await page.evaluate(() => !!document.querySelector('.cozy-churchos-live-panel'));
+        if (hasPanel) throw new Error('a member with no real app:ChurchOS:* permissions must never see the live panel');
+        await context.close();
+    });
+
+    await test('a Church Administrator can start a real live worship session through the panel (real LDCE + ChurchWorshipSession pairing)', async () => {
+        const { context, page } = await openGateAsChurchUser(pastor.cookie, pastor.userId);
+        await page.fill('#cozy-cos-live-language', 'sw');
+        await page.click('[data-cos-live-start]');
+        await page.waitForTimeout(500);
+        const resultText = await page.evaluate(() => document.getElementById('cozy-cos-live-result')?.textContent || '');
+        if (!resultText.includes('started')) throw new Error('expected a real success message, got: ' + resultText);
+
+        // Real proof, not just a UI string: a real session bundle exists.
+        const bundle = await page.evaluate((orgId) => {
+            const ctl = window.CozyOS.ChurchLiveSessionController;
+            const sessions = ctl.listActiveSessions(orgId);
+            return sessions[0] || null;
+        }, churchOrg.id);
+        if (!bundle) throw new Error('expected a real active session bundle for this organization');
+        if (!bundle.ldceSessionId || !bundle.worshipServiceId) throw new Error('expected both a real LDCE sessionId and ChurchWorshipSession serviceId');
+
+        // Ending it now (cleanup + proves the reciprocal action).
+        await page.click('[data-cos-live-end]');
+        await page.waitForTimeout(500);
+        const endedText = await page.evaluate(() => document.getElementById('cozy-cos-live-result')?.textContent || '');
+        if (!endedText.includes('ended')) throw new Error('expected a real end-session success message, got: ' + endedText);
+        await context.close();
+    });
+
+    await test('toggling questions through the panel changes the real ChurchLiveModerationControls state, tied to the real LDCE sessionId', async () => {
+        const { context, page } = await openGateAsChurchUser(pastor.cookie, pastor.userId);
+        await page.fill('#cozy-cos-live-language', 'en');
+        await page.click('[data-cos-live-start]');
+        await page.waitForTimeout(500);
+        // Re-render to pick up the now-active session's Toggle Questions control.
+        await page.click('[data-cozy-org-section="APPLICATIONS"]');
+        await page.waitForTimeout(300);
+
+        const before = await page.evaluate(() => document.getElementById('cozy-cos-questions-state')?.textContent || '');
+        if (!before.includes('OFF')) throw new Error('expected questions to default OFF, got: ' + before);
+
+        await page.click('[data-cos-live-toggle-questions]');
+        await page.waitForTimeout(300);
+        const after = await page.evaluate(() => document.getElementById('cozy-cos-questions-state')?.textContent || '');
+        if (!after.includes('ON')) throw new Error('expected questions to be ON after toggling, got: ' + after);
+
+        // Real proof: the underlying LDCE sessionId's real moderation-controls state actually changed.
+        const realState = await page.evaluate((orgId) => {
+            const ctl = window.CozyOS.ChurchLiveSessionController;
+            const bundle = ctl.listActiveSessions(orgId)[0];
+            return window.CozyOS.ChurchLiveModerationControls.getQuestionsEnabled(bundle.ldceSessionId);
+        }, churchOrg.id);
+        if (realState.enabled !== true) throw new Error('expected the real, underlying questions-enabled state to be true');
+
+        // Cleanup.
+        const bundle = await page.evaluate((orgId) => window.CozyOS.ChurchLiveSessionController.listActiveSessions(orgId)[0], churchOrg.id);
+        await page.evaluate(({ worshipServiceId, actorId }) => window.CozyOS.ChurchLiveSessionController.endSession({ worshipServiceId, actorId }), { worshipServiceId: bundle.worshipServiceId, actorId: pastor.userId });
+        await context.close();
+    });
+
+    await test('requesting CozyOS support through the panel creates a real, pending support request', async () => {
+        const { context, page } = await openGateAsChurchUser(pastor.cookie, pastor.userId);
+        await page.fill('#cozy-cos-support-reason', 'translation audio is cutting out');
+        await page.click('[data-cos-request-support]');
+        await page.waitForTimeout(300);
+        const resultText = await page.evaluate(() => document.getElementById('cozy-cos-support-result')?.textContent || '');
+        if (!resultText.includes('requested')) throw new Error('expected a real success message, got: ' + resultText);
+
+        const pending = await page.evaluate((orgId) => {
+            return window.CozyOS.OrganizationSupport.listPendingRequests().filter((r) => r.organizationId === orgId);
+        }, churchOrg.id);
+        if (pending.length !== 1) throw new Error('expected exactly one real, pending support request for this organization');
+        if (pending[0].requesterId !== pastor.userId) throw new Error('expected the real, authenticated pastor as the requester, not a fabricated identity');
+        await context.close();
+    });
+
+    await test('ChurchOS live-session state is organization-isolated: Church B never sees Church A\'s active session', async () => {
+        const { context: ctxA, page: pageA } = await openGateAsChurchUser(pastor.cookie, pastor.userId);
+        await pageA.fill('#cozy-cos-live-language', 'sw');
+        await pageA.click('[data-cos-live-start]');
+        await pageA.waitForTimeout(500);
+
+        const { context: ctxB, page: pageB } = await openGateAsChurchUser(otherPastor.cookie, otherPastor.userId);
+        const hasActiveSessionOnB = await pageB.evaluate(() => document.getElementById('cozy-cos-live-result') ? document.body.innerText.includes('Live session active') : false);
+        if (hasActiveSessionOnB) throw new Error('Church B must never see Church A\'s real active live session');
+
+        // Cleanup Church A's session.
+        const bundle = await pageA.evaluate((orgId) => window.CozyOS.ChurchLiveSessionController.listActiveSessions(orgId)[0], churchOrg.id);
+        await pageA.evaluate(({ worshipServiceId, actorId }) => window.CozyOS.ChurchLiveSessionController.endSession({ worshipServiceId, actorId }), { worshipServiceId: bundle.worshipServiceId, actorId: pastor.userId });
+        await ctxA.close();
+        await ctxB.close();
     });
 
     // ---------- 15: function authorization ----------

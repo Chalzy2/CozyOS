@@ -108,6 +108,40 @@
         }
         getOrganization(orgId) { const o = this.#organizations.get(orgId); return o ? this.#deepClone(o) : null; }
         organizationExists(orgId) { return this.#organizations.has(orgId); }
+
+        /**
+         * registerExternalOrganization({orgId, name, type})
+         *   TRUST-BOUNDARY BRIDGE — distinct from createOrganization().
+         *   This registry normally MINTS its own organization ids
+         *   (`#generateId("org")`); a real server-side organization
+         *   (created through `server/webauthn-rp/organizations.js` and
+         *   already verified by a successful `POST /organizations/
+         *   context` response — see organization-workspace.js's
+         *   switchTo()) has its OWN id, and this registry has no way to
+         *   recognize it under that exact id without this method. This
+         *   method performs NO verification of its own — callers must
+         *   only ever pass an orgId that has already been independently,
+         *   server-side verified. Idempotent: a second call for the same
+         *   orgId only refreshes name/type, never creates a duplicate or
+         *   changes the id.
+         */
+        registerExternalOrganization(rawInput = {}) {
+            const input = sanitize(rawInput);
+            if (!input.orgId || !String(input.orgId).trim()) throw new TypeError("[organization-registry] registerExternalOrganization(): a real, non-empty orgId is required.");
+            const orgId = String(input.orgId).trim();
+            const now = new Date().toISOString();
+            const existing = this.#organizations.get(orgId);
+            if (existing) {
+                const updated = Object.freeze({ ...existing, name: input.name ? this.#escapeHtml(input.name) : existing.name, type: input.type ? this.#escapeHtml(input.type) : existing.type, updatedAt: now });
+                this.#organizations.set(orgId, updated);
+                return this.#deepClone(updated);
+            }
+            const org = Object.freeze({ orgId, name: input.name ? this.#escapeHtml(input.name) : orgId, type: input.type ? this.#escapeHtml(input.type) : null, notes: null, createdAt: now, updatedAt: now, archived: false, external: true });
+            this.#organizations.set(orgId, org);
+            this.#diagnostics.organizationsCreated++;
+            this.#recordHistory("external-registered", "organization", orgId, { name: org.name });
+            return this.#deepClone(org);
+        }
         listOrganizations({ includeArchived = false } = {}) {
             return Array.from(this.#organizations.values()).filter(o => includeArchived || !o.archived).map(o => this.#deepClone(o));
         }

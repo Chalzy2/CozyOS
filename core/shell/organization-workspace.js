@@ -155,12 +155,34 @@
     // to ask about for a given application.
     const KNOWN_APPLICATION_FUNCTIONS = Object.freeze({
         MpesaOS: Object.freeze(['Transactions', 'Receipts', 'Reports', 'Float', 'Till', 'Paybill']),
+        // LIVE INTEGRATION AUDIT — real ChurchOS organization-tier
+        // functions. Same disclosed, hardcoded-catalog convention as
+        // MpesaOS above (see this file's own header) — gated by the
+        // SAME real, server-verified app:ChurchOS:<Function> permission
+        // entries (functionPermissionName()/isFunctionEnabled() below),
+        // never a second entitlement source.
+        ChurchOS: Object.freeze(['LiveSession', 'Moderation', 'RequestSupport']),
     });
 
     function resolveFunctionsForApplication(applicationId) {
         const known = KNOWN_APPLICATION_FUNCTIONS[applicationId];
         return known ? known.slice() : [];
     }
+
+    // LIVE INTEGRATION AUDIT — the pre-existing ChurchOS-family live
+    // engines (church-live-session-controller.js, church-live-
+    // moderation.js and siblings) were all built around the CLIENT-SIDE
+    // OrganizationMembership.isAuthorized() checking domain-specific
+    // permission strings ("churchos-live:manage", "moderation:comment-
+    // manage") — a different, older vocabulary than the SERVER-verified
+    // "app:ChurchOS:<Function>" function-permission names this file's own
+    // isFunctionEnabled() checks. This map is the one, disclosed
+    // translation between the two, used only by #syncClientAuthority()
+    // below — never a second permission-naming scheme invented elsewhere.
+    const CHURCHOS_LIVE_PERMISSION_BRIDGE = Object.freeze({
+        'app:ChurchOS:LiveSession': 'churchos-live:manage',
+        'app:ChurchOS:Moderation': 'moderation:comment-manage',
+    });
 
     // ------------------------------------------------------------------
     // DOM controller
@@ -278,6 +300,8 @@
                 return { success: false, reason: result.reason };
             }
 
+            this.#syncClientAuthority(result.context);
+
             const core = window.CozyOS.OrganizationWorkspaceCore;
             const presentation = core.resolveWorkspacePresentation(result.context);
             const members = await this.#fetchMembersIfAuthorized(organizationId, presentation);
@@ -361,6 +385,7 @@
             const renderSection = (sectionKey) => {
                 contentEl.innerHTML = this.#renderSectionContent(sectionKey, presentation, ctx);
                 if (sectionKey === core.SECTION.WORKFORCE) this.#wireWorkforceSection(contentEl, presentation.organizationId);
+                if (sectionKey === core.SECTION.APPLICATIONS) this.#wireChurchOSLivePanel(contentEl, presentation, ctx);
             };
             this.#root.querySelectorAll('[data-cozy-org-section]').forEach((btn) => {
                 btn.addEventListener('click', () => renderSection(btn.getAttribute('data-cozy-org-section')));
@@ -372,6 +397,7 @@
                 renderSection(sections[0]);
             } else {
                 contentEl.innerHTML = '<p style="color:#94a3b8;font-size:13px;">Your assigned applications:</p>' + this.#renderApplicationsSection(presentation, ctx);
+                this.#wireChurchOSLivePanel(contentEl, presentation, ctx);
             }
         }
 
@@ -485,8 +511,260 @@
                     const enabled = core.isFunctionEnabled(ctx, appId, fnId);
                     return '<li style="color:' + (enabled ? '#eaf5ee' : '#5a6b63') + ';">' + escapeHtml(fnId) + ' — ' + (enabled ? 'ENABLED' : 'DENIED') + '</li>';
                 }).join('');
-                return '<div style="margin-bottom:12px;"><strong>' + escapeHtml(appId) + '</strong><ul style="font-size:13px;">' + fns + '</ul></div>';
+                const churchPanel = appId === 'ChurchOS' ? this.#renderChurchOSLivePanel(presentation, ctx, core) : '';
+                return '<div style="margin-bottom:12px;"><strong>' + escapeHtml(appId) + '</strong><ul style="font-size:13px;">' + fns + '</ul>' + churchPanel + '</div>';
             }).join('');
+        }
+
+        /**
+         * #renderChurchOSLivePanel(presentation, ctx, core)
+         *   LIVE INTEGRATION AUDIT — the real ChurchOS organization-tier
+         *   live-session surface a Church Administrator was missing
+         *   entirely (see CHURCHOS-AUTHORITY-WIRING-MAP.md's own
+         *   critical finding: every ChurchOS live file was reachable
+         *   only from the PLATFORM-tier admin-workspace.html).
+         *
+         *   VISIBILITY is gated by the SAME real, server-verified
+         *   app:ChurchOS:<Function> permission this file's own
+         *   isFunctionEnabled() already checks for every other
+         *   application (never a second visibility source).
+         *
+         *   ACTIONS inside the panel (start/stop session, toggle
+         *   questions, request support) compose the real, existing
+         *   client-side ChurchOS authorization chain
+         *   (OrganizationMembership.isAuthorized(), the same real check
+         *   every other ChurchOS live file in this repository already
+         *   uses) via ChurchLiveSessionController/
+         *   ChurchLiveModerationControls/OrganizationSupport — this
+         *   file does not re-implement any of their authorization
+         *   logic, it only calls them, exactly like churchos.html's own
+         *   inline script already does for setupChurch()/createMember().
+         *   DISCLOSED, deliberate scope boundary: unlike the rest of
+         *   this file (server-context-only, see this file's own
+         *   header), these action buttons are NOT gated by a real
+         *   server-side ChurchOS-live capability route — no such route
+         *   exists yet (only the generic org:workforce, org:
+         *   applications, and org:permissions capability prefixes this
+         *   file's own header already discloses server.js exposes). The
+         *   server-verified app:ChurchOS:<Function> check above still
+         *   decides whether this panel renders at all; the buttons
+         *   themselves rely on the same client-side authority every
+         *   other ChurchOS live file already does, not a fabricated
+         *   server guarantee.
+         */
+        #renderChurchOSLivePanel(presentation, ctx, core) {
+            const orgId = presentation.organizationId;
+            const canLive = core.isFunctionEnabled(ctx, 'ChurchOS', 'LiveSession');
+            const canModerate = core.isFunctionEnabled(ctx, 'ChurchOS', 'Moderation');
+            const canRequestSupport = core.isFunctionEnabled(ctx, 'ChurchOS', 'RequestSupport');
+            if (!canLive && !canModerate && !canRequestSupport) return '';
+
+            const ctl = window.CozyOS.ChurchLiveSessionController;
+            const active = (canLive && ctl && typeof ctl.listActiveSessions === 'function') ? ctl.listActiveSessions(orgId) : [];
+            const session = active[0] || null;
+
+            const support = window.CozyOS.OrganizationSupport;
+            const activeGrants = (support && typeof support.listActiveGrants === 'function') ? support.listActiveGrants(orgId) : [];
+
+            let html = '<div class="cozy-churchos-live-panel" style="margin-top:10px;padding-top:10px;border-top:1px solid #0f3d2c;">';
+            html += '<div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">LIVE WORSHIP</div>';
+
+            if (canLive) {
+                if (session) {
+                    html += '<p style="font-size:13px;color:#eaf5ee;">Live session active since ' + escapeHtml(session.startedAt) + ' (' + escapeHtml(session.sourceLanguage || 'unknown language') + ').</p>';
+                    html += '<button type="button" class="cozy-btn" data-cos-live-end="' + escapeHtml(session.worshipServiceId) + '">End Session</button>';
+                    if (canModerate) {
+                        html += ' <button type="button" class="cozy-btn" data-cos-live-toggle-questions="' + escapeHtml(session.worshipServiceId) + '">Toggle Questions</button>';
+                        html += '<span id="cozy-cos-questions-state" style="font-size:12px;color:#94a3b8;margin-left:8px;"></span>';
+                    }
+                } else {
+                    html += '<input type="text" id="cozy-cos-live-language" placeholder="Source language (e.g. sw)" style="padding:6px 8px;border-radius:4px;border:1px solid #0f3d2c;background:#01140f;color:#eaf5ee;margin-right:6px;" />';
+                    html += '<button type="button" class="cozy-btn cozy-btn-primary" data-cos-live-start="' + escapeHtml(orgId) + '">Start Live Session</button>';
+                }
+                html += '<p id="cozy-cos-live-result" style="font-size:12px;color:#94a3b8;margin:6px 0 0 0;"></p>';
+            }
+
+            if (canRequestSupport) {
+                html += '<div style="margin-top:10px;">';
+                html += (activeGrants.length > 0)
+                    ? '<p style="font-size:12px;color:#f5c518;">CozyOS Support is currently active for this organization (' + activeGrants.length + ' grant' + (activeGrants.length === 1 ? '' : 's') + ').</p>'
+                    : '';
+                html += '<input type="text" id="cozy-cos-support-reason" placeholder="Describe the issue" style="padding:6px 8px;border-radius:4px;border:1px solid #0f3d2c;background:#01140f;color:#eaf5ee;margin-right:6px;" />';
+                html += '<button type="button" class="cozy-btn" data-cos-request-support="' + escapeHtml(orgId) + '">Request CozyOS Support</button>';
+                html += '<p id="cozy-cos-support-result" style="font-size:12px;color:#94a3b8;margin:6px 0 0 0;"></p>';
+                html += '</div>';
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        /**
+         * #syncClientAuthority(context)
+         *   TRUST-BOUNDARY BRIDGE — LIVE INTEGRATION AUDIT finding: this
+         *   file is correctly server-authoritative for GATING (whether a
+         *   section/panel renders — see resolveWorkspacePresentation()/
+         *   isFunctionEnabled() above, both driven only by this freshly
+         *   fetched, server-verified `context`). But the pre-existing
+         *   ChurchOS-family action engines this panel calls
+         *   (ChurchLiveSessionController, OrganizationSupport, and every
+         *   canonicalized moderation file) all authorize against the
+         *   CLIENT-SIDE OrganizationRegistry/OrganizationMembership —
+         *   which start every page load completely empty, with zero
+         *   knowledge of what the server just verified. Without this
+         *   step, the two would be unsynchronized competing sources of
+         *   truth for the exact same fact (see this file's own commit
+         *   history / CHURCHOS-AUTHORITY-WIRING-MAP.md). This method
+         *   mirrors ONLY what `context` already proved — the organization
+         *   itself, and this one actor's own roles/allowed permissions on
+         *   it — onto the client-side modules, best-effort, never
+         *   throwing (a sync failure must never block the page from
+         *   rendering the already-verified read-only presentation).
+         */
+        #syncClientAuthority(context) {
+            try {
+                const registry = window.CozyOS.OrganizationRegistry;
+                const membership = window.CozyOS.OrganizationMembership;
+                if (!registry || typeof registry.registerExternalOrganization !== 'function') return;
+                if (!membership || typeof membership.syncExternalMembership !== 'function') return;
+                const actorId = this.#resolveActorId();
+                if (!actorId) return;
+
+                registry.registerExternalOrganization({ orgId: context.organizationId, name: context.organizationName });
+
+                const roles = Array.isArray(context.roles) ? context.roles : [];
+                const allowedPermissionNames = (Array.isArray(context.permissions) ? context.permissions : [])
+                    .filter((p) => p && p.effect === 'allow')
+                    .map((p) => p.name);
+                const bridgedPermissions = allowedPermissionNames
+                    .map((name) => CHURCHOS_LIVE_PERMISSION_BRIDGE[name])
+                    .filter(Boolean);
+
+                membership.syncExternalMembership({
+                    userId: actorId,
+                    organizationId: context.organizationId,
+                    roles,
+                    permissions: bridgedPermissions,
+                    status: 'active',
+                });
+            } catch (_err) { /* non-fatal — never blocks rendering the already-verified presentation */ }
+        }
+
+        /** Resolves the real, currently-authenticated actorId the same way every other ChurchOS-family page (churchos.html/pharmacyos.html) already does — never a second identity source. */
+        #resolveActorId() {
+            const session = window.CozyOS && window.CozyOS.Session;
+            if (session && typeof session.current === 'function') {
+                const snap = session.current();
+                if (snap && snap.uid) return snap.uid;
+            }
+            return null;
+        }
+
+        /** Wires the ChurchOS live panel's action buttons — called every time the APPLICATIONS section is (re)rendered, mirroring #wireWorkforceSection()'s own pattern. */
+        #wireChurchOSLivePanel(contentEl, presentation, ctx) {
+            const panel = contentEl.querySelector('.cozy-churchos-live-panel');
+            if (!panel) return;
+            const actorId = this.#resolveActorId();
+
+            const startBtn = panel.querySelector('[data-cos-live-start]');
+            if (startBtn) {
+                startBtn.addEventListener('click', async () => {
+                    const orgId = startBtn.getAttribute('data-cos-live-start');
+                    const sourceLanguage = (contentEl.querySelector('#cozy-cos-live-language') || {}).value;
+                    const resultEl = contentEl.querySelector('#cozy-cos-live-result');
+                    const ctl = window.CozyOS.ChurchLiveSessionController;
+                    if (!ctl) { resultEl.textContent = 'ChurchLiveSessionController is not loaded.'; return; }
+                    if (!actorId) { resultEl.textContent = 'No signed-in user detected.'; return; }
+                    resultEl.textContent = 'Starting…';
+                    const result = await ctl.startSession({ orgId, actorId, sourceLanguage: sourceLanguage && sourceLanguage.trim() });
+                    const message = result.success ? 'Live session started.' : ('Could not start: ' + result.reason);
+                    if (result.success) {
+                        // Refreshing the section re-renders this whole panel
+                        // fresh (needed to swap the Start control for
+                        // End/Toggle-Questions once a session is active) —
+                        // which also wipes the transient message just set
+                        // above on the now-discarded #cozy-cos-live-result
+                        // element. Re-apply it to the FRESH element so a
+                        // caller reading this result immediately after
+                        // still sees it, not a blank re-render.
+                        this.#refreshApplicationsSection(presentation, ctx);
+                        const freshResultEl = contentEl.querySelector('#cozy-cos-live-result');
+                        if (freshResultEl) freshResultEl.textContent = message;
+                    } else {
+                        resultEl.textContent = message;
+                    }
+                });
+            }
+
+            const endBtn = panel.querySelector('[data-cos-live-end]');
+            if (endBtn) {
+                endBtn.addEventListener('click', async () => {
+                    const worshipServiceId = endBtn.getAttribute('data-cos-live-end');
+                    const resultEl = contentEl.querySelector('#cozy-cos-live-result');
+                    const ctl = window.CozyOS.ChurchLiveSessionController;
+                    if (!ctl || !actorId) return;
+                    resultEl.textContent = 'Ending…';
+                    const result = await ctl.endSession({ worshipServiceId, actorId });
+                    const message = result.success ? 'Live session ended.' : ('Could not end: ' + result.reason);
+                    if (result.success) {
+                        // Same re-render-wipes-the-message fix as the Start
+                        // handler above — see its own comment.
+                        this.#refreshApplicationsSection(presentation, ctx);
+                        const freshResultEl = contentEl.querySelector('#cozy-cos-live-result');
+                        if (freshResultEl) freshResultEl.textContent = message;
+                    } else {
+                        resultEl.textContent = message;
+                    }
+                });
+            }
+
+            const toggleBtn = panel.querySelector('[data-cos-live-toggle-questions]');
+            if (toggleBtn) {
+                const worshipServiceId = toggleBtn.getAttribute('data-cos-live-toggle-questions');
+                const stateEl = contentEl.querySelector('#cozy-cos-questions-state');
+                const ctl = window.CozyOS.ChurchLiveSessionController;
+                const modControls = window.CozyOS.ChurchLiveModerationControls;
+                const ldceSessionId = ctl && typeof ctl.getLdceSessionIdFor === 'function' ? ctl.getLdceSessionIdFor(worshipServiceId) : null;
+                const renderState = () => {
+                    if (!stateEl || !modControls || !ldceSessionId) return;
+                    const state = modControls.getQuestionsEnabled(ldceSessionId);
+                    stateEl.textContent = 'Questions: ' + (state.enabled ? 'ON' : 'OFF');
+                };
+                renderState();
+                toggleBtn.addEventListener('click', () => {
+                    if (!modControls || !ldceSessionId || !actorId) return;
+                    const current = modControls.getQuestionsEnabled(ldceSessionId);
+                    const result = modControls.setQuestionsEnabled(ldceSessionId, actorId, !current.enabled);
+                    if (!result || result.status !== 'OK') {
+                        if (stateEl) stateEl.textContent = 'Could not toggle: ' + ((result && result.reason) || 'unknown error');
+                        return;
+                    }
+                    renderState();
+                });
+            }
+
+            const supportBtn = panel.querySelector('[data-cos-request-support]');
+            if (supportBtn) {
+                supportBtn.addEventListener('click', () => {
+                    const organizationId = supportBtn.getAttribute('data-cos-request-support');
+                    const reasonEl = contentEl.querySelector('#cozy-cos-support-reason');
+                    const resultEl = contentEl.querySelector('#cozy-cos-support-result');
+                    const support = window.CozyOS.OrganizationSupport;
+                    if (!support) { resultEl.textContent = 'OrganizationSupport is not loaded.'; return; }
+                    if (!actorId) { resultEl.textContent = 'No signed-in user detected.'; return; }
+                    const reason = (reasonEl && reasonEl.value || '').trim();
+                    const result = support.requestSupport({ organizationId, requesterId: actorId, reason });
+                    resultEl.textContent = result.success ? 'Support requested — a CozyOS administrator will review it.' : ('Could not request support: ' + result.reason);
+                });
+            }
+        }
+
+        /** Real, minimal refresh: re-renders only the APPLICATIONS section content after a real state change (session started/ended), never a full page reload. */
+        #refreshApplicationsSection(presentation, ctx) {
+            const contentEl = this.#root && this.#root.querySelector('#cozy-org-section-content');
+            if (!contentEl) return;
+            contentEl.innerHTML = this.#renderApplicationsSection(presentation, ctx);
+            this.#wireChurchOSLivePanel(contentEl, presentation, ctx);
         }
 
         #renderEntitlementsSection(ctx) {

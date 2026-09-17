@@ -54,6 +54,28 @@
      are not a "coming soon" placeholder anymore. -->
 <script src="core/shell/organization-workspace-core.js"></script>
 <script src="core/shell/organization-workspace.js"></script>
+<!-- LIVE INTEGRATION AUDIT — the real ChurchOS organization-tier live-
+     session capability organization-workspace.js's own APPLICATIONS
+     section now renders (gated by the same real, server-verified
+     app:ChurchOS:<Function> permission every other application function
+     already uses — see that file's own #renderChurchOSLivePanel()
+     comment) needs these real, existing engines loaded here to actually
+     work, not just be listed. Real dependency order: OrganizationRegistry
+     before Membership/Role/Support (all read it); CozyConversation
+     before LDCESessionEngine (its own real dependency); ChurchWorshipSession
+     before the session controller that composes it; the moderation
+     files last, after everything they compose. -->
+<script src="core/organization/organization-registry.js"></script>
+<script src="core/organization/organization-membership.js"></script>
+<script src="core/organization/organization-support.js"></script>
+<script src="core/organization/organization-role.js"></script>
+<script src="core/modules/conversation/cozy-conversation.js"></script>
+<script src="core/modules/speech/adapters/speech-recognition-adapter.js"></script>
+<script src="core/modules/communication/ldce-session-engine.js"></script>
+<script src="core/modules/ChurchOS/church-worship-session.js"></script>
+<script src="core/modules/ChurchOS/church-live-session-controller.js"></script>
+<script src="core/modules/ChurchOS/church-live-moderation.js"></script>
+<script src="core/modules/ChurchOS/church-live-moderation-controls.js"></script>
 <script src="core/modules/identity/identity-engine.js"></script>
 <script src="core/modules/identity/auth-coordinator.js"></script>
 <script src="core/bootstrap/bootstrap.js"></script>

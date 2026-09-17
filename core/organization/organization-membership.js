@@ -215,6 +215,58 @@
             return record ? this.#deepClone(record) : null;
         }
 
+        /**
+         * syncExternalMembership({userId, organizationId, roles,
+         *                          permissions, status})
+         *   TRUST-BOUNDARY BRIDGE — mirrors an ALREADY server-verified
+         *   membership fact (e.g. a successful `POST /organizations/
+         *   context` response) onto this client-side authority, so the
+         *   pre-existing client-side ChurchOS-family engines (built
+         *   around this file's own isAuthorized()/hasMembership(), per
+         *   church-live-session-controller.js and its siblings) see the
+         *   SAME membership the server already confirmed, instead of a
+         *   second, unsynchronized, empty source of truth. Distinct from
+         *   createMembership(): this is idempotent (create-or-overwrite,
+         *   never throws "already has a live membership"), and it
+         *   REPLACES roles/permissions on each call — mirrors the
+         *   server's current truth exactly — rather than only ever
+         *   adding to them, so a permission revoked server-side is
+         *   reflected here too on the next sync. This method performs NO
+         *   verification of its own — callers must only ever pass data
+         *   that has already been independently, server-side verified.
+         */
+        syncExternalMembership(rawInput = {}) {
+            const input = sanitize(rawInput);
+            if (!input.userId) throw new TypeError("[organization-membership] syncExternalMembership(): a real userId is required.");
+            this.#requireOrganization(input.organizationId);
+            const roles = Array.isArray(input.roles) ? input.roles.map(r => this.#escapeHtml(String(r))) : [];
+            const permissions = Array.isArray(input.permissions) ? input.permissions.filter(p => PERMISSION_PATTERN.test(p)) : [];
+            const status = input.status && Object.values(STATUS).includes(input.status) ? input.status : STATUS.ACTIVE;
+            const now = new Date().toISOString();
+            const existing = this.#get(input.userId, input.organizationId);
+            if (existing) {
+                existing.roles = roles;
+                existing.permissions = [...permissions];
+                existing.status = status;
+                existing.updatedAt = now;
+                if (status === STATUS.ACTIVE && !existing.joinedAt) existing.joinedAt = now;
+                this.#record("membership-synced", existing.membershipId, { userId: input.userId, organizationId: input.organizationId });
+                return this.#deepClone(existing);
+            }
+            const membershipId = this.#generateId("orgmem");
+            const record = {
+                membershipId, userId: input.userId, organizationId: input.organizationId,
+                status, roles, applications: [], permissions: [...permissions],
+                invitedBy: null, invitedAt: null, expiresAt: null, respondedAt: null,
+                joinedAt: status === STATUS.ACTIVE ? now : null, suspendedAt: null, removedAt: null,
+                createdAt: now, updatedAt: now, createdBy: "external-sync"
+            };
+            this.#memberships.set(memberKey(input.userId, input.organizationId), record);
+            this.#diagnostics.membershipsCreated++;
+            this.#record("membership-synced", membershipId, { userId: input.userId, organizationId: input.organizationId, roles });
+            return this.#deepClone(record);
+        }
+
         hasMembership(userId, organizationId) {
             const record = this.#get(userId, organizationId);
             return !!record && record.status === STATUS.ACTIVE;
