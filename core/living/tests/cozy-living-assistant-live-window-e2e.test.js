@@ -176,4 +176,74 @@ test('LIVE WINDOW E2E: voice input and text input are proven, by source inspecti
     assert.match(micHandlerRegion, /this\.#send\(payload\.transcript\)/, 'voice transcript must be handed to the SAME #send() text/voice/reasoning pipeline as typed input');
 });
 
+// LIVE WINDOW AI CONSUMPTION AUDIT — the tests above only ever drove
+// two entities (CozyOS the platform, Authenticator). This repository
+// has 11 real applications with committed human-purpose knowledge
+// (cozy-knowledge-registry.js's APPLICATION_HUMAN_PURPOSE_DATA); the
+// audit's own acceptance criteria requires proving Live Window reaches
+// ALL of them through the real DOM, not just one, and that Kiswahili
+// questions are understood as SEMANTIC INTENT (not response
+// translation) through that same real path.
+test('LIVE WINDOW E2E: multiple different real applications resolve correctly through the real DOM (not just one)', async () => {
+    const { browser, page } = await openLiveWindow();
+    try {
+        const shop = await ask(page, 'Why is ShopOS important?');
+        assert.match(shop, /ShopOS/i);
+
+        const church = await ask(page, 'What does ChurchOS do?');
+        assert.match(church, /ChurchOS/i);
+
+        const quarry = await ask(page, 'Who benefits from QuarryOS?');
+        assert.match(quarry, /QuarryOS/i);
+
+        const mpesa = await ask(page, 'What problem does MpesaOS solve?');
+        assert.match(mpesa, /MpesaOS/i);
+    } finally {
+        await browser.close();
+    }
+});
+
+test('LIVE WINDOW E2E: Kiswahili questions about a real application are understood as semantic intent through the real DOM, not just translated', async () => {
+    const { browser, page } = await openLiveWindow();
+    try {
+        const r1 = await ask(page, 'MpesaOS inasaidia nini?');
+        assert.match(r1, /MpesaOS/i);
+        assert.doesNotMatch(r1, /Sina taarifa za umuhimu wa kibinadamu/i);
+
+        // Bare Kiswahili pronoun follow-up ("Ni nani anayenufaika
+        // nayo?" - "who benefits from it?") must resolve against the
+        // real previous turn's entity (MpesaOS), the same conversation-
+        // state mechanism proven for English above, not a second
+        // Kiswahili-only context tracker.
+        const r2 = await ask(page, 'Ni nani anayenufaika nayo?');
+        assert.match(r2, /MpesaOS/i);
+
+        const r3 = await ask(page, 'Inatatua tatizo gani?');
+        assert.match(r3, /MpesaOS/i);
+    } finally {
+        await browser.close();
+    }
+});
+
+test('LIVE WINDOW E2E: platform vs application entity distinction never accidentally falls back to platform-level content', async () => {
+    const { browser, page } = await openLiveWindow();
+    try {
+        const r1 = await ask(page, 'What does ShopOS do?');
+        assert.match(r1, /ShopOS/i);
+
+        const r2 = await ask(page, 'Who benefits from it?');
+        assert.match(r2, /ShopOS/i);
+        assert.doesNotMatch(r2, /^CozyOS exists to solve/i);
+
+        const r3 = await ask(page, 'What is CozyOS for?');
+        assert.match(r3, /CozyOS/i);
+
+        const r4 = await ask(page, 'Who benefits from it?');
+        assert.doesNotMatch(r4, /ShopOS/i);
+        assert.match(r4, /CozyOS/i);
+    } finally {
+        await browser.close();
+    }
+});
+
 console.log('Live Window real-browser end-to-end suite: run complete.');
