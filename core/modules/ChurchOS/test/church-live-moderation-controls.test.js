@@ -69,6 +69,7 @@ function freshEngines() {
     for (const p of [
         '../../communication/ldce-session-engine.js',
         '../../../organization/organization-registry.js',
+        '../../../organization/organization-membership.js',
         '../../../organization/organization-role.js',
         '../church-live-moderation.js',
         '../church-live-moderation-controls.js'
@@ -79,6 +80,9 @@ function freshEngines() {
     global.window = { CozyOS: { CozyConversation: makeStubConversation(), IdentityEngine: identity } };
     require('../../communication/ldce-session-engine.js');
     require('../../../organization/organization-registry.js');
+    // LIVE INTEGRATION AUDIT — canonical authorization source fix: see
+    // church-live-moderation.js's own comment for the full rationale.
+    require('../../../organization/organization-membership.js');
     require('../../../organization/organization-role.js');
     require('../church-live-moderation.js');
     require('../church-live-moderation-controls.js');
@@ -87,9 +91,16 @@ function freshEngines() {
         mod1: global.window.CozyOS.ChurchLiveModeration,
         ctl: global.window.CozyOS.ChurchLiveModerationControls,
         orgRegistry: global.window.CozyOS.OrganizationRegistry,
+        membership: global.window.CozyOS.OrganizationMembership,
         orgRole: global.window.CozyOS.OrganizationRole,
         identity,
     };
+}
+
+/** Registers a real, active OrganizationMembership for userId in orgId, alongside the legacy identity stub record every existing test fixture already sets up. */
+function registerActiveMember(membership, identity, userId, orgId, extra = {}) {
+    identity.registerUser(userId, { orgId, ...extra });
+    membership.createMembership({ userId, organizationId: orgId, status: 'active' });
 }
 
 function makeSessionWithMembers(ldce, identity, hostId, memberIds) {
@@ -494,14 +505,14 @@ test('every moderation-controls event always reports propagationState QUEUED', (
 });
 
 test('an org-role holder (not host, not LDCE-promoted) can use PHC2-native capabilities like slow mode', () => {
-    const { ldce, ctl, identity, orgRegistry, orgRole } = freshEngines();
+    const { ldce, ctl, identity, orgRegistry, orgRole, membership } = freshEngines();
     // makeSessionWithMembers() re-registers each user with an empty
     // identity record as part of session setup, so orgId must be set
     // AFTER it runs, not before (it would otherwise be overwritten).
     const sessionId = makeSessionWithMembers(ldce, identity, 'host-1', ['org-mod', 'viewer-b']);
     const org = orgRegistry.createOrganization({ name: 'Test Church' });
     identity.registerUser('host-1', { orgId: org.orgId });
-    identity.registerUser('org-mod', { orgId: org.orgId });
+    registerActiveMember(membership, identity, 'org-mod', org.orgId);
 
     const role = orgRole.createRole({
         orgId: org.orgId,

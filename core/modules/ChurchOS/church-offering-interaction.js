@@ -210,20 +210,41 @@
                 return { authorized: true, via: "ldce-moderator" };
             }
 
-            if (typeof identity.isPlatformAdmin === "function" && identity.isPlatformAdmin(requesterUserId)) {
-                return { authorized: true, via: "platform-admin" };
+            const hostUser = hostUserId ? identity.getUser(hostUserId) : null;
+            const orgId = hostUser ? hostUser.orgId : null;
+
+            // PLATFORM SUPPORT OVERRIDE — see church-live-moderation.js's
+            // own #isAuthorizedModerator() for the full rationale (same
+            // restriction, applied here with the "view-offerings" scope
+            // for this file's own sensitive financial capability).
+            if (orgId && typeof identity.isPlatformAdmin === "function" && identity.isPlatformAdmin(requesterUserId)) {
+                const support = window.CozyOS.OrganizationSupport;
+                if (support && typeof support.isSupportActive === "function") {
+                    const active = support.isSupportActive(orgId, requesterUserId, { requiredScope: "view-offerings" });
+                    if (active.active) {
+                        if (typeof support.recordSupportAction === "function") {
+                            try { support.recordSupportAction(active.grantId, "offering-access-authorized", { sessionId }); } catch (_err) { /* non-fatal */ }
+                        }
+                        return { authorized: true, via: "platform-support", grantId: active.grantId };
+                    }
+                }
             }
 
             const orgRole = window.CozyOS.OrganizationRole;
             if (!orgRole || typeof orgRole.listRoles !== "function") {
-                return { authorized: false, reason: "Not the host, not an LDCE moderator, not a platform-admin, and OrganizationRole is not loaded to evaluate org-level authorization." };
+                return { authorized: false, reason: "Not the host, not an LDCE moderator, not an active platform-support grant, and OrganizationRole is not loaded to evaluate org-level authorization." };
             }
-            const hostUser = hostUserId ? identity.getUser(hostUserId) : null;
-            const requesterUser = identity.getUser(requesterUserId);
-            const orgId = hostUser ? hostUser.orgId : null;
             if (!orgId) return { authorized: false, reason: "The session host has no orgId on file — cannot evaluate org-level authorization for this session." };
-            if (!requesterUser || requesterUser.orgId !== orgId) {
-                return { authorized: false, reason: "The requester is not the host, not an LDCE moderator, not a platform-admin, and not a member of the session host's organization." };
+            // CANONICAL AUTHORIZATION SOURCE FIX — see church-live-
+            // moderation.js's own #isAuthorizedModerator() for the full
+            // rationale (same fix, applied identically here rather than
+            // left to silently diverge).
+            const membership = window.CozyOS.OrganizationMembership;
+            if (!membership || typeof membership.hasMembership !== "function") {
+                return { authorized: false, reason: "OrganizationMembership is not loaded — cannot evaluate org-level authorization." };
+            }
+            if (!membership.hasMembership(requesterUserId, orgId)) {
+                return { authorized: false, reason: "The requester is not the host, not an LDCE moderator, not an active platform-support grant, and not an active member of the session host's organization." };
             }
             const permission = this.#requireModerationPermission();
             const roles = orgRole.listRoles({ orgId });

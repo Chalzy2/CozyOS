@@ -1076,6 +1076,13 @@
          dashboard.html/index.html already load both; this brings
          admin-workspace.html into parity. -->
     <script src="core/organization/organization-membership.js"></script>
+    <!-- LIVE INTEGRATION AUDIT — CozyOS Platform Support. Real, scoped,
+         time-boxed, auditable support authority (see that file's own
+         header). Loaded here since church-live-moderation.js and its
+         siblings below now compose OrganizationSupport.isSupportActive()
+         to restrict their platform-admin override to a real, active
+         grant rather than a standing override. -->
+    <script src="core/organization/organization-support.js"></script>
     <script src="core/organization/organization-role.js"></script>
     <script src="core/organization/organization-hierarchy.js"></script>
     <script src="core/modules/ChurchOS/church-leadership-bridge.js"></script>
@@ -1571,6 +1578,14 @@
     <script src="core/modules/ChurchOS/live-language-fanout-router.js"></script>
     <script src="core/modules/ChurchOS/church-live-moderation.js"></script>
     <script src="core/modules/ChurchOS/church-live-moderation-controls.js"></script>
+    <!-- LIVE INTEGRATION AUDIT — composes LDCESessionEngine +
+         ChurchWorshipSession (both already loaded above) to start/end a
+         real live worship session as one org-authorized event, and
+         records the {ldceSessionId, worshipServiceId} pairing so Live
+         Window/moderation/the organization workspace can resolve one id
+         from the other (see that file's own header for the real gap
+         this closes). -->
+    <script src="core/modules/ChurchOS/church-live-session-controller.js"></script>
     <!-- Milestone 363 — LDCE Session Reliability & Conversation Sync. -->
     <script src="core/modules/communication/ldce-reliability-engine.js"></script>
     <script src="core/modules/interpretation/cozy-interpretation.js"></script>

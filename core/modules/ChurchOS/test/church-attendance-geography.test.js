@@ -84,22 +84,42 @@ function makeStubIdentity() {
 }
 
 function freshEngines() {
-    for (const p of ['../../communication/ldce-session-engine.js', '../../../organization/organization-registry.js', '../../../organization/organization-role.js', '../church-attendance-geography.js']) {
+    for (const p of ['../../communication/ldce-session-engine.js', '../../../organization/organization-registry.js', '../../../organization/organization-membership.js', '../../../organization/organization-support.js', '../../../organization/organization-role.js', '../church-attendance-geography.js']) {
         delete require.cache[require.resolve(p)];
     }
     const identity = makeStubIdentity();
     global.window = { CozyOS: { CozyConversation: makeStubConversation(), IdentityEngine: identity } };
     require('../../communication/ldce-session-engine.js');
     require('../../../organization/organization-registry.js');
+    // LIVE INTEGRATION AUDIT — canonical authorization source fix:
+    // #isAuthorizedPastorAdmin() now checks a real, active
+    // OrganizationMembership record instead of the legacy
+    // identity.getUser().orgId scalar (see church-live-moderation.js's
+    // own comment for the full rationale). This test file's real org
+    // fixtures (see registerActiveMember() below) must create one.
+    require('../../../organization/organization-membership.js');
+    // LIVE INTEGRATION AUDIT — platform-admin moderation override is now
+    // restricted to a real, active, scoped OrganizationSupport grant
+    // (see church-live-moderation.js's own comment for the full
+    // rationale).
+    require('../../../organization/organization-support.js');
     require('../../../organization/organization-role.js');
     require('../church-attendance-geography.js');
     return {
         ldce: global.window.CozyOS.LDCESessionEngine,
         geo: global.window.CozyOS.ChurchAttendanceGeography,
         orgRegistry: global.window.CozyOS.OrganizationRegistry,
+        membership: global.window.CozyOS.OrganizationMembership,
+        support: global.window.CozyOS.OrganizationSupport,
         orgRole: global.window.CozyOS.OrganizationRole,
         identity,
     };
+}
+
+/** Registers a real, active OrganizationMembership for userId in orgId, alongside the legacy identity stub record every existing test fixture already sets up. */
+function registerActiveMember(membership, identity, userId, orgId, extra = {}) {
+    identity.registerUser(userId, { orgId, ...extra });
+    membership.createMembership({ userId, organizationId: orgId, status: 'active' });
 }
 
 function joinAll(ldce, identity, sessionId, hostId, userCountries) {
@@ -144,9 +164,10 @@ test('module registers version and Modules registry entry', () => {
 /* ------------------------------------------------------------------ */
 
 test('an ordinary member with no org role and no platform-admin grant is refused analytics', () => {
-    const { ldce, geo, identity } = freshEngines();
-    identity.registerUser('host-1', { orgId: 'org_x' });
-    identity.registerUser('random-member', { orgId: 'org_x', country: 'Kenya' });
+    const { ldce, geo, identity, orgRegistry, membership } = freshEngines();
+    const org = orgRegistry.createOrganization({ name: 'Grace Church', type: 'Church' });
+    identity.registerUser('host-1', { orgId: org.orgId });
+    registerActiveMember(membership, identity, 'random-member', org.orgId, { country: 'Kenya' });
     const created = ldce.createSession('host-1', { type: 'meeting' });
 
     const result = geo.getPastorAdminAnalytics(created.sessionId, 'random-member');
@@ -162,11 +183,26 @@ test('an unknown requesterUserId is refused, not silently treated as authorized'
     assert.equal(result.available, false);
 });
 
-test('a real platform-admin is authorized even with no org role at all', () => {
-    const { ldce, geo, identity } = freshEngines();
-    identity.registerUser('host-1', { orgId: 'org_x' });
+test('LIVE INTEGRATION AUDIT: a platform-admin with NO active support grant is refused — no more standing override', () => {
+    const { ldce, geo, identity, orgRegistry } = freshEngines();
+    const org = orgRegistry.createOrganization({ name: 'Grace Church', type: 'Church' });
+    identity.registerUser('host-1', { orgId: org.orgId });
     identity.registerUser('platform-admin-1', { orgId: null, country: 'UK' });
     identity.setPlatformAdmin('platform-admin-1');
+    const created = ldce.createSession('host-1', { type: 'meeting' });
+    joinAll(ldce, identity, created.sessionId, 'host-1', { 'member-a': 'Kenya' });
+
+    const result = geo.getPastorAdminAnalytics(created.sessionId, 'platform-admin-1');
+    assert.equal(result.available, false, 'being a platform admin alone must no longer authorize viewing this church\'s attendance analytics');
+});
+
+test('a platform-admin WITH a real, active, correctly-scoped support grant is authorized (real platform intervention, not a standing override)', () => {
+    const { ldce, geo, identity, orgRegistry, support } = freshEngines();
+    const org = orgRegistry.createOrganization({ name: 'Grace Church', type: 'Church' });
+    identity.registerUser('host-1', { orgId: org.orgId });
+    identity.registerUser('platform-admin-1', { orgId: null, country: 'UK' });
+    identity.setPlatformAdmin('platform-admin-1');
+    support.grantSupport({ organizationId: org.orgId, operatorId: 'platform-admin-1', reason: 'church asked for help reading attendance', scope: ['view-attendance-analytics'] });
     const created = ldce.createSession('host-1', { type: 'meeting' });
     joinAll(ldce, identity, created.sessionId, 'host-1', { 'member-a': 'Kenya' });
 
@@ -176,10 +212,10 @@ test('a real platform-admin is authorized even with no org role at all', () => {
 });
 
 test('a real org role holding the analytics permission, assigned to the requester, authorizes them', () => {
-    const { ldce, geo, identity, orgRegistry, orgRole } = freshEngines();
+    const { ldce, geo, identity, orgRegistry, orgRole, membership } = freshEngines();
     const org = orgRegistry.createOrganization({ name: 'Grace Church', type: 'Church' });
     identity.registerUser('host-1', { orgId: org.orgId });
-    identity.registerUser('pastor-1', { orgId: org.orgId, country: 'Kenya' });
+    registerActiveMember(membership, identity, 'pastor-1', org.orgId, { country: 'Kenya' });
     const role = orgRole.createRole({ name: 'Senior Pastor', orgId: org.orgId, permissions: [geo.PASTOR_ADMIN_ANALYTICS_PERMISSION] });
     orgRole.assignUser(role.roleId, 'pastor-1');
 
@@ -223,10 +259,10 @@ test('a requester in a DIFFERENT organization from the session host is refused e
 /* ------------------------------------------------------------------ */
 
 function authorizedPastorSetup() {
-    const { ldce, geo, identity, orgRegistry, orgRole } = freshEngines();
+    const { ldce, geo, identity, orgRegistry, orgRole, membership } = freshEngines();
     const org = orgRegistry.createOrganization({ name: 'Grace Church', type: 'Church' });
     identity.registerUser('host-1', { orgId: org.orgId });
-    identity.registerUser('pastor-1', { orgId: org.orgId, country: 'Kenya' });
+    registerActiveMember(membership, identity, 'pastor-1', org.orgId, { country: 'Kenya' });
     const role = orgRole.createRole({ name: 'Senior Pastor', orgId: org.orgId, permissions: [geo.PASTOR_ADMIN_ANALYTICS_PERMISSION] });
     orgRole.assignUser(role.roleId, 'pastor-1');
     const created = ldce.createSession('host-1', { type: 'meeting' });
@@ -277,10 +313,10 @@ test('local/east-africa/international split anchors to the requesters real count
 });
 
 test('returns LOCATION_DATA_UNAVAILABLE for regional split, never an invented country, when the requester has no country on file', () => {
-    const { ldce, geo, identity, orgRegistry, orgRole } = freshEngines();
+    const { ldce, geo, identity, orgRegistry, orgRole, membership } = freshEngines();
     const org = orgRegistry.createOrganization({ name: 'Grace Church', type: 'Church' });
     identity.registerUser('host-1', { orgId: org.orgId });
-    identity.registerUser('pastor-no-country', { orgId: org.orgId }); // no country supplied
+    registerActiveMember(membership, identity, 'pastor-no-country', org.orgId); // no country supplied
     const role = orgRole.createRole({ name: 'Senior Pastor', orgId: org.orgId, permissions: [geo.PASTOR_ADMIN_ANALYTICS_PERMISSION] });
     orgRole.assignUser(role.roleId, 'pastor-no-country');
     const created = ldce.createSession('host-1', { type: 'meeting' });

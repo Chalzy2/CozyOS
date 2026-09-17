@@ -185,11 +185,27 @@
          *   permissions/role-assignments/platform-admin status that
          *   already exist on real records.
          */
-        #isAuthorizedPastorAdmin(identity, requesterUserId, hostUserId) {
+        #isAuthorizedPastorAdmin(identity, requesterUserId, hostUserId, sessionId = null) {
             if (!requesterUserId) return { authorized: false, reason: "A real requesterUserId is required." };
 
-            if (typeof identity.isPlatformAdmin === "function" && identity.isPlatformAdmin(requesterUserId)) {
-                return { authorized: true, via: "platform-admin" };
+            const hostUser = hostUserId ? identity.getUser(hostUserId) : null;
+            const orgId = hostUser ? hostUser.orgId : null;
+
+            // PLATFORM SUPPORT OVERRIDE — see church-live-moderation.js's
+            // own #isAuthorizedModerator() for the full rationale (same
+            // restriction, applied here with the "view-attendance-
+            // analytics" scope for this file's own sensitive capability).
+            if (orgId && typeof identity.isPlatformAdmin === "function" && identity.isPlatformAdmin(requesterUserId)) {
+                const support = window.CozyOS.OrganizationSupport;
+                if (support && typeof support.isSupportActive === "function") {
+                    const active = support.isSupportActive(orgId, requesterUserId, { requiredScope: "view-attendance-analytics" });
+                    if (active.active) {
+                        if (typeof support.recordSupportAction === "function") {
+                            try { support.recordSupportAction(active.grantId, "attendance-analytics-viewed", { sessionId }); } catch (_err) { /* non-fatal */ }
+                        }
+                        return { authorized: true, via: "platform-support", grantId: active.grantId };
+                    }
+                }
             }
 
             const orgRole = window.CozyOS.OrganizationRole;
@@ -197,12 +213,17 @@
                 return { authorized: false, reason: "OrganizationRole is not loaded — cannot evaluate org-level authorization." };
             }
 
-            const hostUser = hostUserId ? identity.getUser(hostUserId) : null;
-            const requesterUser = identity.getUser(requesterUserId);
-            const orgId = hostUser ? hostUser.orgId : null;
             if (!orgId) return { authorized: false, reason: "The session host has no orgId on file — cannot evaluate org-level authorization for this session." };
-            if (!requesterUser || requesterUser.orgId !== orgId) {
-                return { authorized: false, reason: "The requester is not a member of the organization this session's host belongs to." };
+            // CANONICAL AUTHORIZATION SOURCE FIX — see church-live-
+            // moderation.js's own #isAuthorizedModerator() for the full
+            // rationale (same fix, applied identically here rather than
+            // left to silently diverge).
+            const membership = window.CozyOS.OrganizationMembership;
+            if (!membership || typeof membership.hasMembership !== "function") {
+                return { authorized: false, reason: "OrganizationMembership is not loaded — cannot evaluate org-level authorization." };
+            }
+            if (!membership.hasMembership(requesterUserId, orgId)) {
+                return { authorized: false, reason: "The requester is not an active member of the organization this session's host belongs to." };
             }
 
             const roles = orgRole.listRoles({ orgId });
@@ -266,7 +287,7 @@
             const session = ldce.getSession(sessionId);
             if (!session) return { available: false, reason: "Unknown LDCE session." };
 
-            const authz = this.#isAuthorizedPastorAdmin(identity, requesterUserId, session.hostId);
+            const authz = this.#isAuthorizedPastorAdmin(identity, requesterUserId, session.hostId, sessionId);
             if (!authz.authorized) return { available: false, reason: authz.reason || "NOT_AUTHORIZED" };
 
             const roster = ldce.listParticipants(sessionId, session.hostId);

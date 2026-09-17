@@ -73,22 +73,39 @@ function makeStubIdentity() {
 }
 
 function freshEngines() {
-    for (const p of ['../../communication/ldce-session-engine.js', '../../../organization/organization-registry.js', '../../../organization/organization-role.js', '../church-live-moderation.js']) {
+    for (const p of ['../../communication/ldce-session-engine.js', '../../../organization/organization-registry.js', '../../../organization/organization-membership.js', '../../../organization/organization-support.js', '../../../organization/organization-role.js', '../church-live-moderation.js']) {
         delete require.cache[require.resolve(p)];
     }
     const identity = makeStubIdentity();
     global.window = { CozyOS: { CozyConversation: makeStubConversation(), IdentityEngine: identity } };
     require('../../communication/ldce-session-engine.js');
     require('../../../organization/organization-registry.js');
+    // LIVE INTEGRATION AUDIT — canonical authorization source fix:
+    // #isAuthorizedModerator() now checks a real, active
+    // OrganizationMembership record instead of the legacy
+    // identity.getUser().orgId scalar. Real org fixtures must create one
+    // (see registerActiveMember() below).
+    require('../../../organization/organization-membership.js');
+    // LIVE INTEGRATION AUDIT — platform-admin moderation override is now
+    // restricted to a real, active, scoped OrganizationSupport grant.
+    require('../../../organization/organization-support.js');
     require('../../../organization/organization-role.js');
     require('../church-live-moderation.js');
     return {
         ldce: global.window.CozyOS.LDCESessionEngine,
         mod: global.window.CozyOS.ChurchLiveModeration,
         orgRegistry: global.window.CozyOS.OrganizationRegistry,
+        membership: global.window.CozyOS.OrganizationMembership,
+        support: global.window.CozyOS.OrganizationSupport,
         orgRole: global.window.CozyOS.OrganizationRole,
         identity,
     };
+}
+
+/** Registers a real, active OrganizationMembership for userId in orgId, alongside the legacy identity stub record every existing test fixture already sets up. */
+function registerActiveMember(membership, identity, userId, orgId, extra = {}) {
+    identity.registerUser(userId, { orgId, ...extra });
+    membership.createMembership({ userId, organizationId: orgId, status: 'active' });
 }
 
 function makeSessionWithMembers(ldce, identity, hostId, memberIds) {
@@ -235,21 +252,40 @@ test('an unknown/unregistered requester is refused, not silently treated as auth
     assert.equal(result.status, 'NOT_AUTHORIZED');
 });
 
-test('a real platform-admin is authorized to moderate even with no LDCE role and no org role', () => {
-    const { ldce, mod, identity } = freshEngines();
+test('LIVE INTEGRATION AUDIT: a platform-admin with NO active support grant is refused — no more standing override', () => {
+    const { ldce, mod, identity, orgRegistry } = freshEngines();
+    const org = orgRegistry.createOrganization({ name: 'Grace Church', type: 'Church' });
     const sessionId = makeSessionWithMembers(ldce, identity, 'host-1', ['viewer-a']);
+    identity.registerUser('host-1', { orgId: org.orgId }); // set AFTER makeSessionWithMembers, which re-registers with {}
     identity.registerUser('platform-admin-1', {});
     identity.setPlatformAdmin('platform-admin-1');
     const posted = mod.postComment(sessionId, 'viewer-a', 'text');
     const result = mod.removeComment(sessionId, 'platform-admin-1', posted.comment.commentId);
+    assert.equal(result.status, 'NOT_AUTHORIZED', 'being a platform admin alone must no longer authorize moderating this church\'s live session');
+});
+
+test('a platform-admin WITH a real, active, correctly-scoped support grant is authorized (real platform intervention, not a standing override)', () => {
+    const { ldce, mod, identity, orgRegistry, support } = freshEngines();
+    const org = orgRegistry.createOrganization({ name: 'Grace Church', type: 'Church' });
+    const sessionId = makeSessionWithMembers(ldce, identity, 'host-1', ['viewer-a']);
+    identity.registerUser('host-1', { orgId: org.orgId });
+    identity.registerUser('platform-admin-1', {});
+    identity.setPlatformAdmin('platform-admin-1');
+    support.grantSupport({ organizationId: org.orgId, operatorId: 'platform-admin-1', reason: 'church asked for help removing spam', scope: ['moderate-live-session'] });
+
+    const posted = mod.postComment(sessionId, 'viewer-a', 'text');
+    const result = mod.removeComment(sessionId, 'platform-admin-1', posted.comment.commentId);
     assert.equal(result.status, 'OK');
+
+    const trail = support.getAuditTrail(org.orgId);
+    assert.equal(trail.some((e) => e.action === 'support-action'), true, 'the real moderation action performed under support must be recorded in the audit trail');
 });
 
 test('a real org role holding the moderation permission, assigned to the requester, authorizes them', () => {
-    const { ldce, mod, identity, orgRegistry, orgRole } = freshEngines();
+    const { ldce, mod, identity, orgRegistry, orgRole, membership } = freshEngines();
     const org = orgRegistry.createOrganization({ name: 'Grace Church', type: 'Church' });
     identity.registerUser('host-1', { orgId: org.orgId });
-    identity.registerUser('pastor-1', { orgId: org.orgId });
+    registerActiveMember(membership, identity, 'pastor-1', org.orgId);
     const role = orgRole.createRole({ name: 'Assistant Pastor', orgId: org.orgId, permissions: [mod.MODERATION_MANAGE_PERMISSION] });
     orgRole.assignUser(role.roleId, 'pastor-1');
     const created = ldce.createSession('host-1', { type: 'classroom' });
