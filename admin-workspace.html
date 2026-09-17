@@ -1068,6 +1068,14 @@
          consume instead of building its own organization system. Registry
          first (Role and Hierarchy both depend on it). -->
     <script src="core/organization/organization-registry.js"></script>
+    <!-- LIVE INTEGRATION AUDIT fix: this page loaded organization-
+         registry.js but never organization-membership.js, even though
+         churchOS-core.js's own createMember() fails closed on
+         OrganizationMembership.isAuthorized() — member creation from
+         this page always threw "OrganizationMembership is not loaded".
+         dashboard.html/index.html already load both; this brings
+         admin-workspace.html into parity. -->
+    <script src="core/organization/organization-membership.js"></script>
     <script src="core/organization/organization-role.js"></script>
     <script src="core/organization/organization-hierarchy.js"></script>
     <script src="core/modules/ChurchOS/church-leadership-bridge.js"></script>
@@ -1545,6 +1553,24 @@
          PlatformEventBus) — see that file's own header for the full
          ownership audit. -->
     <script src="core/modules/ChurchOS/live-church-language-orchestrator.js"></script>
+    <!-- LIVE INTEGRATION AUDIT fix — these four files are real, tested,
+         self-registering, authorization-gated (church-live-moderation.js/
+         -controls.js are fail-closed via LDCESessionEngine + IdentityEngine
+         + OrganizationRole, never trusting the caller), and were confirmed
+         NOT <script>-included anywhere in the repository despite having
+         real, tested production callers within ChurchOS itself
+         (church-prayer-interaction.js, church-offering-interaction.js both
+         read church-live-moderation.js's MODERATION_MANAGE_PERMISSION;
+         live-language-fanout-router.js composes this page's own
+         LiveChurchLanguageOrchestrator + LDCESessionEngine, both already
+         loaded above). Loaded here, immediately after their real
+         dependency (LiveChurchLanguageOrchestrator), so every real
+         dependency each of these four checks at load/call time is already
+         present. -->
+    <script src="core/modules/ChurchOS/live-translation-result-cache.js"></script>
+    <script src="core/modules/ChurchOS/live-language-fanout-router.js"></script>
+    <script src="core/modules/ChurchOS/church-live-moderation.js"></script>
+    <script src="core/modules/ChurchOS/church-live-moderation-controls.js"></script>
     <!-- Milestone 363 — LDCE Session Reliability & Conversation Sync. -->
     <script src="core/modules/communication/ldce-reliability-engine.js"></script>
     <script src="core/modules/interpretation/cozy-interpretation.js"></script>

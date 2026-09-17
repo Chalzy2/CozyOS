@@ -160,6 +160,7 @@
         if (getters.has("getWhyUseCozyOSFact")) return "HUMAN_BENEFITS";
         if (getters.has("getDifferentiationFact")) return "IMPORTANCE";
         if (getters.has("getMissionFact") || getters.has("getProjectOriginFact") || getters.has("getProjectHistoryFact") || getters.has("getPublicStoryFact")) return "ORIGIN_OR_STORY";
+        if (ctxResults.some(r => r.authority === "live-worship-session")) return "LIVE_WORSHIP";
         if (ctxResults.some(r => r.authority === "cozy-memory" || r.authority === "living-memory")) return "PROJECT_KNOWLEDGE";
         return "GENERAL";
     }
@@ -174,11 +175,14 @@
     }
 
     /**
-     * answer(question, { actorId, language, memoryQuery })
+     * answer(question, { actorId, language, memoryQuery, entityHint, liveSessionId })
      *   Real. Never throws — a missing/failing composed authority
      *   degrades the relevant field, never a fabricated answer.
+     *   liveSessionId (LIVE INTEGRATION AUDIT addition) — passed straight
+     *   through to CozyAI.getContext() (see that file's own comment);
+     *   this file adds no live-session logic of its own.
      */
-    async function answer(question, { actorId = null, language = null, memoryQuery = null, entityHint = null } = {}) {
+    async function answer(question, { actorId = null, language = null, memoryQuery = null, entityHint = null, liveSessionId = null } = {}) {
         if (typeof question !== "string" || !question.trim()) {
             return {
                 answer: "A real, non-empty question is required.",
@@ -237,7 +241,7 @@
         // half, e.g. "What is CozyOS and what applications does it have?") ---
         let ctx = { success: false, results: [] };
         if (ai && typeof ai.getContext === "function") {
-            try { ctx = await ai.getContext(question, { actorId, memoryQuery, entityHint }); } catch (_err) { ctx = { success: false, results: [] }; }
+            try { ctx = await ai.getContext(question, { actorId, memoryQuery, entityHint, liveSessionId }); } catch (_err) { ctx = { success: false, results: [] }; }
         }
         const ctxResults = (ctx && Array.isArray(ctx.results)) ? ctx.results : [];
 

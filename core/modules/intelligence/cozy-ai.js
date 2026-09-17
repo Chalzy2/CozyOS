@@ -338,14 +338,33 @@
     }
 
     /**
-     * getContext(question, { actorId, memoryQuery })
+     * getContext(question, { actorId, memoryQuery, entityHint, liveSessionId })
      *   Real. See the MICRO-MILESTONE F section of the file header for
      *   what each composed authority is and why. Never throws - a
      *   missing/throwing dependency degrades that one authority to
      *   "no results from it", the same fail-closed convention
      *   CozyKnowledge already uses, never a fabricated answer.
+     *
+     *   liveSessionId (LIVE INTEGRATION AUDIT addition, optional) — a
+     *   real ChurchOS worship-service id, the same one living-worship-
+     *   player.js's own #serviceId already binds to (read by the caller,
+     *   cozy-living-assistant.js's #send(), via LivingWorshipPlayer.
+     *   getDiagnosticsReport().serviceId — never a second "which session
+     *   is this" tracker). When supplied and a real, still-active
+     *   ChurchWorshipSession service is found under that id, composes
+     *   its own real getActiveService()/getRecentTranscript()/
+     *   getServiceTimeline() into one honestly-labeled "live-worship-
+     *   session" result — the ONLY way this file (or Live Window) can
+     *   answer "what did the pastor just say" from the actual live
+     *   transcript instead of fabricating an answer. No new speech/
+     *   transcript/session engine — pure composition of the existing
+     *   ChurchWorshipSession, same fail-closed discipline as every other
+     *   authority here: an unknown/ended session id is silently skipped
+     *   (never a fabricated "no service" claim pretending to be current
+     *   context), so the caller's own "no context found" honesty path
+     *   still applies.
      */
-    async function getContext(question, { actorId = null, memoryQuery = null, entityHint = null } = {}) {
+    async function getContext(question, { actorId = null, memoryQuery = null, entityHint = null, liveSessionId = null } = {}) {
         if (typeof question !== "string" || !question.trim()) {
             return { success: false, reason: "A real, non-empty question is required." };
         }
@@ -387,6 +406,62 @@
                         });
                     }
                 } catch (_err) { /* honest fall-through — never fabricate */ }
+            }
+        }
+
+        // --- Live Worship Session (LIVE INTEGRATION AUDIT addition) ---
+        if (typeof liveSessionId === "string" && liveSessionId.trim()) {
+            const worship = window.CozyOS.ChurchWorshipSession;
+            if (worship && typeof worship.getActiveService === "function") {
+                let active = null;
+                try { active = worship.getActiveService(liveSessionId); } catch (_err) { active = null; }
+                if (active) {
+                    const pieces = [];
+                    try {
+                        const recent = typeof worship.getRecentTranscript === "function" ? worship.getRecentTranscript(liveSessionId, { limit: 5 }) : null;
+                        if (recent && recent.available && recent.entries.length > 0) {
+                            pieces.push(`Most recently spoken (${active.sourceLanguage}): ${recent.entries.map(e => `"${e.text}"`).join(" ")}`);
+                        }
+                    } catch (_err) { /* honest fall-through */ }
+                    try {
+                        const timeline = typeof worship.getServiceTimeline === "function" ? worship.getServiceTimeline(liveSessionId) : null;
+                        if (timeline && timeline.available && timeline.timeline.length > 0) {
+                            const lastMarker = timeline.timeline[timeline.timeline.length - 1];
+                            pieces.push(`Current service section: ${lastMarker.sectionType}${lastMarker.label ? ` (${lastMarker.label})` : ""}.`);
+                        }
+                        if (timeline && timeline.available && timeline.bibleReferences.length > 0) {
+                            const lastRef = timeline.bibleReferences[timeline.bibleReferences.length - 1];
+                            pieces.push(`Last Scripture reference detected: ${lastRef.rawMatch || `${lastRef.book} ${lastRef.chapter}:${lastRef.verseStart}`}.`);
+                        }
+                    } catch (_err) { /* honest fall-through */ }
+                    // Questions ON/OFF — composes church-live-moderation-
+                    // controls.js's own real host toggle (see that file's
+                    // setQuestionsEnabled()/getQuestionsEnabled()) so Live
+                    // Window never claims a user can ask the pastor a
+                    // question when the host has genuinely disabled that.
+                    try {
+                        const modControls = window.CozyOS.ChurchLiveModerationControls;
+                        if (modControls && typeof modControls.getQuestionsEnabled === "function") {
+                            const qState = modControls.getQuestionsEnabled(liveSessionId);
+                            if (qState && qState.status === "OK") {
+                                pieces.push(`Live questions to the host are currently ${qState.enabled ? "ENABLED" : "DISABLED"} for this session.`);
+                            }
+                        }
+                    } catch (_err) { /* honest fall-through */ }
+
+                    if (pieces.length > 0) {
+                        results.push({
+                            authority: "live-worship-session",
+                            provenance: "window.CozyOS.ChurchWorshipSession",
+                            liveSessionId,
+                            evidence: "VERIFIED",
+                            content: pieces.join(" ")
+                        });
+                    }
+                }
+                // An unknown/ended session id is silently skipped — never
+                // a fabricated "no live service" claim standing in for
+                // real context (see this function's own header comment).
             }
         }
 

@@ -205,6 +205,54 @@ async function main() {
         await context.close();
     });
 
+    // ---------- LIVE INTEGRATION AUDIT: invite control ----------
+    // organization-workspace-core.js's resolveWorkforceControls() already
+    // computed a real canInvite flag, but organization-workspace.js never
+    // rendered any control for it - no invite UI existed anywhere in the
+    // repository even though the real, server-authoritative POST
+    // /organizations/invite route was fully built and tested. This proves
+    // the newly-added invite form end-to-end: real DOM -> real fetch ->
+    // real server route -> real, persisted membership row the invitee's
+    // own real session can then see and accept.
+    await test('the invite form is rendered for an organization administrator (James on ORG-C) and is absent for an ordinary worker (James on ORG-B)', async () => {
+        const { context, page } = await openGate(james.cookie);
+        const hasInviteFormOnOrgB = await page.evaluate(() => !!document.getElementById('cozy-org-invite-form'));
+        if (hasInviteFormOnOrgB) throw new Error('ORG-B: James is a plain cashier there (no canManageWorkforce) - the invite form must not render');
+
+        await page.click(`[data-cozy-org-switch="${orgC.id}"]`);
+        await page.waitForTimeout(500);
+        const hasInviteFormOnOrgC = await page.evaluate(() => !!document.getElementById('cozy-org-invite-form'));
+        if (!hasInviteFormOnOrgC) throw new Error('ORG-C: James is the owner/org-admin there - the invite form must render');
+        await context.close();
+    });
+
+    await test('submitting the invite form creates a real, persisted membership the invitee\'s own real session can accept', async () => {
+        const invitee = await registerAndLogin(baseURL, 'invitee-via-ui');
+        const { context, page } = await openGate(james.cookie);
+        await page.click(`[data-cozy-org-switch="${orgC.id}"]`);
+        await page.waitForTimeout(500);
+
+        await page.fill('#cozy-org-invite-userid', invitee.userId);
+        await page.click('#cozy-org-invite-form button[type="submit"]');
+        await page.waitForTimeout(500);
+        const resultText = await page.evaluate(() => document.getElementById('cozy-org-invite-result')?.textContent || '');
+        if (!resultText.includes('Invited')) throw new Error('expected a success message, got: ' + resultText);
+        await context.close();
+
+        // Real proof, not just a UI success string: the invitee's own
+        // real session can accept a real, persisted invitation the form
+        // actually created via the real server route.
+        const accept = await post(baseURL, '/organizations/invite/accept', { organizationId: orgC.id }, invitee.cookie);
+        if (accept.status !== 200 || !accept.json.ok) throw new Error('invitee could not accept a real invitation created by the UI form: ' + JSON.stringify(accept.json));
+        if (accept.json.membership.status !== 'active') throw new Error('expected membership status "active" after accept, got: ' + accept.json.membership.status);
+    });
+
+    await test('an ordinary worker cannot submit an invite even by calling the real endpoint directly (server-side enforcement, not just a hidden UI control)', async () => {
+        const someone = await registerAndLogin(baseURL, 'someone-else');
+        const result = await post(baseURL, '/organizations/invite', { organizationId: orgB.id, userId: someone.userId, roles: [] }, james.cookie);
+        if (result.status === 200) throw new Error('James (a plain cashier in ORG-B) must not be able to invite - real server authorization, not merely a hidden button, is what protects this');
+    });
+
     // ---------- 15: function authorization ----------
     await test('James in ORG-B (his default org) sees Transactions ENABLED and Receipts DENIED (real server-context-derived entitlement)', async () => {
         const { context, page } = await openGate(james.cookie);

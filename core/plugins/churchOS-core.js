@@ -232,7 +232,23 @@
     // OrganizationMembership.grantPermission()/createMembership({permissions:[...]}).
     instance.MEMBERS_CREATE_PERMISSION = MEMBERS_CREATE_PERMISSION;
 
-    instance.visibility = Object.freeze({ appId: "churchOS", name: "ChurchOS", icon: "⛪", category: "business-application", launchTarget: Object.freeze({ center: "churchOS" }), audience: "all" });
+    // LIVE INTEGRATION AUDIT — real bug found via ApplicationVisibility's
+    // own listAllApplications(): this appId used to be the literal string
+    // "churchOS", which does not match the id ServiceRegistry.
+    // registerApplication() actually registers below ("churchos_core_001").
+    // #listPlatformTools() sweeps this self-declared visibility into a
+    // SEPARATE "capabilities" entry (kept apart from the "applications"
+    // list on purpose, so ChurchOS stays visible to every end user even
+    // before an admin explicitly assigns it — see application-visibility.js's
+    // own header on audience:"all"), but ApplicationVisibility.
+    // getRealLaunchPath(appId) resolves a launch path by reading
+    // ServiceRegistry.getApplication(appId) — which only ever knew
+    // "churchos_core_001". The mismatched id meant the real, working
+    // ChurchOS app rendered TWICE on the end-user Apps surface (once in
+    // "Applications", launchable; once in "Capabilities", permanently
+    // stuck on "Not yet launchable"). Aligning the id to the real
+    // ServiceRegistry id is the whole fix — no new visibility mechanism.
+    instance.visibility = Object.freeze({ appId: "churchos_core_001", name: "ChurchOS", icon: "⛪", category: "business-application", launchTarget: Object.freeze({ center: "churchOS" }), audience: "all" });
 
     if (window.CozyOS.ServiceRegistry && typeof window.CozyOS.ServiceRegistry.registerApplication === "function") {
         try {

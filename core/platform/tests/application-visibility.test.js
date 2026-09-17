@@ -95,17 +95,25 @@ async function makeUser(overrides) {
         mods = loadModules();
         const userId = await makeUser();
         const result = mods.Visibility.listVisibleApplications(userId);
-        const inCapabilities = result.capabilities.some(c => c.appId === 'churchOS');
-        const inApplicationsAsPlatformTool = result.applications.some(a => a.appId === 'churchOS');
+        // LIVE INTEGRATION AUDIT fix: the capability's appId must match
+        // the real ServiceRegistry id ("churchos_core_001") churchOS-
+        // core.js actually registers below — it used to be the
+        // deliberately-mismatched literal "churchOS", which made the
+        // real, working ChurchOS app permanently un-launchable from this
+        // capabilities tile (see application-visibility.js's own
+        // getRealLaunchPath()). Same real app, same real launch path,
+        // reached from two honestly-labeled sections.
+        const inCapabilities = result.capabilities.some(c => c.appId === 'churchos_core_001');
+        const inApplicationsAsPlatformTool = result.applications.some(a => a.kind === 'platform-tool');
         assert.strictEqual(inCapabilities, true, 'ChurchOS should be listed as a capability');
-        assert.strictEqual(inApplicationsAsPlatformTool, false, 'ChurchOS (the platform-tool declaration) should never appear under applications');
+        assert.strictEqual(inApplicationsAsPlatformTool, false, 'a platform-tool declaration should never appear under applications');
     });
 
     await asyncTest('capabilities: without ChurchOS loaded, no capability is fabricated', async () => {
         mods = loadModules({ withChurchOS: false });
         const userId = await makeUser();
         const result = mods.Visibility.listVisibleApplications(userId);
-        assert.strictEqual(result.capabilities.some(c => c.appId === 'churchOS'), false);
+        assert.strictEqual(result.capabilities.some(c => c.appId === 'churchos_core_001'), false);
     });
 
     await asyncTest('capabilities: admin dashboard also receives a capabilities field', async () => {
@@ -114,7 +122,7 @@ async function makeUser(overrides) {
         const result = mods.Visibility.listVisibleApplications(userId);
         assert.strictEqual(result.dashboardType, 'admin');
         assert.ok(Array.isArray(result.capabilities));
-        assert.ok(result.capabilities.some(c => c.appId === 'churchOS'));
+        assert.ok(result.capabilities.some(c => c.appId === 'churchos_core_001'));
     });
 
     await asyncTest('capabilities: admin/developer-only platform tools never leak into end-user capabilities', async () => {
@@ -134,9 +142,15 @@ async function makeUser(overrides) {
         assert.strictEqual(ids.includes('churchOS'), false, 'ModuleRegistry must not gain a fabricated ChurchOS entry');
     });
 
+    test('launch path: getRealLaunchPath resolves ChurchOS\'s real capability appId to its real ServiceRegistry entry point (LIVE INTEGRATION AUDIT fix — was permanently "not yet launchable" due to a mismatched appId)', () => {
+        mods = loadModules();
+        assert.strictEqual(mods.Visibility.getRealLaunchPath('churchos_core_001'), 'applications/ChurchOS/churchos.html');
+    });
+
     test('launch path: getRealLaunchPath returns null for a capability with no real entry file (honest "not yet launchable")', () => {
         mods = loadModules();
-        assert.strictEqual(mods.Visibility.getRealLaunchPath('churchOS'), null);
+        global.window.CozyOS.FakeCapabilityNoEntry = { getVersion: () => '1.0.0', visibility: Object.freeze({ appId: 'fakeCapabilityNoEntry', name: 'Fake Capability', category: 'platform-tool', audience: 'all' }) };
+        assert.strictEqual(mods.Visibility.getRealLaunchPath('fakeCapabilityNoEntry'), null);
     });
 
     // -----------------------------------------------------------------

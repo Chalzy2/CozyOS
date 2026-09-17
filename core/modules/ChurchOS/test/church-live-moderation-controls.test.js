@@ -290,6 +290,80 @@ test('an unauthorized user cannot set slow mode', () => {
 });
 
 /* ------------------------------------------------------------------ */
+/* QUESTIONS ON/OFF (LIVE INTEGRATION AUDIT addition)                  */
+/* ------------------------------------------------------------------ */
+
+test('questions default to disabled for a session with no explicit host toggle yet', () => {
+    const { ldce, ctl, identity } = freshEngines();
+    const sessionId = makeSessionWithMembers(ldce, identity, 'host-1', ['viewer-a']);
+    const state = ctl.getQuestionsEnabled(sessionId);
+    assert.equal(state.status, 'OK');
+    assert.equal(state.enabled, false);
+    assert.equal(state.setBy, null);
+});
+
+test('an authorized host can enable questions and getQuestionsEnabled reflects it', () => {
+    const { ldce, ctl, identity } = freshEngines();
+    const sessionId = makeSessionWithMembers(ldce, identity, 'host-1', ['viewer-a']);
+    const setResult = ctl.setQuestionsEnabled(sessionId, 'host-1', true);
+    assert.equal(setResult.status, 'OK');
+    assert.equal(setResult.questions.enabled, true);
+    assert.equal(setResult.questions.setBy, 'host-1');
+
+    const state = ctl.getQuestionsEnabled(sessionId);
+    assert.equal(state.enabled, true);
+});
+
+test('a host can later disable questions again', () => {
+    const { ldce, ctl, identity } = freshEngines();
+    const sessionId = makeSessionWithMembers(ldce, identity, 'host-1', ['viewer-a']);
+    ctl.setQuestionsEnabled(sessionId, 'host-1', true);
+    const off = ctl.setQuestionsEnabled(sessionId, 'host-1', false);
+    assert.equal(off.status, 'OK');
+    assert.equal(ctl.getQuestionsEnabled(sessionId).enabled, false);
+});
+
+test('an ordinary participant cannot enable questions', () => {
+    const { ldce, ctl, identity } = freshEngines();
+    const sessionId = makeSessionWithMembers(ldce, identity, 'host-1', ['viewer-a']);
+    const result = ctl.setQuestionsEnabled(sessionId, 'viewer-a', true);
+    assert.equal(result.status, 'NOT_AUTHORIZED');
+    assert.equal(ctl.getQuestionsEnabled(sessionId).enabled, false, 'a denied attempt must never flip the real state');
+});
+
+test('a promoted LDCE moderator (not the host) can enable questions', async () => {
+    const { ldce, ctl, identity } = freshEngines();
+    const sessionId = makeSessionWithMembers(ldce, identity, 'host-1', ['mod-a']);
+    const promote = await ldce.setParticipantRole(sessionId, 'host-1', 'mod-a', 'moderator');
+    assert.equal(promote.success, true);
+    const result = ctl.setQuestionsEnabled(sessionId, 'mod-a', true);
+    assert.equal(result.status, 'OK');
+});
+
+test('setQuestionsEnabled is session-scoped: a different session is unaffected', () => {
+    const { ldce, ctl, identity } = freshEngines();
+    const sessionA = makeSessionWithMembers(ldce, identity, 'host-1', ['viewer-a']);
+    const sessionB = makeSessionWithMembers(ldce, identity, 'host-2', ['viewer-c']);
+    ctl.setQuestionsEnabled(sessionA, 'host-1', true);
+    assert.equal(ctl.getQuestionsEnabled(sessionA).enabled, true);
+    assert.equal(ctl.getQuestionsEnabled(sessionB).enabled, false, 'session B was never toggled');
+});
+
+test('setQuestionsEnabled rejects a non-boolean value rather than fabricating a state', () => {
+    const { ldce, ctl, identity } = freshEngines();
+    const sessionId = makeSessionWithMembers(ldce, identity, 'host-1', ['viewer-a']);
+    const result = ctl.setQuestionsEnabled(sessionId, 'host-1', 'yes');
+    assert.equal(result.status, 'REJECTED');
+    assert.equal(ctl.getQuestionsEnabled(sessionId).enabled, false);
+});
+
+test('setQuestionsEnabled reports NOT_FOUND for an unknown session, never a fabricated toggle', () => {
+    const { ctl } = freshEngines();
+    const result = ctl.setQuestionsEnabled('nonexistent-session', 'host-1', true);
+    assert.equal(result.status, 'NOT_FOUND');
+});
+
+/* ------------------------------------------------------------------ */
 /* MUTED PARTICIPANTS CANNOT COMMENT                                   */
 /* ------------------------------------------------------------------ */
 

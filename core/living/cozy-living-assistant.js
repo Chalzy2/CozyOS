@@ -666,8 +666,21 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
             const contextualEntityName = (this.#conversationState && this.#conversationState.lastDiscussedApplication && this.#conversationState.lastDiscussedApplication !== "CozyOS")
                 ? this.#conversationState.lastDiscussedApplication
                 : null;
+            // LIVE INTEGRATION AUDIT — the SAME real "which live service
+            // is currently on screen" signal living-worship-player.js
+            // already tracks internally (its own private #serviceId,
+            // bound by bindToService() when a real worship service is
+            // joined/started), read here via its own disclosed
+            // getDiagnosticsReport() rather than a second, competing
+            // tracker. null on every turn where no live worship service
+            // is currently bound — the exact same honest default as
+            // contextualEntityName above.
+            const liveWorshipPlayer = window.CozyOS && window.CozyOS.LivingWorshipPlayer;
+            const activeLiveSessionId = (liveWorshipPlayer && typeof liveWorshipPlayer.getDiagnosticsReport === "function")
+                ? (liveWorshipPlayer.getDiagnosticsReport().serviceId || null)
+                : null;
             if (answerEngine && typeof answerEngine.answer === "function") {
-                const answerResult = await answerEngine.answer(text, { actorId, entityHint: contextualEntityName });
+                const answerResult = await answerEngine.answer(text, { actorId, entityHint: contextualEntityName, liveSessionId: activeLiveSessionId });
                 if (advisor && typeof advisor.advise === "function") {
                     const advice = advisor.advise({ question: text, answerResult });
                     // Domain 4B (AI Integration discovery): CozyAdvisor's

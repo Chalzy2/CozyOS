@@ -65,6 +65,7 @@
     <footer class="cos-footer">ChurchOS Application (Phase 1) · CozyOS</footer>
 </div>
 <script src="../../core/organization/organization-registry.js"></script>
+<script src="../../core/organization/organization-membership.js"></script>
 <script src="../../core/plugins/churchOS-core.js"></script>
 <script>
 (function () {
@@ -72,7 +73,28 @@
     // Real, minimal UI wiring — no fake data, no second business-logic
     // layer. Every action below calls the real, unmodified
     // window.CozyOS.ChurchOS methods directly.
+    //
+    // LIVE INTEGRATION AUDIT fix: this page previously never loaded
+    // organization-membership.js at all, so createMember()'s own real,
+    // fail-closed OrganizationMembership.isAuthorized() check always
+    // threw "OrganizationMembership is not loaded" — the "Add Member"
+    // button never worked, in production, since the permission-
+    // enforcement dependency (NEXT DEPENDENCY / "Verify Existing Record
+    // Authorization") was added. Also adds the same real, existing
+    // resolveActorId()/Session.current() pattern applications/
+    // PharmacyOS/pharmacyos.html already uses, since createMember() also
+    // now requires a real actorId string to check authorization against
+    // — the previous call never passed one at all.
     let currentOrgId = null;
+
+    function resolveActorId() {
+        const session = window.CozyOS && window.CozyOS.Session;
+        if (session && typeof session.current === "function") {
+            const snap = session.current();
+            if (snap && snap.uid) return snap.uid;
+        }
+        return null;
+    }
 
     function renderMembers() {
         const church = window.CozyOS.ChurchOS;
@@ -102,7 +124,39 @@
             try {
                 const setup = church.setupChurch({ name });
                 currentOrgId = setup.organization.orgId;
-                resultEl.textContent = `Church "${name}" set up.`;
+                // LIVE INTEGRATION AUDIT fix: setupChurch() only ever
+                // created the real Organization — it never seeded the
+                // real membership record the creator needs for
+                // createMember()'s own authorization check
+                // (OrganizationMembership.isAuthorized()) to ever pass.
+                // Without this, the "Add Member" button would always
+                // fail for the very person who just set the church up,
+                // with no way to recover ("Organization Builder" is
+                // ChurchOS's own disclosed real path for every other
+                // role/permission grant, but a founding owner has no
+                // membership yet to open Organization Builder as).
+                // OrganizationMembership.createMembership() is the
+                // existing method documented for exactly this case
+                // ("Direct creation (no invitation round-trip) — e.g.
+                // seeding an organization's initial owner") — composed
+                // here, not duplicated.
+                const membership = window.CozyOS.OrganizationMembership;
+                const actorId = resolveActorId();
+                let ownerNote = "";
+                if (membership && actorId) {
+                    try {
+                        membership.createMembership({
+                            userId: actorId, organizationId: currentOrgId,
+                            roles: ["owner"], permissions: [church.MEMBERS_CREATE_PERMISSION],
+                            status: "active", createdBy: actorId
+                        });
+                    } catch (membershipErr) {
+                        ownerNote = " (owner membership not seeded: " + membershipErr.message + ")";
+                    }
+                } else if (!actorId) {
+                    ownerNote = " (no signed-in user detected — sign in, then use Organization Builder to grant yourself membership before adding members.)";
+                }
+                resultEl.textContent = `Church "${name}" set up.` + ownerNote;
                 document.getElementById("cos-no-org-section").style.display = "none";
                 document.getElementById("cos-members-section").style.display = "block";
                 renderMembers();
@@ -116,7 +170,7 @@
             const lastName = document.getElementById("cos-member-last").value.trim();
             const resultEl = document.getElementById("cos-member-create-result");
             try {
-                church.createMember({ orgId: currentOrgId, firstName, lastName });
+                church.createMember({ orgId: currentOrgId, firstName, lastName, actorId: resolveActorId() });
                 resultEl.textContent = `"${firstName}" added.`;
                 document.getElementById("cos-member-first").value = "";
                 document.getElementById("cos-member-last").value = "";

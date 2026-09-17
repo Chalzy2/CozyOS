@@ -284,6 +284,63 @@ await test('10b. Existing CozyMemory compatibility: pre-existing CozyAI methods 
 });
 
 /* ===================================================================
+   11. LIVE WORSHIP SESSION COMPOSITION (LIVE INTEGRATION AUDIT addition)
+=================================================================== */
+function makeFakeWorshipSession(services) {
+    return {
+        getActiveService: (id) => services[id] ? { serviceId: id, orgId: services[id].orgId, sourceLanguage: services[id].sourceLanguage, activeLanguages: [], transcriptEntries: services[id].transcript.length } : null,
+        getRecentTranscript: (id, { limit = 5 } = {}) => services[id] ? { available: true, entries: services[id].transcript.slice(-limit) } : { available: false },
+        getServiceTimeline: (id) => services[id] ? { available: true, timeline: services[id].timeline || [], bibleReferences: services[id].bibleReferences || [] } : { available: false }
+    };
+}
+
+await test('11. liveSessionId composes a real, VERIFIED "live-worship-session" result from ChurchWorshipSession', async () => {
+    const { ai } = loadFullStack({
+        ChurchWorshipSession: makeFakeWorshipSession({
+            svc1: { orgId: 'org1', sourceLanguage: 'sw', transcript: [{ text: 'Karibuni', at: 't1', language: 'sw' }], timeline: [{ sectionType: 'sermon', label: 'Faith', at: 't2' }], bibleReferences: [{ rawMatch: 'John 3:16' }] }
+        })
+    });
+    const ctx = await ai.getContext('What did the pastor just say?', { actorId: 'viewer1', liveSessionId: 'svc1' });
+    assert.strictEqual(ctx.found, true);
+    const hit = ctx.results.find((r) => r.authority === 'live-worship-session');
+    assert.ok(hit, 'expected a live-worship-session result');
+    assert.strictEqual(hit.evidence, 'VERIFIED');
+    assert.strictEqual(hit.liveSessionId, 'svc1');
+    assert.match(hit.content, /Karibuni/);
+    assert.match(hit.content, /sermon/);
+    assert.match(hit.content, /John 3:16/);
+});
+
+await test('11b. an unknown/ended liveSessionId is silently skipped, never fabricated as live context', async () => {
+    const { ai } = loadFullStack({ ChurchWorshipSession: makeFakeWorshipSession({}) });
+    const ctx = await ai.getContext('What did the pastor just say?', { actorId: 'viewer1', liveSessionId: 'svc-does-not-exist' });
+    assert.strictEqual(ctx.results.some((r) => r.authority === 'live-worship-session'), false);
+});
+
+await test('11c. no liveSessionId supplied: behavior is completely unaffected (backward compatible)', async () => {
+    const { ai } = loadFullStack({ ChurchWorshipSession: makeFakeWorshipSession({ svc1: { orgId: 'org1', sourceLanguage: 'sw', transcript: [{ text: 'x', at: 't', language: 'sw' }] } }) });
+    const ctx = await ai.getContext('What did the pastor just say?', { actorId: 'viewer1' });
+    assert.strictEqual(ctx.results.some((r) => r.authority === 'live-worship-session'), false);
+});
+
+await test('11d. ChurchWorshipSession not loaded: getContext() degrades honestly, never throws', async () => {
+    const { ai } = loadFullStack();
+    const ctx = await ai.getContext('What did the pastor just say?', { actorId: 'viewer1', liveSessionId: 'svc1' });
+    assert.strictEqual(ctx.success, true);
+    assert.strictEqual(ctx.results.some((r) => r.authority === 'live-worship-session'), false);
+});
+
+await test('11e. questions-enabled state is composed in when ChurchLiveModerationControls reports it', async () => {
+    const { ai } = loadFullStack({
+        ChurchWorshipSession: makeFakeWorshipSession({ svc1: { orgId: 'org1', sourceLanguage: 'sw', transcript: [{ text: 'x', at: 't', language: 'sw' }] } }),
+        ChurchLiveModerationControls: { getQuestionsEnabled: (id) => id === 'svc1' ? { status: 'OK', enabled: true } : { status: 'OK', enabled: false } }
+    });
+    const ctx = await ai.getContext('Can I ask the pastor a question?', { actorId: 'viewer1', liveSessionId: 'svc1' });
+    const hit = ctx.results.find((r) => r.authority === 'live-worship-session');
+    assert.match(hit.content, /ENABLED/);
+});
+
+/* ===================================================================
    SUMMARY
 =================================================================== */
 console.log(`\n${passed} passed, ${failed} failed`);

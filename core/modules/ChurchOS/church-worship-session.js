@@ -232,6 +232,28 @@
         }
 
         /**
+         * getRecentTranscript(serviceId, { limit })
+         *   LIVE INTEGRATION AUDIT addition — real, read-only, the
+         *   actual last `limit` real transcript entries already
+         *   accumulated by deliverSpokenText() above (the exact source-
+         *   language text the pastor's own speech recognition produced,
+         *   never a paraphrase or a translation). Added because no
+         *   caller anywhere could read back what was actually said
+         *   without ending the whole service first (endService()'s
+         *   summary was the only place the full transcript surfaced).
+         *   Composed by CozyAI.getContext() (see that file's own
+         *   liveSessionId parameter) so Live Window can honestly answer
+         *   "what did the pastor just say" from the real transcript
+         *   instead of fabricating an answer or refusing outright.
+         */
+        getRecentTranscript(serviceId, { limit = 5 } = {}) {
+            const service = this.#activeServices.get(serviceId);
+            if (!service) return { available: false, reason: `No real active service "${serviceId}".` };
+            const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 5;
+            return { available: true, entries: service.transcript.slice(-safeLimit).map(e => ({ ...e })) };
+        }
+
+        /**
          * detectBibleReferences(text)
          *   Real (M342 update): this file's own reference-detection
          *   regex predated the Living.scripture gateway (M340) and

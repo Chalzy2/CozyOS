@@ -357,7 +357,11 @@
             });
 
             const contentEl = this.#root.querySelector('#cozy-org-section-content');
-            const renderSection = (sectionKey) => { contentEl.innerHTML = this.#renderSectionContent(sectionKey, presentation, ctx); };
+            const core = window.CozyOS.OrganizationWorkspaceCore;
+            const renderSection = (sectionKey) => {
+                contentEl.innerHTML = this.#renderSectionContent(sectionKey, presentation, ctx);
+                if (sectionKey === core.SECTION.WORKFORCE) this.#wireWorkforceSection(contentEl, presentation.organizationId);
+            };
             this.#root.querySelectorAll('[data-cozy-org-section]').forEach((btn) => {
                 btn.addEventListener('click', () => renderSection(btn.getAttribute('data-cozy-org-section')));
             });
@@ -393,11 +397,83 @@
         #renderWorkforceSection(presentation) {
             if (!presentation.workforce.canView) return '<p style="color:#94a3b8;font-size:13px;">Not authorized.</p>';
             const members = this.#state.members;
-            if (!Array.isArray(members)) return '<p style="color:#94a3b8;font-size:13px;">Workforce roster unavailable.</p>';
-            const rows = members.map((m) =>
-                '<li>' + escapeHtml(m.userId) + ' — ' + escapeHtml((m.roles || []).join(', ') || 'no role') + '</li>'
-            ).join('');
-            return '<ul style="font-size:13px;color:#eaf5ee;">' + rows + '</ul>';
+            const rosterHtml = !Array.isArray(members)
+                ? '<p style="color:#94a3b8;font-size:13px;">Workforce roster unavailable.</p>'
+                : '<ul style="font-size:13px;color:#eaf5ee;">' + members.map((m) =>
+                    '<li>' + escapeHtml(m.userId) + ' — ' + escapeHtml((m.roles || []).join(', ') || 'no role') + '</li>'
+                ).join('') + '</ul>';
+
+            // LIVE INTEGRATION AUDIT fix: presentation.workforce.canInvite
+            // was already computed (organization-workspace-core.js's own
+            // resolveWorkforceControls()) but never read/rendered anywhere
+            // in this file — no invite control existed in the DOM at all,
+            // even though the real, server-authoritative POST
+            // /organizations/invite route (server/webauthn-rp/
+            // organizations.js's invite(), already tested) was fully
+            // built and reachable. This file already composes the real
+            // server for the context/roster it renders (#fetchContext(),
+            // #fetchMembersIfAuthorized() above) — the invite form below
+            // composes that exact same real server route, never a second
+            // invite mechanism.
+            const inviteHtml = !presentation.workforce.canInvite ? '' :
+                '<form id="cozy-org-invite-form" style="margin-top:16px;padding-top:12px;border-top:1px solid #0f3d2c;">' +
+                '<div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">INVITE A MEMBER (by CozyID)</div>' +
+                '<input type="text" id="cozy-org-invite-userid" placeholder="CozyID (userId)" required ' +
+                'style="padding:6px 8px;border-radius:4px;border:1px solid #0f3d2c;background:#01140f;color:#eaf5ee;margin-right:6px;" />' +
+                '<input type="text" id="cozy-org-invite-roles" placeholder="Roles (comma-separated, optional)" ' +
+                'style="padding:6px 8px;border-radius:4px;border:1px solid #0f3d2c;background:#01140f;color:#eaf5ee;margin-right:6px;" />' +
+                '<button type="submit" style="padding:6px 12px;border-radius:4px;border:none;background:#0f3d2c;color:#fff;cursor:pointer;">Invite</button>' +
+                '<p id="cozy-org-invite-result" style="font-size:12px;color:#94a3b8;margin:6px 0 0 0;"></p>' +
+                '</form>';
+
+            return rosterHtml + inviteHtml;
+        }
+
+        /**
+         * #inviteMember(organizationId, userId, roles)
+         *   LIVE INTEGRATION AUDIT addition — the real, server-
+         *   authoritative invite call (same #fetchImpl this file already
+         *   uses for #fetchContext()/#fetchMembersIfAuthorized() above).
+         *   actorUserId is never sent from here — server.js's own route
+         *   handler derives it from the authenticated session
+         *   (currentSession(req).userId), exactly like every other
+         *   mutating org route this file already composes.
+         */
+        async #inviteMember(organizationId, userId, roles) {
+            try {
+                const res = await this.#fetchImpl('/organizations/invite', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ organizationId, userId, roles }),
+                });
+                const body = await res.json().catch(() => ({}));
+                if (res.status !== 200 || !body.ok) {
+                    return { success: false, reason: (body && (body.error || body.reason)) || `HTTP ${res.status}` };
+                }
+                return { success: true, membership: body.membership };
+            } catch (err) {
+                return { success: false, reason: err && err.message ? err.message : 'network_error' };
+            }
+        }
+
+        /** Wires the invite form's submit listener — called every time the WORKFORCE section is (re)rendered, since #renderSectionContent only ever replaces contentEl's innerHTML. */
+        #wireWorkforceSection(contentEl, organizationId) {
+            const form = contentEl.querySelector('#cozy-org-invite-form');
+            if (!form) return;
+            form.addEventListener('submit', async (evt) => {
+                evt.preventDefault();
+                const userId = contentEl.querySelector('#cozy-org-invite-userid').value.trim();
+                const rolesRaw = contentEl.querySelector('#cozy-org-invite-roles').value.trim();
+                const roles = rolesRaw ? rolesRaw.split(',').map((r) => r.trim()).filter(Boolean) : [];
+                const resultEl = contentEl.querySelector('#cozy-org-invite-result');
+                if (!userId) { resultEl.textContent = 'A real CozyID is required.'; return; }
+                resultEl.textContent = 'Sending invite…';
+                const result = await this.#inviteMember(organizationId, userId, roles);
+                resultEl.textContent = result.success
+                    ? `Invited "${userId}". They will see this invitation the next time they sign in.`
+                    : `Could not invite: ${result.reason}`;
+            });
         }
 
         #renderApplicationsSection(presentation, ctx) {

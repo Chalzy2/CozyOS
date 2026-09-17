@@ -143,6 +143,7 @@
         #restrictions = new Map();     // sessionId -> Map<userId, {state, mutedAt, mutedBy, mutedReason, unmutedAt, unmutedBy, unmutedReason}>
         #trusted = new Map();          // sessionId -> Set<userId>
         #slowMode = new Map();         // sessionId -> { intervalMs, setBy, setAt }
+        #questionsEnabled = new Map(); // sessionId -> { enabled, setBy, setAt } — LIVE INTEGRATION AUDIT addition
         #lastCommentAt = new Map();    // sessionId -> Map<userId, timestamp ms>
         #messages = new Map();         // sessionId -> Array<official moderator message>
         #history = new Map();          // sessionId -> Array<event>
@@ -401,6 +402,48 @@
         getSlowMode(sessionId) {
             const record = this.#slowMode.get(sessionId);
             return record ? Object.assign({ sessionId }, record) : { sessionId, intervalMs: 0, setBy: null, setAt: null };
+        }
+
+        /* ============================================================= *
+         * QUESTIONS ON/OFF (LIVE INTEGRATION AUDIT addition, session-
+         * scoped) — no generic host "questions enabled" toggle existed
+         * anywhere in the repository (confirmed by repo-wide search: no
+         * hostControls/questionMode construct of any kind), even though
+         * it's a named, required part of ChurchOS's Live Questions
+         * feature ("Pastor starts live service -> Questions initially
+         * controlled by host -> Pastor/moderator enables questions").
+         * Mirrors setSlowMode()/getSlowMode() exactly — same
+         * authorization path (#isAuthorizedModerator(), the SAME real
+         * host/moderator/platform-admin/org-role check every other
+         * mutating method here already uses), same session-scoped Map
+         * storage, same OK/NOT_AUTHORIZED/NOT_FOUND/UNAVAILABLE status
+         * vocabulary. Defaults to disabled (per the flow above:
+         * "Questions initially controlled by host") until a real host/
+         * moderator explicitly enables them — never defaults to open.
+         * ============================================================= */
+
+        setQuestionsEnabled(sessionId, actorId, enabled) {
+            const ldce = this.#requireLdce();
+            if (!ldce) return { status: "UNAVAILABLE", reason: "LDCESessionEngine is not available." };
+            const identity = this.#requireIdentity();
+            if (!identity) return { status: "UNAVAILABLE", reason: "IdentityEngine is not available." };
+            const session = ldce.getSession(sessionId);
+            if (!session) return { status: "NOT_FOUND", reason: "Unknown LDCE session." };
+            const authz = this.#isAuthorizedModerator(ldce, identity, actorId, sessionId, session.hostId);
+            if (!authz.authorized) return { status: "NOT_AUTHORIZED", reason: authz.reason };
+            if (typeof enabled !== "boolean") return { status: "REJECTED", reason: "enabled must be a real boolean." };
+            this.#ensureSession(sessionId);
+            const record = { enabled, setBy: actorId, setAt: new Date().toISOString() };
+            this.#questionsEnabled.set(sessionId, record);
+            const event = this.#recordEvent(sessionId, enabled ? "QUESTIONS_ENABLED" : "QUESTIONS_DISABLED", { actorId });
+            return { status: "OK", questions: Object.assign({ sessionId }, record), event: Object.assign({}, event) };
+        }
+
+        getQuestionsEnabled(sessionId) {
+            const record = this.#questionsEnabled.get(sessionId);
+            return record
+                ? Object.assign({ status: "OK", sessionId }, record)
+                : { status: "OK", sessionId, enabled: false, setBy: null, setAt: null };
         }
 
         /* ============================================================= *

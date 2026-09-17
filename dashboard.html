@@ -539,6 +539,16 @@
      player is not left calling into engines that are not yet defined. -->
 <script src="core/engines/media/live-capture-engine.js"></script>
 <script src="core/engines/collaboration/live-hotspot-engine.js"></script>
+<!-- LIVE INTEGRATION AUDIT fix: church-worship-session.js is
+     living-worship-player.js's own real, direct data source for its
+     Translation/Scripture/Timeline panels (window.CozyOS.
+     ChurchWorshipSession, read directly in the player's own render
+     methods) — it was already loaded on admin-workspace.html but never
+     here, so those three panels had no real backing data on the main
+     end-user dashboard even though the player itself was mounted and
+     visible. Loaded before the player for the same reason
+     admin-workspace.html already orders it that way. -->
+<script src="core/modules/ChurchOS/church-worship-session.js"></script>
 <script src="core/modules/ChurchOS/living-worship-player.js"></script>
 <!-- Dashboard Prompt 1: pure-logic navigation/AI-context module. Loads
      before user-dashboard.js, which now composes it for the real
