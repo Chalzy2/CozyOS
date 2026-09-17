@@ -286,6 +286,27 @@
     const APP_IMPORTANCE_PRONOUNS = new Set(["it", "this", "that", "hii", "hiyo"]);
 
     /**
+     * PLATFORM_LEVEL_INTENTS — UNIVERSAL QUESTION UNDERSTANDING REPAIR.
+     *
+     * The exact, closed set of INTENT_RULES ids (see the array below)
+     * whose composeReply case answers a question about CozyOS the
+     * PLATFORM itself (identity/origin/vision/mission/history/why-use/
+     * differentiation/language-support/founder/list-apps/etc.) rather
+     * than about one specific sub-application. Used ONLY to let
+     * lastDiscussedApplication (see its own comment below) admit
+     * "CozyOS" as a real conversational entity, on the same terms as
+     * any named application — never used to change what these intents
+     * themselves answer.
+     */
+    const PLATFORM_LEVEL_INTENTS = new Set([
+        "what-is-cozyos", "what-is-cozyos-enterprise", "project-origin",
+        "public-story", "cozyos-vision", "cozyos-mission", "project-history",
+        "why-use-cozyos", "differentiation", "language-support-list",
+        "founder", "meta-verified-vs-planned", "list-apps", "list-providers",
+        "all-apps-detailed"
+    ]);
+
+    /**
      * extractAppImportanceCandidate(text)
      *   Real, single extraction point for APP_IMPORTANCE_PATTERN above —
      *   returns whichever capture group matched (there is always at
@@ -361,9 +382,9 @@
         //    ahead of what-is-cozyos for the same reason. ───────────
         { id: "project-origin", pattern: /\bwhy\s+was\s+cozyos\s+started\b|\bwhy\s+did\s+(?:the\s+)?founder\s+create\s+cozyos\b|\borigin\s+of\s+cozyos\b/i },
         { id: "public-story", pattern: /\bpublic\s+story\b|\bcozyos\s+story\b|\bstory\s+of\s+cozyos\b/i },
-        { id: "cozyos-vision", pattern: /\bvision\s+of\s+cozyos\b|\bcozyos'?s?\s+vision\b|\bwhat\s+is\s+cozyos\s+trying\s+to\s+accomplish\b|\bwhat\s+is\s+the\s+vision\b/i },
-        { id: "cozyos-mission", pattern: /\bmission\s+of\s+cozyos\b|\bcozyos'?s?\s+mission\b|\bwhat\s+is\s+the\s+mission\b/i },
-        { id: "project-history", pattern: /\bproject\s+history\b|\bhistory\s+of\s+cozyos\b|\bwhat\s+is\s+the\s+history\b/i },
+        { id: "cozyos-vision", pattern: /\bvision\s+of\s+cozyos\b|\bcozyos'?s?\s+vision\b|\bwhat\s+is\s+cozyos\s+trying\s+to\s+accomplish\b|\bwhat(?:'s|\s+is)\s+the\s+vision\b/i },
+        { id: "cozyos-mission", pattern: /\bmission\s+of\s+cozyos\b|\bcozyos'?s?\s+mission\b|\bwhat(?:'s|\s+is)\s+the\s+mission\b/i },
+        { id: "project-history", pattern: /\bproject\s+history\b|\bhistory\s+of\s+cozyos\b|\bwhat(?:'s|\s+is)\s+the\s+history\b/i },
 
         // ── COZYAI-PUBLIC-VISION-KNOWLEDGE — why-use / differentiation /
         // language-support-list. Placed here (after the project-
@@ -2136,6 +2157,40 @@
                 // resolveApplicationByName() itself confirms is real —
                 // never the raw, unverified candidate string.
                 lastDiscussedApplication: (() => {
+                    // UNIVERSAL QUESTION UNDERSTANDING REPAIR (entity
+                    // context generalization) — real root cause of the
+                    // observed "How is human benefits with it in real
+                    // life?" / "What problems does it solve?" regression
+                    // (after a genuinely CozyOS-platform-level turn like
+                    // "What Cozyos for" / "What's the vision" / "Public
+                    // story behind it"): this tracker previously recorded
+                    // an entity ONLY for "app-importance"/"app-info"/
+                    // "app-detailed-info" turns, so CozyOS the PLATFORM
+                    // was never a valid conversational referent — a
+                    // pronoun follow-up about the platform itself always
+                    // resolved to "" (no candidate), which the
+                    // "app-importance" case then looked up in the
+                    // PER-APPLICATION human-purpose registry
+                    // (getApplicationHumanPurposeFact()), a table that
+                    // structurally can never contain "CozyOS" (it holds
+                    // named sub-applications only) — producing the
+                    // honest-but-wrong "I don't have human-purpose
+                    // information registered for that application yet."
+                    //
+                    // The fix reuses the SAME single tracker/authority
+                    // (never a second, competing context store) and
+                    // simply admits CozyOS the platform as an equal,
+                    // first-class entity value ("CozyOS") whenever the
+                    // turn just answered was genuinely about the
+                    // platform itself. Every downstream consumer of
+                    // lastDiscussedApplication already knows how to
+                    // handle the literal value "CozyOS" — see the
+                    // composeReply "app-importance" case's existing
+                    // `/^cozyos\b/i` branch, which was added for an
+                    // explicitly-typed "cozyos" candidate but works
+                    // identically for a context-resolved one — so this
+                    // is additive, not a new code path.
+                    if (PLATFORM_LEVEL_INTENTS.has(intent)) return "CozyOS";
                     // UNIVERSAL APPLICATION UNDERSTANDING REPAIR —
                     // broadened beyond "app-importance" alone: "app-info"
                     // and "app-detailed-info" turns also discuss a real,

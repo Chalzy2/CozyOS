@@ -1425,14 +1425,6 @@
          cozy-hearing.js depends on it. -->
     <script src="core/engines/audio/cozy-audio-engine.js"></script>
     <script src="core/modules/hearing/cozy-hearing.js"></script>
-    <!-- Living Assistant unification — this page had AudioEngine,
-         CozyHearing, and SpeechRecognitionAdapter all real and loaded
-         (above/line 1252) but never composed together, unlike
-         index.html/dashboard.html (see dashboard.html's own CP14
-         comment). living-hearing-session.js is the existing composer
-         (CP13/CP14) for exactly those three real engines — no new
-         engine added here, this page was just missing the wire. -->
-    <script src="core/modules/hearing/living-hearing-session.js"></script>
     <script src="core/modules/vision/cozy-vision.js"></script>
     <!-- Milestone M274 - real fix: completes the camera chain.
          vision-camera-adapter.js and browser-camera-provider.js were

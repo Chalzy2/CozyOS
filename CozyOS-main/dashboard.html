@@ -190,6 +190,29 @@
      Kiswahili content for those intents. Same real files, same proven
      order, as dashboard.html — nothing new, nothing duplicated. -->
 <script src="core/registry/cozy-registry.js"></script>
+<!-- UNIVERSAL QUESTION UNDERSTANDING REPAIR — real, complete,
+     self-contained capabilities referenced by name inside
+     rule-based-conversational-provider.js's own "record-church-member"
+     intent and CozyIdentityFAQRouter/CozyAI's translate() path, but
+     never actually loaded on any real page (same class of bug as the
+     other fixes in this file). OrganizationRegistry + OrganizationMembership
+     + ChurchOS (core/plugins/churchOS-core.js) together are the complete,
+     bounded dependency set createMember() itself requires (confirmed by
+     reading that function's own real, guarded checks) — without them,
+     a real request like "add John as a new member of my church" always
+     honestly failed with "unavailable" even though the real feature is
+     fully implemented. SpeechTranslationAdapter is the real, existing
+     translation composition cozyos-identity-faq-router.js's
+     _translateIfPossible() and cozy-ai.js's translate() already read;
+     its one soft dependency (CozyLanguagePacks) is optional and
+     honestly falls back to a static seed list when absent (see that
+     adapter's own getSeedLanguages() comment), so it is safe to load on
+     its own here without pulling in the larger, admin-only
+     language-pack subsystem. -->
+<script src="core/organization/organization-registry.js"></script>
+<script src="core/organization/organization-membership.js"></script>
+<script src="core/plugins/churchOS-core.js"></script>
+<script src="core/modules/speech/adapters/speech-translation-adapter.js"></script>
 <!-- USER SECURITY SURFACE — real, existing WebAuthn/enrollment
      architecture, reused verbatim from admin-workspace.html (Milestones
      358-360), mounted here for ordinary users for the first time. Same
@@ -253,6 +276,39 @@
      Answer -> Advisor chain the Living Assistant now uses. No new
      memory engine. -->
 <script src="core/modules/memory/cozy-memory-engine.js"></script>
+<!-- UNIVERSAL QUESTION UNDERSTANDING REPAIR — the real "cognitive
+     stack" rule-based-conversational-provider.js's own think() already
+     calls first, every turn, as a public caller of
+     CognitiveCoordinator.run() (see that provider's own header: "the
+     same real entry point reasoningPipelineProvider already uses, so
+     Memory/Policy/Interpretation/Thinking/Reasoning/Intelligence all
+     still genuinely execute"). All 7 of these real, self-contained
+     files (each depending only on window.CozyOS.ServiceRegistry,
+     already loaded, and on each other) were never actually loaded on
+     any real page, so none of that execution has ever genuinely
+     happened live — CognitiveCoordinator.run() itself, and everything
+     it composes, has been silently absent from every real Live Window
+     conversation. ai-bootstrap.js + cozy-intelligence-provider.js then
+     register the real providers those registries need (see
+     ai-bootstrap.js's own header for exactly which of the 7 concepts
+     get a real provider today vs. an honestly-labeled DISABLED stub —
+     never fabricated as working). Deliberately NOT included here:
+     core/modules/ocrstudio/'s separate OCREngine subsystem — a second,
+     redundant OCR implementation under a different global name from
+     the OCR (core/modules/ocr/cozy-ocr.js) already loaded and already
+     serving image capture; CognitiveCoordinator already fails closed,
+     honestly, when OCREngine specifically is absent (same pattern used
+     throughout this codebase), so this is a disclosed, deliberate scope
+     line, not an oversight. -->
+<script src="core/modules/intelligence/cozy-intelligence.js"></script>
+<script src="core/modules/interpretation/cozy-interpretation.js"></script>
+<script src="core/modules/reasoning/cozy-reasoning.js"></script>
+<script src="core/modules/sense/cozy-sense.js"></script>
+<script src="core/modules/thinking/cozy-thinking.js"></script>
+<script src="core/modules/policy/policy-decision-engine.js"></script>
+<script src="core/modules/cognitive/cognitive-coordinator.js"></script>
+<script src="core/modules/intelligence/ai-bootstrap.js"></script>
+<script src="core/modules/intelligence/cozy-intelligence-provider.js"></script>
 <!-- Living Multimodal Learning increment (CP9/CP10) — LivingLanguageVerification
      (checks window.CozyOS.CozyMemory at call time, not load time) and
      Camera (a pure, dependency-free coordinator/registry — never
@@ -279,6 +335,25 @@
      that file's own header, but is kept after it for readability. -->
 <script src="core/modules/intelligence/language/cozy-language-registry.js"></script>
 <script src="core/modules/intelligence/language/cozy-language-templates.js"></script>
+<!-- UNIVERSAL QUESTION UNDERSTANDING REPAIR (continuing the M363/PHASE
+     6C class of fix above): two more real, fully-written, referenced-
+     by-name files were never actually loaded on any real page.
+     cozy-language-directive.js implements "...in French"/"...kwa
+     Kifaransa" explicit-language-request parsing that
+     cozyos-identity-faq-router.js's own resolve() already reads
+     (window.CozyOS.CozyLanguageDirective.extractLanguageDirective) -
+     without this script tag that reference always resolved to
+     undefined, so the directive was silently ignored on every real
+     page. cozy-lexicon-en-sw.js is the real 473-record Kiswahili/
+     English vocabulary data cozy-knowledge-registry.js's
+     lookupLexiconTermFact() reads and the "animal-identification"
+     intent (rule-based-conversational-provider.js) already calls -
+     without it, that intent could never return a real vocabulary
+     match, only its honest "needs an image" fallback. Both are pure,
+     additive data/parsing modules with no dependency on load order
+     relative to anything else here. -->
+<script src="core/modules/intelligence/language/cozy-language-directive.js"></script>
+<script src="core/modules/intelligence/knowledge/cozy-lexicon-en-sw.js"></script>
 <script src="core/modules/intelligence/knowledge/cozy-knowledge-registry.js"></script>
 <!-- M363 fix: this real, complete, previously-written file (registers window.CozyOS.CozyPublicKnowledge, the owner-approved vision/why-use/language-support-list facts) was never actually loaded on any real page - confirmed by a real Playwright/Chromium run showing why-use-cozyos/differentiation/language-support-list always resolving to NOT_FOUND live. Composed by cozy-knowledge-registry.js at CALL time only (see that file's own header), so exact placement order does not matter, only that it is present. -->
 <script src="core/modules/intelligence/knowledge/cozy-public-knowledge-source.js"></script>

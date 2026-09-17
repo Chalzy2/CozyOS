@@ -278,6 +278,25 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
         // guessed, never defaulted to Kiswahili.
         #currentLanguage = null;
         #conversationId = null; // M366.3 - lazily created once per session via #getOrCreateConversationId(), reused thereafter
+        // UNIVERSAL QUESTION UNDERSTANDING REPAIR — real, confirmed gap:
+        // rule-based-conversational-provider.js's own think() already
+        // computes and RETURNS a real cross-turn entity/intent tracker
+        // (result.result.conversationState — lastDiscussedApplication,
+        // lastIntent, lastApplication, lastLanguage; see that file's own
+        // extensive RP-037/M363 comments) specifically so a pronoun
+        // follow-up ("Why is it important?", "Who benefits from it?")
+        // can resolve against whatever entity (a named application, OR
+        // — since this repair — CozyOS the platform itself) the
+        // PREVIOUS real turn discussed. Before this fix, #send() below
+        // never read this field back in on the NEXT call, so every
+        // single turn was answered as if it were the first message of
+        // the conversation — the entire cross-turn resolution mechanism
+        // existed, was unit-tested, and was completely disconnected
+        // from this, the one live, user-facing conversational window.
+        // Holds the real, previously-RETURNED conversationState object
+        // verbatim (never invented here) - null until a first real turn
+        // has produced one.
+        #conversationState = null;
         #root = null;
         #windowHandle = null; // M366.7 - the real WindowManager handle for the panel, once opened
         #panel = null;
@@ -582,8 +601,17 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
             // is not, without a real "soft preference" precedence tier
             // this file does not have today.
             const result = (ai && typeof ai.think === "function")
-                ? await ai.think(text, { context: this.#currentSection, conversationId, actorId: this.#resolveActorId() })
+                ? await ai.think(text, { context: this.#currentSection, conversationId, actorId: this.#resolveActorId(), conversationState: this.#conversationState })
                 : null;
+
+            // UNIVERSAL QUESTION UNDERSTANDING REPAIR — capture the
+            // real, freshly-returned conversationState for the NEXT
+            // turn's ai.think() call above (see the #conversationState
+            // field's own comment). Only ever the provider's own real,
+            // returned object - never invented or merged with a guess.
+            if (result && result.success && result.result && result.result.conversationState) {
+                this.#conversationState = result.result.conversationState;
+            }
 
             // Kiswahili Capability Dependency #2 — reuses this exact,
             // already-existing, already-computed result.result.language
@@ -618,8 +646,28 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
             const answerEngine = window.CozyOS && window.CozyOS.CozyAnswerEngine;
             const advisor = window.CozyOS && window.CozyOS.CozyAdvisor;
             let unknownRequestFallbackAnswer = null;
+            // UNIVERSAL QUESTION UNDERSTANDING REPAIR — the SAME single
+            // entity-context tracker as #conversationState above (never
+            // a second/competing one): when the previous real turn left
+            // a specific NAMED application under discussion (not the
+            // "CozyOS" platform sentinel, not null), pass it through to
+            // the verified chain too. Without this, a bare pronoun
+            // follow-up with no application name in ITS OWN text (e.g.
+            // "Who benefits from it?" right after discussing ShopOS)
+            // could still satisfy CozyAnswerEngine/getContext()'s own
+            // generic CozyOS-platform benefit/problem/importance routes
+            // (see cozy-ai.js's own comment) and answer with GENERIC
+            // platform content ahead of the correctly-scoped,
+            // ShopOS-specific answer rule-based-conversational-
+            // provider.js's own (now correctly context-aware) fallback
+            // would have given — the verified chain is tried FIRST, so
+            // it must know the same real entity context to defer
+            // correctly, not just to guess.
+            const contextualEntityName = (this.#conversationState && this.#conversationState.lastDiscussedApplication && this.#conversationState.lastDiscussedApplication !== "CozyOS")
+                ? this.#conversationState.lastDiscussedApplication
+                : null;
             if (answerEngine && typeof answerEngine.answer === "function") {
-                const answerResult = await answerEngine.answer(text, { actorId });
+                const answerResult = await answerEngine.answer(text, { actorId, entityHint: contextualEntityName });
                 if (advisor && typeof advisor.advise === "function") {
                     const advice = advisor.advise({ question: text, answerResult });
                     // Domain 4B (AI Integration discovery): CozyAdvisor's
