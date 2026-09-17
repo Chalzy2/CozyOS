@@ -72,6 +72,18 @@
       color here, not a CSS variable, so it never depends on anything
       else loading first.
     -->
+    <!-- BACKGROUND VISIBILITY CORRECTION — real bug found live: this
+         file's own comments below ("cozy-tokens.css defines --bg-primary",
+         "cozy-tokens.css has a platform-admin block") describe
+         core/ui/cozy-tokens.css as loaded, but no <link> for it ever
+         existed anywhere in this file — confirmed by direct inspection.
+         Every var(--cozy-*) reference in this file's own inline <style>
+         block below (and every var(--cozy-bg-gradient) the Living
+         Background canvas depends on) was resolving to nothing without
+         it. Added here, first (matching dashboard.html/index.html's own
+         load order), so every later stylesheet/script that reads these
+         tokens gets real, defined values from the very first paint. -->
+    <link rel="stylesheet" href="core/ui/cozy-tokens.css">
     <link rel="stylesheet" href="core/shell/launch-sequence.css?v=3">
     <!-- M364.3: this launch-screen CSS now lives in the single,
          shared core/shell/launch-sequence.css (extracted verbatim
@@ -502,6 +514,11 @@
     <script src="core/shell/startup-orchestrator.js"></script>
     <script src="core/living/cozy-living-particles.js"></script>
     <script src="core/living/cozy-living-sounds.js"></script>
+    <!-- GLOBAL BACKGROUND VISIBILITY + AUDIO CONTROL CORRECTION — the
+         real, shared mute/unmute/volume UI for the LivingSounds engine
+         directly above, mounted on the Administrator Dashboard too (same
+         control, same preference, never a separate "admin audio system"). -->
+    <script src="core/ui/cozy-audio-control.js"></script>
     <!-- AUTHORIZED FIX (Sequence Path Integrity Pass): launch-sequence.js
          used to load here (before live-animation-engine.js/startup-
          orchestrator.js/cozy-living-sounds.js above), unlike every other
@@ -1721,7 +1738,45 @@
     <script src="core/plugins/shopOS-dashboard.js"></script>
     <script src="core/plugins/shopOS-search.js"></script>
     <script src="core/modules/ShopOS/shopos.js"></script>
+    <!-- LIVE WINDOW RUNTIME AUDIT — real gap found live: this page
+         already registers ChurchOS/ShopOS/Authenticator (via the
+         <script> tags around them), but MpesaOS, QuarryOS, WholesaleOS,
+         InterestOS, and PharmacyOS were never loaded at all - the exact
+         same class of fix as dashboard.html/index.html's own identical
+         comment. mpesaOS-engine.js (not the already-loaded mpesaOS.js
+         above, which never calls registerApplication) is the real file
+         that registers MpesaOS. pharmacyOS-core.js is the real Phase 1
+         application; the old core/plugins/pharmacyOS.js stub referenced
+         directly below no longer exists on disk (a separate, pre-
+         existing dead link, left untouched here as out of this
+         correction's scope). -->
+    <script src="core/plugins/mpesaOS-engine.js"></script>
+    <script src="core/modules/QuarryOS/quarry-index.js"></script>
+    <script src="core/plugins/wholesaleOS-core.js"></script>
+    <script src="core/plugins/interestOS-core.js"></script>
+    <script src="core/plugins/pharmacyOS-core.js"></script>
     <script src="core/plugins/pharmacyOS.js"></script>
+    <script src="core/modules/intelligence/media/cozy-media-intelligence.js"></script>
+    <script src="core/engines/video/ui/cozy-live-camera-capture-app.js"></script>
+    <script src="core/shell/live/cozy-live-session.js"></script>
+    <script src="core/connectivity/ui/cozy-live-connectivity-app.js"></script>
+    <!-- Same real, already-tested registration calls dashboard.html/
+         index.html add (see either file's own comment) - these 4
+         modules expose registerAsApplication()/registerAsCoreApplication()
+         but never call it themselves; every existing caller is each
+         module's own separate dev/demo dashboard page. -->
+    <script>
+      (function () {
+        const mi = window.CozyOS && window.CozyOS.CozyMediaIntelligence;
+        if (mi && typeof mi.registerAsCoreApplication === "function") mi.registerAsCoreApplication();
+        const cam = window.CozyOS && window.CozyOS.CozyLiveCameraCaptureApp;
+        if (cam && typeof cam.registerAsApplication === "function") cam.registerAsApplication();
+        const session = window.CozyOS && window.CozyOS.CozyLiveSession;
+        if (session && typeof session.registerAsApplication === "function") session.registerAsApplication();
+        const connectivity = window.CozyOS && window.CozyOS.CozyLiveConnectivityApp;
+        if (connectivity && typeof connectivity.registerAsApplication === "function") connectivity.registerAsApplication();
+      })();
+    </script>
     <!-- Milestone 361 Stage 3 — Founder Story Experience & Living
          Narration. Loaded here, after CozySpeech/VoiceManager (§1313/
          1358), CozyTranslate (§1393), LivingSounds (§769), and

@@ -62,6 +62,33 @@
        token yet; the other 4 (Certified/Healthy, Warning, Information,
        Failed/Critical) already existed above and are reused as-is. */
     --cozy-pending: #f97316;
+
+    /* BACKGROUND VISIBILITY CORRECTION — real, base default for
+       --cozy-bg-gradient (same value already used below for the
+       "cozyos" shell theme) so this token is never undefined/empty on
+       a page before (or without) a [data-cozy-app="..."] attribute
+       being set on <html> — confirmed via a real browser check that it
+       was empty in exactly that case. Every [data-cozy-app="X"] block
+       below still overrides this per-theme as before; this only adds
+       the missing fallback, it does not change any existing theme's
+       resolved value. */
+    --cozy-bg-gradient: radial-gradient(circle at 50% 0%, #0f1020 0%, #05050a 100%);
+}
+
+/* BACKGROUND VISIBILITY CORRECTION — the one real rule that actually
+   paints --cozy-bg-gradient onto the page. core/ui/cozy-background.js's
+   own header comment already documented the intent ("Let cozy-theme.css
+   radial gradient shine through" underneath its canvas, which sits at
+   z-index:-100 so normal page background always shows through it) but
+   core/shell/cozy-theme.css (which has this exact rule) is not linked
+   on the real served pages (dashboard.html/index.html/admin-workspace.html/
+   login.html only link this file) - so the rule never actually applied
+   there. Added here, the one token file every one of those pages does
+   link, rather than linking a second theme file or duplicating this
+   rule in each page's own inline <style> block. */
+body {
+    background: var(--cozy-bg-gradient);
+    transition: background 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ==========================================================================

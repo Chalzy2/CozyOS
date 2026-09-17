@@ -859,8 +859,21 @@
         /**
          * Utility: connects close-proximity particles into a soft mesh network.
          * Shared by renderMpesaScene-style visuals and renderHospitalScene.
+         *
+         * dotAlphaMultiplier — BACKGROUND VISIBILITY CORRECTION: optional,
+         * defaults to the original fixed 1.5 so renderHospitalScene's
+         * existing call (no 4th argument) is byte-for-byte unchanged.
+         * renderPlatformAdminScene passes a higher value below because a
+         * real browser check found its marks were rendering at an average
+         * alpha of ~0.08/255 (effectively invisible) against the
+         * Administrator Workspace's real, correct white
+         * (--cozy-bg-gradient: #FFFFFF) background — the two scenes need
+         * different intensity because one already sits on a dark backdrop
+         * (where low alpha reads as an ambient glow) and the other is the
+         * one light-theme scene in this file, not because the utility
+         * itself needed to change.
          */
-        drawMeshNetwork(lineColor, dotColor, thresholdRange) {
+        drawMeshNetwork(lineColor, dotColor, thresholdRange, dotAlphaMultiplier = 1.5) {
             const len = this.particles.length;
 
             for (let i = 0; i < len; i++) {
@@ -883,7 +896,7 @@
                 }
 
                 this.ctx.fillStyle = dotColor;
-                this.ctx.globalAlpha = p1.alpha * 1.5;
+                this.ctx.globalAlpha = p1.alpha * dotAlphaMultiplier;
                 this.ctx.beginPath();
                 this.ctx.arc(p1.x, p1.y, p1.size * 1.2, 0, Math.PI * 2);
                 this.ctx.fill();
@@ -935,14 +948,23 @@
             this.ctx.save();
             const brandPrimary = this.getCssVar("--cozy-brand-primary", "#1B5E20");
             const brandAccent = this.getCssVar("--cozy-brand-accent", "#F9A825");
+            // BACKGROUND VISIBILITY CORRECTION — a real browser check
+            // against the Administrator Workspace's real, correct white
+            // (--cozy-bg-gradient: #FFFFFF) background found this scene's
+            // original 0.05 line alpha / 1.5x dot multiplier averaged
+            // 0.08/255 alpha across the canvas (effectively invisible).
+            // Raised to a level confirmed clearly perceptible on white
+            // while staying visibly calmer/sparser than Developer Hub's
+            // own wave scene — never a "decorative", high-contrast look.
             this.drawMeshNetwork(
-                "rgba(27, 94, 32, 0.05)",
+                "rgba(27, 94, 32, 0.14)",
                 brandPrimary,
-                110
+                110,
+                3.2
             );
-            // Faint gold accent dots on a slow-moving subset, kept sparse and
-            // low-alpha to stay "subtle" rather than decorative.
-            this.ctx.globalAlpha = 0.05;
+            // Gold accent dots on a slow-moving subset, kept sparse but
+            // raised from 0.05 for the same real-contrast reason above.
+            this.ctx.globalAlpha = 0.14;
             this.ctx.fillStyle = brandAccent;
             this.particles.slice(0, 8).forEach(p => {
                 this.ctx.beginPath();

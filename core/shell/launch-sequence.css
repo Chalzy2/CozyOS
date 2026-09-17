@@ -7,8 +7,26 @@
  * milestones as core/shell/launch-sequence.js) so both dashboard.html
  * and index.html render the identical, single approved launch screen —
  * never two different or duplicated versions of it.
+ *
+ * BACKGROUND VISIBILITY CORRECTION — real bug found live: this file
+ * previously also set `html, body { background: #011c15 !important; }`.
+ * That declaration was redundant for its own stated purpose —
+ * #cozy-launch-screen below already covers the entire viewport with its
+ * own opaque background at position:fixed;inset:0;z-index:999999, so
+ * body/html's own background is never visible underneath it during
+ * boot regardless of what it is — and, because of !important, it
+ * permanently pinned every CozyOS page's background to this one flat
+ * boot-splash color forever, even long after the launch screen itself
+ * faded out (.cozy-launch-hidden only fades #cozy-launch-screen's own
+ * opacity; it never touched this separate html/body rule). That
+ * permanently hid the real, intended --cozy-bg-gradient theme
+ * background (core/ui/cozy-tokens.css) the Living Background canvas
+ * (core/ui/cozy-background.js) is designed to render its animation on
+ * top of — see that file's own "Let cozy-theme.css radial gradient
+ * shine through" comment. Removed entirely; margin:0 (the only other
+ * real effect) is preserved.
  */
-        html, body { background: #011c15 !important; margin: 0; }
+        html, body { margin: 0; }
         #cozy-launch-screen {
             position: fixed; inset: 0; z-index: 999999;
             background: #011c15;

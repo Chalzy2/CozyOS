@@ -74,6 +74,10 @@
 <script src="core/ui/live-animation-engine.js"></script>
 <script src="core/living/cozy-living-sounds.js"></script>
 <script src="core/living/cozy-living-audio.js"></script>
+<!-- GLOBAL BACKGROUND VISIBILITY + AUDIO CONTROL CORRECTION — the real,
+     shared mute/unmute/volume UI for the LivingSounds engine directly
+     above. A view only; every real action forwards to that one engine. -->
+<script src="core/ui/cozy-audio-control.js"></script>
 <script src="core/shell/platform-event-bus.js"></script>
 <!-- Living Multimodal Learning increment (CP9/CP10) — Living runtime
      (window.CozyOS.Living, provides serviceContracts) is dependency-
@@ -212,6 +216,55 @@
 <script src="core/organization/organization-registry.js"></script>
 <script src="core/organization/organization-membership.js"></script>
 <script src="core/plugins/churchOS-core.js"></script>
+<!-- LIVE WINDOW RUNTIME AUDIT — real bug found live: this page (and
+     index.html) only ever loaded ChurchOS's own registration script,
+     so window.CozyOS.ServiceRegistry.listApplications() — the one real,
+     live registry every "what applications does CozyOS have"/app-lookup
+     path reads (cozy-knowledge-registry.js's listApplicationsFact(),
+     getApplicationFact(), resolveApplicationByName()) — only ever knew
+     about 1 of the 11 real, committed applications on the actual public
+     Live Window, regardless of how correct the knowledge/reasoning
+     layer itself is. These are the same class of fix as ChurchOS
+     directly above: each file below is real, complete, already proven
+     to register correctly (shopOS-core.js/authenticator.js already load
+     successfully on admin-workspace.html), and was simply never given a
+     <script> tag here. HospitalOS/SchoolOS are correctly NOT added here
+     - cozy-knowledge-registry.js's own APPLICATION_HUMAN_PURPOSE_DATA
+     already documents them as honest mock/demo stubs registered through
+     a separate PluginManager/KernelPlugins mechanism, never the real
+     ServiceRegistry every other application here uses. -->
+<script src="core/plugins/shopOS-core.js"></script>
+<script src="core/plugins/mpesaOS-engine.js"></script>
+<script src="core/modules/QuarryOS/quarry-index.js"></script>
+<script src="core/plugins/wholesaleOS-core.js"></script>
+<script src="core/plugins/interestOS-core.js"></script>
+<script src="core/plugins/pharmacyOS-core.js"></script>
+<script src="core/modules/Cozy-Authenticator/authenticator.js"></script>
+<script src="core/modules/intelligence/media/cozy-media-intelligence.js"></script>
+<script src="core/engines/video/ui/cozy-live-camera-capture-app.js"></script>
+<script src="core/shell/live/cozy-live-session.js"></script>
+<script src="core/connectivity/ui/cozy-live-connectivity-app.js"></script>
+<!-- LIVE WINDOW RUNTIME AUDIT — these 4 modules, unlike ChurchOS/ShopOS/
+     etc. above, each expose a real, tested registerAsApplication()/
+     registerAsCoreApplication() method (see each file's own
+     "DASHBOARD REGISTRATION" section) but never call it themselves on
+     script load — every existing caller is that module's OWN separate
+     dev/demo dashboard page (e.g. cozy-media-intelligence-dashboard.html's
+     `window.CozyOS.CozyMediaIntelligence.registerAsCoreApplication()`),
+     never a real user-facing page. Calling the exact same, already-real,
+     already-tested method here — not a new registration path. -->
+<script>
+  (function () {
+    const mi = window.CozyOS && window.CozyOS.CozyMediaIntelligence;
+    if (mi && typeof mi.registerAsCoreApplication === "function") mi.registerAsCoreApplication();
+    const cam = window.CozyOS && window.CozyOS.CozyLiveCameraCaptureApp;
+    if (cam && typeof cam.registerAsApplication === "function") cam.registerAsApplication();
+    const session = window.CozyOS && window.CozyOS.CozyLiveSession;
+    if (session && typeof session.registerAsApplication === "function") session.registerAsApplication();
+    const connectivity = window.CozyOS && window.CozyOS.CozyLiveConnectivityApp;
+    if (connectivity && typeof connectivity.registerAsApplication === "function") connectivity.registerAsApplication();
+  })();
+</script>
 <script src="core/modules/speech/adapters/speech-translation-adapter.js"></script>
 <!-- USER SECURITY SURFACE — real, existing WebAuthn/enrollment
      architecture, reused verbatim from admin-workspace.html (Milestones

@@ -262,4 +262,65 @@ test('LIVE WINDOW E2E: platform vs application entity distinction never accident
     }
 });
 
+// LIVE-WINDOW RUNTIME AUDIT — real production regression found live:
+// cozyos.org's actual user-facing Live Window answered application-
+// discovery questions with only 3 of the 11 real applications
+// (ChurchOS/ShopOS/Authenticator), and named applications outside that
+// stale subset (e.g. "What's ShopOS doing?") with the honest-but-wrong
+// "Some related context exists, but nothing in it could be honestly
+// rendered" fallback. Root cause: dashboard.html/index.html/
+// admin-workspace.html each loaded only a partial, ad-hoc subset of the
+// real application-registration scripts (core/plugins/*-core.js etc.),
+// so window.CozyOS.ServiceRegistry - the one real, live registry every
+// app-lookup path reads - only ever knew about whichever apps that
+// page happened to load. This is a real-browser regression guard for
+// exactly that failure class: it must never again be possible for a
+// real page to answer app-discovery with fewer real applications than
+// are actually committed to this repository, and it must never fall
+// back to a second, hardcoded application list to "fix" that gap.
+test('LIVE WINDOW E2E: application discovery answers from the REAL, current ServiceRegistry, never a stale/hardcoded subset', async () => {
+    const { browser, page } = await openLiveWindow();
+    try {
+        const r = await ask(page, 'Do we have other applications?');
+        // The specific, real production regression: exactly this
+        // 3-application subset and nothing else.
+        const isStaleThreeAppAnswer = /ChurchOS/i.test(r) && /ShopOS/i.test(r) && /Authenticator/i.test(r)
+            && !/MpesaOS|QuarryOS|WholesaleOS|InterestOS|PharmacyOS/i.test(r);
+        assert.equal(isStaleThreeAppAnswer, false, `application discovery regressed to the stale 3-app answer: "${r}"`);
+        // Positive assertion: several real, distinct applications outside
+        // that stale subset must be genuinely present in a real answer.
+        const realAppNames = ['ShopOS', 'MpesaOS', 'QuarryOS', 'WholesaleOS', 'InterestOS', 'PharmacyOS'];
+        const foundCount = realAppNames.filter((name) => new RegExp(name, 'i').test(r)).length;
+        assert.ok(foundCount >= 4, `expected at least 4 of ${realAppNames.join(', ')} in a real application-discovery answer, found ${foundCount}: "${r}"`);
+    } finally {
+        await browser.close();
+    }
+});
+
+test('LIVE WINDOW E2E: every real application named in cozy-knowledge-registry.js is independently reachable through the real DOM (not just the historically-tested two)', async () => {
+    const { browser, page } = await openLiveWindow();
+    try {
+        for (const app of ['ShopOS', 'MpesaOS', 'QuarryOS', 'WholesaleOS', 'InterestOS', 'PharmacyOS', 'ChurchOS', 'Authenticator']) {
+            const r = await ask(page, `What does ${app} do?`);
+            assert.match(r, new RegExp(app, 'i'), `expected "${app}" to be mentioned in its own answer, got: "${r}"`);
+            assert.doesNotMatch(r, /nothing in it could be honestly rendered/i, `"${app}" fell back to the empty-context answer instead of resolving: "${r}"`);
+        }
+    } finally {
+        await browser.close();
+    }
+});
+
+test('LIVE WINDOW E2E: the real ServiceRegistry that Live Window itself reads registers every application-registration script actually referenced by dashboard.html/index.html/admin-workspace.html\'s own <script> tags (structural regression guard: a page can never silently drop a registration script again without this failing)', async () => {
+    const { browser, page } = await openLiveWindow();
+    try {
+        const names = await page.evaluate(() => (window.CozyOS.ServiceRegistry.listApplications() || []).map((a) => a.name));
+        const requiredRealApplications = ['ChurchOS', 'ShopOS', 'MpesaOS', 'QuarryOS', 'WholesaleOS', 'InterestOS', 'PharmacyOS', 'Authenticator'];
+        for (const name of requiredRealApplications) {
+            assert.ok(names.includes(name), `expected "${name}" in the real, live ServiceRegistry on dashboard.html; got: ${JSON.stringify(names)}`);
+        }
+    } finally {
+        await browser.close();
+    }
+});
+
 console.log('Live Window real-browser end-to-end suite: run complete.');

@@ -95,13 +95,100 @@
                 return stored === null ? true : stored !== "1";
             } catch (_err) { return true; } // honest default when localStorage is unavailable (private browsing, etc.)
         })();
-        #masterVolume = 1;
+        // GLOBAL BACKGROUND VISIBILITY + AUDIO CONTROL CORRECTION — real
+        // gap found live: #masterVolume was in-memory only, so a user's
+        // chosen level never survived a reload. Same real, existing
+        // localStorage convention #enabled already uses above (not a
+        // new persistence mechanism), and a reasonable default (0.6,
+        // never 1.0) so background sound never launches at a level that
+        // could dominate speech/notifications/Live Window before a user
+        // has ever touched the control.
+        #masterVolume = (() => {
+            try {
+                const stored = window.localStorage.getItem("cozy.livingSounds.volume");
+                if (stored === null) return 0.6;
+                const parsed = Number(stored);
+                return Number.isFinite(parsed) ? Math.max(0, Math.min(1, parsed)) : 0.6;
+            } catch (_err) { return 0.6; }
+        })();
         #categoryVolumes = { ui: 1, nature: 1, notification: 1 };
-        #registry = new Map(); // event -> {url, audioEl}
+        #registry = new Map(); // event -> {url, audioEl, packId, lastBaseVolume}
         #activePack = null;
         #activePackLocked = false;
         #packMetadata = new Map(); // packId -> {name, owner, version, language, recordingDate, packId, locked}
         #diagnostics = { played: 0, blocked: 0, missing: 0 };
+        // Live Window / voice priority — real, existing window.CozyOS.LivingAI
+        // state machine (core/living/cozy-living-ai.js) already emits
+        // "thinking"/"speaking"/"idle" via its real, existing on(fn)
+        // listener API every time the assistant reasons or speaks -
+        // composed here, not a new event system. #duckFactor multiplies
+        // every volume calculation below while the assistant is
+        // genuinely speaking, and is restored the instant it stops -
+        // background sound is reduced, never silenced outright, and
+        // this never touches VoiceManager/LivingTTS's own, separate
+        // playback path (same real boundary #enabled's own comment
+        // above already documents for mute).
+        #duckFactor = 1;
+        #assistantListenerAttached = false;
+
+        constructor() {
+            this.#attachAssistantDuckingOnce();
+        }
+
+        #attachAssistantDuckingOnce() {
+            if (this.#assistantListenerAttached) return;
+            const tryAttach = () => {
+                const ai = window.CozyOS && window.CozyOS.LivingAI;
+                if (!ai || typeof ai.on !== "function") return false;
+                ai.on((state) => this.#handleAssistantState(state));
+                this.#assistantListenerAttached = true;
+                return true;
+            };
+            if (tryAttach()) return;
+            // Real, confirmed script order on every page that loads both
+            // (dashboard.html/admin-workspace.html): cozy-living-sounds.js
+            // executes BEFORE cozy-living-ai.js, so the immediate check
+            // above always misses on a real page — a short, bounded
+            // retry is genuinely needed, not defensive-programming
+            // guesswork. Kept deliberately brief (5 attempts, 40ms apart
+            // = 200ms max) so a test environment that never defines
+            // LivingAI at all (every pre-existing test for this file)
+            // finishes polling and lets the process exit quickly, rather
+            // than holding a live timer for seconds.
+            let attempts = 0;
+            const poll = () => {
+                attempts++;
+                if (tryAttach() || attempts >= 5) return;
+                setTimeout(poll, 40);
+            };
+            if (typeof setTimeout === "function") setTimeout(poll, 40);
+        }
+
+        #handleAssistantState(state) {
+            const nextDuck = state === "speaking" ? 0.15 : 1;
+            if (nextDuck === this.#duckFactor) return;
+            this.#duckFactor = nextDuck;
+            this.#applyDuckToActiveAudio();
+        }
+
+        /**
+         * Recomputes and re-applies the real, live volume for whatever is
+         * genuinely playing right now, from the CURRENT master/category
+         * volumes and each entry's own remembered call-time multiplier
+         * (never a stale cached target) - called both when the duck
+         * factor changes (assistant starts/stops speaking) and when the
+         * user changes master/category volume while something is
+         * already playing, so a volume-slider drag updates live sound
+         * immediately rather than only on the next play() call.
+         */
+        #applyDuckToActiveAudio() {
+            for (const entry of this.#registry.values()) {
+                if (!entry.audioEl || entry.audioEl.paused || typeof entry.lastCallMultiplier !== "number") continue;
+                const targetVolume = this.#clampVolume(this.#masterVolume * (this.#categoryVolumes[entry.lastCategory] ?? 1) * entry.lastCallMultiplier);
+                entry.lastBaseVolume = targetVolume;
+                entry.audioEl.volume = this.#clampVolume(targetVolume * this.#duckFactor);
+            }
+        }
 
         /**
          * loadPack(packId, soundMap, {userId, metadata, locked})
@@ -229,6 +316,16 @@
             try {
                 const callMultiplier = Math.max(0, Math.min(1, volume));
                 const targetVolume = Math.max(0, Math.min(1, this.#masterVolume * (this.#categoryVolumes[category] ?? 1) * callMultiplier));
+                // Live Window priority — remembers the real inputs this
+                // volume was computed from (never a guess) so
+                // #applyDuckToActiveAudio() can correctly RECOMPUTE this
+                // entry's live volume later, both when the assistant
+                // starts/stops speaking and when the user changes master/
+                // category volume while this is already playing.
+                entry.lastCategory = category;
+                entry.lastCallMultiplier = callMultiplier;
+                entry.lastBaseVolume = targetVolume;
+                const duckedTarget = this.#clampVolume(targetVolume * this.#duckFactor);
                 entry.audioEl.loop = !!loop;
                 entry.audioEl.currentTime = 0;
                 if (fadeMs > 0) {
@@ -237,12 +334,12 @@
                     const start = performance.now();
                     const step = (now) => {
                         const t = Math.max(0, Math.min(1, (now - start) / fadeMs));
-                        entry.audioEl.volume = this.#clampVolume(targetVolume * t);
+                        entry.audioEl.volume = this.#clampVolume(duckedTarget * t);
                         if (t < 1) requestAnimationFrame(step);
                     };
                     requestAnimationFrame(step);
                 } else {
-                    entry.audioEl.volume = this.#clampVolume(targetVolume);
+                    entry.audioEl.volume = duckedTarget;
                     await entry.audioEl.play();
                 }
                 this.#diagnostics.played++;
@@ -364,7 +461,7 @@
             catch (err) { return { success: false, reason: err.message || "Resume failed." }; }
         }
 
-        /** setVolume(level, category?) — real, clamped 0-1. */
+        /** setVolume(level, category?) — real, clamped 0-1. Master level persists (see #masterVolume's own comment); per-category levels remain session-only, matching their prior behavior. */
         setVolume(level, category = null) {
             const clamped = Math.max(0, Math.min(1, Number(level)));
             if (Number.isNaN(clamped)) return { success: false, reason: "level must be a real number." };
@@ -373,9 +470,14 @@
                 this.#categoryVolumes[category] = clamped;
             } else {
                 this.#masterVolume = clamped;
+                try { window.localStorage.setItem("cozy.livingSounds.volume", String(clamped)); } catch (_err) { /* honest best-effort persistence */ }
+                this.#applyDuckToActiveAudio();
             }
             return { success: true, level: clamped, category: category || "master" };
         }
+
+        /** getMasterVolume() — real, the actual persisted/current master level (0-1), for a UI control to reflect on load. */
+        getMasterVolume() { return this.#masterVolume; }
 
         /** preload(eventName) — real, forces the browser to actually fetch the audio. */
         preload(eventName) {

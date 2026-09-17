@@ -59,6 +59,10 @@
 <script src="core/ui/live-animation-engine.js"></script>
 <script src="core/living/cozy-living-sounds.js"></script>
 <script src="core/living/cozy-living-audio.js"></script>
+<!-- GLOBAL BACKGROUND VISIBILITY + AUDIO CONTROL CORRECTION — the real,
+     shared mute/unmute/volume UI for the LivingSounds engine directly
+     above. A view only; every real action forwards to that one engine. -->
+<script src="core/ui/cozy-audio-control.js"></script>
 <script src="core/shell/platform-event-bus.js"></script>
 <!-- Living Multimodal Learning increment (CP9/CP10) — Living runtime
      (window.CozyOS.Living, provides serviceContracts) is dependency-
@@ -175,6 +179,42 @@
 <script src="core/organization/organization-registry.js"></script>
 <script src="core/organization/organization-membership.js"></script>
 <script src="core/plugins/churchOS-core.js"></script>
+<!-- LIVE WINDOW RUNTIME AUDIT — same real gap fixed in dashboard.html
+     (see that file's own comment): this page only ever loaded ChurchOS's
+     own registration script, so window.CozyOS.ServiceRegistry.
+     listApplications() only ever knew about 1 of the 11 real
+     applications on the actual public Live Window. HospitalOS/SchoolOS
+     are correctly not added - honest mock/demo stubs per
+     cozy-knowledge-registry.js's own documentation, never registered
+     through the real ServiceRegistry. -->
+<script src="core/plugins/shopOS-core.js"></script>
+<script src="core/plugins/mpesaOS-engine.js"></script>
+<script src="core/modules/QuarryOS/quarry-index.js"></script>
+<script src="core/plugins/wholesaleOS-core.js"></script>
+<script src="core/plugins/interestOS-core.js"></script>
+<script src="core/plugins/pharmacyOS-core.js"></script>
+<script src="core/modules/Cozy-Authenticator/authenticator.js"></script>
+<script src="core/modules/intelligence/media/cozy-media-intelligence.js"></script>
+<script src="core/engines/video/ui/cozy-live-camera-capture-app.js"></script>
+<script src="core/shell/live/cozy-live-session.js"></script>
+<script src="core/connectivity/ui/cozy-live-connectivity-app.js"></script>
+<!-- Same real, already-tested registration calls dashboard.html adds
+     (see that file's own comment) - these 4 modules expose
+     registerAsApplication()/registerAsCoreApplication() but never call
+     it themselves; every existing caller is each module's own separate
+     dev/demo dashboard page, never a real user-facing one. -->
+<script>
+  (function () {
+    const mi = window.CozyOS && window.CozyOS.CozyMediaIntelligence;
+    if (mi && typeof mi.registerAsCoreApplication === "function") mi.registerAsCoreApplication();
+    const cam = window.CozyOS && window.CozyOS.CozyLiveCameraCaptureApp;
+    if (cam && typeof cam.registerAsApplication === "function") cam.registerAsApplication();
+    const session = window.CozyOS && window.CozyOS.CozyLiveSession;
+    if (session && typeof session.registerAsApplication === "function") session.registerAsApplication();
+    const connectivity = window.CozyOS && window.CozyOS.CozyLiveConnectivityApp;
+    if (connectivity && typeof connectivity.registerAsApplication === "function") connectivity.registerAsApplication();
+  })();
+</script>
 <script src="core/modules/speech/adapters/speech-translation-adapter.js"></script>
 <!-- USER SECURITY SURFACE — real, existing WebAuthn/enrollment
      architecture, reused verbatim from admin-workspace.html (Milestones
