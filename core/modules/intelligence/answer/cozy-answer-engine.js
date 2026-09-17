@@ -152,6 +152,13 @@
         if (getters.has("listProvidersFact")) return "TECHNICAL";
         if (getters.has("getFounderFact")) return "IDENTITY";
         if (getters.has("getVisionFact")) return "VISION";
+        // UNIVERSAL QUESTION UNDERSTANDING REPAIR — label these two
+        // platform-level facts honestly by knowledge domain instead of
+        // falling through to "GENERAL", now that cozy-ai.js's
+        // CONTEXT_KNOWLEDGE_ROUTES can route human-benefit/problem-
+        // solved-style questions to them (see that file's own comment).
+        if (getters.has("getWhyUseCozyOSFact")) return "HUMAN_BENEFITS";
+        if (getters.has("getDifferentiationFact")) return "IMPORTANCE";
         if (getters.has("getMissionFact") || getters.has("getProjectOriginFact") || getters.has("getProjectHistoryFact") || getters.has("getPublicStoryFact")) return "ORIGIN_OR_STORY";
         if (ctxResults.some(r => r.authority === "cozy-memory" || r.authority === "living-memory")) return "PROJECT_KNOWLEDGE";
         return "GENERAL";
@@ -171,7 +178,7 @@
      *   Real. Never throws — a missing/failing composed authority
      *   degrades the relevant field, never a fabricated answer.
      */
-    async function answer(question, { actorId = null, language = null, memoryQuery = null } = {}) {
+    async function answer(question, { actorId = null, language = null, memoryQuery = null, entityHint = null } = {}) {
         if (typeof question !== "string" || !question.trim()) {
             return {
                 answer: "A real, non-empty question is required.",
@@ -195,8 +202,31 @@
         const comparisonLike = COMPARISON_PATTERN.test(question);
 
         // --- Step: existing FAQ/Knowledge path (identity/origin/vision/etc.) ---
+        // UNIVERSAL QUESTION UNDERSTANDING REPAIR — real bug found via
+        // an actual Live Window run (not just unit tests): CozyIdentityFAQRouter
+        // owns no per-application knowledge and already has a real,
+        // deliberate scope guard for that — "a query naming another
+        // real CozyOS application is never this router's to answer"
+        // (see that file's own _mentionsOtherApplication() comment) —
+        // but that guard only ever sees the LITERAL text of one turn.
+        // A bare pronoun follow-up naming no application at all (e.g.
+        // "Who benefits from it?" right after a real, specific
+        // application was under discussion) has no app name for that
+        // guard to catch, so the router's own word-overlap scorer could
+        // still fuzzy-match a short, low-specificity platform trigger
+        // (observed live: "who benefits from cozyos" matched "Who
+        // benefits from it?" purely via the shared word "benefits" once
+        // the brand name and connectives are stopworded) and confidently
+        // answer with the wrong, platform-level text ahead of the
+        // correctly-scoped, application-specific answer. entityHint
+        // (see cozy-living-assistant.js's own comment) is the SAME real
+        // conversation-context signal already used to guard getContext()
+        // below — applying it here too, honestly extending the router's
+        // own stated scope rule to context-implied applications, not
+        // only textually-named ones.
         let faqResult = null;
-        if (router && typeof router.resolve === "function") {
+        const skipFaqRouterForNamedApp = typeof entityHint === "string" && entityHint.trim().length > 0;
+        if (router && typeof router.resolve === "function" && !skipFaqRouterForNamedApp) {
             try { faqResult = await router.resolve(question, { language }); } catch (_err) { faqResult = null; }
         }
         const faqMatched = !!(faqResult && faqResult.matched);
@@ -207,7 +237,7 @@
         // half, e.g. "What is CozyOS and what applications does it have?") ---
         let ctx = { success: false, results: [] };
         if (ai && typeof ai.getContext === "function") {
-            try { ctx = await ai.getContext(question, { actorId, memoryQuery }); } catch (_err) { ctx = { success: false, results: [] }; }
+            try { ctx = await ai.getContext(question, { actorId, memoryQuery, entityHint }); } catch (_err) { ctx = { success: false, results: [] }; }
         }
         const ctxResults = (ctx && Array.isArray(ctx.results)) ? ctx.results : [];
 

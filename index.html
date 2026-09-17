@@ -166,6 +166,16 @@
      Kiswahili content for those intents. Same real files, same proven
      order, as dashboard.html — nothing new, nothing duplicated. -->
 <script src="core/registry/cozy-registry.js"></script>
+<!-- UNIVERSAL QUESTION UNDERSTANDING REPAIR — same real, previously-
+     disconnected files fixed in dashboard.html (see that file's own
+     comment here): OrganizationRegistry + OrganizationMembership +
+     ChurchOS (createMember()'s complete real dependency set) and
+     SpeechTranslationAdapter (already read by
+     cozyos-identity-faq-router.js/cozy-ai.js's translate() path). -->
+<script src="core/organization/organization-registry.js"></script>
+<script src="core/organization/organization-membership.js"></script>
+<script src="core/plugins/churchOS-core.js"></script>
+<script src="core/modules/speech/adapters/speech-translation-adapter.js"></script>
 <!-- USER SECURITY SURFACE — real, existing WebAuthn/enrollment
      architecture, reused verbatim from admin-workspace.html (Milestones
      358-360), mounted here for ordinary users for the first time. Kept
@@ -226,6 +236,20 @@
      Answer -> Advisor chain the Living Assistant now uses. No new
      memory engine. -->
 <script src="core/modules/memory/cozy-memory-engine.js"></script>
+<!-- UNIVERSAL QUESTION UNDERSTANDING REPAIR — same real "cognitive
+     stack" wiring fixed in dashboard.html (see that file's own
+     comment): CognitiveCoordinator.run() and everything it composes
+     had never actually loaded on any real page. -->
+<script src="core/modules/intelligence/cozy-intelligence.js"></script>
+<script src="core/modules/interpretation/cozy-interpretation.js"></script>
+<script src="core/modules/reasoning/cozy-reasoning.js"></script>
+<script src="core/modules/sense/cozy-sense.js"></script>
+<script src="core/modules/thinking/cozy-thinking.js"></script>
+<script src="core/modules/policy/policy-engine.js"></script>
+<script src="core/modules/policy/policy-decision-engine.js"></script>
+<script src="core/modules/cognitive/cognitive-coordinator.js"></script>
+<script src="core/modules/intelligence/ai-bootstrap.js"></script>
+<script src="core/modules/intelligence/cozy-intelligence-provider.js"></script>
 <!-- Living Multimodal Learning increment (CP9/CP10) — LivingLanguageVerification
      (checks window.CozyOS.CozyMemory at call time, not load time) and
      Camera (a pure, dependency-free coordinator/registry — never
@@ -252,6 +276,16 @@
      that file's own header, but is kept after it for readability. -->
 <script src="core/modules/intelligence/language/cozy-language-registry.js"></script>
 <script src="core/modules/intelligence/language/cozy-language-templates.js"></script>
+<!-- UNIVERSAL QUESTION UNDERSTANDING REPAIR: same real, previously-
+     disconnected files fixed in dashboard.html (see that file's own
+     comment here) - cozy-language-directive.js (explicit "...in
+     French"/"...kwa Kifaransa" language-request parsing, already read
+     by cozyos-identity-faq-router.js's resolve()) and
+     cozy-lexicon-en-sw.js (the real 473-record Kiswahili/English
+     vocabulary data lookupLexiconTermFact()/the "animal-identification"
+     intent already read) were never loaded on this page either. -->
+<script src="core/modules/intelligence/language/cozy-language-directive.js"></script>
+<script src="core/modules/intelligence/knowledge/cozy-lexicon-en-sw.js"></script>
 <script src="core/modules/intelligence/knowledge/cozy-knowledge-registry.js"></script>
 <!-- M363 fix: this real, complete, previously-written file (registers window.CozyOS.CozyPublicKnowledge, the owner-approved vision/why-use/language-support-list facts) was never actually loaded on any real page - confirmed by a real Playwright/Chromium run showing why-use-cozyos/differentiation/language-support-list always resolving to NOT_FOUND live. Composed by cozy-knowledge-registry.js at CALL time only (see that file's own header), so exact placement order does not matter, only that it is present. -->
 <script src="core/modules/intelligence/knowledge/cozy-public-knowledge-source.js"></script>

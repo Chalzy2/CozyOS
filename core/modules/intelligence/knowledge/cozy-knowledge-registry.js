@@ -1293,8 +1293,29 @@
         for (const field of SUBSTANCE_FIELDS) {
             const swKey = field + "Sw";
             const swValue = data[swKey];
+            const enValue = data[field];
+            // UNIVERSAL QUESTION UNDERSTANDING REPAIR — real bug found via
+            // an actual Live Window Kiswahili run: "Authenticator inasaidia
+            // nini?" / "Kwa nini Authenticator ni muhimu?" always reported
+            // "no-kiswahili-human-purpose-payload-yet" even though every
+            // Kiswahili field Authenticator actually has (humanPurposeSw,
+            // realLifeProblemsSw, whoBenefitsSw, humanBenefitsSw,
+            // currentVerifiedCapabilitiesSw) is real and complete. Root
+            // cause: visionCapabilities/visionCapabilitiesSw are BOTH
+            // genuinely, honestly empty arrays for Authenticator (nothing
+            // is planned-but-not-implemented — everything about it is
+            // already real, per its own visionSourceNote) - the old
+            // `swValue.length > 0` check could not distinguish "an
+            // honest, equally-empty field on both languages" (nothing to
+            // translate, not a gap) from "the English side has real
+            // content this application's Kiswahili entry never
+            // translated" (a genuine gap, still correctly fail-closed
+            // below). An array field only fails now when the ENGLISH
+            // side has real entries but the Kiswahili side doesn't -
+            // never for a field that is legitimately empty in both
+            // languages at once.
             const hasRealSwValue = Array.isArray(swValue)
-                ? swValue.length > 0
+                ? (Array.isArray(enValue) && enValue.length === 0 ? true : swValue.length > 0)
                 : (typeof swValue === "string" && swValue.length > 0);
             if (!hasRealSwValue) return null; // fail-closed: no fabricated/English fallback
             swResolved[field] = swValue;
@@ -1562,6 +1583,30 @@
         return { evidence: results.length > 0 ? "VERIFIED" : "NOT_FOUND", matches: results };
     }
 
+    /**
+     * listApplicationHumanPurposeNamesFact()
+     *   UNIVERSAL QUESTION UNDERSTANDING REPAIR — real gap found via a
+     *   live-window audit: cozyos-identity-faq-router.js's own scope
+     *   guard (KNOWN_OTHER_APPLICATIONS — "a query naming another real
+     *   CozyOS application is never this router's to answer") was a
+     *   manually-maintained, hardcoded array that had already drifted
+     *   out of sync with this file's real APPLICATION_HUMAN_PURPOSE_DATA
+     *   table: 4 of the 11 real, committed, VERIFIED applications
+     *   (Authenticator, MediaIntelligence, HospitalOS, SchoolOS) were
+     *   silently missing from it, leaving those 4 applications'
+     *   questions unprotected from exactly the false-positive platform-
+     *   trigger fuzzy-match that guard exists to prevent. Rather than
+     *   patch that one array (the same "regex/list patchwork" class of
+     *   bug the wider repair is meant to eliminate), this exposes the
+     *   real, single source of truth this file already owns so ANY
+     *   caller can stay in sync automatically as applications are
+     *   added — no second, competing application-name list anywhere.
+     */
+    function listApplicationHumanPurposeNamesFact() {
+        const names = Object.keys(APPLICATION_HUMAN_PURPOSE_DATA);
+        return { evidence: names.length > 0 ? "VERIFIED" : "NOT_FOUND", names };
+    }
+
     function getApplicationHumanPurposeFact(name, lang) {
         // M363.1 real-device fix — normalize away spacing/case
         // variation ("Church OS", "church os", "ChurchOS", "churchos")
@@ -1673,6 +1718,7 @@
         lookupLexiconTermFact,
         getApplicationFact,
         getApplicationHumanPurposeFact,
+        listApplicationHumanPurposeNamesFact,
         getApplicationDetailedInfo,
         getApplicationDetailedInfoFact,
         getAllApplicationsDetailedFact,

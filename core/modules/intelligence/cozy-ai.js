@@ -246,8 +246,76 @@
     const CONTEXT_KNOWLEDGE_ROUTES = Object.freeze([
         { keywords: ["architecture", "application", "app", "module", "system"], getter: "listApplicationsFact" },
         { keywords: ["provider"], getter: "listProvidersFact" },
-        { keywords: ["founder", "creator", "who made", "who built", "who created"], getter: "getFounderFact" }
+        { keywords: ["founder", "creator", "who made", "who built", "who created"], getter: "getFounderFact" },
+        // UNIVERSAL QUESTION UNDERSTANDING REPAIR — real root cause of
+        // the observed "How is human benefits with it in real life?" /
+        // "Human benefits with cozyos" / "What problems does cozyos
+        // solve in real life" regression: these two real, already-
+        // VERIFIED CozyOS-platform facts (getWhyUseCozyOSFact() /
+        // getDifferentiationFact() — see cozy-public-knowledge-source.js,
+        // condensing the owner-approved "solves practical, everyday
+        // problems... for individuals, churches, schools, and
+        // communities" / differentiation content) were never reachable
+        // from THIS generic fallback path at all, because no keyword
+        // route pointed to them. Whenever a question reached getContext()
+        // without matching any higher-level intent (the FAQ router's
+        // fixed trigger list, or the rule-based provider's own regex
+        // set) — which is exactly what happens for genuinely indirect
+        // or malformed phrasing no fixed pattern anticipated — this
+        // left ctxResults empty (or non-empty-but-unrenderable) for
+        // every human-benefit/problem-solved-style question, producing
+        // the dishonest-sounding "Some related context exists, but
+        // nothing in it could be honestly rendered" / "I don't have
+        // verified information" fallbacks even though real, verified,
+        // on-topic content existed the whole time.
+        //
+        // This is a routing-table addition only — no new knowledge, no
+        // new authority, no per-phrase regex. Deliberately broad,
+        // low-specificity keyword stems (substring-matched, so
+        // "benefit"/"benefits", "problem"/"problems", "important"/
+        // "importance" are each covered by one stem) because this path
+        // is the LAST resort after every more specific router has
+        // already had a chance to answer — see
+        // _mentionsNamedApplication() below for the one honesty guard
+        // this needs: never answer with PLATFORM-level content when the
+        // question actually names a specific sub-application (that
+        // remains getApplicationHumanPurposeFact()'s job).
+        { keywords: ["benefit", "gain", "useful", "usefulness"], getter: "getWhyUseCozyOSFact" },
+        { keywords: ["problem", "solve", "solving", "solves"], getter: "getWhyUseCozyOSFact" },
+        { keywords: ["important", "importance", "matter", "point of cozyos"], getter: "getDifferentiationFact" }
     ]);
+
+    /**
+     * _mentionsNamedApplication(question)
+     *   Real, dynamic check against the live application registry
+     *   (window.CozyOS.listApplications() — the same source
+     *   resolveApplicationByName()/listApplicationsFact() already read;
+     *   no second inventory, no hardcoded app-name list). Used only to
+     *   stop the platform-level benefit/problem/importance routes above
+     *   from answering with CozyOS-wide content when the question
+     *   genuinely names one specific sub-application (e.g. "What
+     *   problem does ShopOS solve?") — that question belongs to
+     *   getApplicationHumanPurposeFact(), never to this generic
+     *   fallback. Fails open (returns false) when the registry isn't
+     *   loaded, since the higher-level app-importance/app-info routing
+     *   already tries first and this is only the last-resort path.
+     */
+    function _mentionsNamedApplication(question) {
+        // Same two-source lookup as resolveApplicationByName() (rule-
+        // based-conversational-provider.js) and getApplicationFact()/
+        // getApplicationHumanPurposeFact() (cozy-knowledge-registry.js)
+        // — the real window.CozyOS.listApplications() facade first,
+        // window.CozyOS.ServiceRegistry.listApplications() as the same
+        // honest fallback those other call sites already use. Not a
+        // second/competing lookup path.
+        const lister = (window.CozyOS && typeof window.CozyOS.listApplications === "function" && window.CozyOS.listApplications)
+            || (window.CozyOS && window.CozyOS.ServiceRegistry && typeof window.CozyOS.ServiceRegistry.listApplications === "function" && (() => window.CozyOS.ServiceRegistry.listApplications()));
+        if (!lister) return false;
+        const apps = (() => { try { return lister(); } catch (_err) { return null; } })();
+        if (!Array.isArray(apps)) return false;
+        const q = question.toLowerCase().replace(/\s+/g, "");
+        return apps.some((a) => a && typeof a.name === "string" && a.name.length > 0 && q.includes(a.name.toLowerCase().replace(/\s+/g, "")));
+    }
 
     /** #matchRoutes() — real substring matching against a fixed keyword table. Not semantic; disclosed as such in the file header. */
     function matchRoutes(question, table) {
@@ -267,7 +335,7 @@
      *   "no results from it", the same fail-closed convention
      *   CozyKnowledge already uses, never a fabricated answer.
      */
-    async function getContext(question, { actorId = null, memoryQuery = null } = {}) {
+    async function getContext(question, { actorId = null, memoryQuery = null, entityHint = null } = {}) {
         if (typeof question !== "string" || !question.trim()) {
             return { success: false, reason: "A real, non-empty question is required." };
         }
@@ -277,7 +345,23 @@
         // --- Public Story + Knowledge Registry (both via CozyKnowledge; never FounderStory directly) ---
         const knowledge = window.CozyOS.CozyKnowledge;
         if (knowledge) {
-            const getterNames = [...new Set([...matchRoutes(question, CONTEXT_STORY_ROUTES), ...matchRoutes(question, CONTEXT_KNOWLEDGE_ROUTES)])];
+            const PLATFORM_ONLY_GETTERS = new Set(["getWhyUseCozyOSFact", "getDifferentiationFact"]);
+            // See _mentionsNamedApplication() below AND this file's
+            // caller (cozy-living-assistant.js's #send()) for the fuller
+            // explanation: a THIS-TURN literal app name is one real
+            // signal that platform-level content is wrong here; an
+            // explicit entityHint carried over from the real, previous
+            // turn's conversationState.lastDiscussedApplication (a
+            // pronoun follow-up naming no application of its own, e.g.
+            // "Who benefits from it?" right after ShopOS) is the other.
+            // Either one alone is sufficient to suppress the generic
+            // CozyOS-platform routes below - never a guess, both trace
+            // back to the SAME single entity-resolution authority
+            // (rule-based-conversational-provider.js's real, verified
+            // application resolution).
+            const namesAnApp = _mentionsNamedApplication(question) || (typeof entityHint === "string" && entityHint.trim().length > 0);
+            let getterNames = [...new Set([...matchRoutes(question, CONTEXT_STORY_ROUTES), ...matchRoutes(question, CONTEXT_KNOWLEDGE_ROUTES)])];
+            if (namesAnApp) getterNames = getterNames.filter((g) => !PLATFORM_ONLY_GETTERS.has(g));
             for (const getterName of getterNames) {
                 const fn = knowledge[getterName];
                 if (typeof fn !== "function") continue;

@@ -351,11 +351,37 @@
     // names only (the same ones with real human-purpose records in
     // cozy-knowledge-registry.js) — never a guess at what "sounds like"
     // an app name.
-    const KNOWN_OTHER_APPLICATIONS = Object.freeze([
+    // UNIVERSAL QUESTION UNDERSTANDING REPAIR — this list used to be a
+    // second, manually-maintained, hardcoded array here. A live-window
+    // audit found it had already drifted out of sync with the real,
+    // single source of truth (cozy-knowledge-registry.js's own
+    // APPLICATION_HUMAN_PURPOSE_DATA table): 4 of the real, committed,
+    // VERIFIED applications (Authenticator, MediaIntelligence,
+    // HospitalOS, SchoolOS) were silently missing, leaving those
+    // applications' questions unprotected from the exact false-positive
+    // platform-trigger fuzzy-match this guard exists to prevent. Now
+    // reads window.CozyOS.CozyKnowledge.listApplicationHumanPurposeNamesFact()
+    // — the SAME real table getApplicationHumanPurposeFact() itself
+    // reads — live, at call time, so a newly-added application is
+    // guarded automatically the moment its real human-purpose record is
+    // committed, with no second list to remember to update. Falls back
+    // to the smaller, previously-hardcoded set only if that real
+    // authority genuinely isn't loaded, so this router degrades no
+    // worse than it already did before this fix, never worse.
+    const FALLBACK_KNOWN_OTHER_APPLICATIONS = Object.freeze([
         "shopos", "churchos", "mpesaos", "quarryos", "pharmacyos", "wholesaleos", "interestos"
     ]);
+    function _knownOtherApplications() {
+        const knowledge = window.CozyOS && window.CozyOS.CozyKnowledge;
+        if (!knowledge || typeof knowledge.listApplicationHumanPurposeNamesFact !== "function") return FALLBACK_KNOWN_OTHER_APPLICATIONS;
+        try {
+            const fact = knowledge.listApplicationHumanPurposeNamesFact();
+            if (fact && fact.evidence === "VERIFIED" && Array.isArray(fact.names) && fact.names.length > 0) return fact.names;
+        } catch (_err) { /* honest fall-through to the static fallback below */ }
+        return FALLBACK_KNOWN_OTHER_APPLICATIONS;
+    }
     function _mentionsOtherApplication(normQuery) {
-        return KNOWN_OTHER_APPLICATIONS.some((name) => normQuery.includes(name));
+        return _knownOtherApplications().some((name) => normQuery.includes(name));
     }
 
     function detectIntent(text) {
