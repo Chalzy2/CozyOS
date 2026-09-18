@@ -50,7 +50,7 @@
     window.CozyOS.Modules = window.CozyOS.Modules || {};
     if (window.CozyOS.Modules["cozy-language-templates"]) return;
 
-    const VERSION = "1.2.0"; // COZYAI-PUBLIC-VISION-KNOWLEDGE: added why-use-cozyos / differentiation / language-support-list templates. REGISTRATION/AUTH: how-to-register is now evidence-backed (:verified/:not_found), Kiswahili-first with a genuine committed translation (not an English-fallback placeholder).
+    const VERSION = "1.3.0"; // COZYAI-PUBLIC-VISION-KNOWLEDGE: added why-use-cozyos / differentiation / language-support-list templates. REGISTRATION/AUTH: how-to-register is now evidence-backed (:verified/:not_found), Kiswahili-first with a genuine committed translation (not an English-fallback placeholder). LIVE-WINDOW-LANGUAGE-AUDIT: added language-request:confirmed/:unrecognized (explicit "greet/speak in X" requests, distinct from language-support-list).
     const LANGS = ["en", "sw", "fr", "ar", "so"];
 
     const TEMPLATES = Object.freeze({
@@ -493,6 +493,34 @@
                 return `Orodha ya lugha zinazolengwa za CozyOS, iliyoidhinishwa na mmiliki, ni: ${target}. Siwezi kuona rejista ya upatikanaji wa lugha ya moja kwa moja kutoka hapa kwa sasa, kwa hivyo siwezi kuthibitisha ni zipi kati ya hizi zinazopatikana leo.`;
             }
         }),
+        // LIVE-WINDOW-LANGUAGE-AUDIT — explicit language requests
+        // ("Greet me in French", "Can talk to me in Kiswahili", "Do you
+        // speak Kiswahili") are a genuinely different intent from
+        // language-support-list's general "which languages exist"
+        // question: the person named ONE specific language and expects
+        // CozyOS to actually switch to / confirm it, not recite the
+        // whole policy list. "language-request:confirmed" is the short
+        // confirmation sentence composeReply's "language-request" case
+        // prepends to the existing verified "greeting-generic" template
+        // in the resolved language — reusing that template rather than
+        // writing new per-language greeting prose a second time.
+        "language-request:confirmed": Object.freeze({
+            en: (name) => `Yes — I can speak ${name}.`,
+            sw: (name) => `Ndiyo — ninaweza kuzungumza ${name}.`,
+            fr: (name) => `Oui — je peux parler ${name}.`,
+            ar: (name) => `نعم — أستطيع التحدث باللغة ${name}.`,
+            so: (name) => `Haa — waxaan ku hadli karaa ${name}.`
+        }),
+        // Shown instead of the confirmation above when no recognized
+        // language name could be extracted from the utterance at all —
+        // an honest "which one did you mean" rather than a guess.
+        "language-request:unrecognized": Object.freeze({
+            en: "I couldn't tell which language you meant — which one would you like?",
+            sw: "Sikuweza kutambua ni lugha gani uliyomaanisha — ungependa ipi?",
+            fr: "Je n'ai pas pu déterminer quelle langue vous vouliez dire — laquelle souhaitez-vous ?",
+            ar: "لم أتمكن من تحديد اللغة التي تقصدها — أي لغة تريد؟",
+            so: "Ma garan karin luqadda aad ula jeeddo — tee baad doonaysaa?"
+        }),
         "language-support-list:not_found": Object.freeze({
             en: "I don't have a verified answer yet for CozyOS's language support.",
             sw: "Sina bado jibu lililothibitishwa kuhusu usaidizi wa lugha wa CozyOS.",
@@ -751,6 +779,6 @@
 
     window.CozyOS.Modules["cozy-language-templates"] = Object.freeze({
         version: VERSION,
-        description: "RP-027 + COZYAI-PUBLIC-VISION-KNOWLEDGE + REGISTRATION/AUTH — Verified response templates for the 5 default CozyOS languages (en/sw/fr/ar/so), covering RP-026's original 7 intents, RP-027's CozyOS-identity/apps/authentication/account/provider/architecture intents, COZYAI-PUBLIC-VISION-KNOWLEDGE's why-use-cozyos/differentiation/language-support-list, and (this repair) registration. Fixed-text intents map directly to a per-language string; evidence-backed intents (founder, list-apps, list-providers, why-use-cozyos, differentiation, language-support-list, how-to-register) map to a fixed per-language sentence FRAME that only interpolates live/committed repository data, never generates new language at runtime. The why-use/differentiation/language-support-list frames' interpolated content is English-authored only this pass (an honest, disclosed limitation, not a translation) — the lead-in sentence around it is still per-language; fr/ar/so fall back to the English frame via getTemplate()'s entry[lang]||entry.en behavior. how-to-register:verified is the one exception with a genuine, fully committed Kiswahili translation (stepsSw, passwordSw) alongside English, per this milestone's Kiswahili-first requirement — fr/ar/so still honestly fall back to English for it, since no verified fr/ar/so translation of these specific steps exists yet. No extended-language (luo/ki/kam/zu/lg/ig) entries exist here yet — an honest, disclosed gap, not an omission."
+        description: "RP-027 + COZYAI-PUBLIC-VISION-KNOWLEDGE + REGISTRATION/AUTH — Verified response templates for the 5 default CozyOS languages (en/sw/fr/ar/so), covering RP-026's original 7 intents, RP-027's CozyOS-identity/apps/authentication/account/provider/architecture intents, COZYAI-PUBLIC-VISION-KNOWLEDGE's why-use-cozyos/differentiation/language-support-list, and (this repair) registration. Fixed-text intents map directly to a per-language string; evidence-backed intents (founder, list-apps, list-providers, why-use-cozyos, differentiation, language-support-list, how-to-register) map to a fixed per-language sentence FRAME that only interpolates live/committed repository data, never generates new language at runtime. The why-use/differentiation/language-support-list frames' interpolated content is English-authored only this pass (an honest, disclosed limitation, not a translation) — the lead-in sentence around it is still per-language; fr/ar/so fall back to the English frame via getTemplate()'s entry[lang]||entry.en behavior. how-to-register:verified is the one exception with a genuine, fully committed Kiswahili translation (stepsSw, passwordSw) alongside English, per this milestone's Kiswahili-first requirement — fr/ar/so still honestly fall back to English for it, since no verified fr/ar/so translation of these specific steps exists yet. No extended-language (luo/ki/kam/zu/lg/ig) entries exist here yet — an honest, disclosed gap, not an omission. LIVE-WINDOW-LANGUAGE-AUDIT added language-request:confirmed/:unrecognized for explicit single-language requests (\"greet me in French\", \"can you speak Kiswahili\"), which reuses the existing greeting-generic template for the actual greeting rather than duplicating per-language prose."
     });
 })();

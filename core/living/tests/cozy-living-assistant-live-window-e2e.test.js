@@ -405,4 +405,65 @@ test('LIVE WINDOW E2E: Kiswahili ChurchOS-specific questions resolve to real, ve
     }
 });
 
+// LIVE-WINDOW-LANGUAGE-AUDIT: real-DOM regression guard for the exact
+// bug-report phrases this repair pass fixed. Every case below is driven
+// through the real, visible #cozy-living-assistant-input +
+// real "Enter" keypress, exactly like every other test in this file —
+// this is the actual chat text a human would see in dashboard.html,
+// after the real CozyAnswerEngine/CozyAdvisor chain (checked first) and
+// this repository's own fallback logic in cozy-living-assistant.js's
+// #send() (see that file's own comment on this exact precedence).
+test('LIVE WINDOW E2E: explicit language requests switch to/confirm the requested verified language through the real DOM, never expose internal fallback wording', async () => {
+    const { browser, page } = await openLiveWindow();
+    try {
+        const r1 = await ask(page, 'Do you speak in kiswahili');
+        assert.match(r1, /Kiswahili/i, `expected r1 to confirm Kiswahili, got: "${r1}"`);
+        assert.doesNotMatch(r1, /Some related context exists/i);
+
+        const r2 = await ask(page, 'Greet me in French');
+        assert.match(r2, /Bonjour/, `expected a real French greeting, got: "${r2}"`);
+
+        const r3 = await ask(page, 'Can talk to me in kiswahili');
+        assert.match(r3, /Habari!/, `expected a real Kiswahili greeting, got: "${r3}"`);
+        assert.doesNotMatch(r3, /Some related context exists/i);
+
+        const r4 = await ask(page, 'Habari yako');
+        assert.match(r4, /Habari!/, `expected the existing Kiswahili greeting to still work, got: "${r4}"`);
+    } finally {
+        await browser.close();
+    }
+});
+
+test('LIVE WINDOW E2E: "Greet me in Arabic" and "Greet me in Somali" produce real greetings through the real DOM', async () => {
+    const { browser, page } = await openLiveWindow();
+    try {
+        const rAr = await ask(page, 'Greet me in Arabic');
+        assert.match(rAr, /مرحبًا/, `expected a real Arabic greeting, got: "${rAr}"`);
+
+        const rSo = await ask(page, 'Greet me in Somali');
+        assert.match(rSo, /Salaan/, `expected a real Somali greeting, got: "${rSo}"`);
+    } finally {
+        await browser.close();
+    }
+});
+
+test('LIVE WINDOW E2E: Kiswahili CozyOS purpose/benefit phrasings resolve to real verified content through the real DOM, never the internal debug/fallback wording', async () => {
+    const { browser, page } = await openLiveWindow();
+    try {
+        const phrases = [
+            'Cozyos inanisaiaje',
+            'Nini cozyos inatufaika nayo',
+            'Cozyos inafaida gani kwetu',
+        ];
+        for (const q of phrases) {
+            const r = await ask(page, q);
+            assert.doesNotMatch(r, /Some related context exists/i, `"${q}" leaked internal fallback wording: "${r}"`);
+            assert.doesNotMatch(r, /I don't have a rule-based answer for that yet/i, `"${q}" fell through to unsupported: "${r}"`);
+            assert.match(r, /CozyOS/i, `expected "${q}" to answer about CozyOS, got: "${r}"`);
+        }
+    } finally {
+        await browser.close();
+    }
+});
+
 console.log('Live Window real-browser end-to-end suite: run complete.');

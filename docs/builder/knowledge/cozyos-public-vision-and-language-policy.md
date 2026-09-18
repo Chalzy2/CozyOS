@@ -167,6 +167,16 @@ African-first to **Africa-first with broader global accessibility**,
 African-first remaining the center of the vision rather than its
 exclusive scope.
 
+**Correction (Live Window language-audit pass):** the 13 languages
+named just above are not the complete list — Luganda and Igbo are also
+part of this same 17-language target list, as the NOT_READY(6) line
+directly below already states. They were missing from the named list
+above due to an authoring gap, not a policy decision; `cozy-public-
+knowledge-source.js`'s `TARGET_LANGUAGES` has been corrected to include
+both. (The list below still only reaches 15 named languages against a
+stated count of 17 — that remaining gap is unresolved and is not
+guessed at here.)
+
 **The target list and the actual runtime registry state are two
 separate things, by design.** Current registry state
 (`cozy-language-registry.js`), unaffected by this policy resolution:
