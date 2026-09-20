@@ -166,6 +166,12 @@
         // (see that file's own comment); label it honestly by its real
         // domain instead of falling through to "GENERAL".
         if (ctxResults.some(r => r.authority === "application-knowledge")) return "APPLICATION_INFORMATION";
+        // Phase 2: CozyAI + Live Window Business-Data Q&A — cozy-ai.js's
+        // getContext() composes CozyBusinessDataIntent's real, private,
+        // per-actor business-data answer under this authority; label it
+        // honestly as private business data, distinct from public
+        // application knowledge (see cozy-ai.js's own comment).
+        if (ctxResults.some(r => r.authority === "interestos-business-data")) return "BUSINESS_DATA";
         if (ctxResults.some(r => r.authority === "live-worship-session")) return "LIVE_WORSHIP";
         if (ctxResults.some(r => r.authority === "cozy-memory" || r.authority === "living-memory")) return "PROJECT_KNOWLEDGE";
         return "GENERAL";
@@ -197,13 +203,25 @@
      *   through to CozyAI.getContext() unchanged; this file adds no
      *   business-calculation logic of its own (InterestOSBusinessWorkspace.
      *   computeSummary() already enforces owner/visibility fail-closed).
+     *   businessConversationState (Phase 2: Business-Data Q&A addition) —
+     *   passed straight through to CozyAI.getContext(), which passes it
+     *   straight through to CozyBusinessDataIntent — the real, previous-
+     *   turn {lastBusinessMetric, lastBusinessTimeRange, lastBusinessTableId}
+     *   a bare follow-up ("And yesterday?") needs to resolve without the
+     *   user repeating themselves. This file adds no business intent
+     *   classification of its own; the returned businessDataConversationState
+     *   field (see the return shape below) is CozyBusinessDataIntent's own
+     *   real, disclosed updated state, for the caller (cozy-living-
+     *   assistant.js) to carry into the NEXT turn — the same existing
+     *   #conversationState mechanism lastDiscussedApplication already
+     *   uses, never a second memory/context system.
      */
-    async function answer(question, { actorId = null, language = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null, businessContext = null } = {}) {
+    async function answer(question, { actorId = null, language = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null, businessContext = null, businessConversationState = null } = {}) {
         if (typeof question !== "string" || !question.trim()) {
             return {
                 answer: "A real, non-empty question is required.",
                 intent: "INVALID_INPUT", responseMode: "INSUFFICIENT_EVIDENCE",
-                evidenceState: "INSUFFICIENT_DATA", sources: [], reasoningUsed: false, contextUsed: []
+                evidenceState: "INSUFFICIENT_DATA", sources: [], reasoningUsed: false, contextUsed: [], businessDataConversationState: null
             };
         }
 
@@ -214,7 +232,7 @@
             return {
                 answer: "The answer composition authorities (CozyIdentityFAQRouter / CozyAI) are not loaded in this environment.",
                 intent: "UNKNOWN", responseMode: "INSUFFICIENT_EVIDENCE",
-                evidenceState: "UNAVAILABLE", sources: [], reasoningUsed: false, contextUsed: []
+                evidenceState: "UNAVAILABLE", sources: [], reasoningUsed: false, contextUsed: [], businessDataConversationState: null
             };
         }
 
@@ -257,9 +275,10 @@
         // half, e.g. "What is CozyOS and what applications does it have?") ---
         let ctx = { success: false, results: [] };
         if (ai && typeof ai.getContext === "function") {
-            try { ctx = await ai.getContext(question, { actorId, memoryQuery, entityHint, liveSessionId, supportScope, businessContext, language }); } catch (_err) { ctx = { success: false, results: [] }; }
+            try { ctx = await ai.getContext(question, { actorId, memoryQuery, entityHint, liveSessionId, supportScope, businessContext, language, businessConversationState }); } catch (_err) { ctx = { success: false, results: [] }; }
         }
         const ctxResults = (ctx && Array.isArray(ctx.results)) ? ctx.results : [];
+        const businessDataConversationState = (ctx && ctx.businessDataConversationState) || null;
 
         if (faqMatched) {
             const isReal = faqResult.isReal !== false;
@@ -298,7 +317,8 @@
                 evidenceState: isReal ? "VERIFIED" : "INSUFFICIENT_DATA",
                 sources: dedupeSources(sources),
                 reasoningUsed: !!multiIntent,
-                contextUsed: ctxResults
+                contextUsed: ctxResults,
+                businessDataConversationState
             };
         }
 
@@ -308,7 +328,7 @@
                 answer: "I don't have verified information to answer that yet. Please rephrase, or this may not be something CozyOS has documented/verified.",
                 intent: "UNKNOWN", responseMode: "INSUFFICIENT_EVIDENCE",
                 evidenceState: (ai && typeof ai.getContext === "function") ? "INSUFFICIENT_DATA" : "UNAVAILABLE",
-                sources: [], reasoningUsed: false, contextUsed: []
+                sources: [], reasoningUsed: false, contextUsed: [], businessDataConversationState
             };
         }
 
@@ -319,7 +339,7 @@
             return {
                 answer: "Some related context exists, but nothing in it could be honestly rendered as a verified answer.",
                 intent, responseMode: "INSUFFICIENT_EVIDENCE",
-                evidenceState: "INSUFFICIENT_DATA", sources: [], reasoningUsed: false, contextUsed: ctxResults
+                evidenceState: "INSUFFICIENT_DATA", sources: [], reasoningUsed: false, contextUsed: ctxResults, businessDataConversationState
             };
         }
 
@@ -345,7 +365,8 @@
             evidenceState: "VERIFIED",
             sources,
             reasoningUsed: pieces.length > 1 || responseMode === "WHY_REASONING" || responseMode === "COMPARISON",
-            contextUsed: ctxResults
+            contextUsed: ctxResults,
+            businessDataConversationState
         };
     }
 

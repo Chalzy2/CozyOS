@@ -297,6 +297,18 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
         // verbatim (never invented here) - null until a first real turn
         // has produced one.
         #conversationState = null;
+        // Phase 2: CozyAI + Live Window Business-Data Q&A — a SEPARATE
+        // private field (never merged into #conversationState above,
+        // which the rule-based-conversational-provider.js wholesale-
+        // replaces every turn via ai.think()'s own returned object) so a
+        // bare business-data follow-up ("And yesterday?") can carry
+        // forward the real {lastBusinessMetric, lastBusinessTimeRange,
+        // lastBusinessTableId} CozyBusinessDataIntent itself returned on
+        // the previous turn (see cozy-ai.js's own comment) without
+        // depending on that unrelated provider preserving fields it
+        // doesn't own. Page-lifetime only, never persisted, never a
+        // second CozyMemory — same discipline as #currentLanguage below.
+        #businessConversationState = null;
         #root = null;
         #windowHandle = null; // M366.7 - the real WindowManager handle for the panel, once opened
         #panel = null;
@@ -707,7 +719,17 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
                 // chain can answer a named-application question in the
                 // SAME language the user actually asked in, instead of
                 // defaulting to English. No new language detector.
-                const answerResult = await answerEngine.answer(text, { actorId, entityHint: contextualEntityName, liveSessionId: effectiveLiveSessionId, supportScope, language: this.#currentLanguage });
+                const answerResult = await answerEngine.answer(text, { actorId, entityHint: contextualEntityName, liveSessionId: effectiveLiveSessionId, supportScope, language: this.#currentLanguage, businessConversationState: this.#businessConversationState });
+                // Phase 2: CozyAI + Live Window Business-Data Q&A — only
+                // update when this turn's real business-data flow
+                // actually returned a fresh state (see cozy-ai.js's own
+                // comment on when it returns null: a clarification was
+                // asked, or the question carried no business-data signal
+                // at all) — an unrelated turn must never silently clear
+                // an unresolved follow-up context.
+                if (answerResult.businessDataConversationState) {
+                    this.#businessConversationState = answerResult.businessDataConversationState;
+                }
                 if (advisor && typeof advisor.advise === "function") {
                     const advice = advisor.advise({ question: text, answerResult });
                     // Domain 4B (AI Integration discovery): CozyAdvisor's

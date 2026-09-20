@@ -63,6 +63,7 @@ const roots = {
     publicKnowledgeSource: path.join(__dirname, '..', 'knowledge', 'cozy-public-knowledge-source.js'),
     memoryEngine: path.join(__dirname, '..', '..', 'memory', 'cozy-memory-engine.js'),
     businessWorkspace: path.join(__dirname, '..', '..', '..', 'plugins', 'interestOS-business-workspace.js'),
+    businessDataIntent: path.join(__dirname, '..', 'business-data', 'cozy-business-data-intent.js'),
     cozyAi: path.join(__dirname, '..', 'cozy-ai.js'),
     identityFaqRouter: path.join(__dirname, '..', '..', 'knowledge', 'cozyos-identity-faq-router.js'),
     answerEngine: path.join(__dirname, '..', 'answer', 'cozy-answer-engine.js'),
@@ -88,7 +89,7 @@ function loadFullStack(extraCozyOS) {
     if (!global.crypto) { global.crypto = require('crypto').webcrypto; }
     [roots.secretRegistry, roots.encryptionManager, roots.secretManager, roots.typedManagers, roots.rotationHealth,
      roots.vaultEngine, roots.founderStory, roots.knowledgeRegistry, roots.publicKnowledgeSource, roots.memoryEngine,
-     roots.businessWorkspace, roots.cozyAi, roots.identityFaqRouter, roots.answerEngine, roots.cozyLearn
+     roots.businessWorkspace, roots.businessDataIntent, roots.cozyAi, roots.identityFaqRouter, roots.answerEngine, roots.cozyLearn
     ].forEach((p) => require(p));
     return {
         window: fakeWindow,
@@ -743,6 +744,86 @@ await test('15k. QuarryOS (a third, distinct application) resolves through the e
     const hit = ctx.results.find((r) => r.authority === 'application-knowledge');
     assert.ok(hit, 'expected QuarryOS\'s own real knowledge, the same universal mechanism as every other application');
     assert.strictEqual(hit.applicationName, 'QuarryOS');
+});
+
+/* ===================================================================
+   16. PHASE 2 — COZYAI + LIVE WINDOW BUSINESS-DATA Q&A. Proves the real
+   getContext() wiring: CozyBusinessDataIntent composed under authority
+   "interestos-business-data", businessDataConversationState threaded
+   through getContext() -> CozyAnswerEngine.answer(), coexistence with
+   the existing "application-knowledge" authority (section 12/13 of the
+   Phase 2 spec), and that private business data never enters
+   CozyKnowledge or any public authority.
+=================================================================== */
+await test('16a. getContext() composes a real, VERIFIED "interestos-business-data" result for a free-text business question, with no explicit businessContext', async () => {
+    const { ai, workspace } = loadFullStack();
+    const table = workspace.createTable({ owner: 'bizOwner16a', name: 'Shop' });
+    const dateCol = workspace.addColumn(table.id, { label: 'Date', type: 'DATE', role: 'DATE' }, 'bizOwner16a').columns.find((c) => c.role === 'DATE');
+    const sellCol = workspace.addColumn(table.id, { label: 'Sell', type: 'NUMBER', role: 'SELLING_PRICE' }, 'bizOwner16a').columns.find((c) => c.role === 'SELLING_PRICE');
+    const today = new Date().toISOString();
+    workspace.addRow(table.id, { [dateCol.id]: today, [sellCol.id]: 500 }, 'bizOwner16a');
+    const ctx = await ai.getContext('How much did I sell today?', { actorId: 'bizOwner16a' });
+    const hit = ctx.results.find((r) => r.authority === 'interestos-business-data');
+    assert.ok(hit, 'expected a real interestos-business-data result');
+    assert.strictEqual(hit.evidence, 'VERIFIED');
+    assert.match(hit.content, /500/);
+    assert.strictEqual(ctx.businessDataConversationState.lastBusinessMetric, 'REVENUE');
+});
+
+await test('16b. businessDataConversationState threads through CozyAnswerEngine.answer() unchanged, for the caller to carry into the next turn', async () => {
+    const { answerEngine, workspace } = loadFullStack();
+    const table = workspace.createTable({ owner: 'bizOwner16b', name: 'Shop' });
+    const dateCol = workspace.addColumn(table.id, { label: 'Date', type: 'DATE', role: 'DATE' }, 'bizOwner16b').columns.find((c) => c.role === 'DATE');
+    const sellCol = workspace.addColumn(table.id, { label: 'Sell', type: 'NUMBER', role: 'SELLING_PRICE' }, 'bizOwner16b').columns.find((c) => c.role === 'SELLING_PRICE');
+    workspace.addRow(table.id, { [dateCol.id]: new Date().toISOString(), [sellCol.id]: 750 }, 'bizOwner16b');
+    const result = await answerEngine.answer('How much did I sell today?', { actorId: 'bizOwner16b' });
+    assert.strictEqual(result.evidenceState, 'VERIFIED');
+    assert.strictEqual(result.intent, 'BUSINESS_DATA');
+    assert.match(result.answer, /750/);
+    assert.ok(result.businessDataConversationState, 'expected the real updated conversation state to be returned for the caller to carry forward');
+    assert.strictEqual(result.businessDataConversationState.lastBusinessMetric, 'REVENUE');
+});
+
+await test('16c. Public application knowledge and private business data coexist in one answer when a question genuinely asks both (multi-intent composition)', async () => {
+    const { answerEngine, workspace, window: win } = loadFullStack({ ServiceRegistry: { listApplications: () => [{ id: 'interestos', name: 'InterestOS' }] } });
+    const table = workspace.createTable({ owner: 'bizOwner16c', name: 'Shop' });
+    const dateCol = workspace.addColumn(table.id, { label: 'Date', type: 'DATE', role: 'DATE' }, 'bizOwner16c').columns.find((c) => c.role === 'DATE');
+    const sellCol = workspace.addColumn(table.id, { label: 'Sell', type: 'NUMBER', role: 'SELLING_PRICE' }, 'bizOwner16c').columns.find((c) => c.role === 'SELLING_PRICE');
+    workspace.addRow(table.id, { [dateCol.id]: new Date().toISOString(), [sellCol.id]: 900 }, 'bizOwner16c');
+    const ctx = await win.CozyOS.CozyAI.getContext('What is InterestOS and how much did I sell today?', { actorId: 'bizOwner16c' });
+    assert.ok(ctx.results.some((r) => r.authority === 'application-knowledge'), 'expected the public InterestOS application-knowledge result to still be present');
+    assert.ok(ctx.results.some((r) => r.authority === 'interestos-business-data'), 'expected the private business-data result to ALSO be present, not discarded');
+});
+
+await test('16d. Private business data never enters CozyKnowledge or any public authority — the result is tagged its own distinct, private authority', async () => {
+    const { ai, workspace, knowledge } = loadFullStack();
+    const table = workspace.createTable({ owner: 'bizOwner16d', name: 'Shop' });
+    const dateCol = workspace.addColumn(table.id, { label: 'Date', type: 'DATE', role: 'DATE' }, 'bizOwner16d').columns.find((c) => c.role === 'DATE');
+    const sellCol = workspace.addColumn(table.id, { label: 'Sell', type: 'NUMBER', role: 'SELLING_PRICE' }, 'bizOwner16d').columns.find((c) => c.role === 'SELLING_PRICE');
+    workspace.addRow(table.id, { [dateCol.id]: new Date().toISOString(), [sellCol.id]: 12345 }, 'bizOwner16d');
+    await ai.getContext('How much did I sell today?', { actorId: 'bizOwner16d' });
+    // CozyKnowledge itself must never have been mutated with private data.
+    const appFact = typeof knowledge.getApplicationFact === 'function' ? knowledge.getApplicationFact('bizOwner16d') : { evidence: 'NOT_FOUND' };
+    assert.notStrictEqual(appFact.evidence, 'VERIFIED', 'private business data must never leak into CozyKnowledge under any key');
+    // A completely different, anonymous actor must never see it either.
+    const strangerCtx = await ai.getContext('How much did I sell today?', { actorId: 'stranger16d' });
+    assert.doesNotMatch(JSON.stringify(strangerCtx.results), /12345/, 'private business data must never leak to a different actor via getContext()');
+});
+
+await test('16e. businessContext (the existing, narrower InterestOS-widget hook) suppresses the new free-text auto-classifier — no redundant double answer', async () => {
+    const { ai, workspace } = loadFullStack();
+    const table = workspace.createTable({ owner: 'bizOwner16e', name: 'Shop' });
+    const dateCol = workspace.addColumn(table.id, { label: 'Date', type: 'DATE', role: 'DATE' }, 'bizOwner16e').columns.find((c) => c.role === 'DATE');
+    const sellCol = workspace.addColumn(table.id, { label: 'Sell', type: 'NUMBER', role: 'SELLING_PRICE' }, 'bizOwner16e').columns.find((c) => c.role === 'SELLING_PRICE');
+    workspace.addRow(table.id, { [dateCol.id]: new Date().toISOString(), [sellCol.id]: 100 }, 'bizOwner16e');
+    const ctx = await ai.getContext('What is my profit this month?', { actorId: 'bizOwner16e', businessContext: { tableId: table.id, period: 'monthly' } });
+    assert.strictEqual(ctx.results.filter((r) => r.authority === 'interestos-business-data').length, 0, 'the new auto-classifier must defer entirely to an explicit businessContext, never compose a redundant second answer');
+});
+
+await test('16f. No business-data signal at all: businessDataConversationState stays null, true no-op', async () => {
+    const { ai } = loadFullStack();
+    const ctx = await ai.getContext('What is CozyOS?', { actorId: 'anyone' });
+    assert.strictEqual(ctx.businessDataConversationState, null);
 });
 
 /* ===================================================================

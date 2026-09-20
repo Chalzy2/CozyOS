@@ -238,6 +238,18 @@
 <script src="core/modules/QuarryOS/quarry-index.js"></script>
 <script src="core/plugins/wholesaleOS-core.js"></script>
 <script src="core/plugins/interestOS-core.js"></script>
+<!-- InterestOS Full Completion Phase 2 (CozyAI + Live Window Business-
+     Data Q&A) real bootstrap gap: InterestOSBusinessWorkspace (Phase 1)
+     and CozyBusinessDataIntent (Phase 2) were real, complete files but
+     never loaded on dashboard.html/index.html at all — the exact
+     "loaded vs integrated" class of gap this repository has hit before
+     (see cozy-public-knowledge-source.js's own M363 precedent). Without
+     these two script tags, window.CozyOS.InterestOSBusinessWorkspace/
+     CozyBusinessDataIntent are simply undefined here, so cozy-ai.js's
+     own composition of them (see that file's own comment) would always
+     silently no-op. -->
+<script src="core/plugins/interestOS-business-workspace.js"></script>
+<script src="core/modules/intelligence/business-data/cozy-business-data-intent.js"></script>
 <script src="core/plugins/pharmacyOS-core.js"></script>
 <script src="core/modules/Cozy-Authenticator/authenticator.js"></script>
 <script src="core/modules/intelligence/media/cozy-media-intelligence.js"></script>

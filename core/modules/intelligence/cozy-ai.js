@@ -491,12 +491,48 @@
      *   view; corrective action still goes through those same existing,
      *   real, permission-checked engines, never a new one.
      */
-    async function getContext(question, { actorId = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null, businessContext = null, language = null } = {}) {
+    async function getContext(question, { actorId = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null, businessContext = null, language = null, businessConversationState = null } = {}) {
         if (typeof question !== "string" || !question.trim()) {
             return { success: false, reason: "A real, non-empty question is required." };
         }
         const effectiveActorId = (typeof actorId === "string" && actorId.trim()) ? actorId : "anonymous";
         const results = [];
+        let businessDataConversationState = null;
+
+        // --- InterestOS business-DATA question (Phase 2: CozyAI + Live
+        // Window Business-Data Q&A) — distinct from businessContext above
+        // (that narrower hook only fires when a CALLER, e.g. InterestOS's
+        // own embedded "Ask CozyAI" widget, already knows exactly which
+        // table/period it means). This composes CozyBusinessDataIntent's
+        // real, disclosed classifier + the SAME InterestOSBusinessWorkspace
+        // as the one authoritative business-data source, for a genuinely
+        // free-text question asked from the Live Window itself, with no
+        // pre-selected table. Returns null (true no-op) for any question
+        // with no business-data signal at all — see that file's own
+        // header. Never touches CozyKnowledge/CozyMemory — this is
+        // private, per-actor data, structurally kept out of the public
+        // knowledge registry.
+        // Skipped when a caller (e.g. InterestOS's own embedded "Ask
+        // CozyAI" widget) already supplied an explicit businessContext —
+        // that caller already knows exactly which table/period it means,
+        // so auto-classifying the same question here would only ever
+        // produce a redundant second statement of the same real number,
+        // never a wrong one, but never a needed one either.
+        const businessIntent = window.CozyOS.CozyBusinessDataIntent;
+        if (businessIntent && typeof businessIntent.answerBusinessDataQuestion === "function" && !businessContext) {
+            try {
+                const businessResult = businessIntent.answerBusinessDataQuestion(question, { actorId: effectiveActorId, language, conversationState: businessConversationState });
+                if (businessResult && businessResult.matched && businessResult.content) {
+                    results.push({
+                        authority: "interestos-business-data",
+                        provenance: "window.CozyOS.CozyBusinessDataIntent -> window.CozyOS.InterestOSBusinessWorkspace",
+                        evidence: "VERIFIED",
+                        content: businessResult.content
+                    });
+                    businessDataConversationState = businessResult.updatedConversationState || null;
+                }
+            } catch (_err) { /* honest fall-through — never fabricate */ }
+        }
 
         // --- Public Story + Knowledge Registry (both via CozyKnowledge; never FounderStory directly) ---
         const knowledge = window.CozyOS.CozyKnowledge;
@@ -811,7 +847,7 @@
 
         return {
             success: true, isReal: true, question, actorId: effectiveActorId,
-            found: results.length > 0, results,
+            found: results.length > 0, results, businessDataConversationState,
             note: results.length > 0
                 ? "Composed from existing, unmodified authorities: CozyKnowledge (VERIFIED facts only, includes Public Story via FounderStory.getPublicStory()) and CozyMemory (owner/visibility/organisation-enforced search, split into cozy-memory / living-memory by namespace)."
                 : "No context genuinely matched in any composed authority — honest empty state, not a fabricated answer."
