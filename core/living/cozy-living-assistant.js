@@ -679,8 +679,26 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
             const activeLiveSessionId = (liveWorshipPlayer && typeof liveWorshipPlayer.getDiagnosticsReport === "function")
                 ? (liveWorshipPlayer.getDiagnosticsReport().serviceId || null)
                 : null;
+            // SUPPORT INTEGRATION addition — a THIRD, distinct
+            // authorization context (see cozy-ai.js's own getContext()
+            // header): when a CozyOS platform admin has chosen, via
+            // organization-support-panel.js's real "Inspect via Live
+            // Window" action on one of their own real, active
+            // OrganizationSupport grants, to inspect a specific live
+            // session, that choice is read here (core/organization/
+            // live-support-context.js — a disclosed hand-off variable
+            // only, never a second identity/authorization system) and
+            // takes priority over the participant-facing
+            // activeLiveSessionId above. getContext() independently,
+            // freshly re-verifies the real grant every call regardless
+            // of what is read here — a stale/cleared value can only ever
+            // cause it to compose LESS, never more.
+            const liveSupportContext = window.CozyOS && window.CozyOS.LiveSupportContext && typeof window.CozyOS.LiveSupportContext.get === "function"
+                ? window.CozyOS.LiveSupportContext.get() : null;
+            const effectiveLiveSessionId = liveSupportContext ? liveSupportContext.liveSessionId : activeLiveSessionId;
+            const supportScope = liveSupportContext ? liveSupportContext.supportScope : null;
             if (answerEngine && typeof answerEngine.answer === "function") {
-                const answerResult = await answerEngine.answer(text, { actorId, entityHint: contextualEntityName, liveSessionId: activeLiveSessionId });
+                const answerResult = await answerEngine.answer(text, { actorId, entityHint: contextualEntityName, liveSessionId: effectiveLiveSessionId, supportScope });
                 if (advisor && typeof advisor.advise === "function") {
                     const advice = advisor.advise({ question: text, answerResult });
                     // Domain 4B (AI Integration discovery): CozyAdvisor's

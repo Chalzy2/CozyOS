@@ -99,6 +99,7 @@ async function main() {
 
       await test('clicking Grant Support with a checked scope creates a real, scoped, time-boxed grant and resolves the pending request', async () => {
         await page.check('.cozy-support-scope[value="moderate-live-session"]');
+        await page.check('.cozy-support-scope[value="inspect-live-session"]');
         await page.fill('.cozy-support-grant-reason', 'Helping diagnose a real audio issue');
         await page.fill('.cozy-support-grant-duration', '2');
         await page.click('.cozy-support-grant-btn');
@@ -123,6 +124,43 @@ async function main() {
 
         const rootHtmlHasGrant = await page.evaluate((grantId) => document.querySelector('[data-grant-id="' + grantId + '"]') !== null, state.activeGrants[0].grantId);
         if (!rootHtmlHasGrant) throw new Error('expected the real, freshly-granted support session to render in the Active Support Grants list after re-render');
+      });
+
+      await test('a granted "inspect-live-session" scope renders a real "Inspect via Live Window" action that sets the real, disclosed LiveSupportContext hand-off', async () => {
+        // ChurchLiveSessionController itself is a further downstream
+        // collaborator this panel only ever QUERIES (listActiveSessions())
+        // for button visibility — the real getContext() composition this
+        // hand-off ultimately feeds is already proven against the real,
+        // unmodified cozy-ai.js in core/modules/intelligence/tests/
+        // cozy-ai-context.test.js (tests 12a-12e). This stub exists only
+        // so the panel's own real "does an active session exist to
+        // inspect" query has something real to call.
+        const { grantId, liveSessionId } = await page.evaluate(() => {
+          const { orgId } = window.__cozyTestSupport;
+          window.CozyOS.ChurchLiveSessionController = {
+            listActiveSessions: (id) => id === orgId ? [{ worshipServiceId: 'svc_real_test_1', orgId: id }] : [],
+          };
+          const grant = window.CozyOS.OrganizationSupport.listAllActiveGrants().filter((g) => g.organizationId === orgId)[0];
+          window.CozyOS.OrganizationSupportPanel.mount(document.getElementById('cozy-support-inbox-root'));
+          return { grantId: grant.grantId, liveSessionId: 'svc_real_test_1' };
+        });
+
+        const inspectBtnCount = await page.locator('.cozy-support-inspect-btn[data-grant-id="' + grantId + '"]').count();
+        if (inspectBtnCount !== 1) throw new Error('expected exactly one real Inspect via Live Window button for a grant with the inspect-live-session scope, got ' + inspectBtnCount);
+
+        await page.click('.cozy-support-inspect-btn[data-grant-id="' + grantId + '"]');
+        await page.waitForTimeout(150);
+
+        const resultText = await page.evaluate(() => document.getElementById('cozy-support-inbox-result')?.textContent || '');
+        if (!resultText.includes('inspecting')) throw new Error('expected a real confirmation message, got: ' + resultText);
+
+        const handoff = await page.evaluate(() => window.CozyOS.LiveSupportContext.get());
+        if (!handoff) throw new Error('expected a real LiveSupportContext value to be set');
+        if (handoff.liveSessionId !== liveSessionId) throw new Error('expected the real liveSessionId to be handed off, got: ' + JSON.stringify(handoff));
+        if (handoff.supportScope !== 'inspect-live-session') throw new Error('expected the real inspect-live-session scope to be handed off, got: ' + JSON.stringify(handoff));
+        if (handoff.grantId !== grantId) throw new Error('expected the real grantId to be handed off, got: ' + JSON.stringify(handoff));
+
+        await page.evaluate(() => { delete window.CozyOS.ChurchLiveSessionController; window.CozyOS.LiveSupportContext.clear(); });
       });
 
       await test('clicking Revoke on a real active grant actually revokes it (isSupportActive() becomes false)', async () => {

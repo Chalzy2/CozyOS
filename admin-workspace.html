@@ -1096,6 +1096,12 @@
          (see its own header) — mounted into #cozy-support-inbox-root by
          the bootstrap script below, after WorkspaceShell mounts. -->
     <script src="core/organization/organization-support-panel.js"></script>
+    <!-- SUPPORT INTEGRATION addition — tiny, disclosed hand-off variable
+         (see its own header) so cozy-living-assistant.js's Live Window
+         can read which live session/scope the panel above just set via
+         its own "Inspect via Live Window" action. Loaded before
+         cozy-living-assistant.js, after the panel that writes to it. -->
+    <script src="core/organization/live-support-context.js"></script>
     <script src="core/organization/organization-role.js"></script>
     <script src="core/organization/organization-hierarchy.js"></script>
     <script src="core/modules/ChurchOS/church-leadership-bridge.js"></script>

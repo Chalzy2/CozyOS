@@ -330,14 +330,126 @@ await test('11d. ChurchWorshipSession not loaded: getContext() degrades honestly
     assert.strictEqual(ctx.results.some((r) => r.authority === 'live-worship-session'), false);
 });
 
-await test('11e. questions-enabled state is composed in when ChurchLiveModerationControls reports it', async () => {
+await test('11e. questions-enabled state is composed in via the real LDCE<->worship-service pairing (SUPPORT INTEGRATION fix)', async () => {
+    // Regression test for a real, previously-silent bug: getContext()
+    // used to call ChurchLiveModerationControls.getQuestionsEnabled()
+    // with the raw worshipServiceId, but that file's own state is keyed
+    // by the real LDCE sessionId (it calls ldce.getSession(sessionId)
+    // internally) — always a miss, so the "Live questions..." line was
+    // always reporting the default DISABLED state regardless of the
+    // real host toggle. Fixed by resolving the real pairing via
+    // ChurchLiveSessionController.getLdceSessionIdFor() first, the same
+    // real pairing organization-workspace.js's own Toggle Questions
+    // control already uses.
     const { ai } = loadFullStack({
         ChurchWorshipSession: makeFakeWorshipSession({ svc1: { orgId: 'org1', sourceLanguage: 'sw', transcript: [{ text: 'x', at: 't', language: 'sw' }] } }),
-        ChurchLiveModerationControls: { getQuestionsEnabled: (id) => id === 'svc1' ? { status: 'OK', enabled: true } : { status: 'OK', enabled: false } }
+        ChurchLiveSessionController: { getLdceSessionIdFor: (worshipServiceId) => worshipServiceId === 'svc1' ? 'ldce_abc' : null },
+        ChurchLiveModerationControls: { getQuestionsEnabled: (id) => id === 'ldce_abc' ? { status: 'OK', enabled: true } : { status: 'OK', enabled: false } }
     });
     const ctx = await ai.getContext('Can I ask the pastor a question?', { actorId: 'viewer1', liveSessionId: 'svc1' });
     const hit = ctx.results.find((r) => r.authority === 'live-worship-session');
     assert.match(hit.content, /ENABLED/);
+});
+
+await test('11f. no ChurchLiveSessionController loaded: questions-enabled line is honestly omitted, never a fabricated/default state', async () => {
+    const { ai } = loadFullStack({
+        ChurchWorshipSession: makeFakeWorshipSession({ svc1: { orgId: 'org1', sourceLanguage: 'sw', transcript: [{ text: 'x', at: 't', language: 'sw' }] } }),
+        ChurchLiveModerationControls: { getQuestionsEnabled: () => { throw new Error('must never be called without a real ldceSessionId'); } }
+    });
+    const ctx = await ai.getContext('Can I ask the pastor a question?', { actorId: 'viewer1', liveSessionId: 'svc1' });
+    const hit = ctx.results.find((r) => r.authority === 'live-worship-session');
+    assert.ok(hit, 'expected the live-worship-session result to still compose from transcript alone');
+    assert.doesNotMatch(hit.content, /ENABLED|DISABLED/);
+});
+
+/* ===================================================================
+   12. LIVE SUPPORT DIAGNOSTICS (SUPPORT INTEGRATION addition) — a
+   THIRD, distinct authorization context (platform-admin + an active,
+   scoped OrganizationSupport grant), consumed through the SAME
+   getContext() call, never a second AI/context system. Every test
+   below independently proves the participant and support contexts
+   never mix.
+=================================================================== */
+function makeFakeSessionController(bundles) {
+    return {
+        getSessionBundle: (id) => bundles[id] || null,
+        getLdceSessionIdFor: (id) => bundles[id] ? bundles[id].ldceSessionId : null,
+    };
+}
+function makeFakeIdentityWithPlatformAdmin(adminIds) {
+    return { isPlatformAdmin: (id) => adminIds.includes(id) };
+}
+
+await test('12a. a real platform admin with an active, correctly-scoped support grant sees the real live-support-diagnostics result', async () => {
+    let recordedAction = null;
+    const { ai } = loadFullStack({
+        ChurchWorshipSession: makeFakeWorshipSession({ svc1: { orgId: 'org1', sourceLanguage: 'sw', transcript: [{ text: 'x', at: 't', language: 'sw' }] } }),
+        ChurchLiveSessionController: makeFakeSessionController({ svc1: { orgId: 'org1', hostUserId: 'pastor1', ldceSessionId: 'ldce_abc' } }),
+        IdentityEngine: makeFakeIdentityWithPlatformAdmin(['cozyos-admin-1']),
+        OrganizationSupport: {
+            isSupportActive: (orgId, operatorId, { requiredScope }) =>
+                (orgId === 'org1' && operatorId === 'cozyos-admin-1' && requiredScope === 'inspect-live-session')
+                    ? { active: true, grantId: 'grant-1' } : { active: false },
+            recordSupportAction: (grantId, action, detail) => { recordedAction = { grantId, action, detail }; return { success: true }; }
+        },
+        LDCESessionEngine: { getSession: (id) => id === 'ldce_abc' ? { state: 'active' } : null, listParticipants: (id, requesterId) => (id === 'ldce_abc' && requesterId === 'pastor1') ? [{ userId: 'p1' }, { userId: 'p2' }] : [] },
+        ChurchLiveModerationControls: { getSlowMode: () => ({ intervalMs: 0 }), getQuestionsEnabled: () => ({ status: 'OK', enabled: false }) }
+    });
+    const ctx = await ai.getContext('inspect this session', { actorId: 'cozyos-admin-1', liveSessionId: 'svc1', supportScope: 'inspect-live-session' });
+    const hit = ctx.results.find((r) => r.authority === 'live-support-diagnostics');
+    assert.ok(hit, 'expected a real live-support-diagnostics result for an authorized platform admin with an active grant');
+    assert.strictEqual(hit.orgId, 'org1');
+    assert.strictEqual(hit.grantId, 'grant-1');
+    assert.match(hit.content, /2 participant/);
+    assert.ok(recordedAction, 'expected the inspection to be recorded as a real, auditable support action');
+    assert.strictEqual(recordedAction.grantId, 'grant-1');
+    assert.strictEqual(recordedAction.action, 'live-context-inspected');
+});
+
+await test('12b. a platform admin with NO active support grant never sees live-support-diagnostics (fail-closed)', async () => {
+    const { ai } = loadFullStack({
+        ChurchWorshipSession: makeFakeWorshipSession({ svc1: { orgId: 'org1', sourceLanguage: 'sw', transcript: [{ text: 'x', at: 't', language: 'sw' }] } }),
+        ChurchLiveSessionController: makeFakeSessionController({ svc1: { orgId: 'org1', hostUserId: 'pastor1', ldceSessionId: 'ldce_abc' } }),
+        IdentityEngine: makeFakeIdentityWithPlatformAdmin(['cozyos-admin-1']),
+        OrganizationSupport: { isSupportActive: () => ({ active: false }) }
+    });
+    const ctx = await ai.getContext('inspect this session', { actorId: 'cozyos-admin-1', liveSessionId: 'svc1', supportScope: 'inspect-live-session' });
+    assert.strictEqual(ctx.results.some((r) => r.authority === 'live-support-diagnostics'), false);
+});
+
+await test('12c. an ordinary (non-platform-admin) actor requesting supportScope never sees live-support-diagnostics, even with a real-looking scope string', async () => {
+    const { ai } = loadFullStack({
+        ChurchWorshipSession: makeFakeWorshipSession({ svc1: { orgId: 'org1', sourceLanguage: 'sw', transcript: [{ text: 'x', at: 't', language: 'sw' }] } }),
+        ChurchLiveSessionController: makeFakeSessionController({ svc1: { orgId: 'org1', hostUserId: 'pastor1', ldceSessionId: 'ldce_abc' } }),
+        IdentityEngine: makeFakeIdentityWithPlatformAdmin(['cozyos-admin-1']),
+        OrganizationSupport: { isSupportActive: () => ({ active: true, grantId: 'grant-1' }) } // even if this fired, the actor is not a platform admin
+    });
+    const ctx = await ai.getContext('inspect this session', { actorId: 'ordinary-viewer', liveSessionId: 'svc1', supportScope: 'inspect-live-session' });
+    assert.strictEqual(ctx.results.some((r) => r.authority === 'live-support-diagnostics'), false);
+});
+
+await test('12d. a normal participant call (no supportScope) never includes live-support-diagnostics, even for a real platform admin actor', async () => {
+    const { ai } = loadFullStack({
+        ChurchWorshipSession: makeFakeWorshipSession({ svc1: { orgId: 'org1', sourceLanguage: 'sw', transcript: [{ text: 'x', at: 't', language: 'sw' }] } }),
+        ChurchLiveSessionController: makeFakeSessionController({ svc1: { orgId: 'org1', hostUserId: 'pastor1', ldceSessionId: 'ldce_abc' } }),
+        IdentityEngine: makeFakeIdentityWithPlatformAdmin(['cozyos-admin-1']),
+        OrganizationSupport: { isSupportActive: () => ({ active: true, grantId: 'grant-1' }) }
+    });
+    const ctx = await ai.getContext('What did the pastor just say?', { actorId: 'cozyos-admin-1', liveSessionId: 'svc1' });
+    assert.strictEqual(ctx.results.some((r) => r.authority === 'live-support-diagnostics'), false);
+    const participantHit = ctx.results.find((r) => r.authority === 'live-worship-session');
+    assert.ok(participantHit, 'the participant-safe result must still compose normally');
+});
+
+await test('12e. an unknown liveSessionId with supportScope never fabricates diagnostics, never throws', async () => {
+    const { ai } = loadFullStack({
+        ChurchWorshipSession: makeFakeWorshipSession({}),
+        IdentityEngine: makeFakeIdentityWithPlatformAdmin(['cozyos-admin-1']),
+        OrganizationSupport: { isSupportActive: () => ({ active: true, grantId: 'grant-1' }) }
+    });
+    const ctx = await ai.getContext('inspect this session', { actorId: 'cozyos-admin-1', liveSessionId: 'svc-does-not-exist', supportScope: 'inspect-live-session' });
+    assert.strictEqual(ctx.success, true);
+    assert.strictEqual(ctx.results.some((r) => r.authority === 'live-support-diagnostics'), false);
 });
 
 /* ===================================================================

@@ -55,6 +55,13 @@
         "view-attendance-analytics",
         "view-offerings",
         "moderate-prayer-requests",
+        // SUPPORT INTEGRATION addition — the real requiredScope
+        // cozy-ai.js's own getContext() checks (via
+        // OrganizationSupport.isSupportActive()) before composing its
+        // "live-support-diagnostics" result. Read-only: session/LDCE
+        // state, participant count, slow-mode/questions state — never
+        // moderation actions (those stay under "moderate-live-session").
+        "inspect-live-session",
     ]);
 
     function escapeHtml(value) {
@@ -159,10 +166,26 @@
         }
 
         #renderActiveGrant(g) {
+            let inspectBtn = "";
+            if (g.scope.includes("inspect-live-session")) {
+                // SUPPORT INTEGRATION addition — real, org-isolated lookup
+                // via the existing ChurchLiveSessionController; never a
+                // second "which session" tracker. Only offered when this
+                // grant's own real scope actually covers it and a real
+                // active session exists right now for this organization.
+                const ctl = window.CozyOS.ChurchLiveSessionController;
+                const active = (ctl && typeof ctl.listActiveSessions === "function") ? ctl.listActiveSessions(g.organizationId) : [];
+                if (active.length > 0) {
+                    inspectBtn = ' <button type="button" class="cozy-btn cozy-support-inspect-btn" data-grant-id="' + escapeHtml(g.grantId) +
+                        '" data-live-session-id="' + escapeHtml(active[0].worshipServiceId) +
+                        '" data-org-id="' + escapeHtml(g.organizationId) + '">Inspect via Live Window</button>';
+                }
+            }
             return '<div class="cozy-support-grant" data-grant-id="' + escapeHtml(g.grantId) + '" style="border-top:1px solid #0f3d2c;padding:10px 0;">' +
                 '<p style="margin:0 0 4px 0;"><strong>' + escapeHtml(this.#orgLabel(g.organizationId)) + '</strong> — operator ' + escapeHtml(g.operatorId) + ", scope: " + escapeHtml(g.scope.join(", ")) + "</p>" +
                 '<p style="margin:0 0 6px 0;font-size:12px;color:#94a3b8;">Authorized ' + escapeHtml(g.authorizedAt) + " — expires " + escapeHtml(g.expiresAt) + "</p>" +
                 '<button type="button" class="cozy-btn cozy-support-revoke-btn" data-grant-id="' + escapeHtml(g.grantId) + '">Revoke</button>' +
+                inspectBtn +
                 "</div>";
         }
 
@@ -220,6 +243,23 @@
                     } else if (resultEl) {
                         resultEl.textContent = message;
                     }
+                });
+            });
+
+            this.#root.querySelectorAll(".cozy-support-inspect-btn").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    const liveSupportContext = window.CozyOS.LiveSupportContext;
+                    if (!liveSupportContext) {
+                        if (resultEl) resultEl.textContent = "LiveSupportContext is not loaded.";
+                        return;
+                    }
+                    liveSupportContext.set({
+                        liveSessionId: btn.getAttribute("data-live-session-id"),
+                        supportScope: "inspect-live-session",
+                        orgId: btn.getAttribute("data-org-id"),
+                        grantId: btn.getAttribute("data-grant-id"),
+                    });
+                    if (resultEl) resultEl.textContent = "Live Window is now inspecting this session under your active support grant. Open Live Window and ask it a question.";
                 });
             });
         }

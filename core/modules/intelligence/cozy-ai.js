@@ -338,7 +338,8 @@
     }
 
     /**
-     * getContext(question, { actorId, memoryQuery, entityHint, liveSessionId })
+     * getContext(question, { actorId, memoryQuery, entityHint,
+     *                         liveSessionId, supportScope })
      *   Real. See the MICRO-MILESTONE F section of the file header for
      *   what each composed authority is and why. Never throws - a
      *   missing/throwing dependency degrades that one authority to
@@ -363,8 +364,46 @@
      *   (never a fabricated "no service" claim pretending to be current
      *   context), so the caller's own "no context found" honesty path
      *   still applies.
+     *
+     *   supportScope (SUPPORT INTEGRATION addition, optional) — the SAME
+     *   Live Window / same getContext() call, consumed under a THIRD,
+     *   distinct authorization context: a CozyOS platform administrator
+     *   with a real, active, scoped OrganizationSupport grant for the
+     *   organization that owns liveSessionId. This never creates a
+     *   second AI/context system — it is one additional, clearly-
+     *   labeled "live-support-diagnostics" result entry, added ONLY when
+     *   ALL of the following are independently, freshly verified here
+     *   (never cached, never assumed from a prior call):
+     *     1. liveSessionId resolves to a real, still-active
+     *        ChurchWorshipSession service (same check the participant
+     *        path above already performs);
+     *     2. ChurchLiveSessionController.getSessionBundle(liveSessionId)
+     *        resolves a real {orgId, hostUserId, ldceSessionId} bundle
+     *        (the real, existing LDCE<->ChurchWorshipSession pairing —
+     *        no second lookup table);
+     *     3. IdentityEngine.isPlatformAdmin(actorId) is real and true;
+     *     4. OrganizationSupport.isSupportActive(orgId, actorId,
+     *        { requiredScope: supportScope }) reports a real, live
+     *        (non-expired, non-revoked) grant for exactly that scope.
+     *   Any one of these failing means this entry is silently omitted —
+     *   the exact same fail-closed discipline as every other authority
+     *   in this function, never a partial or downgraded diagnostic. A
+     *   normal participant call (no supportScope, or an actor who is
+     *   not a platform admin, or no active grant) can never reach this
+     *   branch, so the participant/support contexts never mix in the
+     *   same result set. Every real inspection this branch performs is
+     *   also recorded via OrganizationSupport.recordSupportAction() —
+     *   inspecting a session's live technical state under a support
+     *   grant is itself an auditable action, per that file's own
+     *   auditability requirement. This never moderates, never joins,
+     *   never changes any session state — read-only composition of
+     *   already-existing engines (LDCESessionEngine.getSession()/
+     *   listParticipants(), ChurchLiveModerationControls.getSlowMode()/
+     *   getQuestionsEnabled()) for a platform admin's own diagnostic
+     *   view; corrective action still goes through those same existing,
+     *   real, permission-checked engines, never a new one.
      */
-    async function getContext(question, { actorId = null, memoryQuery = null, entityHint = null, liveSessionId = null } = {}) {
+    async function getContext(question, { actorId = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null } = {}) {
         if (typeof question !== "string" || !question.trim()) {
             return { success: false, reason: "A real, non-empty question is required." };
         }
@@ -434,6 +473,24 @@
                             pieces.push(`Last Scripture reference detected: ${lastRef.rawMatch || `${lastRef.book} ${lastRef.chapter}:${lastRef.verseStart}`}.`);
                         }
                     } catch (_err) { /* honest fall-through */ }
+                    // SUPPORT INTEGRATION fix: church-live-moderation-
+                    // controls.js's setQuestionsEnabled()/getQuestionsEnabled()
+                    // are keyed by the real LDCE sessionId (they call
+                    // ldce.getSession(sessionId) internally), never by
+                    // ChurchWorshipSession's own worshipServiceId that
+                    // liveSessionId actually is (see this function's own
+                    // header). Resolving the real pairing via
+                    // ChurchLiveSessionController.getLdceSessionIdFor()
+                    // (the same real pairing organization-workspace.js's
+                    // own Toggle Questions control already uses) fixes a
+                    // real, previously-silent bug: the line below was
+                    // always looking up a key that could never match,
+                    // always falling back to the default "DISABLED"
+                    // state regardless of what the host actually set.
+                    const sessionCtl = window.CozyOS.ChurchLiveSessionController;
+                    const ldceSessionId = (sessionCtl && typeof sessionCtl.getLdceSessionIdFor === "function")
+                        ? sessionCtl.getLdceSessionIdFor(liveSessionId) : null;
+
                     // Questions ON/OFF — composes church-live-moderation-
                     // controls.js's own real host toggle (see that file's
                     // setQuestionsEnabled()/getQuestionsEnabled()) so Live
@@ -441,8 +498,8 @@
                     // question when the host has genuinely disabled that.
                     try {
                         const modControls = window.CozyOS.ChurchLiveModerationControls;
-                        if (modControls && typeof modControls.getQuestionsEnabled === "function") {
-                            const qState = modControls.getQuestionsEnabled(liveSessionId);
+                        if (modControls && typeof modControls.getQuestionsEnabled === "function" && ldceSessionId) {
+                            const qState = modControls.getQuestionsEnabled(ldceSessionId);
                             if (qState && qState.status === "OK") {
                                 pieces.push(`Live questions to the host are currently ${qState.enabled ? "ENABLED" : "DISABLED"} for this session.`);
                             }
@@ -457,6 +514,66 @@
                             evidence: "VERIFIED",
                             content: pieces.join(" ")
                         });
+                    }
+
+                    // --- SUPPORT INTEGRATION: live-support-diagnostics ---
+                    // See this function's own header comment for the full
+                    // four-point authorization this branch independently,
+                    // freshly re-verifies every call — never cached, never
+                    // inherited from the participant path above. A normal
+                    // participant call (no supportScope) never reaches
+                    // this branch at all.
+                    if (typeof supportScope === "string" && supportScope.trim() && effectiveActorId !== "anonymous") {
+                        try {
+                            const identity = window.CozyOS.IdentityEngine;
+                            const support = window.CozyOS.OrganizationSupport;
+                            const bundle = (sessionCtl && typeof sessionCtl.getSessionBundle === "function") ? sessionCtl.getSessionBundle(liveSessionId) : null;
+                            if (identity && typeof identity.isPlatformAdmin === "function" && identity.isPlatformAdmin(effectiveActorId) &&
+                                support && typeof support.isSupportActive === "function" && bundle && bundle.orgId) {
+                                const grant = support.isSupportActive(bundle.orgId, effectiveActorId, { requiredScope: supportScope });
+                                if (grant && grant.active) {
+                                    const diag = [];
+                                    diag.push(`Worship service ${liveSessionId} (org ${bundle.orgId}, host ${bundle.hostUserId}), source language ${active.sourceLanguage}.`);
+
+                                    const ldce = window.CozyOS.LDCESessionEngine;
+                                    if (ldce && ldceSessionId) {
+                                        try {
+                                            const ldceSession = typeof ldce.getSession === "function" ? ldce.getSession(ldceSessionId) : null;
+                                            // listParticipants() is fail-closed to a real host/participant
+                                            // requester (see that file's own comment) — this passes the
+                                            // real session hostId as the requester, a read-only technical
+                                            // lookup on our already-support-authorized side, never a new
+                                            // authorization path of its own.
+                                            const roster = typeof ldce.listParticipants === "function" ? ldce.listParticipants(ldceSessionId, bundle.hostUserId) : [];
+                                            if (ldceSession) diag.push(`LDCE session ${ldceSessionId}: ${roster.length} participant record(s), state "${ldceSession.state || "unknown"}".`);
+                                        } catch (_err) { /* honest fall-through */ }
+                                    }
+                                    const modControls = window.CozyOS.ChurchLiveModerationControls;
+                                    if (modControls && ldceSessionId) {
+                                        try {
+                                            const slow = typeof modControls.getSlowMode === "function" ? modControls.getSlowMode(ldceSessionId) : null;
+                                            if (slow) diag.push(`Slow mode: ${slow.intervalMs > 0 ? slow.intervalMs + "ms" : "off"}.`);
+                                            const qState = typeof modControls.getQuestionsEnabled === "function" ? modControls.getQuestionsEnabled(ldceSessionId) : null;
+                                            if (qState && qState.status === "OK") diag.push(`Questions: ${qState.enabled ? "ON" : "OFF"}.`);
+                                        } catch (_err) { /* honest fall-through */ }
+                                    }
+
+                                    results.push({
+                                        authority: "live-support-diagnostics",
+                                        provenance: "window.CozyOS.OrganizationSupport",
+                                        liveSessionId,
+                                        orgId: bundle.orgId,
+                                        grantId: grant.grantId,
+                                        evidence: "VERIFIED",
+                                        content: diag.join(" ")
+                                    });
+
+                                    if (typeof support.recordSupportAction === "function") {
+                                        try { support.recordSupportAction(grant.grantId, "live-context-inspected", { liveSessionId, question }); } catch (_err) { /* non-fatal */ }
+                                    }
+                                }
+                            }
+                        } catch (_err) { /* honest fall-through — never fabricate, never widen access on error */ }
                     }
                 }
                 // An unknown/ended session id is silently skipped — never

@@ -175,14 +175,20 @@
     }
 
     /**
-     * answer(question, { actorId, language, memoryQuery, entityHint, liveSessionId })
+     * answer(question, { actorId, language, memoryQuery, entityHint,
+     *                     liveSessionId, supportScope })
      *   Real. Never throws — a missing/failing composed authority
      *   degrades the relevant field, never a fabricated answer.
      *   liveSessionId (LIVE INTEGRATION AUDIT addition) — passed straight
      *   through to CozyAI.getContext() (see that file's own comment);
      *   this file adds no live-session logic of its own.
+     *   supportScope (SUPPORT INTEGRATION addition) — passed straight
+     *   through to CozyAI.getContext() unchanged; this file performs no
+     *   authorization of its own for it (getContext() independently,
+     *   freshly re-verifies platform-admin + active support grant every
+     *   call — see that file's own comment for the full check).
      */
-    async function answer(question, { actorId = null, language = null, memoryQuery = null, entityHint = null, liveSessionId = null } = {}) {
+    async function answer(question, { actorId = null, language = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null } = {}) {
         if (typeof question !== "string" || !question.trim()) {
             return {
                 answer: "A real, non-empty question is required.",
@@ -241,7 +247,7 @@
         // half, e.g. "What is CozyOS and what applications does it have?") ---
         let ctx = { success: false, results: [] };
         if (ai && typeof ai.getContext === "function") {
-            try { ctx = await ai.getContext(question, { actorId, memoryQuery, entityHint, liveSessionId }); } catch (_err) { ctx = { success: false, results: [] }; }
+            try { ctx = await ai.getContext(question, { actorId, memoryQuery, entityHint, liveSessionId, supportScope }); } catch (_err) { ctx = { success: false, results: [] }; }
         }
         const ctxResults = (ctx && Array.isArray(ctx.results)) ? ctx.results : [];
 
