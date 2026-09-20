@@ -151,7 +151,7 @@
     "use strict";
     window.CozyOS = window.CozyOS || {};
     window.CozyOS.Modules = window.CozyOS.Modules || {};
-    const MODULE_VERSION = "1.1.0-sa3-extension";
+    const MODULE_VERSION = "1.2.0-cml";
     if (window.CozyOS.Modules["semantic-answer-planner"]) return;
 
     /**
@@ -517,7 +517,33 @@
         const evidenceResult = gatherEvidenceForGoal(goal, entityValue, language);
         const fields = goal === "DIFFERENTIATION" ? [] : (GOAL_FIELD_MAP[goal] || []);
 
+        let sourceEvidence = evidenceResult.evidence;
+        let learnedSupplementUsed = false;
         if (!evidenceResult.success || evidenceResult.evidence.length === 0) {
+            // CML — real, disclosed, narrow supplementary evidence source,
+            // same pattern as this file's own SUPPLEMENTARY_GOAL_PATTERNS:
+            // only ever consulted when the primary, real CozyKnowledge-
+            // backed evidence genuinely found nothing. Never overrides
+            // real primary evidence when it exists. window.CozyOS.
+            // LearningEvidenceSupplement (core/modules/learning/adapters/
+            // learning-evidence-supplement.js) is optional and additive —
+            // composes only VERIFIED, governed multimodal-learning
+            // observations (never CANDIDATE/OBSERVED); when not loaded or
+            // when it also finds nothing, behavior is byte-identical to
+            // before this supplement existed (falls through to the real
+            // detectLanguageGap()/NO_EVIDENCE_AVAILABLE paths below,
+            // unchanged).
+            const supplement = window.CozyOS.LearningEvidenceSupplement;
+            if (supplement && typeof supplement.collectLearnedEvidence === "function") {
+                const learned = supplement.collectLearnedEvidence({ goal, entityValue, language });
+                if (learned && learned.success && Array.isArray(learned.evidence) && learned.evidence.length > 0) {
+                    sourceEvidence = learned.evidence;
+                    learnedSupplementUsed = true;
+                }
+            }
+        }
+
+        if (!learnedSupplementUsed && (!evidenceResult.success || evidenceResult.evidence.length === 0)) {
             const gap = detectLanguageGap({ goal, entityValue, requestedLanguage: language, fields });
             if (gap) {
                 return { success: false, reason: "LANGUAGE_GAP", goal, goalSource, entity: entityValue, language, languageGap: gap, diagnostics: { intentResult, entitySource, cognitiveStatus: classifyCognitiveStatus({ kind: "language-gap" }) } };
@@ -525,7 +551,7 @@
             return { success: false, reason: "NO_EVIDENCE_AVAILABLE", goal, goalSource, entity: entityValue, language, errors: evidenceResult.errors, diagnostics: { intentResult, entitySource, cognitiveStatus: classifyCognitiveStatus({ kind: "no-evidence" }) } };
         }
 
-        const { authoritative, conflicted } = partitionEvidenceByAuthority(evidenceResult.evidence);
+        const { authoritative, conflicted } = partitionEvidenceByAuthority(sourceEvidence);
         if (authoritative.length === 0) {
             return { success: false, reason: "EVIDENCE_CONFLICT", goal, goalSource, entity: entityValue, language, conflictedEvidenceIds: conflicted.map((ev) => ev.id), diagnostics: { intentResult, entitySource, cognitiveStatus: classifyCognitiveStatus({ kind: "evidence-conflict" }) } };
         }
@@ -549,7 +575,7 @@
         const cognitiveStatus = classifyCognitiveStatus({ kind: conflicted.length > 0 ? "understood-with-conflict" : "understood" });
         return {
             success: true, plan: built.plan, evidence: authoritative,
-            diagnostics: { intentResult, goalSource, entitySource, cognitiveStatus, conflictedEvidenceIds: conflicted.length > 0 ? conflicted.map((ev) => ev.id) : undefined },
+            diagnostics: { intentResult, goalSource, entitySource, cognitiveStatus, learnedSupplementUsed, conflictedEvidenceIds: conflicted.length > 0 ? conflicted.map((ev) => ev.id) : undefined },
         };
     }
 
@@ -561,6 +587,6 @@
     window.CozyOS.SemanticAnswerPlanner = SemanticAnswerPlanner;
     window.CozyOS.Modules["semantic-answer-planner"] = Object.freeze({
         version: MODULE_VERSION,
-        description: "SA-3 — Semantic Answer Planner (+ SA-3 EXTENSION: cognitive context resolution, evidence-conflict handling, language-gap detection, action-vs-information classification, cognitiveStatus reporting via contracts/cognitive-decision-contract.js). Wires the real, existing SemanticIntentEngine into an actual SemanticAnswerPlan, backed exclusively by real, authorized VerifiedEvidence from SA-2. No sentence construction, no translation, no learning, no CognitiveCoordinator/CozyThinking/CozyReasoning/CozyInterpretation registration, no Live Window/TTS/CozyBuilder wiring. Not <script>-included by any page."
+        description: "SA-3 — Semantic Answer Planner (+ SA-3 EXTENSION: cognitive context resolution, evidence-conflict handling, language-gap detection, action-vs-information classification, cognitiveStatus reporting via contracts/cognitive-decision-contract.js) (+ CML: an optional, narrow, disclosed window.CozyOS.LearningEvidenceSupplement fallback — real, governed, VERIFIED multimodal-learning evidence only, consulted only when the primary CozyKnowledge-backed evidence found nothing; diagnostics.learnedSupplementUsed reports when it fired). Wires the real, existing SemanticIntentEngine into an actual SemanticAnswerPlan, backed by real, authorized VerifiedEvidence from SA-2 (primary) and CML (supplementary). No sentence construction, no translation, no CognitiveCoordinator/CozyThinking/CozyReasoning/CozyInterpretation registration, no Live Window/TTS/CozyBuilder wiring. Not <script>-included by any page."
     });
 })();

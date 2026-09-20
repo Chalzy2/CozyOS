@@ -61,6 +61,19 @@
     const CORRECTION_VALIDATION_STATES = Object.freeze([
         "PROPOSED", "CONFIRMED", "REJECTED"
     ]);
+    // CML addition — real, disclosed, additive. Section 5 of the CML
+    // "Spelling/Correction Learning" phase requires the correction
+    // architecture to be extensible to more than spelling, WITHOUT a
+    // second engine per correction kind. correctionType is optional
+    // (defaults to null, exactly like every other pre-existing optional
+    // field here) so every pre-CML caller/test continues to behave
+    // identically; a caller that DOES supply one gets it validated
+    // against this real, closed vocabulary rather than accepted as an
+    // arbitrary string.
+    const CORRECTION_TYPES = Object.freeze([
+        "SPELLING", "WORD_CHOICE", "GRAMMAR", "TRANSLATION", "MEANING",
+        "PRONUNCIATION", "ENTITY_NAME", "REGIONAL_USAGE", "DIALECT", "CONTEXT"
+    ]);
     const CONFLICT_STATUSES = Object.freeze([
         "CONFLICT_OPEN", "CONFLICT_UNRESOLVED", "CONFLICT_RESOLVED"
     ]);
@@ -177,6 +190,9 @@
         if (inp.originalValue === undefined || inp.correctedValue === undefined) {
             return { status: "REJECTED", reason: "MISSING_VALUES" };
         }
+        if (inp.correctionType !== undefined && inp.correctionType !== null && CORRECTION_TYPES.indexOf(inp.correctionType) === -1) {
+            return { status: "REJECTED", reason: "UNKNOWN_CORRECTION_TYPE" };
+        }
         const id = `corr_${nextCorrectionId++}`;
         const record = {
             id,
@@ -184,6 +200,14 @@
             targetRecordType: inp.targetRecordType, // "EXPRESSION" | "TRANSLATION_RELATIONSHIP"
             originalValue: inp.originalValue,
             correctedValue: inp.correctedValue,
+            // CML addition — real, additive, never required (see
+            // CORRECTION_TYPES comment above). unusual != incorrect: this
+            // file still never infers correctionType on its own; a caller
+            // that omits it simply gets null, same as every other
+            // optional field.
+            correctionType: inp.correctionType || null,
+            language: inp.language ? String(inp.language).toLowerCase() : null,
+            context: inp.context || null,
             correctedBy: inp.correctedBy || null,
             reason: inp.reason || null,
             timestamp: nowISO(),
@@ -327,6 +351,7 @@
         VERSION,
         RELATIONSHIP_VALIDATION_STATES,
         CORRECTION_VALIDATION_STATES,
+        CORRECTION_TYPES,
         CONFLICT_STATUSES,
         bindBackends,
         createTranslationRelationship,
