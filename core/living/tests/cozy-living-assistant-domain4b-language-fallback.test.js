@@ -23,11 +23,16 @@
  *        responseMode === "UNKNOWN_REQUEST" && evidenceState !==
  *        "VERIFIED" — is real, not a guessed condition).
  *     3. The REAL rule-based-conversational-provider.js, given the same
- *        question, DOES produce a real, evidence-backed answer via its
- *        language-support-list intent (composing the real
- *        CozyLanguageRegistry (RP-027) + CozyKnowledge.
- *        getLanguageSupportListFact()) — the exact value #send() now
- *        surfaces via resolveConversationalReply(result.result).
+ *        question, DOES produce a real, evidence-backed answer — via
+ *        its "language-request" intent (LIVE-WINDOW-LANGUAGE-AUDIT:
+ *        moved here from language-support-list, since naming ONE
+ *        specific language is a genuinely different request from
+ *        asking for the whole list — see that repair's own test suite,
+ *        m365-live-window-language-routing-repair.test.js), composing
+ *        the real CozyLanguageRegistry (RP-027) to confirm/switch to
+ *        the requested language when AVAILABLE, or honestly disclose
+ *        the fallback when it's still NOT_READY — the exact value
+ *        #send() now surfaces via resolveConversationalReply(result.result).
  *   Together these prove #send()'s new branch is wired to real,
  *   evidence-backed values end to end, even though the DOM-bound method
  *   itself isn't driven directly here.
@@ -108,20 +113,32 @@ test('"Do you speak Kiswahili?" -> CozyAdvisor classifies as UNKNOWN_REQUEST (co
 });
 
 // 3. The real rule-based provider DOES have a genuine, evidence-backed answer.
-test('"Do you speak Kiswahili?" -> real rule-based-conversational-provider answers via language-support-list, distinguishing AVAILABLE from NOT_READY', async () => {
+//
+// LIVE-WINDOW-LANGUAGE-AUDIT UPDATE: a real routing bug was found and
+// fixed live-testing the actual Live Window — "Do you speak Kiswahili?"
+// names ONE specific language and expects CozyOS to actually confirm/
+// switch to it, not recite the whole language-support-list. This is a
+// genuinely different intent ("language-request", added this pass) from
+// the general "which languages do you support" question test 5 below
+// still covers. This test now proves the CORRECTED routing/answer; see
+// core/living/test/m365-live-window-language-routing-repair.test.js for
+// the full regression suite around this fix.
+test('"Do you speak Kiswahili?" -> real rule-based-conversational-provider answers via language-request, confirming and greeting in Kiswahili (AVAILABLE)', async () => {
     const provider = freshRuleBasedProvider();
     const result = await provider.think('Do you speak Kiswahili?');
-    assert.equal(result.result.intent, 'language-support-list');
+    assert.equal(result.result.intent, 'language-request');
     assert.notEqual(result.result.intent, 'unsupported');
-    assert.match(result.result.text, /verified and available to answer in:.*Kiswahili/i);
+    assert.match(result.result.text, /Kiswahili/i);
+    assert.match(result.result.text, /Habari!/); // the real, existing verified Kiswahili greeting-generic template
 });
 
 // 4. A currently-NOT_READY language must never be claimed as spoken.
-test('"Do you speak Luo?" -> the real answer honestly lists Luo as NOT_READY, never claims it is available', async () => {
+test('"Do you speak Luo?" -> the real answer honestly discloses Luo is NOT_READY and falls back, never claims it is available', async () => {
     const provider = freshRuleBasedProvider();
     const result = await provider.think('Do you speak Luo?');
-    assert.equal(result.result.intent, 'language-support-list');
-    assert.match(result.result.text, /not yet verified \(NOT_READY\):.*Luo/i);
+    assert.equal(result.result.intent, 'language-request');
+    assert.match(result.result.text, /Luo/i);
+    assert.match(result.result.text, /don't yet have verified Luo/i);
 });
 
 // 5. General "which languages" phrasing still works (no regression to the existing pattern).
@@ -132,10 +149,11 @@ test('"Which languages does CozyOS support?" still resolves to language-support-
 });
 
 // 6. Kiswahili-phrased capability question also works.
-test('Kiswahili: "Je, CozyOS inajua Kiswahili?" -> language-support-list (Kiswahili phrasing of the same capability question)', async () => {
+test('Kiswahili: "Je, CozyOS inajua Kiswahili?" -> language-request (Kiswahili phrasing of the same specific-language question), confirms and greets in Kiswahili', async () => {
     const provider = freshRuleBasedProvider();
     const result = await provider.think('Je, CozyOS inajua Kiswahili?');
-    assert.equal(result.result.intent, 'language-support-list');
+    assert.equal(result.result.intent, 'language-request');
+    assert.match(result.result.text, /Habari!/);
 });
 
 // 7. Domain 4A's own required behavior is unaffected: #send()'s new

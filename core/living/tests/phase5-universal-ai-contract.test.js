@@ -246,7 +246,7 @@ test('F1: learning placeholder is always inert (candidateCreated:false, scope:nu
 });
 
 test('F2 (N/A, documented not skipped): no createCandidate()/promoteCandidate() exists for intent or knowledge learning', () => {
-    const contractApi = Object.keys(require('/home/claude/cozyos/CozyOS-M355-LiveWindowAI-AUDIT-CHECKPOINT-V2/core/living/cozy-ai-universal-contract.js'));
+    const contractApi = Object.keys(require(CONTRACT_PATH));
     // This test intentionally documents an absence as a real, checked
     // fact rather than silently skipping - Phase 5 does not implement
     // intent/knowledge learning (Section 15), and this proves the

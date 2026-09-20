@@ -242,6 +242,12 @@
         // for "inasaidia", "nni" for "nini").
         out = out.replace(/\binsaidia/gi, "inasaidia");
         out = out.replace(/\bnni\b/gi, "nini");
+        // LIVE-WINDOW-LANGUAGE-AUDIT — real dropped-syllable typo found
+        // live ("inanisaiaje" for "inanisaidiaje", the object-infixed
+        // "-je" form of "-saidia" missing its "di"), same fixed-table
+        // discipline as the "insaidia" fix above: one exact, known-safe
+        // substitution, not a fuzzy/guessing normalizer.
+        out = out.replace(/\binanisaiaje\b/gi, "inanisaidiaje");
         // UNIVERSAL USER QUESTION UNDERSTANDING — real, common English
         // typos found in live conversation ("knowore" for "know more",
         // "inwhich" for "in which") — same fixed-table discipline as
@@ -497,7 +503,30 @@
         // ["me"] object-pronoun forms below). Same existing
         // why-use-cozyos answer — only recognizing more real ways
         // people ask for it.
-        { id: "why-use-cozyos", pattern: /\bwhy\s+(?:should|would)\s+(?:i|someone|you)\s+use\s+cozyos\b|\bwhy\s+use\s+cozyos\b|\bbenefits?\s+of\s+cozyos\b|\bwhy\s+cozyos\b|\bwhy\s+is\s+cozyos\s+benefits?\b|\bkwa\s+nini\s+nitumie(?:\s+cozyos)?\b|\bkwa\s+nini\s+(?:ni)?tumie\s+cozyos\b|\bfaida\s+za\s+cozyos\b|\bcozyos\s+itanisaidia\s+nini\b|\bcozyos\s+inanisaidia\s+nini\b|\bmtumiaji\s+anapata\s+faida\s+gani\b|\bkwa\s+nini\s+cozyos\s+ni\s+nzuri\s+kwa\s+afrika\b|\bcozyos\s+inabadilisha\s+maisha\s+(?:ya\s+mtu\s+)?kwa\s+njia\s+gani\b|\bna\s+cozyos\s+je\b|\bcozyos\s+inasaidiaje\b|\bcozyos\s+inasaidia(?:\s+na)?\s+nini\b|\bcozyos\s+inatusaidia\s+na\s+(?:faida\s+gani|nini)(?:\s+kwetu)?\b|\bnitanufaika\s+vipi\s+(?:na|nikitumia)\s+cozyos\b|\btutapata\s+nini\s+tukitumia\s+cozyos\b|\bcozyos\s+ni\s+ya\s+nini\b/i },
+        // LIVE-WINDOW-LANGUAGE-AUDIT — three more real, natural Kiswahili
+        // CozyOS purpose/benefit shapes found live-testing the actual
+        // Live Window, appended (not interleaved) so every existing
+        // alternative/capture-group above is unchanged:
+        //   - "Cozyos inanisaidiaje" (via normalizeUserText's typo fix
+        //     above) — the object-infixed "-je" question form of the
+        //     already-covered generic "cozyos inasaidiaje", distinct
+        //     because of the "ni" ("me") infix.
+        //   - "Nini cozyos inatufaika nayo" — "what does CozyOS benefit
+        //     us with", a "nini <subject> X nayo" word order distinct
+        //     from the already-covered "X inatusaidia na nini" order;
+        //     the verb stem accepts the "-faika"/"-nufaisha"/"-saidia"
+        //     synonyms this file already treats as equivalent elsewhere.
+        //   - "Cozyos inafaida gani kwetu" — "what benefit does CozyOS
+        //     have for us", the "ina[ ]faida gani" possessive-benefit
+        //     phrasing (optional space/join, optional trailing "kwetu"),
+        //     distinct from the already-covered "faida za cozyos" (a
+        //     "faida of X" order rather than "X has faida" order).
+        // Same existing why-use-cozyos answer in every case — only
+        // recognizing more real ways people ask for it, per this
+        // repair's own "fix the routing architecture, not individual
+        // hard-coded phrases" instruction: each addition below is a
+        // genuine phrasing/word-order CLASS, not a single literal string.
+        { id: "why-use-cozyos", pattern: /\bwhy\s+(?:should|would)\s+(?:i|someone|you)\s+use\s+cozyos\b|\bwhy\s+use\s+cozyos\b|\bbenefits?\s+of\s+cozyos\b|\bwhy\s+cozyos\b|\bwhy\s+is\s+cozyos\s+benefits?\b|\bkwa\s+nini\s+nitumie(?:\s+cozyos)?\b|\bkwa\s+nini\s+(?:ni)?tumie\s+cozyos\b|\bfaida\s+za\s+cozyos\b|\bcozyos\s+itanisaidia\s+nini\b|\bcozyos\s+inanisaidia\s+nini\b|\bmtumiaji\s+anapata\s+faida\s+gani\b|\bkwa\s+nini\s+cozyos\s+ni\s+nzuri\s+kwa\s+afrika\b|\bcozyos\s+inabadilisha\s+maisha\s+(?:ya\s+mtu\s+)?kwa\s+njia\s+gani\b|\bna\s+cozyos\s+je\b|\bcozyos\s+inasaidiaje\b|\bcozyos\s+inanisaidiaje\b|\bcozyos\s+inasaidia(?:\s+na)?\s+nini\b|\bcozyos\s+inatusaidia\s+na\s+(?:faida\s+gani|nini)(?:\s+kwetu)?\b|\bnitanufaika\s+vipi\s+(?:na|nikitumia)\s+cozyos\b|\btutapata\s+nini\s+tukitumia\s+cozyos\b|\bcozyos\s+ni\s+ya\s+nini\b|\bnini\s+cozyos\s+inatu(?:faika|nufaisha|saidia)\s+nayo\b|\bcozyos\s+ina\s*faida\s+gani(?:\s+kwetu)?\b/i },
         { id: "differentiation", pattern: /\bhow\s+is\s+cozyos\s+different\b|\bwhat\s+makes\s+cozyos\s+different\b|\bhow\s+does\s+cozyos\s+differ\b|\bcozyos\s+vs\.?\s|\bcompared\s+to\s+other\s+apps?\b|\binatofautianaje\b|\btofauti\s+(?:ya|na)\s+cozyos\b|\bcozyos\s+inatofautiana(?:naje)?\b/i },
         // Real-device fix — the "cozyos inaweza X" alternative below had
         // (?:ki)? OPTIONAL, so it matched ANY "CozyOS inaweza <word>"
@@ -506,7 +535,38 @@
         // (a benefits question) was being misclassified here. Kiswahili
         // language names are genuinely always "ki"-prefixed (Kiswahili,
         // Kiingereza, Kifaransa, Kiarabu) - made required, not optional.
-        { id: "language-support-list", pattern: /\bwhich\s+languages?\s+(?:does\s+)?cozyos\s+support\b|\bwhat\s+languages?\s+(?:does\s+)?cozyos\s+support\b|\blanguage\s+support\b|\bsupported\s+languages\b|\blugha\s+(?:zipi|gani)\s+(?:zinazoungwa\s+mkono|zinazotumika)\b|\bcozyos\s+inaunga\s+mkono\s+lugha\s+gani\b|\b(?:do|does|can)\s+(?:you|cozyos)\s+(?:speak|understand)\s+[a-z\u00c0-\u024f]+\b|\b(?:una\s*(?:jua|elewa|zungumza)|(?:je,?\s*)?cozyos\s+in(?:aweza|ajua|azungumza))\s+ki[a-z]+\b/i },
+        // LIVE-WINDOW-LANGUAGE-AUDIT — real routing bug found live-testing
+        // the actual Live Window: "Do you speak Kiswahili?" and "Can you
+        // talk to me in French?" NAME one specific language and expect
+        // CozyOS to actually confirm/switch to it — a genuinely
+        // different intent from "which languages does CozyOS support"
+        // (a request for the whole policy list). Both used to share one
+        // over-broad clause here (`(?:do|does|can) (?:you|cozyos)
+        // (?:speak|understand) [a-z]+`, which matches ANY single word
+        // after "speak", including a real language name), so a specific
+        // request always fell into the generic list answer instead of
+        // ever being confirmed/switched. That clause (and its Kiswahili
+        // equivalent) is MOVED below to the new "language-request"
+        // intent, checked first, so a specific-language ask is always
+        // classified correctly; this intent now only matches genuine
+        // "what/which languages" list questions.
+        { id: "language-support-list", pattern: /\bwhich\s+languages?\s+(?:does\s+)?cozyos\s+support\b|\bwhat\s+languages?\s+(?:does\s+)?cozyos\s+support\b|\blanguage\s+support\b|\bsupported\s+languages\b|\blugha\s+(?:zipi|gani)\s+(?:zinazoungwa\s+mkono|zinazotumika)\b|\bcozyos\s+inaunga\s+mkono\s+lugha\s+gani\b/i },
+        // LIVE-WINDOW-LANGUAGE-AUDIT — "language-request": an explicit
+        // request to speak/greet/respond in ONE named language. Covers:
+        //   - "Do/does/can you/CozyOS speak/talk/understand <language>"
+        //     (moved here from language-support-list above)
+        //   - "Can (you) talk to me in <language>" / "Talk to me in..."
+        //   - "Greet me in <language>" / "Say hello in <language>" /
+        //     "Greetings in <language>"
+        //   - Kiswahili: "Unaweza kuzungumza/kuelewa/kujua <lugha>",
+        //     "CozyOS inaweza/inajua/inazungumza <lugha>" (moved here,
+        //     same clause as before), "Nisalimie kwa <lugha>" (greet me
+        //     in), "Salimia kwa <lugha>".
+        // The actual target language name is extracted separately by
+        // extractSpeakableLanguageCode() below (composeReply's
+        // "language-request" case) — this pattern only needs to
+        // recognize the REQUEST SHAPE, not parse the language itself.
+        { id: "language-request", pattern: /\b(?:do|does|can)\s+(?:you|cozyos)\s+(?:speak|talk|understand)\s+(?:to\s+me\s+)?(?:in\s+)?[a-z\u00c0-\u024f]+\b|\bcan\s+(?:you\s+)?talk\s+to\s+me\s+in\s+[a-z\u00c0-\u024f]+\b|\btalk\s+to\s+me\s+in\s+[a-z\u00c0-\u024f]+\b|\bgreet\s+me\s+in\s+[a-z\u00c0-\u024f]+\b|\bsay\s+hello\s+in\s+[a-z\u00c0-\u024f]+\b|\bgreetings?\s+in\s+[a-z\u00c0-\u024f]+\b|\b(?:una\s*(?:jua|elewa|zungumza)|(?:je,?\s*)?cozyos\s+in(?:aweza|ajua|azungumza))\s+ki[a-z]+\b|\bnisalimie\s+kwa\s+[a-z\u00c0-\u024f]+\b|\bsalimia\s+kwa\s+[a-z\u00c0-\u024f]+\b/i },
 
         // Domain 4D (Intent Understanding discovery) — real, disclosed
         // fix for a genuine classifier gap: no "translate this" intent
@@ -1072,6 +1132,40 @@
     });
     function extractTargetLanguageCode(text) {
         for (const [code, patterns] of Object.entries(TARGET_LANGUAGE_NAMES)) {
+            if (patterns.some((p) => p.test(text))) return code;
+        }
+        return null;
+    }
+
+    // LIVE-WINDOW-LANGUAGE-AUDIT — "language-request" dependency.
+    // Deliberately a SEPARATE, broader map from TARGET_LANGUAGE_NAMES
+    // above, not an extension of it: TARGET_LANGUAGE_NAMES is
+    // intentionally restricted to the 5 AVAILABLE languages because
+    // recognizing a NOT_READY language NAME there would let the
+    // translate-request feature imply a translation capability that
+    // was never verified (see that map's own comment). A "language-
+    // request" ("greet me in X" / "do you speak X") makes no such
+    // claim — it only needs to honestly recognize WHAT was asked for,
+    // so it can name that language back to the person even when
+    // falling back (via CozyLanguageRegistry.resolveLanguage()) to an
+    // AVAILABLE one. Every code here is a real, already-registered
+    // cozy-language-registry.js code (5 AVAILABLE + 6 NOT_READY) —
+    // this never invents a language the registry doesn't know about.
+    const SPEAKABLE_LANGUAGE_NAMES = Object.freeze({
+        en: [/\benglish\b/i, /\bkiingereza\b/i],
+        sw: [/\bswahili\b/i, /\bkiswahili\b/i],
+        fr: [/\bfrench\b/i, /\bkifaransa\b/i],
+        ar: [/\barabic\b/i, /\bkiarabu\b/i],
+        so: [/\bsomali\b/i, /\bkisomali\b/i],
+        luo: [/\bluo\b/i, /\bdholuo\b/i],
+        ki: [/\bkikuyu\b/i, /\bg[iĩ]k[uũ]y[uũ]\b/i],
+        kam: [/\bkikamba\b/i, /\bkamba\b/i],
+        zu: [/\bzulu\b/i, /\bisizulu\b/i],
+        lg: [/\bluganda\b/i, /\bganda\b/i],
+        ig: [/\bigbo\b/i]
+    });
+    function extractSpeakableLanguageCode(text) {
+        for (const [code, patterns] of Object.entries(SPEAKABLE_LANGUAGE_NAMES)) {
             if (patterns.some((p) => p.test(text))) return code;
         }
         return null;
@@ -1772,6 +1866,45 @@
                 }
                 const frame = template("app-launch:unresolved", lang);
                 return typeof frame === "function" ? frame(candidate || "") : frame;
+            }
+            // LIVE-WINDOW-LANGUAGE-AUDIT — an explicit, single-language
+            // request ("Greet me in French", "Can talk to me in
+            // Kiswahili", "Do you speak Kiswahili"). Deliberately
+            // resolves its OWN target language from the extracted
+            // language name (extractSpeakableLanguageCode(rawText)),
+            // independent of `lang` (the outer per-turn conversational
+            // language resolved from whatever language the person
+            // happened to type IN) — per this repair's own requirement
+            // that an explicit request must switch to/use the requested
+            // language, not just be answered about in whatever language
+            // the question itself was asked. Reuses the real, existing
+            // verified CozyLanguageRegistry.resolveLanguage() (RP-027)
+            // and the existing "greeting-generic" template for the
+            // actual greeting — no new knowledge or capability, exactly
+            // this repair's "reuse the existing verified knowledge
+            // architecture" instruction.
+            case "language-request": {
+                const registry = window.CozyOS && window.CozyOS.CozyLanguageRegistry;
+                const requestedCode = extractSpeakableLanguageCode(rawText || "");
+                if (!requestedCode) {
+                    return template("language-request:unrecognized", lang);
+                }
+                const resolved = (registry && typeof registry.resolveLanguage === "function")
+                    ? safeCall(() => registry.resolveLanguage({ requested: requestedCode }))
+                    : null;
+                const finalCode = (resolved && resolved.code) || "en";
+                const confirmFrame = template("language-request:confirmed", finalCode);
+                const confirmText = typeof confirmFrame === "function" ? confirmFrame(languageDisplayName(requestedCode)) : confirmFrame;
+                const greetingFrame = template("greeting-generic", finalCode);
+                let out = `${confirmText} ${greetingFrame}`;
+                if (resolved && resolved.fallback) {
+                    const templates = window.CozyOS && window.CozyOS.CozyLanguageTemplates;
+                    const disclosureFn = templates && templates.FALLBACK_DISCLOSURE && templates.FALLBACK_DISCLOSURE[finalCode];
+                    if (typeof disclosureFn === "function") {
+                        out = `${out} ${disclosureFn(languageDisplayName(requestedCode), languageDisplayName(finalCode))}`;
+                    }
+                }
+                return out;
             }
             case "language-support-list": {
                 const fact = knowledge && typeof knowledge.getLanguageSupportListFact === "function" ? safeCall(() => knowledge.getLanguageSupportListFact()) : null;

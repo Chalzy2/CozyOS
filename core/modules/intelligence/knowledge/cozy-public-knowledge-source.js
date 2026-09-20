@@ -72,7 +72,7 @@
     window.CozyOS.Modules = window.CozyOS.Modules || {};
     if (window.CozyOS.Modules["cozy-public-knowledge-source"]) return;
 
-    const VERSION = "1.0.0";
+    const VERSION = "1.1.0"; // LIVE-WINDOW-LANGUAGE-AUDIT: TARGET_LANGUAGES now includes Luganda/Igbo, matching the source document's own NOT_READY(6) statement and the live registry — fixes a real target-list/registered-language inconsistency in the language-support-list reply.
     const SOURCE_DOC = "docs/builder/knowledge/cozyos-public-vision-and-language-policy.md";
 
     /**
@@ -107,11 +107,31 @@
      *   NOT_READY placeholder entries for Russian/Chinese/Hausa/Yorùbá
      *   is "a reasonable future step, not yet done" — this file does
      *   not do that step either).
+     *
+     *   AUDIT FIX (Live Window language-routing repair): this list
+     *   previously omitted Luganda and Igbo, even though the source
+     *   document's own "Language Policy" section explicitly states
+     *   both are registered NOT_READY entries "on this 17-language
+     *   list" (see the doc's own NOT_READY(6) line, which names Luo,
+     *   Kikuyu, Kikamba, isiZulu, Luganda, Igbo together as one set).
+     *   Omitting them here produced a real, user-visible inconsistency:
+     *   the language-support-list reply would name Luganda/Igbo as
+     *   "registered but not yet verified" while the target list right
+     *   next to it never mentioned them at all — an internal
+     *   contradiction, not a disclosed limitation. Both are added below
+     *   to match what the source document and the live registry
+     *   (cozy-language-registry.js's own EXTENDED_LANGUAGES) already
+     *   agree on. Disclosed, unresolved gap this fix does NOT invent an
+     *   answer for: the source document's headline still calls this a
+     *   "17 languages" list while only 15 are ever named anywhere in
+     *   it (13 originally listed + these 2) — that arithmetic gap is a
+     *   pre-existing authoring gap in the owner-approved document
+     *   itself, not something this file fabricates a resolution for.
      */
     const TARGET_LANGUAGES = Object.freeze([
         "English", "Kiswahili", "French", "Arabic", "Somali",
         "Russian", "Chinese/Mandarin", "Hausa", "Yorùbá",
-        "Luo", "Kikuyu", "Kikamba", "isiZulu"
+        "Luo", "Kikuyu", "Kikamba", "isiZulu", "Luganda", "Igbo"
     ]);
 
     function safeCall(fn) {
