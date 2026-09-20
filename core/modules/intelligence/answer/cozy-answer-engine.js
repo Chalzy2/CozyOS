@@ -160,6 +160,12 @@
         if (getters.has("getWhyUseCozyOSFact")) return "HUMAN_BENEFITS";
         if (getters.has("getDifferentiationFact")) return "IMPORTANCE";
         if (getters.has("getMissionFact") || getters.has("getProjectOriginFact") || getters.has("getProjectHistoryFact") || getters.has("getPublicStoryFact")) return "ORIGIN_OR_STORY";
+        // LIVE WINDOW APPLICATION SEMANTIC UNDERSTANDING REPAIR —
+        // cozy-ai.js's getContext() composes a named application's own
+        // real human-purpose/capability knowledge under this authority
+        // (see that file's own comment); label it honestly by its real
+        // domain instead of falling through to "GENERAL".
+        if (ctxResults.some(r => r.authority === "application-knowledge")) return "APPLICATION_INFORMATION";
         if (ctxResults.some(r => r.authority === "live-worship-session")) return "LIVE_WORSHIP";
         if (ctxResults.some(r => r.authority === "cozy-memory" || r.authority === "living-memory")) return "PROJECT_KNOWLEDGE";
         return "GENERAL";
@@ -251,7 +257,7 @@
         // half, e.g. "What is CozyOS and what applications does it have?") ---
         let ctx = { success: false, results: [] };
         if (ai && typeof ai.getContext === "function") {
-            try { ctx = await ai.getContext(question, { actorId, memoryQuery, entityHint, liveSessionId, supportScope, businessContext }); } catch (_err) { ctx = { success: false, results: [] }; }
+            try { ctx = await ai.getContext(question, { actorId, memoryQuery, entityHint, liveSessionId, supportScope, businessContext, language }); } catch (_err) { ctx = { success: false, results: [] }; }
         }
         const ctxResults = (ctx && Array.isArray(ctx.results)) ? ctx.results : [];
 

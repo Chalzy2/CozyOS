@@ -698,7 +698,16 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
             const effectiveLiveSessionId = liveSupportContext ? liveSupportContext.liveSessionId : activeLiveSessionId;
             const supportScope = liveSupportContext ? liveSupportContext.supportScope : null;
             if (answerEngine && typeof answerEngine.answer === "function") {
-                const answerResult = await answerEngine.answer(text, { actorId, entityHint: contextualEntityName, liveSessionId: effectiveLiveSessionId, supportScope });
+                // LIVE WINDOW APPLICATION SEMANTIC UNDERSTANDING REPAIR —
+                // this.#currentLanguage was already refreshed above from
+                // THIS turn's real, resolved result.result.language (the
+                // SAME rule-based-conversational-provider.js signal
+                // Kiswahili Capability Dependency #2 already reuses for
+                // voice input) — passed straight through so the verified
+                // chain can answer a named-application question in the
+                // SAME language the user actually asked in, instead of
+                // defaulting to English. No new language detector.
+                const answerResult = await answerEngine.answer(text, { actorId, entityHint: contextualEntityName, liveSessionId: effectiveLiveSessionId, supportScope, language: this.#currentLanguage });
                 if (advisor && typeof advisor.advise === "function") {
                     const advice = advisor.advise({ question: text, answerResult });
                     // Domain 4B (AI Integration discovery): CozyAdvisor's

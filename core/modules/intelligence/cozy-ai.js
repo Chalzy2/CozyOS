@@ -330,21 +330,31 @@
     ]);
 
     /**
-     * _mentionsNamedApplication(question)
-     *   Real, dynamic check against the live application registry
-     *   (window.CozyOS.listApplications() — the same source
+     * _resolveNamedApplication(question)
+     *   LIVE WINDOW APPLICATION SEMANTIC UNDERSTANDING REPAIR — real,
+     *   dynamic entity resolution against the live application registry
+     *   (window.CozyOS.listApplications() — the SAME source
      *   resolveApplicationByName()/listApplicationsFact() already read;
-     *   no second inventory, no hardcoded app-name list). Used only to
-     *   stop the platform-level benefit/problem/importance routes above
-     *   from answering with CozyOS-wide content when the question
-     *   genuinely names one specific sub-application (e.g. "What
-     *   problem does ShopOS solve?") — that question belongs to
-     *   getApplicationHumanPurposeFact(), never to this generic
-     *   fallback. Fails open (returns false) when the registry isn't
-     *   loaded, since the higher-level app-importance/app-info routing
-     *   already tries first and this is only the last-resort path.
+     *   no second inventory, no hardcoded app-name list). Returns the
+     *   real, matched {id, name} record, or null.
+     *
+     *   Two passes, both against the SAME real registry, never a second
+     *   knowledge source:
+     *     1. Exact substring (whitespace/case-normalized) — the fast,
+     *        unambiguous path this file already had.
+     *     2. Fuzzy — reuses window.CozyOS.CozyLearn.levenshtein() (the
+     *        ONE real, already-loaded edit-distance primitive this
+     *        repository uses for spelling correction elsewhere, see
+     *        cozy-learn.js's own suggestCorrection()) against each
+     *        word/short-phrase in the question, so a genuine typo
+     *        ("InteresOs" for "InterestOS") still resolves without a
+     *        hand-built typo dictionary. Same safety threshold formula
+     *        CozyLearn's own suggestCorrection() already uses
+     *        (distance <= min(2, max(1, floor(name.length*0.3)))) —
+     *        not a new, looser rule. Degrades to exact-substring-only,
+     *        never throws, when CozyLearn isn't loaded.
      */
-    function _mentionsNamedApplication(question) {
+    function _resolveNamedApplication(question) {
         // Same two-source lookup as resolveApplicationByName() (rule-
         // based-conversational-provider.js) and getApplicationFact()/
         // getApplicationHumanPurposeFact() (cozy-knowledge-registry.js)
@@ -354,11 +364,55 @@
         // second/competing lookup path.
         const lister = (window.CozyOS && typeof window.CozyOS.listApplications === "function" && window.CozyOS.listApplications)
             || (window.CozyOS && window.CozyOS.ServiceRegistry && typeof window.CozyOS.ServiceRegistry.listApplications === "function" && (() => window.CozyOS.ServiceRegistry.listApplications()));
-        if (!lister) return false;
+        if (!lister) return null;
         const apps = (() => { try { return lister(); } catch (_err) { return null; } })();
-        if (!Array.isArray(apps)) return false;
+        if (!Array.isArray(apps)) return null;
+        const validApps = apps.filter((a) => a && typeof a.name === "string" && a.name.trim().length > 0);
+
         const q = question.toLowerCase().replace(/\s+/g, "");
-        return apps.some((a) => a && typeof a.name === "string" && a.name.length > 0 && q.includes(a.name.toLowerCase().replace(/\s+/g, "")));
+        const exact = validApps.find((a) => q.includes(a.name.toLowerCase().replace(/\s+/g, "")));
+        if (exact) return { id: exact.id, name: exact.name };
+
+        const learn = window.CozyOS && window.CozyOS.CozyLearn;
+        if (!learn || typeof learn.levenshtein !== "function") return null;
+        const words = question.toLowerCase().match(/[a-z]+/g) || [];
+        let best = null;
+        for (const word of words) {
+            if (word.length < 4) continue; // too short to safely fuzzy-match (same guard cozy-learn.js's own detectUnknownTerms() uses)
+            for (const app of validApps) {
+                const needle = app.name.toLowerCase().replace(/\s+/g, "");
+                if (needle.length < 4) continue;
+                // Real, ordinary English/Kiswahili words that legitimately
+                // appear in these questions ("churches" in "help
+                // churches") can land within a small edit distance of a
+                // real app name ("ChurchOS") purely by coincidence — a
+                // real false-positive this file's own regression suite
+                // caught. Every real CozyOS application name in this
+                // registry ends in a short, disclosed, consistent suffix
+                // (the "OS" naming convention, or a real full word like
+                // "Authenticator") — requiring the candidate word's own
+                // final two letters to match the app name's final two
+                // letters is a genuine, structural signal from the SAME
+                // real naming convention every application already
+                // follows, not a new per-word dictionary, and it still
+                // accepts real typos (an ordinary typo very rarely
+                // changes a word's own last two letters) while rejecting
+                // an unrelated, correctly-spelled word that merely
+                // resembles the prefix.
+                if (word.slice(-2) !== needle.slice(-2)) continue;
+                const distance = learn.levenshtein(word, needle);
+                const maxAllowed = Math.min(2, Math.max(1, Math.floor(needle.length * 0.3)));
+                if (distance <= maxAllowed && (!best || distance < best.distance)) {
+                    best = { app, distance };
+                }
+            }
+        }
+        return best ? { id: best.app.id, name: best.app.name } : null;
+    }
+
+    /** Backward-compatible boolean wrapper — see _resolveNamedApplication() above, the one real resolver both this and getContext()'s application-knowledge routing (below) share. */
+    function _mentionsNamedApplication(question) {
+        return !!_resolveNamedApplication(question);
     }
 
     /** #matchRoutes() — real substring matching against a fixed keyword table. Not semantic; disclosed as such in the file header. */
@@ -437,7 +491,7 @@
      *   view; corrective action still goes through those same existing,
      *   real, permission-checked engines, never a new one.
      */
-    async function getContext(question, { actorId = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null, businessContext = null } = {}) {
+    async function getContext(question, { actorId = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null, businessContext = null, language = null } = {}) {
         if (typeof question !== "string" || !question.trim()) {
             return { success: false, reason: "A real, non-empty question is required." };
         }
@@ -447,10 +501,19 @@
         // --- Public Story + Knowledge Registry (both via CozyKnowledge; never FounderStory directly) ---
         const knowledge = window.CozyOS.CozyKnowledge;
         if (knowledge) {
-            const PLATFORM_ONLY_GETTERS = new Set(["getWhyUseCozyOSFact", "getDifferentiationFact"]);
-            // See _mentionsNamedApplication() below AND this file's
+            // LIVE WINDOW APPLICATION SEMANTIC UNDERSTANDING REPAIR —
+            // listApplicationsFact() joined the platform-only suppression
+            // set: a question that names one specific, real application
+            // is wrong to answer with "here is the full app list" just
+            // as much as it's wrong to answer with generic CozyOS
+            // purpose text — both are platform-wide content standing in
+            // for the named application's own real, existing knowledge
+            // (composed just below).
+            const PLATFORM_ONLY_GETTERS = new Set(["getWhyUseCozyOSFact", "getDifferentiationFact", "listApplicationsFact"]);
+            // See _resolveNamedApplication() below AND this file's
             // caller (cozy-living-assistant.js's #send()) for the fuller
-            // explanation: a THIS-TURN literal app name is one real
+            // explanation: a THIS-TURN literal (or safely fuzzy-matched
+            // — see _resolveNamedApplication()) app name is one real
             // signal that platform-level content is wrong here; an
             // explicit entityHint carried over from the real, previous
             // turn's conversationState.lastDiscussedApplication (a
@@ -458,12 +521,48 @@
             // "Who benefits from it?" right after ShopOS) is the other.
             // Either one alone is sufficient to suppress the generic
             // CozyOS-platform routes below - never a guess, both trace
-            // back to the SAME single entity-resolution authority
-            // (rule-based-conversational-provider.js's real, verified
-            // application resolution).
-            const namesAnApp = _mentionsNamedApplication(question) || (typeof entityHint === "string" && entityHint.trim().length > 0);
+            // back to the SAME single entity-resolution authority.
+            const namedApplication = _resolveNamedApplication(question)
+                || ((typeof entityHint === "string" && entityHint.trim()) ? _resolveNamedApplication(entityHint) : null);
+            const namesAnApp = !!namedApplication || (typeof entityHint === "string" && entityHint.trim().length > 0);
             let getterNames = [...new Set([...matchRoutes(question, CONTEXT_STORY_ROUTES), ...matchRoutes(question, CONTEXT_KNOWLEDGE_ROUTES)])];
             if (namesAnApp) getterNames = getterNames.filter((g) => !PLATFORM_ONLY_GETTERS.has(g));
+
+            // --- Named-application knowledge (LIVE WINDOW APPLICATION
+            // SEMANTIC UNDERSTANDING REPAIR) — when the question (or the
+            // carried-forward conversational entity) names one real,
+            // specific application, THAT application's own real,
+            // already-loaded human-purpose knowledge is the authoritative
+            // source, composed via getApplicationDetailedInfoFact() — the
+            // SAME existing, real, already-tested composition function
+            // the rule-based conversational provider's own "app-info"/
+            // "app-importance" intents already use elsewhere in this
+            // repository (no second application-knowledge store, no new
+            // per-application logic). language, when given, is the SAME
+            // per-turn language signal cozy-living-assistant.js already
+            // resolves via LivingAI.think()/rule-based-conversational-
+            // provider.js's own resolveLanguage() — this function adds no
+            // language detection or translation of its own;
+            // getApplicationDetailedInfoFact()/resolvePurposeForLanguage()
+            // already do real, disclosed, fail-closed EN/SW resolution
+            // per field, honestly reporting NOT_FOUND (never a silent
+            // English substitution) when a Kiswahili payload genuinely
+            // doesn't exist for that application yet.
+            if (namedApplication && typeof knowledge.getApplicationDetailedInfoFact === "function") {
+                try {
+                    const detailFact = knowledge.getApplicationDetailedInfoFact(namedApplication.name, language);
+                    if (detailFact && detailFact.evidence === "VERIFIED" && detailFact.answer) {
+                        results.push({
+                            authority: "application-knowledge",
+                            provenance: "window.CozyOS.CozyKnowledge.getApplicationDetailedInfoFact",
+                            applicationName: namedApplication.name,
+                            evidence: "VERIFIED",
+                            content: detailFact.answer
+                        });
+                    }
+                } catch (_err) { /* honest fall-through — never fabricate */ }
+            }
+
             for (const getterName of getterNames) {
                 const fn = knowledge[getterName];
                 if (typeof fn !== "function") continue;

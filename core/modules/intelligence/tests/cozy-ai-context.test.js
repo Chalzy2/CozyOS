@@ -65,7 +65,8 @@ const roots = {
     businessWorkspace: path.join(__dirname, '..', '..', '..', 'plugins', 'interestOS-business-workspace.js'),
     cozyAi: path.join(__dirname, '..', 'cozy-ai.js'),
     identityFaqRouter: path.join(__dirname, '..', '..', 'knowledge', 'cozyos-identity-faq-router.js'),
-    answerEngine: path.join(__dirname, '..', 'answer', 'cozy-answer-engine.js')
+    answerEngine: path.join(__dirname, '..', 'answer', 'cozy-answer-engine.js'),
+    cozyLearn: path.join(__dirname, '..', '..', '..', 'living', 'cozy-learn.js')
 };
 
 /**
@@ -87,7 +88,7 @@ function loadFullStack(extraCozyOS) {
     if (!global.crypto) { global.crypto = require('crypto').webcrypto; }
     [roots.secretRegistry, roots.encryptionManager, roots.secretManager, roots.typedManagers, roots.rotationHealth,
      roots.vaultEngine, roots.founderStory, roots.knowledgeRegistry, roots.publicKnowledgeSource, roots.memoryEngine,
-     roots.businessWorkspace, roots.cozyAi, roots.identityFaqRouter, roots.answerEngine
+     roots.businessWorkspace, roots.cozyAi, roots.identityFaqRouter, roots.answerEngine, roots.cozyLearn
     ].forEach((p) => require(p));
     return {
         window: fakeWindow,
@@ -96,7 +97,20 @@ function loadFullStack(extraCozyOS) {
         founderStory: fakeWindow.CozyOS.FounderStory,
         knowledge: fakeWindow.CozyOS.CozyKnowledge,
         workspace: fakeWindow.CozyOS.InterestOSBusinessWorkspace,
-        answerEngine: fakeWindow.CozyOS.CozyAnswerEngine
+        answerEngine: fakeWindow.CozyOS.CozyAnswerEngine,
+        learn: fakeWindow.CozyOS.CozyLearn
+    };
+}
+
+/** A richer, real-shaped application registry (ChurchOS/InterestOS/QuarryOS + the default MpesaOS) for the named-application routing tests below. */
+function makeMultiAppServiceRegistry() {
+    return {
+        listApplications: () => [
+            { id: 'mpesaos', name: 'MpesaOS' },
+            { id: 'churchos', name: 'ChurchOS' },
+            { id: 'interestos', name: 'InterestOS' },
+            { id: 'quarryos', name: 'QuarryOS' }
+        ]
     };
 }
 
@@ -602,6 +616,133 @@ await test('14j. Regression guard: CognitiveCoordinator\'s own internal "cogniti
     const ctx = await ai.getContext('unrelated gibberish question xyz123', { actorId: null });
     assert.strictEqual(ctx.results.some((r) => r.namespace === 'cognitive-default'), false, 'cognitive-default must never surface as context');
     assert.strictEqual(ctx.found, false, 'a genuinely empty context (aside from internal bookkeeping noise) must stay honestly empty');
+});
+
+/* ===================================================================
+   15. LIVE WINDOW APPLICATION SEMANTIC UNDERSTANDING REPAIR — a named,
+   real application's own human-purpose knowledge (already loaded,
+   already real, getApplicationDetailedInfoFact()) must be reachable
+   through getContext(), take priority over the generic platform-wide
+   application list / CozyOS purpose text, tolerate a genuine spelling
+   typo via the existing CozyLearn.levenshtein() primitive (no new
+   typo dictionary), and answer in the caller's real, resolved
+   language — all through the ONE real answerEngine.answer() chain,
+   no second AI/knowledge store/language engine of any kind.
+=================================================================== */
+await test('15a. A named, real application ("ChurchOS") resolves to its OWN human-purpose knowledge, tagged "application-knowledge"', async () => {
+    const { ai } = loadFullStack({ ServiceRegistry: makeMultiAppServiceRegistry() });
+    const ctx = await ai.getContext('How does ChurchOS help a church?', { actorId: null });
+    const hit = ctx.results.find((r) => r.authority === 'application-knowledge');
+    assert.ok(hit, 'expected a real application-knowledge result for ChurchOS');
+    assert.strictEqual(hit.evidence, 'VERIFIED');
+    assert.strictEqual(hit.applicationName, 'ChurchOS');
+    assert.match(hit.content, /church/i);
+});
+
+await test('15b. A named application question never falls back to the generic application list, even when the word "applications" appears in the question', async () => {
+    const { ai } = loadFullStack({ ServiceRegistry: makeMultiAppServiceRegistry() });
+    const ctx = await ai.getContext('InterestOS is among CozyOS applications, what does it help in real life solutions', { actorId: null });
+    const appHit = ctx.results.find((r) => r.authority === 'application-knowledge');
+    assert.ok(appHit, 'expected InterestOS\'s own knowledge to be reached');
+    assert.strictEqual(appHit.applicationName, 'InterestOS');
+    assert.strictEqual(ctx.results.some((r) => r.getter === 'listApplicationsFact'), false, 'the generic application list must not be the answer to a named-application question');
+});
+
+await test('15c. Generic "how many applications are available" (no application named) still resolves via the real, unmodified listApplicationsFact route', async () => {
+    const { ai } = loadFullStack({ ServiceRegistry: makeMultiAppServiceRegistry() });
+    const ctx = await ai.getContext('How many applications are available?', { actorId: null });
+    assert.strictEqual(ctx.results.some((r) => r.authority === 'application-knowledge'), false);
+    const listHit = ctx.results.find((r) => r.getter === 'listApplicationsFact');
+    assert.ok(listHit, 'the real application-list route must still work when no specific application is named');
+});
+
+await test('15d. Fuzzy spelling variation ("InteresOs") still resolves to the real, canonical InterestOS via the existing CozyLearn.levenshtein() primitive — no hand-built typo dictionary', async () => {
+    const { ai } = loadFullStack({ ServiceRegistry: makeMultiAppServiceRegistry() });
+    const ctx = await ai.getContext('InteresOs is among cozyos applications what does it help in real life solutions', { actorId: null });
+    const hit = ctx.results.find((r) => r.authority === 'application-knowledge');
+    assert.ok(hit, 'expected the fuzzy-matched InterestOS application-knowledge result');
+    assert.strictEqual(hit.applicationName, 'InterestOS');
+});
+
+await test('15e. Imperfect natural phrasing ("Hot. Does one benefit in churchOs") still resolves to ChurchOS\'s own benefit knowledge, not the honest-but-wrong fallback', async () => {
+    const { ai, answerEngine } = loadFullStack({ ServiceRegistry: makeMultiAppServiceRegistry() });
+    const ctx = await ai.getContext('Hot. Does one benefit in churchOs', { actorId: null });
+    const hit = ctx.results.find((r) => r.authority === 'application-knowledge');
+    assert.ok(hit, 'expected ChurchOS\'s own knowledge, not an empty context');
+    assert.strictEqual(hit.applicationName, 'ChurchOS');
+    const answerResult = await answerEngine.answer('Hot. Does one benefit in churchOs', { actorId: null });
+    assert.strictEqual(answerResult.evidenceState, 'VERIFIED');
+    assert.doesNotMatch(answerResult.answer, /Some related context exists|I don't have verified information/i);
+});
+
+await test('15f. language: "sw" reaches getApplicationDetailedInfoFact() with lang="sw" and returns real Kiswahili content, never a silent English substitution', async () => {
+    const { ai } = loadFullStack({ ServiceRegistry: makeMultiAppServiceRegistry() });
+    const ctxSw = await ai.getContext('ChurchOS inasaidiaje kanisa?', { actorId: null, language: 'sw' });
+    const hitSw = ctxSw.results.find((r) => r.authority === 'application-knowledge');
+    assert.ok(hitSw, 'expected a Kiswahili application-knowledge result for ChurchOS');
+    assert.match(hitSw.content, /kanisa/i, 'expected genuine Kiswahili substance');
+
+    const ctxEn = await ai.getContext('How does ChurchOS help a church?', { actorId: null, language: 'en' });
+    const hitEn = ctxEn.results.find((r) => r.authority === 'application-knowledge');
+    assert.notStrictEqual(hitSw.content, hitEn.content, 'Kiswahili and English answers must be genuinely different real text, not the same string with a language flag');
+});
+
+await test('15g. no language supplied: behavior defaults to English, exactly as before this repair (true no-op)', async () => {
+    const { ai } = loadFullStack({ ServiceRegistry: makeMultiAppServiceRegistry() });
+    const ctxNoLang = await ai.getContext('How does ChurchOS help a church?', { actorId: null });
+    const ctxEnLang = await ai.getContext('How does ChurchOS help a church?', { actorId: null, language: 'en' });
+    const a = ctxNoLang.results.find((r) => r.authority === 'application-knowledge');
+    const b = ctxEnLang.results.find((r) => r.authority === 'application-knowledge');
+    assert.strictEqual(a.content, b.content);
+});
+
+await test('15h. entityHint (a carried-forward conversational entity) resolves the same application-knowledge, even when the CURRENT question names no application of its own', async () => {
+    const { ai } = loadFullStack({ ServiceRegistry: makeMultiAppServiceRegistry() });
+    const ctx = await ai.getContext('What problem does it solve?', { actorId: null, entityHint: 'ChurchOS' });
+    const hit = ctx.results.find((r) => r.authority === 'application-knowledge');
+    assert.ok(hit, 'expected the carried-forward ChurchOS entity to resolve real application knowledge');
+    assert.strictEqual(hit.applicationName, 'ChurchOS');
+});
+
+await test('15i. An unregistered/nonexistent application name never fabricates application-knowledge, never throws', async () => {
+    const { ai } = loadFullStack({ ServiceRegistry: makeMultiAppServiceRegistry() });
+    const ctx = await ai.getContext('What does NonexistentAppXYZ help with?', { actorId: null });
+    assert.strictEqual(ctx.success, true);
+    assert.strictEqual(ctx.results.some((r) => r.authority === 'application-knowledge'), false);
+});
+
+await test('15j. No second AI/knowledge store: application-knowledge is composed from the SAME window.CozyOS.CozyKnowledge singleton every other authority in this file already uses', async () => {
+    const { window: win, ai, knowledge } = loadFullStack({ ServiceRegistry: makeMultiAppServiceRegistry() });
+    let called = false;
+    // window.CozyOS.CozyKnowledge is Object.freeze()'d (like every other
+    // real CozyOS facade), so the object's OWN properties can't be
+    // reassigned — replace which object the window.CozyOS.CozyKnowledge
+    // property points to instead (window.CozyOS itself is a plain,
+    // non-frozen object), the same valid interception technique used to
+    // instrument the real, frozen production objects during this
+    // repair's own browser audit.
+    win.CozyOS.CozyKnowledge = {
+        ...knowledge,
+        getApplicationDetailedInfoFact: function (...args) { called = true; return knowledge.getApplicationDetailedInfoFact.apply(knowledge, args); }
+    };
+    await ai.getContext('What does InterestOS help with?', { actorId: null });
+    assert.strictEqual(called, true, 'expected the composition to call the one real, existing CozyKnowledge getter, not a second store');
+});
+
+await test('15l. Fuzzy matching never false-positives on a real, correctly-spelled, unrelated word ("churches") that merely resembles an app name\'s prefix — regression guard for a real bug this repair found', async () => {
+    const { ai } = loadFullStack({ ServiceRegistry: makeMultiAppServiceRegistry() });
+    const ctx = await ai.getContext('How can cozyos helps churches', { actorId: null });
+    assert.strictEqual(ctx.results.some((r) => r.authority === 'application-knowledge'), false, '"churches" must never be treated as a typo of "ChurchOS"');
+    const platformHit = ctx.results.find((r) => r.getter === 'getWhyUseCozyOSFact');
+    assert.ok(platformHit, 'the real platform-level "help" route must still fire normally');
+});
+
+await test('15k. QuarryOS (a third, distinct application) resolves through the exact same universal mechanism as ChurchOS/InterestOS — no per-application code path', async () => {
+    const { ai } = loadFullStack({ ServiceRegistry: makeMultiAppServiceRegistry() });
+    const ctx = await ai.getContext('What does QuarryOS help with?', { actorId: null });
+    const hit = ctx.results.find((r) => r.authority === 'application-knowledge');
+    assert.ok(hit, 'expected QuarryOS\'s own real knowledge, the same universal mechanism as every other application');
+    assert.strictEqual(hit.applicationName, 'QuarryOS');
 });
 
 /* ===================================================================

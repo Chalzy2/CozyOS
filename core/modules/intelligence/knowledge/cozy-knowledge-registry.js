@@ -908,13 +908,19 @@
                 "losing important paperwork (a receipt, a contract, a delivery note) or having no safe place to keep it",
                 "forgetting what you told CozyOS to remind you about, with no single place to check what's still coming up",
                 "a completed reminder leaving its directive stuck showing as still active",
-                "having no simple way to give CozyOS a personal directive, teach it something, or track a goal outside of a single application"
+                "having no simple way to give CozyOS a personal directive, teach it something, or track a goal outside of a single application",
+                // Full Completion Phase 1 (Business Management Workspace) —
+                // real, shipped, tested capability, not a plan.
+                "no simple way to record what a small business is selling, buying, and spending without forcing it into someone else's fixed accounting template",
+                "not knowing, at a glance, whether the business made a profit this week/month/year, or what its current cash position is"
             ]),
             realLifeProblemsSw: Object.freeze([
                 "kupoteza hati muhimu (risiti, mkataba, noti ya uwasilishaji) au kutokuwa na mahali salama pa kuzitunza",
                 "kusahau ulichomwomba CozyOS akukumbushe, bila mahali pamoja pa kuangalia yale bado yanayokuja",
                 "kikumbusho kilichokamilika kuacha agizo lake likionekana bado hai",
-                "kutokuwa na njia rahisi ya kumpa CozyOS agizo la kibinafsi, kumfundisha kitu, au kufuatilia lengo nje ya programu moja"
+                "kutokuwa na njia rahisi ya kumpa CozyOS agizo la kibinafsi, kumfundisha kitu, au kufuatilia lengo nje ya programu moja",
+                "kutokuwa na njia rahisi ya kurekodi biashara ndogo inauza nini, inanunua nini, na inatumia nini bila kulazimishwa kwenye muundo wa uhasibu uliowekwa na mtu mwingine",
+                "kutojua, kwa haraka, kama biashara imepata faida wiki/mwezi/mwaka huu, au hali yake ya sasa ya fedha taslimu ilivyo"
             ]),
             whoBenefits: Object.freeze(["individual users", "small-business owners"]),
             whoBenefitsSw: Object.freeze(["watumiaji binafsi", "wamiliki wa biashara ndogo"]),
@@ -922,13 +928,17 @@
                 "one place to find a document again when it's needed, kept privately and only accessible to its real owner",
                 "a quick, honest answer to what you've asked CozyOS to remind you about, with a real way to close the loop once it's handled",
                 "confirm-before-persist directives, so an imperfect guess at what you meant is corrected by you before anything is saved",
-                "honestly labeled, user-taught knowledge (Teach Cozy) instead of an assumption presented as fact"
+                "honestly labeled, user-taught knowledge (Teach Cozy) instead of an assumption presented as fact",
+                "a flexible business table for recording products, stock, sales, and buying/cost information, with automatic revenue, cost, profit, expenses, savings, and cash-balance totals for daily, weekly, monthly, or yearly periods",
+                "real stock-movement tracking per product over a chosen period, computed only from what was actually recorded, never guessed"
             ]),
             humanBenefitsSw: Object.freeze([
                 "mahali pamoja pa kuipata tena hati inapohitajika, ikitunzwa kwa faragha na kufikiwa tu na mmiliki wake halisi",
                 "jibu la haraka na la kweli kuhusu ulichomwomba CozyOS akukumbushe, na njia halisi ya kukamilisha jambo hilo baada ya kulishughulikia",
                 "maagizo yanayothibitishwa kabla ya kuhifadhiwa, ili dhana isiyo kamili ya ulichomaanisha irekebishwe na wewe kabla ya kitu chochote kuhifadhiwa",
-                "maarifa yaliyofundishwa na mtumiaji (Teach Cozy) yaliyowekwa alama kwa uaminifu badala ya dhana inayowasilishwa kama ukweli"
+                "maarifa yaliyofundishwa na mtumiaji (Teach Cozy) yaliyowekwa alama kwa uaminifu badala ya dhana inayowasilishwa kama ukweli",
+                "jedwali linaloweza kubadilika la biashara kwa kurekodi bidhaa, hisa, mauzo, na taarifa za ununuzi/gharama, likiwa na jumla za moja kwa moja za mapato, gharama, faida, matumizi, akiba, na salio la fedha taslimu kwa vipindi vya kila siku, wiki, mwezi, au mwaka",
+                "ufuatiliaji halisi wa mzunguko wa hisa kwa kila bidhaa katika kipindi ulichochagua, ukihesabiwa tu kutoka kile kilichorekodiwa kwa uhalisia, kamwe si kubahatisha"
             ]),
             currentVerifiedCapabilities: Object.freeze([
                 "user directives with a confirm-before-persist draft step, backed by CozyMemory",
@@ -938,7 +948,8 @@
                 "My Reminders — a real, owner-isolated list read from the same records scheduleOneTimeReminder() writes, with a real 'Mark done' action",
                 "real business/construction/church Calculations, a pure passthrough to the existing FormulaRegistry/CalculationEngine",
                 "My Documents — real, durable, owner-isolated document list/save/search/upload/download via InterestOSDocumentsClient, personal for individual users and organization-scoped for company users",
-                "document attachment from three real, verified sources: Camera, Photos, and Files"
+                "document attachment from three real, verified sources: Camera, Photos, and Files",
+                "My Business — a real, flexible business management workspace (InterestOSBusinessWorkspace): user-defined tables and columns, optional role-tagged columns (product, date, buying price, selling price, quantity, expense, savings, payment status) driving automatic revenue/cost/profit/expenses/savings/cash-balance totals and per-product stock movement for a chosen daily/weekly/monthly/yearly period"
             ]),
             currentVerifiedCapabilitiesSw: Object.freeze([
                 "maagizo ya mtumiaji yenye hatua ya rasimu inayothibitishwa kabla ya kuhifadhiwa, yakitegemea CozyMemory",
@@ -948,7 +959,8 @@
                 "My Reminders — orodha halisi, iliyotengwa kwa mmiliki, inayosomwa kutoka rekodi zilezile scheduleOneTimeReminder() huandika, ikiwa na tendo halisi la 'Mark done'",
                 "uhesabuji halisi wa biashara/ujenzi/kanisa, muunganiko safi kwenye FormulaRegistry/CalculationEngine iliyopo",
                 "My Documents — orodha halisi, ya kudumu, iliyotengwa kwa mmiliki ya hati za kuorodhesha/kuhifadhi/kutafuta/kupakia/kupakua kupitia InterestOSDocumentsClient, ya binafsi kwa watumiaji binafsi na ya shirika kwa watumiaji wa kampuni",
-                "kuambatanisha hati kutoka vyanzo vitatu halisi, vilivyothibitishwa: Kamera, Picha, na Faili"
+                "kuambatanisha hati kutoka vyanzo vitatu halisi, vilivyothibitishwa: Kamera, Picha, na Faili",
+                "My Business — nafasi halisi, inayoweza kubadilika ya usimamizi wa biashara (InterestOSBusinessWorkspace): majedwali na safu zinazoundwa na mtumiaji, safu za hiari zenye majukumu (bidhaa, tarehe, bei ya ununuzi, bei ya mauzo, wingi, matumizi, akiba, hali ya malipo) zinazoendesha jumla za moja kwa moja za mapato/gharama/faida/matumizi/akiba/salio la fedha taslimu na mzunguko wa hisa kwa kila bidhaa kwa kipindi cha kila siku/wiki/mwezi/mwaka ulichochagua"
             ]),
             visionCapabilities: Object.freeze([
                 "PDF generation, OCR, sharing, and printing for documents",
