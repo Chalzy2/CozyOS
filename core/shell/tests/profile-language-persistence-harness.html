@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Profile language persistence harness</title>
+<!--
+  Real-browser harness for profile-language-persistence-browser.test.js.
+  Loads the REAL, unmodified production files in the order a page would:
+  IdentityStorage (real IndexedDB) and IdentityEngine, then the language
+  registry, the 2A-1 contract and the 2A-2 normalizer. It registers one
+  throwaway local user (or finds it again after a reload through the
+  engine's own restorePersistedUsers()). No UI. Not served to production users.
+-->
+</head>
+<body>
+<script src="/core/modules/identity/identity-storage.js"></script>
+<script src="/core/modules/identity/identity-engine.js"></script>
+<script src="/core/modules/intelligence/language-packs/cozy-language-pack-registry.js"></script>
+<script src="/core/shell/dashboard-profile-language-contract.js"></script>
+<script src="/core/shell/dashboard-profile-language-normalizer.js"></script>
+<script>
+(async function () {
+  try {
+    const IE = window.CozyOS.IdentityEngine;
+    await IE.ready;
+    const found = IE.getUserIdByUsername("langtester");
+    let userId = found && found.userId;
+    if (!userId) {
+      const r = await IE.register({ accountType: "user", firstName: "Charles", lastName: "Owuor", username: "langtester", email: "langtester@example.com", phone: "+254700000002", password: "Str0ng!Passw0rd", confirmPassword: "Str0ng!Passw0rd", acceptTerms: true, country: "Kenya" });
+      if (!r.available) throw new Error("register failed: " + r.reason);
+      userId = r.userId;
+    }
+    window.__langHarness = { ready: true, userId };
+  } catch (err) {
+    window.__langHarness = { ready: false, error: String((err && err.stack) || err) };
+  }
+})();
+</script>
+</body>
+</html>

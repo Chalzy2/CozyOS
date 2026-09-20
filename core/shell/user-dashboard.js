@@ -111,6 +111,21 @@
  *   explanation panel above it. The genuine missing dependency for a
  *   real free-text conversational backend is recorded, not hidden.
  *
+ * USER PROFILE PHASE 1 — WHAT CHANGED
+ *   #renderProfileSurface() is now a real, editable Profile: profile
+ *   picture (preview only), Full Name, Country, City, Save. Data comes
+ *   from IdentityEngine.getProfile()/updateProfile() (the existing user
+ *   record — no second profile store) and the pure-logic
+ *   core/shell/dashboard-profile-core.js. PICTURE: no user-scoped image
+ *   storage exists in CozyOS, so a chosen picture is a local preview
+ *   only (blob: URL, never stored, never sent anywhere) and the UI says
+ *   so; persistence is deferred to Profile Phase 2. NOT part of this
+ *   phase: languages spoken / mother languages / Teach CozyAI (a
+ *   separate language-profile phase), security settings, privacy.
+ *   Both engines degrade honestly: if the profile core or the engine's
+ *   getProfile()/updateProfile() are absent, the surface shows the
+ *   previous read-only readout and an explicit "not available" note.
+ *
  * MOUNTING
  *   Called once from index.html, replacing the prior honest placeholder
  *   for authenticated visitors. Renders into a container element passed
@@ -148,6 +163,9 @@
         #pinnedApps = [];
         #visibleApps = { available: false, applications: [] };
         #dashboardConfig = { available: false, reason: null };
+        #profileCurrent = null;
+        #profilePicture = null; // { url, name } — local blob: preview only, never persisted
+        #profileSaving = false;
 
         /**
          * render(container, userId)
@@ -1022,29 +1040,180 @@
         }
 
         /**
-         * #renderProfileSurface() — Level 1 Profile. Composes the real,
-         * existing window.CozyOS.IdentityEngine.getUser()/
-         * getDashboardConfig() — never a second identity/profile store.
-         * No profile-picture backend exists anywhere in this repository
-         * (confirmed by audit) — this surface does not fabricate one;
-         * it honestly labels the capability as not built.
+         * #renderProfileSurface() — Level 1 Profile, User Profile Phase 1.
+         *   Composes the real IdentityEngine.getUser() (read-only account
+         *   lines) and getProfile()/updateProfile() (the four editable
+         *   display fields) — never a second identity/profile store.
+         *   Picture: preview only (see header) — honestly labeled; the
+         *   "Not implemented" note is always rendered.
          */
         #renderProfileSurface() {
             const host = this.#container.querySelector("#cozy-ud-surface-profile");
             if (!host) return;
             const identity = window.CozyOS.IdentityEngine;
+            const core = window.CozyOS.DashboardProfileCore;
             let user = null;
             if (identity && typeof identity.getUser === "function") { try { user = identity.getUser(this.#userId); } catch (_err) { user = null; } }
+            let stored = null;
+            if (core && identity && typeof identity.getProfile === "function" && typeof identity.updateProfile === "function") {
+                try { const p = identity.getProfile(this.#userId); if (p && p.available) stored = p; } catch (_err) { stored = null; }
+            }
+            const current = stored ? core.fromStoredProfile(stored) : null;
+            this.#profileCurrent = current;
+
+            const accountLines = user ? `
+                <p class="cozy-disclosure-note">Username: ${escapeHtml(user.username)}</p>
+                <p class="cozy-disclosure-note">Status: ${escapeHtml(user.status)}</p>
+                <p class="cozy-disclosure-note">Dashboard type: ${escapeHtml((this.#dashboardConfig && this.#dashboardConfig.dashboardType) || "unknown")}</p>
+            ` : `<p class="cozy-disclosure-note">Profile data is not available right now.</p>`;
+
+            const pictureNote = core
+                ? `Not implemented — picture saving is deferred to ${escapeHtml(core.getPicturePersistenceStatus().deferredTo)}. Your choice below is a preview on this device only; it is not saved and will be gone after you leave this page.`
+                : `Not implemented — profile picture saving is not available yet.`;
+
+            const pic = this.#profilePicture;
+            const initials = current ? core.initialsFor(current.fullName) : "";
+            const pictureSection = `
+                <section id="cozy-ud-profile-picture" class="cozy-ud-profile-block">
+                    <h4>Profile Picture</h4>
+                    ${core ? `
+                    <div class="cozy-ud-avatar-row">
+                        <div id="cozy-ud-avatar" class="cozy-ud-avatar" role="img" aria-label="${pic ? "Profile picture preview" : "No profile picture chosen"}">${pic ? `<img src="${escapeHtml(pic.url)}" alt="Profile picture preview">` : (initials ? escapeHtml(initials) : "👤")}</div>
+                        <div class="cozy-ud-avatar-actions">
+                            <button type="button" class="cozy-btn" id="cozy-ud-avatar-choose" ${pic ? "hidden" : ""}>Choose Picture</button>
+                            <button type="button" class="cozy-btn" id="cozy-ud-avatar-replace" ${pic ? "" : "hidden"}>Replace Picture</button>
+                            <button type="button" class="cozy-btn" id="cozy-ud-avatar-remove" ${pic ? "" : "hidden"}>Remove</button>
+                        </div>
+                    </div>
+                    <input type="file" id="cozy-ud-avatar-file" accept="image/jpeg,image/png,image/webp" hidden>
+                    <p id="cozy-ud-avatar-error" class="cozy-ud-field-error" role="alert"></p>` : ``}
+                    <p class="cozy-disclosure-note">${pictureNote}</p>
+                </section>`;
+
+            let fieldsSection;
+            if (current) {
+                const countries = core.listCountries();
+                const keepOption = current.countryListed ? "" : `<option value="${escapeHtml(core.KEEP_CURRENT_COUNTRY)}" selected>${escapeHtml(current.countryRaw)} (current)</option>`;
+                fieldsSection = `
+                <section id="cozy-ud-profile-fields" class="cozy-ud-profile-block">
+                    <label class="cozy-ud-field-label" for="cozy-ud-profile-fullname">Full Name</label>
+                    <input type="text" id="cozy-ud-profile-fullname" class="cozy-living-input" maxlength="${core.LIMITS.fullName}" autocomplete="name" value="${escapeHtml(current.fullName)}">
+                    <p id="cozy-ud-profile-fullname-error" class="cozy-ud-field-error" role="alert"></p>
+                    <label class="cozy-ud-field-label" for="cozy-ud-profile-country">Country</label>
+                    <select id="cozy-ud-profile-country" class="cozy-living-input" autocomplete="country">
+                        <option value="" ${current.countryRaw ? "" : "selected"}>Select country</option>
+                        ${keepOption}
+                        ${countries.map(c => `<option value="${escapeHtml(c.code)}" ${current.countryListed && c.code === current.countryCode ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}
+                    </select>
+                    <p id="cozy-ud-profile-country-error" class="cozy-ud-field-error" role="alert"></p>
+                    <label class="cozy-ud-field-label" for="cozy-ud-profile-city">City</label>
+                    <input type="text" id="cozy-ud-profile-city" class="cozy-living-input" maxlength="${core.LIMITS.city}" autocomplete="address-level2" value="${escapeHtml(current.city)}">
+                    <p id="cozy-ud-profile-city-error" class="cozy-ud-field-error" role="alert"></p>
+                    <button type="button" class="cozy-btn cozy-btn-primary" id="cozy-ud-profile-save">Save Profile</button>
+                    <p id="cozy-ud-profile-status" class="cozy-disclosure-note" role="status" aria-live="polite"></p>
+                </section>`;
+            } else {
+                fieldsSection = `<p class="cozy-disclosure-note">Profile editing is not available right now.</p>`;
+            }
+
             host.innerHTML = `
                 <h3>Profile</h3>
-                ${user ? `
-                    <p class="cozy-disclosure-note">Username: ${escapeHtml(user.username)}</p>
-                    <p class="cozy-disclosure-note">Status: ${escapeHtml(user.status)}</p>
-                    <p class="cozy-disclosure-note">Dashboard type: ${escapeHtml((this.#dashboardConfig && this.#dashboardConfig.dashboardType) || "unknown")}</p>
-                ` : `<p class="cozy-disclosure-note">Profile data is not available right now.</p>`}
-                <h4>Profile Picture</h4>
-                <p class="cozy-disclosure-note">Not implemented — no profile-picture backend exists in CozyOS yet. This is a vision capability, not a current one.</p>
+                <div id="cozy-ud-profile-card">
+                    ${pictureSection}
+                    ${fieldsSection}
+                    <section id="cozy-ud-profile-account" class="cozy-ud-profile-block">
+                        <h4>Account</h4>
+                        ${accountLines}
+                    </section>
+                </div>
             `;
+            if (core) this.#wireProfileSurface(host, core, identity);
+        }
+
+        /** #wireProfileSurface() — picture preview + Save handlers. Every message goes through escapeHtml; nothing here reads GPS/IP/locale. */
+        #wireProfileSurface(host, core, identity) {
+            const say = (sel, msg) => { const el = host.querySelector(sel); if (el) el.innerHTML = escapeHtml(msg || ""); };
+            const paintAvatar = () => {
+                const avatar = host.querySelector("#cozy-ud-avatar");
+                if (!avatar) return;
+                const pic = this.#profilePicture;
+                const initials = this.#profileCurrent ? core.initialsFor(this.#profileCurrent.fullName) : "";
+                avatar.setAttribute("aria-label", pic ? "Profile picture preview" : "No profile picture chosen");
+                avatar.innerHTML = pic ? `<img src="${escapeHtml(pic.url)}" alt="Profile picture preview">` : (initials ? escapeHtml(initials) : "👤");
+                const choose = host.querySelector("#cozy-ud-avatar-choose");
+                const replace = host.querySelector("#cozy-ud-avatar-replace");
+                const remove = host.querySelector("#cozy-ud-avatar-remove");
+                if (choose) choose.hidden = !!pic;
+                if (replace) replace.hidden = !pic;
+                if (remove) remove.hidden = !pic;
+                const img = avatar.querySelector("img");
+                if (img) img.addEventListener("error", () => { this.#dropProfilePicture(); paintAvatar(); say("#cozy-ud-avatar-error", "That file could not be displayed as a picture."); });
+            };
+            const fileInput = host.querySelector("#cozy-ud-avatar-file");
+            const pick = () => { if (fileInput && typeof fileInput.click === "function") fileInput.click(); };
+            const chooseBtn = host.querySelector("#cozy-ud-avatar-choose");
+            const replaceBtn = host.querySelector("#cozy-ud-avatar-replace");
+            const removeBtn = host.querySelector("#cozy-ud-avatar-remove");
+            if (chooseBtn) chooseBtn.addEventListener("click", pick);
+            if (replaceBtn) replaceBtn.addEventListener("click", pick);
+            if (removeBtn) removeBtn.addEventListener("click", () => {
+                this.#dropProfilePicture();
+                if (fileInput) fileInput.value = "";
+                say("#cozy-ud-avatar-error", "");
+                paintAvatar();
+            });
+            if (fileInput) fileInput.addEventListener("change", () => {
+                const file = fileInput.files && fileInput.files[0];
+                if (!file) return;
+                const check = core.validateProfilePicture(file);
+                if (!check.valid) { say("#cozy-ud-avatar-error", check.reason); fileInput.value = ""; return; }
+                let url = null;
+                try { if (typeof URL !== "undefined" && typeof URL.createObjectURL === "function") url = URL.createObjectURL(file); } catch (_err) { url = null; }
+                if (!url) { say("#cozy-ud-avatar-error", "This browser cannot preview pictures."); fileInput.value = ""; return; }
+                this.#dropProfilePicture();
+                this.#profilePicture = { url, name: String(file.name || "") };
+                say("#cozy-ud-avatar-error", "");
+                paintAvatar();
+            });
+            paintAvatar();
+
+            const saveBtn = host.querySelector("#cozy-ud-profile-save");
+            if (!saveBtn) return;
+            const nameEl = host.querySelector("#cozy-ud-profile-fullname");
+            const countryEl = host.querySelector("#cozy-ud-profile-country");
+            const cityEl = host.querySelector("#cozy-ud-profile-city");
+            const onEnter = (e) => { if (e && e.key === "Enter") saveBtn.click(); };
+            if (nameEl) nameEl.addEventListener("keydown", onEnter);
+            if (cityEl) cityEl.addEventListener("keydown", onEnter);
+            saveBtn.addEventListener("click", async () => {
+                if (this.#profileSaving) return;
+                const result = core.validateProfileInput({ fullName: nameEl ? nameEl.value : "", countryCode: countryEl ? countryEl.value : "", city: cityEl ? cityEl.value : "" }, this.#profileCurrent);
+                say("#cozy-ud-profile-fullname-error", result.errors.fullName);
+                say("#cozy-ud-profile-country-error", result.errors.country);
+                say("#cozy-ud-profile-city-error", result.errors.city);
+                say("#cozy-ud-profile-status", "");
+                if (!result.valid) return;
+                if (!Object.keys(result.changes).length) { say("#cozy-ud-profile-status", "No changes to save."); return; }
+                this.#profileSaving = true;
+                saveBtn.disabled = true;
+                let outcome;
+                try { outcome = await identity.updateProfile(this.#userId, result.changes); }
+                catch (err) { outcome = { available: false, reason: err && err.message ? err.message : "Unexpected error." }; }
+                this.#profileSaving = false;
+                saveBtn.disabled = false;
+                if (!outcome || outcome.available !== true) { say("#cozy-ud-profile-status", `Could not save your profile: ${(outcome && outcome.reason) || "unknown reason"}`); return; }
+                try { const p = identity.getProfile(this.#userId); if (p && p.available) this.#profileCurrent = core.fromStoredProfile(p); } catch (_err) { /* keep previous baseline */ }
+                paintAvatar();
+                say("#cozy-ud-profile-status", outcome.persisted ? "Profile saved." : `Saved for this session only — this device could not store it permanently${outcome.persistReason ? ` (${outcome.persistReason})` : ""}.`);
+            });
+        }
+
+        /** #dropProfilePicture() — revokes the local blob: preview URL so nothing lingers in memory. */
+        #dropProfilePicture() {
+            if (this.#profilePicture && this.#profilePicture.url) {
+                try { if (typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") URL.revokeObjectURL(this.#profilePicture.url); } catch (_err) { /* nothing to revoke */ }
+            }
+            this.#profilePicture = null;
         }
 
         /**

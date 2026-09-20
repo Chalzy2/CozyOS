@@ -1264,6 +1264,178 @@
         }
 
         /**
+         * getProfile(userId) / updateProfile(userId, changes)
+         *   User Profile Phase 1 — real, additive. The Profile surface
+         *   (core/shell/user-dashboard.js) needs to read and edit four
+         *   plain display fields on the user record: firstName,
+         *   lastName, country, city. Follows setLanguagePreference()'s
+         *   exact precedent: same "users" IdentityStorage store (no
+         *   schema/version bump), same record, no new store.
+         *
+         *   DELIBERATELY NOT getUser(): getUser() is consumed by many
+         *   unrelated modules (living-ai-context-engine, memory engine,
+         *   ChurchOS, ...). Adding name/city to it would widen what
+         *   every one of them can read. getProfile() is a separate,
+         *   narrow getter used only by the Profile surface.
+         *
+         *   updateProfile() is fail-closed and whitelist-only: unknown
+         *   userId -> { available:false }; any key other than the four
+         *   above (username, email, phone, roles, hash, salt, status,
+         *   ...) is REJECTED, never silently applied; values must be
+         *   text (country/city may be null to clear); length-capped;
+         *   control characters stripped; text is HTML-escaped on store
+         *   exactly as register() does for firstName/lastName. All
+         *   fields are validated before any is assigned, so a rejected
+         *   call changes nothing. The audit entry records WHICH fields
+         *   changed, never their values.
+         *
+         *   PROFILE PHASE 2A-3 EXTENSION: motherLanguages / languagesKnown are
+         *   now accepted too, but ONLY as a pair validated by the 2A-2
+         *   normalizer, and such a request is all-or-nothing — see the
+         *   2A-3 block below (it changes nothing about the four fields above
+         *   when a request has no language fields).
+         *
+         *   HONEST LIMIT: like setLanguagePreference(), this trusts the
+         *   userId its local caller supplies (the dashboard passes the
+         *   AuthCoordinator session's userId). There is no server-side
+         *   profile authority yet; that belongs to Profile Phase 2.
+         *   `persisted` in the result reports honestly whether
+         *   IdentityStorage confirmed the write.
+         */
+        getProfile(userId) {
+            const user = this.#users.get(userId);
+            if (!user) return { available: false, reason: `No real user found with id "${userId}".` };
+            return {
+                available: true,
+                firstName: user.firstName ?? null, lastName: user.lastName ?? null, country: user.country ?? null, city: user.city ?? null,
+                // Profile Phase 2A-3: always arrays. A record saved before these fields existed reads as [] / [].
+                motherLanguages: this.#storedLanguageList(user.motherLanguages),
+                languagesKnown: this.#storedLanguageList(user.languagesKnown)
+            };
+        }
+
+        /**
+         * Profile Phase 2A-3 — the two language lists, persisted through this
+         * same record and the same "users" IdentityStorage store (no new
+         * store, no schema change). Ownership stays separated:
+         *   dashboard-profile-language-contract.js   what languages exist (reads CozyLanguagePacks)
+         *   dashboard-profile-language-normalizer.js is this language profile valid?
+         *   identity-engine.js (here)                can this VALID profile be persisted?
+         *   IdentityStorage                          where is it stored?
+         * The engine holds NO language logic: it hands the lists to
+         * window.CozyOS.DashboardProfileLanguageNormalizer and persists only
+         * what comes back ok:true. If the normalizer (or, through it, the
+         * registry/contract) is unavailable, a request that includes language
+         * fields is REJECTED — it never falls back to saving unvalidated ids.
+         * Reading needs none of that: getProfile() only returns what was stored.
+         *
+         * A request that includes either language field is ALL-OR-NOTHING:
+         *   - rejected by the normalizer (ok:false)  -> nothing applied, nothing
+         *     saved (not the other language field, not firstName/city/... in the
+         *     same call); `languages.rejected` lists every offending value.
+         *   - storage refuses / throws / is absent     -> every field in the call
+         *     is restored to its previous value, the result says so
+         *     (available:false, persisted:false) and success is never claimed.
+         * A partial request (only one language field) is merged with the stored
+         * value of the other before normalizing, so mother ⊆ known always holds
+         * for the stored record. Requests WITHOUT language fields keep the exact
+         * Phase 1 behavior above (including its session-only persisted:false).
+         * `languagePreference` (the interface language) is not an editable
+         * profile field: it is never read, written or derived here.
+         * Profile writes are queued one at a time so a rollback can never
+         * overwrite a concurrent update.
+         */
+        #profileWriteQueue = Promise.resolve();
+
+        #storedLanguageList(value) { return Array.isArray(value) ? value.filter((v) => typeof v === "string") : []; }
+
+        #stageLanguageFields(user, changes) {
+            const has = (k) => Object.prototype.hasOwnProperty.call(changes, k);
+            const reject = (reason, rejected, text) => ({ ok: false, failure: { available: false, reason: `updateProfile(): ${text}`, languages: { ok: false, reason, rejected } } });
+            const normalizer = window.CozyOS && window.CozyOS.DashboardProfileLanguageNormalizer;
+            if (!normalizer || typeof normalizer.normalizeLanguageProfile !== "function") {
+                return reject("NORMALIZER_UNAVAILABLE", [], "language fields cannot be saved because the language normalizer is not loaded; nothing was saved.");
+            }
+            const merged = {
+                motherLanguages: has("motherLanguages") ? changes.motherLanguages : this.#storedLanguageList(user.motherLanguages),
+                languagesKnown: has("languagesKnown") ? changes.languagesKnown : this.#storedLanguageList(user.languagesKnown)
+            };
+            let result = null;
+            try { result = normalizer.normalizeLanguageProfile(merged); } catch (_err) { result = null; }
+            const p = result && result.ok === true ? result.profile : null;
+            const valid = !!p && Array.isArray(p.motherLanguages) && Array.isArray(p.languagesKnown)
+                && p.motherLanguages.concat(p.languagesKnown).every((id) => typeof id === "string" && id.length > 0);
+            if (!valid) {
+                const why = (result && result.reason) || "NORMALIZER_ERROR";
+                const rejected = result && Array.isArray(result.rejected) ? result.rejected.map((r) => ({ ...r })) : [];
+                return reject(why, rejected, `language fields were rejected (${why}); nothing was saved.`);
+            }
+            return { ok: true, motherLanguages: p.motherLanguages.slice(), languagesKnown: p.languagesKnown.slice() };
+        }
+
+        updateProfile(userId, changes) {
+            const run = this.#profileWriteQueue.then(() => this.#applyProfileUpdate(userId, changes));
+            this.#profileWriteQueue = run.then(() => undefined, () => undefined);
+            return run;
+        }
+
+        async #applyProfileUpdate(userId, changes) {
+            const user = this.#users.get(userId);
+            if (!user) return { available: false, reason: `No real user found with id "${userId}".` };
+            if (!changes || typeof changes !== "object" || Array.isArray(changes)) return { available: false, reason: "updateProfile(): changes must be an object." };
+            const LIMITS = { firstName: 100, lastName: 100, country: 80, city: 80 };
+            const NULLABLE = { firstName: false, lastName: false, country: true, city: true };
+            const LANGUAGE_KEYS = ["motherLanguages", "languagesKnown"];
+            const staged = {};
+            for (const key of Object.keys(changes)) {
+                if (LANGUAGE_KEYS.includes(key)) continue; // validated as a pair by the normalizer, below
+                if (!Object.prototype.hasOwnProperty.call(LIMITS, key)) return { available: false, reason: `updateProfile(): field "${key}" is not an editable profile field.` };
+                const value = changes[key];
+                if (value === null) {
+                    if (!NULLABLE[key]) return { available: false, reason: `updateProfile(): ${key} cannot be cleared.` };
+                    staged[key] = null;
+                    continue;
+                }
+                if (typeof value !== "string") return { available: false, reason: `updateProfile(): ${key} must be text.` };
+                const clean = value.replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim();
+                if (clean.length > LIMITS[key]) return { available: false, reason: `updateProfile(): ${key} must be ${LIMITS[key]} characters or fewer.` };
+                if (key === "firstName" && !clean) return { available: false, reason: "updateProfile(): firstName cannot be empty." };
+                if (key === "lastName") staged[key] = this.#escapeHtml(clean);
+                else staged[key] = clean ? this.#escapeHtml(clean) : null;
+            }
+            const languageRequest = LANGUAGE_KEYS.some((k) => Object.prototype.hasOwnProperty.call(changes, k));
+            if (languageRequest) {
+                const lang = this.#stageLanguageFields(user, changes);
+                if (!lang.ok) return lang.failure;
+                staged.motherLanguages = lang.motherLanguages;
+                staged.languagesKnown = lang.languagesKnown;
+            }
+            const updated = Object.keys(staged);
+            if (!updated.length) return { available: true, updated: [], persisted: true };
+            const previous = languageRequest ? updated.map((k) => [k, Object.prototype.hasOwnProperty.call(user, k), user[k]]) : null;
+            for (const key of updated) user[key] = staged[key];
+            if (!languageRequest) this.#logAudit("PROFILE_UPDATED", `${user.username}: ${updated.join(", ")}`);
+            let persisted = false, persistReason = null;
+            const storage = window.CozyOS.IdentityStorage;
+            if (storage && typeof storage.save === "function") {
+                try {
+                    const r = await storage.save("users", user);
+                    persisted = !!(r && r.success);
+                    if (!persisted) persistReason = (r && r.reason) || "IdentityStorage did not confirm the save.";
+                } catch (err) { persistReason = err && err.message ? err.message : "IdentityStorage save failed."; }
+            } else { persistReason = "IdentityStorage is not loaded."; }
+            if (languageRequest) {
+                if (!persisted) {
+                    for (const [k, had, value] of previous) { if (had) user[k] = value; else delete user[k]; }
+                    this.#logAudit("PROFILE_UPDATE_ROLLED_BACK", `${user.username}: ${updated.join(", ")}`);
+                    return { available: false, reason: "updateProfile(): the profile could not be stored, so nothing was changed.", persisted: false, persistReason };
+                }
+                this.#logAudit("PROFILE_UPDATED", `${user.username}: ${updated.join(", ")}`);
+            }
+            return persisted ? { available: true, updated, persisted: true } : { available: true, updated, persisted: false, persistReason };
+        }
+
+        /**
          * assignCompanyReference(userId, {companyId, branchId, departmentId, teamId})
          *   Real, additive fix for a genuine interface gap: createUser()
          *   never stored these references. This engine stores the

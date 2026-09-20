@@ -579,6 +579,23 @@
      boundary decision. Composes IdentityEngine.getDashboardConfig()'s
      real isPlatformAdmin field only - see that file's own header. -->
 <script src="core/shell/dashboard-settings-admin-boundary-core.js"></script>
+<!-- Profile Phase 2A-4 — the existing, already-verified 2A-1/2A-2/2A-3
+     language stack (Profile 2A-3 audit finding 1) was never loaded on
+     this page, so every language save was rejected by design
+     (REGISTRY_UNAVAILABLE / CONTRACT_UNAVAILABLE / NORMALIZER_UNAVAILABLE).
+     No file below is new or modified; this only adds their script
+     tags in the order their own headers require: language pack
+     registry (Tier 1 identity authority) -> 2A-1 contract (reads the
+     registry) -> 2A-2 normalizer (calls the 2A-1 contract). Must load
+     before user-dashboard.js and before identity-engine.js is used
+     (identity-engine.js is already loaded above, but only checks the
+     normalizer's presence at call time, so load order relative to it
+     does not matter — this must simply be in place before any save). -->
+<script src="core/modules/intelligence/language-packs/cozy-language-pack-registry.js"></script>
+<script src="core/shell/dashboard-profile-language-contract.js"></script>
+<script src="core/shell/dashboard-profile-language-normalizer.js"></script>
+<!-- User Profile Phase 1: pure-logic Profile surface helpers (ISO country list, name mapping, validation). Loads before user-dashboard.js, which composes it. -->
+<script src="core/shell/dashboard-profile-core.js"></script>
 <link rel="stylesheet" href="core/shell/user-dashboard.css">
 <script src="core/shell/learning-panel-ui.js"></script>
 <script src="core/shell/user-dashboard.js"></script>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Profile Phase 1 harness</title>
+<!--
+  Real-browser harness for core/shell/tests/profile-phase1-browser.test.js.
+  Loads the REAL, unmodified production files (same stylesheets and the
+  same script order dashboard.html uses for these pieces): the real
+  IdentityEngine + IdentityStorage (real IndexedDB), the real
+  DashboardNavigationCore, DashboardProfileCore and UserDashboard. It
+  registers one throwaway local user (or reuses it after a reload, via
+  the engine's own restorePersistedUsers()) and mounts the dashboard on
+  the Profile surface. Nothing here is served to production users.
+-->
+<link rel="stylesheet" href="/core/ui/cozy-tokens.css">
+<link rel="stylesheet" href="/core/living/cozy-living.css">
+<link rel="stylesheet" href="/core/shell/user-dashboard.css">
+<style>body { margin: 0; }</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="/core/modules/identity/identity-storage.js"></script>
+<script src="/core/modules/identity/identity-engine.js"></script>
+<script src="/core/shell/dashboard-navigation-core.js"></script>
+<script src="/core/shell/dashboard-profile-core.js"></script>
+<script src="/core/shell/user-dashboard.js"></script>
+<script>
+(async function () {
+  try {
+    const IE = window.CozyOS.IdentityEngine;
+    await IE.ready;
+    let found = IE.getUserIdByUsername("profiletester");
+    let userId = found && found.userId;
+    if (!userId) {
+      const r = await IE.register({ accountType: "user", firstName: "Charles", lastName: "Owuor", username: "profiletester", email: "profiletester@example.com", phone: "+254700000001", password: "Str0ng!Passw0rd", confirmPassword: "Str0ng!Passw0rd", acceptTerms: true });
+      if (!r.available) throw new Error("register failed: " + r.reason);
+      userId = r.userId;
+    }
+    await window.CozyOS.UserDashboard.render(document.getElementById("root"), userId);
+    window.CozyOS.DashboardNavigationCore.switchTo("profile");
+    window.__profileHarness = { ready: true, userId };
+  } catch (err) {
+    window.__profileHarness = { ready: false, error: String(err && err.stack || err) };
+  }
+})();
+</script>
+</body>
+</html>
