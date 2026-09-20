@@ -466,4 +466,70 @@ test('LIVE WINDOW E2E: Kiswahili CozyOS purpose/benefit phrasings resolve to rea
     }
 });
 
+// LIVE WINDOW INCOGNITO REPAIR — real-DOM regression guard for the
+// exact bug report: an anonymous/incognito visitor (openLiveWindow()
+// below never signs in — no window.CozyOS.Session.current().uid at
+// all, the real incognito shape) asking a general "know more about
+// CozyOS" question after a plain greeting must reach real, verified
+// CozyOS application/public knowledge, never the confusing
+// "Some related context exists..." fallback the bug report observed.
+// Every answer below is read back from the real rendered DOM after a
+// real "Enter" keypress — the same actual chat text a human using
+// dashboard.html would see, never a direct module call.
+test('LIVE WINDOW E2E (INCOGNITO REPAIR): an anonymous visitor asking to know more about CozyOS after a greeting gets a real, verified explanation', async () => {
+    const { browser, page } = await openLiveWindow();
+    try {
+        const isAnonymous = await page.evaluate(() => {
+            const s = window.CozyOS && window.CozyOS.Session;
+            return !(s && typeof s.current === 'function' && s.current() && s.current().uid);
+        });
+        assert.equal(isAnonymous, true, 'this test requires a real anonymous/incognito-equivalent session (no signed-in uid)');
+
+        const greeting = await ask(page, 'Hello good evening');
+        assert.match(greeting, /good evening/i);
+
+        const messageCountBefore = await page.$$eval('#cozy-living-assistant-messages > *', (els) => els.length);
+
+        const answer = await ask(page, 'I want to know more about CozyOS');
+        assert.doesNotMatch(answer, /Some related context exists/i, `anonymous general-information question leaked the internal fallback: "${answer}"`);
+        assert.doesNotMatch(answer, /I don't have verified information/i, `real, verified CozyOS knowledge should have been found, got: "${answer}"`);
+        assert.match(answer, /CozyOS/i, `expected a real CozyOS explanation, got: "${answer}"`);
+
+        const messageCountAfter = await page.$$eval('#cozy-living-assistant-messages > *', (els) => els.length);
+        assert.equal(messageCountAfter - messageCountBefore, 2, 'exactly one user message and one assistant reply must be appended — no duplicate assistant/system invoked');
+
+        // Equivalent EN phrasings from the same anonymous session.
+        for (const q of ['What is CozyOS?', 'Tell me about CozyOS.', 'What can CozyOS do?']) {
+            const r = await ask(page, q);
+            assert.doesNotMatch(r, /Some related context exists/i, `"${q}" leaked the internal fallback for an anonymous visitor: "${r}"`);
+            assert.match(r, /CozyOS/i, `expected "${q}" to answer about CozyOS, got: "${r}"`);
+        }
+    } finally {
+        await browser.close();
+    }
+});
+
+test('LIVE WINDOW E2E (INCOGNITO REPAIR): "CozyOS ni nini?" answers in real Kiswahili for an anonymous visitor', async () => {
+    const { browser, page } = await openLiveWindow();
+    try {
+        const r = await ask(page, 'CozyOS ni nini?');
+        assert.doesNotMatch(r, /Some related context exists/i);
+        assert.match(r, /CozyOS|Charles/i);
+        assert.match(r, /kuunda|jamii|mtandao|teknolojia/i, `expected real Kiswahili content, got: "${r}"`);
+    } finally {
+        await browser.close();
+    }
+});
+
+test('LIVE WINDOW E2E (INCOGNITO REPAIR): an anonymous visitor asking an unsupported factual question still gets the honest fallback, not a fabricated answer', async () => {
+    const { browser, page } = await openLiveWindow();
+    try {
+        const r = await ask(page, 'What is the airspeed velocity of an unladen swallow?');
+        assert.doesNotMatch(r, /Some related context exists/i);
+        assert.doesNotMatch(r, /CozyOS exists to solve practical/i, 'must never fabricate an on-topic answer for an off-topic question');
+    } finally {
+        await browser.close();
+    }
+});
+
 console.log('Live Window real-browser end-to-end suite: run complete.');

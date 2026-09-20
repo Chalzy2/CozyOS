@@ -153,7 +153,19 @@
                 // (answerWhyCreated(), unchanged), no new prose.
                 "chimbuko la cozyos", "asili ya cozyos", "chanzo cha cozyos",
                 "nieleze kuhusu chimbuko la cozyos", "nieleze kuhusu asili ya cozyos",
-                "nieleze kuhusu cozyos", "eleza kuhusu cozyos", "niambie hadithi ya cozyos"]
+                "nieleze kuhusu cozyos", "eleza kuhusu cozyos", "niambie hadithi ya cozyos",
+                // LIVE WINDOW INCOGNITO REPAIR — real, previously-
+                // unmatched bare "what is CozyOS" Kiswahili phrasing
+                // ("CozyOS ni nini?"). "ni"/"nini" are both stopworded
+                // out of the word-overlap scorer (see OVERLAP_STOPWORDS
+                // above), so this bare form had zero distinguishing
+                // vocabulary to match against ANY trigger and fell all
+                // the way through to CozyAI.getContext()'s own
+                // English-only knowledge-registry path. Same
+                // already-answered general-information question
+                // (answerWhyCreated(), real Kiswahili prose, unchanged)
+                // — not a new intent, not new prose.
+                "cozyos ni nini"]
         },
         [INTENTS.COZYOS_MISSION]: {
             en: ["what is cozyos's mission", "what is the mission of cozyos", "what does cozyos aim to achieve",

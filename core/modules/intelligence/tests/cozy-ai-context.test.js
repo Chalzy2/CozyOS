@@ -35,7 +35,10 @@ async function test(name, fn) {
 }
 
 function makeFakeDeveloperIdentity() {
-    return { answerWhoCreatedYou() { return { known: true, answer: 'CozyOS was founded by Test Founder.' }; } };
+    return {
+        answerWhoCreatedYou() { return { known: true, answer: 'CozyOS was founded by Test Founder.' }; },
+        answerWhyCreated() { return { known: true, answer: 'CozyOS was created to solve real community problems.' }; }
+    };
 }
 function makeFakeServiceRegistry() {
     return { listApplications: () => [{ id: 'mpesaos', name: 'MpesaOS' }] };
@@ -57,9 +60,12 @@ const roots = {
     vaultEngine: path.join(__dirname, '..', '..', 'vault', 'cozy-vault-engine.js'),
     founderStory: path.join(__dirname, '..', '..', 'founder-story', 'founder-story-engine.js'),
     knowledgeRegistry: path.join(__dirname, '..', 'knowledge', 'cozy-knowledge-registry.js'),
+    publicKnowledgeSource: path.join(__dirname, '..', 'knowledge', 'cozy-public-knowledge-source.js'),
     memoryEngine: path.join(__dirname, '..', '..', 'memory', 'cozy-memory-engine.js'),
     businessWorkspace: path.join(__dirname, '..', '..', '..', 'plugins', 'interestOS-business-workspace.js'),
-    cozyAi: path.join(__dirname, '..', 'cozy-ai.js')
+    cozyAi: path.join(__dirname, '..', 'cozy-ai.js'),
+    identityFaqRouter: path.join(__dirname, '..', '..', 'knowledge', 'cozyos-identity-faq-router.js'),
+    answerEngine: path.join(__dirname, '..', 'answer', 'cozy-answer-engine.js')
 };
 
 /**
@@ -80,7 +86,8 @@ function loadFullStack(extraCozyOS) {
     global.window = fakeWindow;
     if (!global.crypto) { global.crypto = require('crypto').webcrypto; }
     [roots.secretRegistry, roots.encryptionManager, roots.secretManager, roots.typedManagers, roots.rotationHealth,
-     roots.vaultEngine, roots.founderStory, roots.knowledgeRegistry, roots.memoryEngine, roots.businessWorkspace, roots.cozyAi
+     roots.vaultEngine, roots.founderStory, roots.knowledgeRegistry, roots.publicKnowledgeSource, roots.memoryEngine,
+     roots.businessWorkspace, roots.cozyAi, roots.identityFaqRouter, roots.answerEngine
     ].forEach((p) => require(p));
     return {
         window: fakeWindow,
@@ -88,7 +95,8 @@ function loadFullStack(extraCozyOS) {
         memory: fakeWindow.CozyOS.CozyMemory,
         founderStory: fakeWindow.CozyOS.FounderStory,
         knowledge: fakeWindow.CozyOS.CozyKnowledge,
-        workspace: fakeWindow.CozyOS.InterestOSBusinessWorkspace
+        workspace: fakeWindow.CozyOS.InterestOSBusinessWorkspace,
+        answerEngine: fakeWindow.CozyOS.CozyAnswerEngine
     };
 }
 
@@ -504,6 +512,96 @@ await test('13e. InterestOSBusinessWorkspace not loaded: getContext() degrades h
     const ctx = await window.CozyOS.CozyAI.getContext('What is my profit?', { actorId: 'shopOwner', businessContext: { tableId: 'bizt_1', period: 'monthly' } });
     assert.strictEqual(ctx.success, true);
     assert.strictEqual(ctx.results.some((r) => r.authority === 'interestos-business'), false);
+});
+
+/* ===================================================================
+   14. LIVE WINDOW INCOGNITO REPAIR — anonymous/public-knowledge
+   regression suite. Proves the real, full production chain
+   (CozyIdentityFAQRouter -> CozyAI.getContext() -> CozyAnswerEngine.
+   answer(), the SAME unmodified function InterestOS's "Ask CozyAI" and
+   the Live Window both call) reaches real, VERIFIED CozyOS application/
+   public knowledge for an anonymous actor (actorId: null), for the
+   exact bug-reported phrasing and its documented equivalents, while
+   personal-memory restriction and the honest-empty-state fallback for
+   genuinely unsupported questions remain fully intact. No second
+   CozyAI, no incognito-specific knowledge store — every assertion below
+   calls the one real, shared answerEngine.answer().
+=================================================================== */
+const PUBLIC_KNOWLEDGE_QUESTIONS = [
+    'What is CozyOS?',
+    'Tell me about CozyOS.',
+    'CozyOS inafanya nini?',
+    'Why was CozyOS created?',
+    'What can CozyOS do?',
+    'I want to know more about CozyOS'
+];
+
+for (const q of PUBLIC_KNOWLEDGE_QUESTIONS) {
+    await test(`14. Anonymous actor: "${q}" resolves to a real, VERIFIED CozyOS answer (not the honest-but-wrong fallback)`, async () => {
+        const { answerEngine } = loadFullStack();
+        const result = await answerEngine.answer(q, { actorId: null });
+        assert.strictEqual(result.evidenceState, 'VERIFIED', `expected VERIFIED evidence for "${q}", got: ${result.answer}`);
+        assert.doesNotMatch(result.answer, /Some related context exists/i);
+        assert.doesNotMatch(result.answer, /I don't have verified information/i);
+        assert.match(result.answer, /cozyos/i);
+    });
+}
+
+await test('14c. Anonymous actor: "CozyOS ni nini?" resolves to a real, VERIFIED, Kiswahili-language answer', async () => {
+    const { answerEngine } = loadFullStack();
+    const result = await answerEngine.answer('CozyOS ni nini?', { actorId: null });
+    assert.strictEqual(result.evidenceState, 'VERIFIED');
+    assert.doesNotMatch(result.answer, /Some related context exists/i);
+    // Real Kiswahili prose (DeveloperIdentity's public COZYOS_ORIGIN
+    // answer), not an English fallback string.
+    assert.match(result.answer, /CozyOS|Charles/i);
+    assert.match(result.answer, /kuunda|jamii|mtandao/i, 'expected genuine Kiswahili content, not an English-only answer');
+});
+
+await test('14f. Anonymous actor asking for private information is correctly restricted — never leaks another owner\'s private memory', async () => {
+    const { answerEngine, memory } = loadFullStack();
+    memory.saveMemory('cozy-ai-learning', 'someones-private-plan', 'The private roadmap note only bob can see.',
+        { actorId: 'bob', owner: 'bob', visibility: 'private' });
+    const result = await answerEngine.answer('What is the private roadmap note?', { actorId: null });
+    assert.doesNotMatch(result.answer, /private roadmap note only bob/i);
+    assert.ok(!(result.sources || []).some((s) => s.key === 'someones-private-plan'));
+});
+
+await test('14g. Anonymous actor asking a genuinely unsupported factual question still gets the honest empty-state fallback', async () => {
+    const { answerEngine } = loadFullStack();
+    const result = await answerEngine.answer('What is the airspeed velocity of an unladen swallow?', { actorId: null });
+    assert.notStrictEqual(result.evidenceState, 'VERIFIED');
+    assert.match(result.answer, /I don't have verified information/i);
+    assert.doesNotMatch(result.answer, /Some related context exists/i, 'a genuinely-empty context must never be reported as the confusing "some related context exists" message');
+});
+
+await test('14h. Authenticated actor asking the same CozyOS question gets the same real public knowledge, with no personal memory required', async () => {
+    const { answerEngine } = loadFullStack();
+    const anonResult = await answerEngine.answer('What is CozyOS?', { actorId: null });
+    const authResult = await answerEngine.answer('What is CozyOS?', { actorId: 'real-signed-in-user-1' });
+    assert.strictEqual(authResult.evidenceState, 'VERIFIED');
+    assert.strictEqual(authResult.answer, anonResult.answer, 'the same public application knowledge must not depend on being signed in');
+});
+
+await test('14i. No duplicate CozyOS knowledge store: the same single getWhyUseCozyOSFact() source answers every equivalent phrasing identically', async () => {
+    const { answerEngine } = loadFullStack();
+    const r1 = await answerEngine.answer('What is CozyOS?', { actorId: null });
+    const r2 = await answerEngine.answer('What can CozyOS do?', { actorId: null });
+    const r3 = await answerEngine.answer('I want to know more about CozyOS', { actorId: null });
+    assert.strictEqual(r1.answer, r2.answer);
+    assert.strictEqual(r2.answer, r3.answer);
+});
+
+await test('14j. Regression guard: CognitiveCoordinator\'s own internal "cognitive-default" bookkeeping namespace never pollutes getContext() results', async () => {
+    const { ai, memory } = loadFullStack();
+    // Real shape CognitiveCoordinator.run() actually saves (see that
+    // file's own saveMemory() call) — an internal diagnostic record
+    // whose `content` is an object, never real, directly renderable text.
+    memory.saveMemory('cognitive-default', 'outcome_test1', { input: 'unrelated gibberish question xyz123', outcome: { some: 'internal trace' } },
+        { owner: null, actorId: null, visibility: 'private' });
+    const ctx = await ai.getContext('unrelated gibberish question xyz123', { actorId: null });
+    assert.strictEqual(ctx.results.some((r) => r.namespace === 'cognitive-default'), false, 'cognitive-default must never surface as context');
+    assert.strictEqual(ctx.found, false, 'a genuinely empty context (aside from internal bookkeeping noise) must stay honestly empty');
 });
 
 /* ===================================================================

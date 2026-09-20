@@ -292,7 +292,41 @@
         // churches/schools/communities as real beneficiaries (see the
         // comment above) — this was a routing gap, not a knowledge gap.
         { keywords: ["help"], getter: "getWhyUseCozyOSFact" },
-        { keywords: ["important", "importance", "matter", "point of cozyos"], getter: "getDifferentiationFact" }
+        { keywords: ["important", "importance", "matter", "point of cozyos"], getter: "getDifferentiationFact" },
+        // LIVE WINDOW INCOGNITO REPAIR — real production gap: general
+        // "I want to know more about CozyOS" / "Tell me more about
+        // CozyOS" / "Learn more about CozyOS" phrasing shared no
+        // keyword stem with any route above (nor any FAQ router
+        // trigger), so getContext() returned zero results for this
+        // whole phrasing class regardless of actor identity — the
+        // question was never "personal", it was a genuine routing gap
+        // in application/public knowledge retrieval. getWhyUseCozyOSFact()
+        // already, honestly, describes what CozyOS is and who it's for
+        // (see the "benefit"/"help" stems above, same getter, same
+        // PLATFORM_ONLY_GETTERS guard so a question naming a real,
+        // specific sub-application still defers to that application's
+        // own answer instead of this platform-level one).
+        { keywords: ["know more", "learn more", "more about cozyos", "tell me more"], getter: "getWhyUseCozyOSFact" },
+        // LIVE WINDOW INCOGNITO REPAIR — the bare general-description
+        // question ("What is CozyOS?", "CozyOS ni nini?", "What can
+        // CozyOS do?", "CozyOS inafanya nini?", "CozyOS ina msaada
+        // gani?") shares no keyword stem with anything above either —
+        // every existing route requires a more specific word (benefit/
+        // problem/help/vision/etc.) that a bare "what is X" question
+        // never contains. These are exact, literal EN+SW phrasings of
+        // the SAME single underlying "what is/does CozyOS (do)" intent
+        // (the codebase's own established phrase-routing pattern —
+        // see the FAQ router's own EN/SW TRIGGERS lists — not a new
+        // per-language branch), all resolving to the SAME single real
+        // getter as the routes above. No new knowledge, no new
+        // authority, no language-specific logic of its own.
+        {
+            keywords: [
+                "what is cozyos", "what's cozyos", "what can cozyos do", "what does cozyos do",
+                "cozyos ni nini", "cozyos inafanya nini", "cozyos ina msaada gani"
+            ],
+            getter: "getWhyUseCozyOSFact"
+        }
     ]);
 
     /**
@@ -588,11 +622,36 @@
         // prefix. Composes two existing public methods; adds no new matching
         // logic of its own — recall() already tokenizes a natural-language
         // question far better than a literal-substring search would.
+        //
+        // LIVE WINDOW INCOGNITO REPAIR — real, confirmed gap: this fan-out
+        // previously searched EVERY namespace with no exclusion, including
+        // CognitiveCoordinator.run()'s own internal bookkeeping namespace
+        // ("cognitive-default" — see that file's own saveMemory() call,
+        // which stores {input: <the raw question text>, outcome: <its own
+        // internal trace>}). That record is not personal/project
+        // knowledge a user asked CozyOS to remember — it's the
+        // coordinator's own execution log — but because its `input` field
+        // literally repeats prior question text, a related follow-up
+        // question would keyword-match its own earlier self and get
+        // pushed into `results` as an unrenderable non-string `content`
+        // (an object, not text), which incorrectly turned a genuinely
+        // empty context into a false non-empty one — masking real
+        // application-knowledge routes and confusing the honest-empty-
+        // state fallback in cozy-answer-engine.js. This exclusion is
+        // narrow (the one literal, documented namespace name
+        // CognitiveCoordinator itself uses for this purpose — see
+        // cozy-living-assistant.js's own #send() comment, which already
+        // assumed this exclusion existed) and actor-agnostic: it applies
+        // identically to anonymous and signed-in callers, and every real
+        // namespace a feature or user actually saves under (e.g.
+        // "cozy-ai-learning", "living-*", "interestos:*") is untouched.
+        const COORDINATOR_INTERNAL_NAMESPACES = new Set(["cognitive-default"]);
         const memory = window.CozyOS.CozyMemory;
         const query = (typeof memoryQuery === "string" && memoryQuery.trim()) ? memoryQuery : question;
         if (memory && typeof memory.listNamespaces === "function" && typeof memory.recall === "function") {
             let namespaces = [];
             try { namespaces = memory.listNamespaces() || []; } catch (_err) { namespaces = []; }
+            namespaces = namespaces.filter((ns) => !(ns && COORDINATOR_INTERNAL_NAMESPACES.has(ns.name)));
             for (const ns of namespaces) {
                 let hits = [];
                 try { hits = memory.recall(ns.name, query, effectiveActorId) || []; } catch (_err) { hits = []; }
