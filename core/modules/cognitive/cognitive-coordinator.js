@@ -39,6 +39,19 @@
  *   — this file adds no separate permission check, since doing so would
  *   duplicate ownership IdentityEngine/CozyMemory already hold.
  *
+ * SA-3B CHANGE (activation/wiring only — this file's ownership boundary
+ * above is unchanged)
+ *   run() gained one additive, optional parameter, `conversationState`
+ *   (default null, fully backward-compatible), threaded into
+ *   CozyInterpretation.interpret()'s own existing `context` parameter
+ *   alongside the already-real `actorId` — previously always `{}` since
+ *   no real interpretation provider existed to use it. This lets a
+ *   registered interpretation provider (see core/modules/cognitive/
+ *   providers/semantic-answer-interpretation-provider.js, SA-3B's own
+ *   activation bridge) see the real, already-existing conversation
+ *   context. interpret()'s own contract is unmodified; no new context
+ *   system was introduced.
+ *
  * HONEST SCOPE — v1
  *   Built this pass: the real text-input pipeline (Interpretation ->
  *   Thinking -> Reasoning -> Intelligence -> Memory -> Policy), full
@@ -56,7 +69,7 @@
     const VERSION = "1.0.0-ENTERPRISE";
     if (window.CozyOS.CognitiveCoordinator) return;
 
-    const STAGES = Object.freeze(["interpretation", "thinking", "reasoning", "intelligence", "memory", "policy"]);
+    const STAGES = Object.freeze(["interpretation", "semanticAnswer", "thinking", "reasoning", "intelligence", "memory", "policy"]);
 
     class CozyCognitiveCoordinator {
         #runHistory = [];
@@ -85,7 +98,7 @@
         }
 
         /**
-         * run({ text, actorId, memoryNamespace, category, thinkingProviderId })
+         * run({ text, actorId, memoryNamespace, category, thinkingProviderId, conversationState })
          *   Real orchestration — Gate 5's sequence, composing each
          *   engine's actual real method. Returns a real, structured
          *   result plus a full diagnostics trail (Gate 13) — never a
@@ -101,8 +114,45 @@
          *   to CozyThinking's own default provider as before this
          *   parameter existed) — this coordinator still never picks or
          *   fabricates a provider itself.
+         *
+         *   conversationState (SA-3B, additive, default null): the real,
+         *   already-existing per-turn context object callers may already
+         *   have (e.g. cozy-living-assistant.js's own
+         *   #conversationState — real, live shape
+         *   {lastIntent, lastApplication, lastDiscussedApplication,
+         *   lastLanguage}, unchanged by this parameter). Threaded, along
+         *   with the already-real `actorId`, into
+         *   CozyInterpretation.interpret()'s own existing `context`
+         *   parameter — previously always `{}` (interpret() was called
+         *   with no context key at all), so no registered interpretation
+         *   provider could ever see conversation state or actorId, even
+         *   though this coordinator had both in scope the whole time.
+         *   This is the one, minimal, additive wiring gap SA-3B closes:
+         *   it does not change interpret()'s own contract (still
+         *   `fn(evidenceArray, context)`, unmodified in cozy-
+         *   interpretation.js), does not add a new context system, and
+         *   is fully backward-compatible — a caller that omits
+         *   conversationState reproduces the exact prior behavior
+         *   (context.conversationState stays null; before this change,
+         *   context itself did not exist at all). The real, already-
+         *   active "living-nlu-baseline" provider (ai-bootstrap.js) never
+         *   reads context at all (confirmed by reading its own fn before
+         *   this edit), so this change is a genuine no-op for it — it
+         *   keeps producing byte-identical output.
+         *
+         *   Stage "semanticAnswer" (SA-3B, additive, new): calls
+         *   window.CozyOS.SemanticAnswerInterpretationProvider.
+         *   buildInterpretation() directly — NOT through
+         *   CozyInterpretation's own single-provider-per-call slot, which
+         *   "living-nlu-baseline" already occupies as the real, existing
+         *   default (see that bridge file's own header for the full,
+         *   disclosed reasoning). This stage runs additively, alongside
+         *   Stage 1, changing nothing about Stage 1's provider, inputs,
+         *   or output. A missing bridge file degrades exactly like every
+         *   other optional engine here: a real "skipped" diagnostic,
+         *   never a fabricated result.
          */
-        async run({ text, actorId = "system", memoryNamespace = "cognitive-default", category = "custom", conversationId = null, thinkingProviderId = null } = {}) {
+        async run({ text, actorId = "system", memoryNamespace = "cognitive-default", category = "custom", conversationId = null, thinkingProviderId = null, conversationState = null } = {}) {
             if (typeof text !== "string" || !text.trim()) return { success: false, reason: "Real input text is required." };
             const diagnostics = { stages: {}, startedAt: new Date().toISOString() };
             const evidence = [{ source: "user-input", data: text }];
@@ -113,12 +163,27 @@
             if (!interpretation) {
                 diagnostics.stages.interpretation = { skipped: true, reason: "CozyInterpretation is not loaded." };
             } else {
-                interpretationResult = await interpretation.interpret({ sourceType: "custom", evidence });
+                interpretationResult = await interpretation.interpret({ sourceType: "custom", evidence, context: { actorId, conversationState } });
                 diagnostics.stages.interpretation = interpretationResult.available
                     ? { ran: true, isReal: interpretationResult.isReal }
                     : { ran: true, isReal: false, reason: interpretationResult.reason };
             }
             const interpretationsUsed = (interpretationResult && interpretationResult.isReal && Array.isArray(interpretationResult.results)) ? interpretationResult.results : [];
+
+            // Stage 1b: Semantic Answer (SA-3B, additive — see run()'s own doc comment above)
+            let semanticAnswerResult = null;
+            const semanticAnswerProvider = window.CozyOS.SemanticAnswerInterpretationProvider;
+            if (!semanticAnswerProvider || typeof semanticAnswerProvider.buildInterpretation !== "function") {
+                diagnostics.stages.semanticAnswer = { skipped: true, reason: "SemanticAnswerInterpretationProvider is not loaded." };
+            } else {
+                try {
+                    semanticAnswerResult = semanticAnswerProvider.buildInterpretation(evidence, { actorId, conversationState });
+                    diagnostics.stages.semanticAnswer = { ran: true, isReal: true, cognitiveStatus: (semanticAnswerResult.supportingData && semanticAnswerResult.supportingData.cognitiveStatus) || null };
+                } catch (err) {
+                    semanticAnswerResult = null;
+                    diagnostics.stages.semanticAnswer = { ran: true, isReal: false, reason: `Provider threw: ${err && err.message ? err.message : String(err)}` };
+                }
+            }
 
             // Stage 2: Thinking
             let thinkingResult = null;
@@ -213,7 +278,7 @@
             diagnostics.completedAt = new Date().toISOString();
             const result = {
                 success: true, // the ORCHESTRATION completed; individual stages may honestly be unavailable — see diagnostics
-                interpretation: interpretationResult, thinking: thinkingResult, reasoning: reasoningResult,
+                interpretation: interpretationResult, semanticAnswer: semanticAnswerResult, thinking: thinkingResult, reasoning: reasoningResult,
                 intelligence: intelligenceResult, recalledMemories, policyResult, savedMemoryKey, diagnostics
             };
             this.#runHistory.push({ text, actorId, at: diagnostics.startedAt, diagnostics: this.#deepClone(diagnostics) });

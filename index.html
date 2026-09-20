@@ -329,6 +329,26 @@
 <script src="core/modules/intelligence/knowledge/cozy-knowledge-registry.js"></script>
 <!-- M363 fix: this real, complete, previously-written file (registers window.CozyOS.CozyPublicKnowledge, the owner-approved vision/why-use/language-support-list facts) was never actually loaded on any real page - confirmed by a real Playwright/Chromium run showing why-use-cozyos/differentiation/language-support-list always resolving to NOT_FOUND live. Composed by cozy-knowledge-registry.js at CALL time only (see that file's own header), so exact placement order does not matter, only that it is present. -->
 <script src="core/modules/intelligence/knowledge/cozy-public-knowledge-source.js"></script>
+<!-- SA-3B — Semantic Answer Construction chain (SA-1 contracts, SA-2
+     evidence adapters, SA-3 planner) + the SA-3B activation bridge.
+     Previously real, tested, and complete but never <script>-included
+     on any page (same class of gap M363/PHASE-6C fixed above) — SA-3B
+     is the first phase authorized to connect it. Composed only at CALL
+     time by the bridge provider below (registered into CozyInterpretation,
+     loaded earlier on this page), never at load time, so exact order
+     relative to unrelated scripts does not matter, only that every file
+     in this chain loads before the bridge registers itself. Produces a
+     real SemanticAnswerPlan + cognitive decision state as a diagnostic,
+     internal artifact only — the real Live Window reply (CozyAnswerEngine
+     -> CozyAdvisor, below) is completely unmodified by this chain. -->
+<script src="core/modules/intelligence/semantic-answer/contracts/semantic-answer-plan-contract.js"></script>
+<script src="core/modules/intelligence/semantic-answer/contracts/verified-evidence-contract.js"></script>
+<script src="core/modules/intelligence/semantic-answer/contracts/cognitive-decision-contract.js"></script>
+<script src="core/modules/intelligence/semantic-answer/evidence/verified-evidence-adapter.js"></script>
+<script src="core/modules/intelligence/semantic-answer/evidence/source-adapters/cozy-knowledge-adapter.js"></script>
+<script src="core/modules/intelligence/semantic-answer/evidence/source-adapters/cozy-memory-adapter.js"></script>
+<script src="core/modules/intelligence/semantic-answer/planning/semantic-answer-planner.js"></script>
+<script src="core/modules/cognitive/providers/semantic-answer-interpretation-provider.js"></script>
 <!-- Checkpoint K — the verified intelligence chain (Checkpoints F-J),
      real and previously reachable only from admin-workspace.html /
      Node tests. Wired here, in the same dependency order already

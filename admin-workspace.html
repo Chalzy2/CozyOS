@@ -1608,6 +1608,27 @@
     <!-- Milestone 363 — LDCE Session Reliability & Conversation Sync. -->
     <script src="core/modules/communication/ldce-reliability-engine.js"></script>
     <script src="core/modules/interpretation/cozy-interpretation.js"></script>
+    <!-- SA-3B — Semantic Answer Construction chain (SA-1 contracts, SA-2
+         evidence adapters, SA-3 planner) + the SA-3B activation bridge.
+         Previously real, tested, and complete but never <script>-included
+         on any page (same class of gap M363/PHASE-6C fixed above) — SA-3B
+         is the first phase authorized to connect it. Must load after
+         CozyInterpretation (just above), which the bridge provider
+         registers with at load time; the chain's own internal
+         dependencies (semantic-answer-plan-contract.js etc.) are composed
+         only at CALL time, so exact order among themselves does not
+         matter. Produces a real SemanticAnswerPlan + cognitive decision
+         state as a diagnostic, internal artifact only — the real Live
+         Window reply (CozyAnswerEngine -> CozyAdvisor) is completely
+         unmodified by this chain. -->
+    <script src="core/modules/intelligence/semantic-answer/contracts/semantic-answer-plan-contract.js"></script>
+    <script src="core/modules/intelligence/semantic-answer/contracts/verified-evidence-contract.js"></script>
+    <script src="core/modules/intelligence/semantic-answer/contracts/cognitive-decision-contract.js"></script>
+    <script src="core/modules/intelligence/semantic-answer/evidence/verified-evidence-adapter.js"></script>
+    <script src="core/modules/intelligence/semantic-answer/evidence/source-adapters/cozy-knowledge-adapter.js"></script>
+    <script src="core/modules/intelligence/semantic-answer/evidence/source-adapters/cozy-memory-adapter.js"></script>
+    <script src="core/modules/intelligence/semantic-answer/planning/semantic-answer-planner.js"></script>
+    <script src="core/modules/cognitive/providers/semantic-answer-interpretation-provider.js"></script>
     <script src="core/modules/thinking/cozy-thinking.js"></script>
     <script src="core/modules/reasoning/cozy-reasoning.js"></script>
     <script src="core/modules/intelligence/cozy-intelligence.js"></script>
