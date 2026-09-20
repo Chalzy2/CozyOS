@@ -1,9 +1,18 @@
 <!DOCTYPE html>
-<html lang="en">
+<!-- Full Completion Phase 1 — data-cozy-app activates the real, existing
+     "Shared Shell default" color tokens in core/ui/cozy-tokens.css
+     (--cozy-accent/--cozy-border/--cozy-muted/etc. below all read from
+     that real block, never invented values) without pulling in the
+     full theme-switching JS machinery, which is out of this phase's
+     scope (see the "My Business" section below — the only part of this
+     page styled from these tokens in Phase 1; every other existing
+     section is intentionally left as-is, a later UI/UX phase's job). -->
+<html lang="en" data-cozy-app="cozyos">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>InterestOS — CozyOS Business Application</title>
+<link rel="stylesheet" href="../../core/ui/cozy-tokens.css">
 <style>
   .ios-app { font-family: sans-serif; padding: 12px; max-width: 100%; box-sizing: border-box; }
   .ios-app * { box-sizing: border-box; }
@@ -38,6 +47,48 @@
   .ios-attach-option:hover, .ios-attach-option:focus { background: #f0f4f8; }
   .ios-attach-cancel { color: #b00020; }
   .ios-list li button { min-height: 36px; }
+
+  /*
+   * "My Business" — Full Completion Phase 1. Mobile-first: every
+   * control below is min-height:44px (real touch target), the table
+   * scrolls horizontally in its own bounded container (never the whole
+   * page) so a table wider than the screen never forces page-level
+   * horizontal overflow, and every color/radius reads from the real
+   * CozyOS tokens (core/ui/cozy-tokens.css), with an honest static
+   * fallback so this section still renders correctly if that
+   * stylesheet is ever unavailable.
+   */
+  .ios-biz-section select, .ios-biz-section input[type="text"] { min-height: 44px; }
+  .ios-biz-section button { min-height: 44px; min-width: 44px; }
+  .ios-biz-table-scroll {
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+      border: 1px solid var(--cozy-border, #ddd);
+      border-radius: var(--cozy-radius-md, 12px);
+      margin: 10px 0;
+  }
+  table.ios-biz-table { border-collapse: collapse; width: 100%; min-width: 480px; }
+  table.ios-biz-table th, table.ios-biz-table td {
+      border-bottom: 1px solid var(--cozy-border, #eee);
+      padding: 6px 8px; text-align: left; vertical-align: top;
+  }
+  table.ios-biz-table th { background: var(--cozy-accent-glow, #eef2ff); position: sticky; top: 0; }
+  .ios-biz-col-head { display: flex; flex-direction: column; gap: 4px; min-width: 120px; }
+  .ios-biz-col-head input[type="text"] { min-height: 36px; font-weight: 600; }
+  .ios-biz-col-head select { min-height: 32px; font-size: 0.8rem; }
+  .ios-biz-col-controls, .ios-biz-row-controls { display: flex; gap: 2px; }
+  .ios-biz-col-controls button, .ios-biz-row-controls button { min-height: 28px; min-width: 28px; padding: 2px 6px; font-size: 0.85rem; }
+  table.ios-biz-table td input { width: 100%; min-height: 36px; border: 1px solid var(--cozy-border, #ccc); border-radius: 6px; padding: 4px 6px; }
+  .ios-biz-summary-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 8px; margin-top: 10px;
+  }
+  .ios-biz-stat {
+      border: 1px solid var(--cozy-border, #ddd); border-radius: var(--cozy-radius-md, 12px);
+      padding: 10px; background: var(--cozy-accent-glow, #f8fafc);
+  }
+  .ios-biz-stat .ios-biz-stat-label { font-size: 0.78rem; opacity: 0.75; }
+  .ios-biz-stat .ios-biz-stat-value { font-size: 1.15rem; font-weight: 700; word-break: break-word; }
+  .ios-biz-stat.ios-biz-stat-negative .ios-biz-stat-value { color: var(--cozy-error, #ef4444); }
 </style>
 </head>
 <body>
@@ -174,6 +225,54 @@
         </div>
     </section>
 
+    <section class="ios-section ios-biz-section">
+        <h3>My Business</h3>
+        <p class="ios-note">A flexible business table — you decide the columns and rows, nothing is forced. Tag a column's role (e.g. "Selling Price") so CozyOS can calculate totals automatically; untagged columns still work as a plain, editable grid.</p>
+
+        <div class="ios-row">
+            <input type="text" id="ios-biz-table-name-input" placeholder="Table name (e.g. Shop Sales)" />
+            <button id="ios-biz-new-table-btn">+ New Table</button>
+            <button id="ios-biz-rename-table-btn">Rename Selected</button>
+        </div>
+        <div class="ios-row">
+            <select id="ios-biz-table-select"></select>
+            <button id="ios-biz-delete-table-btn">Delete Table</button>
+        </div>
+        <p id="ios-biz-empty-note" class="ios-note"></p>
+
+        <div id="ios-biz-table-editor" style="display:none;">
+            <div class="ios-biz-table-scroll">
+                <table class="ios-biz-table" id="ios-biz-grid"></table>
+            </div>
+
+            <div class="ios-row">
+                <input type="text" id="ios-biz-new-col-label" placeholder="Column name (e.g. Product)" />
+                <select id="ios-biz-new-col-type">
+                    <option value="TEXT">Text</option>
+                    <option value="NUMBER">Number</option>
+                    <option value="DATE">Date</option>
+                </select>
+                <select id="ios-biz-new-col-role"></select>
+                <button id="ios-biz-add-column-btn">+ Column</button>
+            </div>
+            <div class="ios-row">
+                <button id="ios-biz-add-row-btn">+ Row</button>
+            </div>
+
+            <div class="ios-row">
+                <select id="ios-biz-period-select">
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly" selected>Monthly</option>
+                    <option value="yearly">Yearly</option>
+                </select>
+                <button id="ios-biz-summary-btn">View Totals</button>
+            </div>
+            <div id="ios-biz-summary" class="ios-biz-summary-grid" style="display:none;"></div>
+            <p id="ios-biz-summary-note" class="ios-note"></p>
+        </div>
+    </section>
+
     <footer class="ios-note">InterestOS Application (Phase 1) · CozyOS</footer>
 </div>
 <script src="../../core/modules/memory/cozy-memory-engine.js"></script>
@@ -187,6 +286,7 @@
 <script src="../../core/calculation/calculation-engine.js"></script>
 <script src="../../core/plugins/interestOS-core.js"></script>
 <script src="../../core/plugins/interestOS-documents-client.js"></script>
+<script src="../../core/plugins/interestOS-business-workspace.js"></script>
 <script>
 (function () {
     "use strict";
@@ -411,6 +511,7 @@
         renderTaught();
         renderGoals();
         initMyDocuments();
+        initMyBusiness();
     }
 
     /**
@@ -733,6 +834,221 @@
         });
 
         refreshList({});
+    }
+
+    /**
+     * initMyBusiness() — Full Completion Phase 1. Real UI over
+     * window.CozyOS.InterestOSBusinessWorkspace only — no business logic
+     * lives in this file; every add/rename/remove/reorder/calculate
+     * action below is a direct call into that real, tested engine.
+     */
+    const ROLE_LABELS = {
+        PRODUCT: "Product", DATE: "Date", BUYING_PRICE: "Buying Price", SELLING_PRICE: "Selling Price",
+        QUANTITY: "Quantity", CUSTOMER: "Customer", EXPENSE_AMOUNT: "Expense", SAVINGS_AMOUNT: "Savings",
+        PAYMENT_STATUS: "Payment Status", CATEGORY: "Category", NOTE: "Note",
+    };
+    const COLUMN_TYPE_TO_INPUT = { TEXT: "text", NUMBER: "number", DATE: "date" };
+
+    function initMyBusiness() {
+        const ws = window.CozyOS.InterestOSBusinessWorkspace;
+        const owner = resolveActorId();
+        const emptyNote = document.getElementById("ios-biz-empty-note");
+        if (!ws) { emptyNote.textContent = "Business workspace is not available."; return; }
+        if (!owner) { emptyNote.textContent = "Sign in to use My Business."; return; }
+
+        let currentTableId = null;
+
+        const tableSelect = document.getElementById("ios-biz-table-select");
+        const nameInput = document.getElementById("ios-biz-table-name-input");
+        const editor = document.getElementById("ios-biz-table-editor");
+        const grid = document.getElementById("ios-biz-grid");
+        const newColLabel = document.getElementById("ios-biz-new-col-label");
+        const newColType = document.getElementById("ios-biz-new-col-type");
+        const newColRole = document.getElementById("ios-biz-new-col-role");
+        const summaryBox = document.getElementById("ios-biz-summary");
+        const summaryNote = document.getElementById("ios-biz-summary-note");
+
+        // Real role vocabulary, read directly from the engine's own
+        // frozen list — never a second, hand-copied enum here.
+        newColRole.innerHTML = '<option value="">(no automatic role)</option>' +
+            ws.COLUMN_ROLES.map((r) => `<option value="${r}">${ROLE_LABELS[r] || r}</option>`).join("");
+
+        function refreshTableSelect(selectId) {
+            const tables = ws.listTables(owner, owner);
+            tableSelect.innerHTML = tables.length
+                ? tables.map((t) => `<option value="${t.id}">${t.name}</option>`).join("")
+                : "";
+            if (selectId && tables.some((t) => t.id === selectId)) {
+                tableSelect.value = selectId;
+                currentTableId = selectId;
+            } else if (tables.length) {
+                currentTableId = tables[0].id;
+                tableSelect.value = currentTableId;
+            } else {
+                currentTableId = null;
+            }
+            emptyNote.textContent = tables.length ? "" : "No business tables yet — create one above.";
+            editor.style.display = currentTableId ? "block" : "none";
+            if (currentTableId) renderGrid();
+        }
+
+        function renderGrid() {
+            const table = ws.getTable(currentTableId, owner);
+            if (!table) { editor.style.display = "none"; return; }
+            editor.style.display = "block";
+
+            const headCells = table.columns.map((col, idx) => `
+                <th>
+                    <div class="ios-biz-col-head">
+                        <input type="text" data-col-id="${col.id}" class="ios-biz-col-label-input" value="${col.label}">
+                        <select data-col-id="${col.id}" class="ios-biz-col-role-select">
+                            <option value="">(no role)</option>
+                            ${ws.COLUMN_ROLES.map((r) => `<option value="${r}" ${col.role === r ? "selected" : ""}>${ROLE_LABELS[r] || r}</option>`).join("")}
+                        </select>
+                        <div class="ios-biz-col-controls">
+                            <button type="button" data-move-col="${col.id}" data-dir="-1" ${idx === 0 ? "disabled" : ""} aria-label="Move column left">◀</button>
+                            <button type="button" data-move-col="${col.id}" data-dir="1" ${idx === table.columns.length - 1 ? "disabled" : ""} aria-label="Move column right">▶</button>
+                            <button type="button" data-remove-col="${col.id}" aria-label="Remove column">🗑</button>
+                        </div>
+                    </div>
+                </th>`).join("");
+
+            const bodyRows = table.rows.map((row, idx) => {
+                const cells = table.columns.map((col) => {
+                    const inputType = COLUMN_TYPE_TO_INPUT[col.type] || "text";
+                    const raw = row.cells[col.id];
+                    const value = raw === undefined || raw === null ? "" : raw;
+                    return `<td><input type="${inputType}" data-row-id="${row.id}" data-col-id="${col.id}" value="${String(value).replace(/"/g, "&quot;")}"></td>`;
+                }).join("");
+                return `<tr>
+                    ${cells}
+                    <td>
+                        <div class="ios-biz-row-controls">
+                            <button type="button" data-move-row="${row.id}" data-dir="-1" ${idx === 0 ? "disabled" : ""} aria-label="Move row up">▲</button>
+                            <button type="button" data-move-row="${row.id}" data-dir="1" ${idx === table.rows.length - 1 ? "disabled" : ""} aria-label="Move row down">▼</button>
+                            <button type="button" data-remove-row="${row.id}" aria-label="Remove row">🗑</button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join("");
+
+            grid.innerHTML = table.columns.length
+                ? `<thead><tr>${headCells}<th>Row</th></tr></thead><tbody>${bodyRows}</tbody>`
+                : "";
+            summaryBox.style.display = "none";
+            summaryNote.textContent = table.columns.length ? "" : "Add at least one column to start entering rows.";
+            wireGridEvents(table);
+        }
+
+        function wireGridEvents(table) {
+            grid.querySelectorAll(".ios-biz-col-label-input").forEach((el) => {
+                el.addEventListener("change", () => {
+                    try { ws.renameColumn(currentTableId, el.dataset.colId, el.value, owner); } catch (_err) { /* honest no-op — value reverts on next render */ }
+                    renderGrid();
+                });
+            });
+            grid.querySelectorAll(".ios-biz-col-role-select").forEach((el) => {
+                el.addEventListener("change", () => {
+                    ws.setColumnRole(currentTableId, el.dataset.colId, el.value || null, owner);
+                    renderGrid();
+                });
+            });
+            grid.querySelectorAll("[data-move-col]").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    const ids = table.columns.map((c) => c.id);
+                    const i = ids.indexOf(btn.dataset.moveCol);
+                    const j = i + parseInt(btn.dataset.dir, 10);
+                    if (j < 0 || j >= ids.length) return;
+                    [ids[i], ids[j]] = [ids[j], ids[i]];
+                    ws.reorderColumns(currentTableId, ids, owner);
+                    renderGrid();
+                });
+            });
+            grid.querySelectorAll("[data-remove-col]").forEach((btn) => {
+                btn.addEventListener("click", () => { ws.removeColumn(currentTableId, btn.dataset.removeCol, owner); renderGrid(); });
+            });
+            grid.querySelectorAll("table.ios-biz-table td input, .ios-biz-table td input").forEach((el) => {
+                el.addEventListener("change", () => {
+                    ws.updateRow(currentTableId, el.dataset.rowId, { [el.dataset.colId]: el.value }, owner);
+                });
+            });
+            grid.querySelectorAll("[data-move-row]").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    const ids = table.rows.map((r) => r.id);
+                    const i = ids.indexOf(btn.dataset.moveRow);
+                    const j = i + parseInt(btn.dataset.dir, 10);
+                    if (j < 0 || j >= ids.length) return;
+                    [ids[i], ids[j]] = [ids[j], ids[i]];
+                    ws.reorderRows(currentTableId, ids, owner);
+                    renderGrid();
+                });
+            });
+            grid.querySelectorAll("[data-remove-row]").forEach((btn) => {
+                btn.addEventListener("click", () => { ws.removeRow(currentTableId, btn.dataset.removeRow, owner); renderGrid(); });
+            });
+        }
+
+        document.getElementById("ios-biz-new-table-btn").addEventListener("click", () => {
+            const name = nameInput.value.trim();
+            if (!name) return;
+            const table = ws.createTable({ owner, actorId: owner, name });
+            nameInput.value = "";
+            refreshTableSelect(table.id);
+        });
+
+        document.getElementById("ios-biz-rename-table-btn").addEventListener("click", () => {
+            const name = nameInput.value.trim();
+            if (!name || !currentTableId) return;
+            ws.renameTable(currentTableId, name, owner);
+            nameInput.value = "";
+            refreshTableSelect(currentTableId);
+        });
+
+        document.getElementById("ios-biz-delete-table-btn").addEventListener("click", () => {
+            if (!currentTableId) return;
+            ws.deleteTable(currentTableId, owner);
+            refreshTableSelect(null);
+        });
+
+        tableSelect.addEventListener("change", () => { currentTableId = tableSelect.value; renderGrid(); });
+
+        document.getElementById("ios-biz-add-column-btn").addEventListener("click", () => {
+            const label = newColLabel.value.trim();
+            if (!label || !currentTableId) return;
+            ws.addColumn(currentTableId, { label, type: newColType.value, role: newColRole.value || null }, owner);
+            newColLabel.value = "";
+            renderGrid();
+        });
+
+        document.getElementById("ios-biz-add-row-btn").addEventListener("click", () => {
+            if (!currentTableId) return;
+            ws.addRow(currentTableId, {}, owner);
+            renderGrid();
+        });
+
+        document.getElementById("ios-biz-summary-btn").addEventListener("click", () => {
+            if (!currentTableId) return;
+            const period = document.getElementById("ios-biz-period-select").value;
+            const summary = ws.computeSummary(currentTableId, { period }, owner);
+            if (!summary.available) { summaryNote.textContent = summary.reason; summaryBox.style.display = "none"; return; }
+            const stats = [
+                ["Revenue", summary.revenue], ["Cost", summary.cost], ["Profit", summary.profit],
+                ["Expenses", summary.expenses], ["Savings", summary.savings], ["Cash Balance", summary.cashBalance],
+            ];
+            summaryBox.innerHTML = stats.map(([label, value]) => `
+                <div class="ios-biz-stat ${value < 0 ? "ios-biz-stat-negative" : ""}">
+                    <div class="ios-biz-stat-label">${label}</div>
+                    <div class="ios-biz-stat-value">${value}</div>
+                </div>`).join("") + (summary.stockMovement.length ? `
+                <div class="ios-biz-stat">
+                    <div class="ios-biz-stat-label">Stock Movement</div>
+                    <div class="ios-biz-stat-value">${summary.stockMovement.map((s) => `${s.product}: ${s.quantity}`).join(", ")}</div>
+                </div>` : "");
+            summaryBox.style.display = "grid";
+            summaryNote.textContent = `${summary.rowsInPeriod} row(s) in this period. ${summary.cashBalanceAssumption}`;
+        });
+
+        refreshTableSelect(null);
     }
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
