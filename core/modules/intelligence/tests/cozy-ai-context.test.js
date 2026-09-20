@@ -58,6 +58,7 @@ const roots = {
     founderStory: path.join(__dirname, '..', '..', 'founder-story', 'founder-story-engine.js'),
     knowledgeRegistry: path.join(__dirname, '..', 'knowledge', 'cozy-knowledge-registry.js'),
     memoryEngine: path.join(__dirname, '..', '..', 'memory', 'cozy-memory-engine.js'),
+    businessWorkspace: path.join(__dirname, '..', '..', '..', 'plugins', 'interestOS-business-workspace.js'),
     cozyAi: path.join(__dirname, '..', 'cozy-ai.js')
 };
 
@@ -79,14 +80,15 @@ function loadFullStack(extraCozyOS) {
     global.window = fakeWindow;
     if (!global.crypto) { global.crypto = require('crypto').webcrypto; }
     [roots.secretRegistry, roots.encryptionManager, roots.secretManager, roots.typedManagers, roots.rotationHealth,
-     roots.vaultEngine, roots.founderStory, roots.knowledgeRegistry, roots.memoryEngine, roots.cozyAi
+     roots.vaultEngine, roots.founderStory, roots.knowledgeRegistry, roots.memoryEngine, roots.businessWorkspace, roots.cozyAi
     ].forEach((p) => require(p));
     return {
         window: fakeWindow,
         ai: fakeWindow.CozyOS.CozyAI,
         memory: fakeWindow.CozyOS.CozyMemory,
         founderStory: fakeWindow.CozyOS.FounderStory,
-        knowledge: fakeWindow.CozyOS.CozyKnowledge
+        knowledge: fakeWindow.CozyOS.CozyKnowledge,
+        workspace: fakeWindow.CozyOS.InterestOSBusinessWorkspace
     };
 }
 
@@ -450,6 +452,58 @@ await test('12e. an unknown liveSessionId with supportScope never fabricates dia
     const ctx = await ai.getContext('inspect this session', { actorId: 'cozyos-admin-1', liveSessionId: 'svc-does-not-exist', supportScope: 'inspect-live-session' });
     assert.strictEqual(ctx.success, true);
     assert.strictEqual(ctx.results.some((r) => r.authority === 'live-support-diagnostics'), false);
+});
+
+/* ===================================================================
+   13. INTERESTOS BUSINESS CONTEXT COMPOSITION (BUSINESS INTEGRATION
+   addition) — composes the real, unmodified InterestOSBusinessWorkspace.
+   computeSummary() (already owner/visibility fail-closed) into one
+   VERIFIED "interestos-business" result; adds no second calculation
+   engine or authorization path of its own.
+=================================================================== */
+await test('13a. businessContext composes a real, VERIFIED "interestos-business" result from computeSummary()', async () => {
+    const { ai, workspace } = loadFullStack();
+    const table = workspace.createTable({ owner: 'shopOwner', name: 'Shop Sales' });
+    const dateCol = workspace.addColumn(table.id, { label: 'Date', type: 'DATE', role: 'DATE' }, 'shopOwner');
+    const sellCol = workspace.addColumn(table.id, { label: 'Sell', type: 'NUMBER', role: 'SELLING_PRICE' }, 'shopOwner');
+    const buyCol = workspace.addColumn(table.id, { label: 'Buy', type: 'NUMBER', role: 'BUYING_PRICE' }, 'shopOwner');
+    const today = new Date().toISOString().slice(0, 10);
+    workspace.addRow(table.id, { [dateCol.columns.find(c => c.role === 'DATE').id]: today, [sellCol.columns.find(c => c.role === 'SELLING_PRICE').id]: 100, [buyCol.columns.find(c => c.role === 'BUYING_PRICE').id]: 60 }, 'shopOwner');
+
+    const ctx = await ai.getContext('What is my profit this month?', { actorId: 'shopOwner', businessContext: { tableId: table.id, period: 'monthly' } });
+    const hit = ctx.results.find((r) => r.authority === 'interestos-business');
+    assert.ok(hit, 'expected a real interestos-business result');
+    assert.strictEqual(hit.evidence, 'VERIFIED');
+    assert.strictEqual(hit.tableId, table.id);
+    assert.match(hit.content, /profit 40/);
+});
+
+await test('13b. no businessContext supplied: behavior is completely unaffected (true no-op, backward compatible)', async () => {
+    const { ai } = loadFullStack();
+    const ctx = await ai.getContext('What is my profit this month?', { actorId: 'shopOwner' });
+    assert.strictEqual(ctx.results.some((r) => r.authority === 'interestos-business'), false);
+});
+
+await test('13c. a wrong actorId (not the table owner) never sees the business summary — fail-closed via computeSummary()/getTable()', async () => {
+    const { ai, workspace } = loadFullStack();
+    const table = workspace.createTable({ owner: 'shopOwner', name: 'Shop Sales' });
+    const ctx = await ai.getContext('What is my profit?', { actorId: 'stranger', businessContext: { tableId: table.id, period: 'monthly' } });
+    assert.strictEqual(ctx.results.some((r) => r.authority === 'interestos-business'), false);
+});
+
+await test('13d. an unknown tableId never fabricates a summary, never throws', async () => {
+    const { ai } = loadFullStack();
+    const ctx = await ai.getContext('What is my profit?', { actorId: 'shopOwner', businessContext: { tableId: 'bizt_does_not_exist', period: 'monthly' } });
+    assert.strictEqual(ctx.success, true);
+    assert.strictEqual(ctx.results.some((r) => r.authority === 'interestos-business'), false);
+});
+
+await test('13e. InterestOSBusinessWorkspace not loaded: getContext() degrades honestly, never throws', async () => {
+    const { window, memory } = loadFullStack();
+    delete window.CozyOS.InterestOSBusinessWorkspace;
+    const ctx = await window.CozyOS.CozyAI.getContext('What is my profit?', { actorId: 'shopOwner', businessContext: { tableId: 'bizt_1', period: 'monthly' } });
+    assert.strictEqual(ctx.success, true);
+    assert.strictEqual(ctx.results.some((r) => r.authority === 'interestos-business'), false);
 });
 
 /* ===================================================================

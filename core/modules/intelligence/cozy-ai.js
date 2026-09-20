@@ -403,7 +403,7 @@
      *   view; corrective action still goes through those same existing,
      *   real, permission-checked engines, never a new one.
      */
-    async function getContext(question, { actorId = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null } = {}) {
+    async function getContext(question, { actorId = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null, businessContext = null } = {}) {
         if (typeof question !== "string" || !question.trim()) {
             return { success: false, reason: "A real, non-empty question is required." };
         }
@@ -612,6 +612,42 @@
                         content: hit.entry.value
                     });
                 }
+            }
+        }
+
+        // --- InterestOS business-data summary (BUSINESS INTEGRATION addition) ---
+        // Composes InterestOSBusinessWorkspace.computeSummary() — the one,
+        // real, unmodified calculation engine — into a plain-English
+        // result entry. getTable()/computeSummary() already enforce
+        // owner/visibility, so a wrong actorId or unknown/foreign tableId
+        // fails closed to `available: false` and contributes nothing here;
+        // never a second calculation path of its own.
+        if (businessContext && typeof businessContext === "object" && typeof businessContext.tableId === "string" && businessContext.tableId.trim()) {
+            const workspace = window.CozyOS.InterestOSBusinessWorkspace;
+            if (workspace && typeof workspace.computeSummary === "function") {
+                try {
+                    const summary = workspace.computeSummary(
+                        businessContext.tableId,
+                        { period: businessContext.period, referenceDate: businessContext.referenceDate },
+                        effectiveActorId
+                    );
+                    if (summary && summary.available) {
+                        const pieces = [
+                            `For the ${summary.period} period (${summary.rowsInPeriod} recorded row(s)): revenue ${summary.revenue}, cost ${summary.cost}, expenses ${summary.expenses}, profit ${summary.profit}, cash balance ${summary.cashBalance}.`,
+                            summary.cashBalanceAssumption
+                        ];
+                        if (summary.stockMovement.length > 0) {
+                            pieces.push(`Stock movement: ${summary.stockMovement.map((s) => `${s.product} x${s.quantity}`).join(", ")}.`);
+                        }
+                        results.push({
+                            authority: "interestos-business",
+                            provenance: "window.CozyOS.InterestOSBusinessWorkspace",
+                            tableId: businessContext.tableId,
+                            evidence: "VERIFIED",
+                            content: pieces.filter(Boolean).join(" ")
+                        });
+                    }
+                } catch (_err) { /* honest fall-through — never fabricate */ }
             }
         }
 

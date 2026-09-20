@@ -270,6 +270,12 @@
             </div>
             <div id="ios-biz-summary" class="ios-biz-summary-grid" style="display:none;"></div>
             <p id="ios-biz-summary-note" class="ios-note"></p>
+
+            <div class="ios-row">
+                <input type="text" id="ios-biz-ask-input" placeholder="Ask CozyAI about this table (e.g. What's my profit this month?)" />
+                <button id="ios-biz-ask-btn">Ask CozyAI</button>
+            </div>
+            <p id="ios-biz-ask-answer" class="ios-note" style="display:none;"></p>
         </div>
     </section>
 
@@ -287,6 +293,8 @@
 <script src="../../core/plugins/interestOS-core.js"></script>
 <script src="../../core/plugins/interestOS-documents-client.js"></script>
 <script src="../../core/plugins/interestOS-business-workspace.js"></script>
+<script src="../../core/modules/intelligence/cozy-ai.js"></script>
+<script src="../../core/modules/intelligence/answer/cozy-answer-engine.js"></script>
 <script>
 (function () {
     "use strict";
@@ -1046,6 +1054,42 @@
                 </div>` : "");
             summaryBox.style.display = "grid";
             summaryNote.textContent = `${summary.rowsInPeriod} row(s) in this period. ${summary.cashBalanceAssumption}`;
+        });
+
+        // "Ask CozyAI" — real composition through the same, single
+        // window.CozyOS.CozyAnswerEngine -> CozyAI.getContext() chain
+        // every other CozyOS surface uses (see cozy-ai.js's own header);
+        // no second AI, memory, or calculation engine of its own. The
+        // businessContext hook composes InterestOSBusinessWorkspace.
+        // computeSummary() for the currently selected table/period,
+        // which itself already enforces owner/visibility fail-closed.
+        const askInput = document.getElementById("ios-biz-ask-input");
+        const askBtn = document.getElementById("ios-biz-ask-btn");
+        const askAnswer = document.getElementById("ios-biz-ask-answer");
+        askBtn.addEventListener("click", async () => {
+            const question = askInput.value.trim();
+            if (!question) return;
+            const answerEngine = window.CozyOS.CozyAnswerEngine;
+            askAnswer.style.display = "block";
+            if (!answerEngine || typeof answerEngine.answer !== "function") {
+                askAnswer.textContent = "CozyAI is not available in this environment.";
+                return;
+            }
+            if (!currentTableId) {
+                askAnswer.textContent = "Select or create a business table first.";
+                return;
+            }
+            askAnswer.textContent = "Thinking...";
+            const period = document.getElementById("ios-biz-period-select").value;
+            try {
+                const result = await answerEngine.answer(question, {
+                    actorId: owner,
+                    businessContext: { tableId: currentTableId, period },
+                });
+                askAnswer.textContent = result && result.answer ? result.answer : "No answer available.";
+            } catch (_err) {
+                askAnswer.textContent = "CozyAI could not answer that question right now.";
+            }
         });
 
         refreshTableSelect(null);

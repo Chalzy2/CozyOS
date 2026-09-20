@@ -187,8 +187,12 @@
      *   authorization of its own for it (getContext() independently,
      *   freshly re-verifies platform-admin + active support grant every
      *   call — see that file's own comment for the full check).
+     *   businessContext (BUSINESS INTEGRATION addition) — passed straight
+     *   through to CozyAI.getContext() unchanged; this file adds no
+     *   business-calculation logic of its own (InterestOSBusinessWorkspace.
+     *   computeSummary() already enforces owner/visibility fail-closed).
      */
-    async function answer(question, { actorId = null, language = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null } = {}) {
+    async function answer(question, { actorId = null, language = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null, businessContext = null } = {}) {
         if (typeof question !== "string" || !question.trim()) {
             return {
                 answer: "A real, non-empty question is required.",
@@ -247,7 +251,7 @@
         // half, e.g. "What is CozyOS and what applications does it have?") ---
         let ctx = { success: false, results: [] };
         if (ai && typeof ai.getContext === "function") {
-            try { ctx = await ai.getContext(question, { actorId, memoryQuery, entityHint, liveSessionId, supportScope }); } catch (_err) { ctx = { success: false, results: [] }; }
+            try { ctx = await ai.getContext(question, { actorId, memoryQuery, entityHint, liveSessionId, supportScope, businessContext }); } catch (_err) { ctx = { success: false, results: [] }; }
         }
         const ctxResults = (ctx && Array.isArray(ctx.results)) ? ctx.results : [];
 
