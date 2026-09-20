@@ -57,6 +57,15 @@ const PATHS = Object.freeze({
     gapDetection: path.join(__dirname, '..', 'adapters', 'gap-detection.js'),
     regressionGenerator: path.join(__dirname, '..', 'adapters', 'regression-generator.js'),
     learningEvidenceSupplement: path.join(__dirname, '..', 'adapters', 'learning-evidence-supplement.js'),
+    // CML-6 — Continuous Authorized Observation & Repeated-Evidence
+    // Learning Fabric.
+    evidenceProfile: path.join(__dirname, '..', 'adapters', 'evidence-profile.js'),
+    conflictDetection: path.join(__dirname, '..', 'adapters', 'conflict-detection.js'),
+    languageGapRegistry: path.join(__dirname, '..', 'adapters', 'language-gap-registry.js'),
+    learningGapDiscovery: path.join(__dirname, '..', 'adapters', 'learning-gap-discovery.js'),
+    activeLearning: path.join(__dirname, '..', 'adapters', 'active-learning.js'),
+    learningPriority: path.join(__dirname, '..', 'adapters', 'learning-priority.js'),
+    continuousLearningFabric: path.join(__dirname, '..', 'continuous-learning-fabric.js'),
 });
 
 function freshLoad(selectedKeys) {
@@ -146,7 +155,64 @@ function loadFullStackWithPlanner() {
     };
 }
 
+/**
+ * Full real stack for CML-6 Continuous Authorized Observation &
+ * Repeated-Evidence Learning Fabric tests: everything
+ * loadFullStackWithPlanner() loads, PLUS the new fabric pieces.
+ */
+function loadFullStackWithFabric() {
+    const w = freshLoad([
+        'memoryEngine', 'sense', 'cozyLearn', 'safetyGate', 'languagePackRegistry', 'languageAcquisitionPipeline', 'languageKnowledgeModel',
+        'multimodalObservationCore', 'evidenceContract',
+        'observationContract', 'conceptContract', 'observationAdapter', 'observationLifecycle', 'evidenceBridge', 'conceptRegistry',
+        'observationStore', 'learningCorrelation', 'correctionLearning',
+        'knowledgeIngestion', 'searchEngine', 'searchLearnBridge',
+        'semanticIntent', 'knowledgeRegistry', 'publicKnowledge', 'planContract', 'cognitiveDecision', 'evidenceAdapter', 'knowledgeAdapter', 'planner',
+        'gapDetection', 'regressionGenerator', 'learningEvidenceSupplement',
+        'evidenceProfile', 'conflictDetection', 'languageGapRegistry', 'learningGapDiscovery', 'activeLearning', 'learningPriority', 'continuousLearningFabric',
+    ]);
+    if (w.CozyOS.CozyLanguagePacks && typeof w.CozyOS.CozyLanguagePacks.registerDefaultPacks === 'function') {
+        w.CozyOS.CozyLanguagePacks.registerDefaultPacks();
+    }
+    return {
+        memory: w.CozyOS.CozyMemory,
+        sense: w.CozyOS.CozySense,
+        learn: w.CozyOS.CozyLearn,
+        packs: w.CozyOS.CozyLanguagePacks,
+        acquisition: w.CozyOS.CozyLanguageAcquisition,
+        knowledgeModel: w.CozyOS.CozyLanguageKnowledgeModel,
+        core: w.CozyOS.MultimodalObservationCore,
+        evidenceContract: w.CozyOS.VerifiedEvidenceContract,
+        observationContract: w.CozyOS.MultimodalObservationContract,
+        conceptContract: w.CozyOS.CanonicalConceptContract,
+        adapter: w.CozyOS.MultimodalObservationAdapter,
+        lifecycle: w.CozyOS.ObservationLifecycle,
+        bridge: w.CozyOS.ObservationEvidenceBridge,
+        conceptRegistry: w.CozyOS.CanonicalConceptRegistry,
+        observationStore: w.CozyOS.ObservationStore,
+        correlation: w.CozyOS.LearningCorrelation,
+        correctionLearning: w.CozyOS.CorrectionLearning,
+        knowledgeIngestion: w.CozyOS.CozyKnowledgeIngestion,
+        searchEngine: w.CozyOS.SearchEngine,
+        searchLearnBridge: w.CozyOS.SearchLearnBridge,
+        intentEngine: w.CozyOS.SemanticIntentEngine,
+        knowledge: w.CozyOS.CozyKnowledge,
+        planner: w.CozyOS.SemanticAnswerPlanner,
+        gapDetection: w.CozyOS.GapDetection,
+        regressionGenerator: w.CozyOS.RegressionGenerator,
+        learningEvidenceSupplement: w.CozyOS.LearningEvidenceSupplement,
+        evidenceProfile: w.CozyOS.EvidenceProfile,
+        conflictDetection: w.CozyOS.ConflictDetection,
+        languageGapRegistry: w.CozyOS.LanguageGapRegistry,
+        learningGapDiscovery: w.CozyOS.LearningGapDiscovery,
+        activeLearning: w.CozyOS.ActiveLearning,
+        learningPriority: w.CozyOS.LearningPriority,
+        fabric: w.CozyOS.ContinuousLearningFabric,
+        window: w,
+    };
+}
+
 const AUTHORIZED_CONSENT = Object.freeze({ authorized: true, scope: 'SELF', grantedBy: 'test-user' });
 const UNAUTHORIZED_CONSENT = Object.freeze({ authorized: false, scope: 'SESSION_PARTICIPANTS', grantedBy: null });
 
-module.exports = { PATHS, freshLoad, loadFullStack, loadFullStackWithPlanner, AUTHORIZED_CONSENT, UNAUTHORIZED_CONSENT };
+module.exports = { PATHS, freshLoad, loadFullStack, loadFullStackWithPlanner, loadFullStackWithFabric, AUTHORIZED_CONSENT, UNAUTHORIZED_CONSENT };

@@ -32,11 +32,18 @@
      *   itself decides confidence/language/entity — every field below
      *   is read directly off the real planner result.
      */
-    function detectGap({ text, conversationState = null, requestedLanguage = null, actorId = null } = {}) {
+    function detectGap({ text, conversationState = null, requestedLanguage = null, entityHint = null, actorId = null } = {}) {
         const planner = window.CozyOS.SemanticAnswerPlanner;
         if (!planner || typeof planner.planAnswer !== "function") return { success: false, reason: "SemanticAnswerPlanner is not loaded." };
 
-        const result = planner.planAnswer({ text, conversationState, requestedLanguage, actorId });
+        // CML-6 addition — real, additive, optional passthrough of the
+        // planner's own real, pre-existing entityHint parameter (same
+        // established convention as cozy-answer-engine.js's entityHint /
+        // cozy-living-assistant.js's contextualEntityName — see
+        // semantic-answer-planner.js's own planAnswer() header). Adds no
+        // new entity-resolution logic of its own; omitting it reproduces
+        // this file's pre-CML-6 behavior exactly.
+        const result = planner.planAnswer({ text, conversationState, requestedLanguage, entityHint, actorId });
         const cognitiveStatus = (result.diagnostics && result.diagnostics.cognitiveStatus) || null;
         const gapDetected = GAP_STATUSES.includes(cognitiveStatus) && !result.success;
 
