@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<!--
+  core/tests/browser/fixtures/organization-support-panel-fixture.html
+
+  NOT a dashboard, NOT a redesign of any real UI. Same real fixture
+  convention already established by organization-membership-fixture.html
+  (see that file's own header) — loads the REAL, unmodified source files
+  core/organization/organization-support-panel.js depends on, with real
+  <script src> tags, exactly the same loading mechanism admin-
+  workspace.html uses for the same files. admin-workspace.html's own
+  mount of this panel is gated behind a real server-authoritative
+  platform-admin check (AdminGateCore.decideGateAction() against a real
+  POST /webauthn/session) that this milestone's server tree has no route
+  to satisfy for a real test account (see chalzydashboard-organization-
+  workspace-browser.test.js's own PLATFORM-tier note for the identical,
+  disclosed limitation) — this fixture tests the panel's own real
+  rendering/wiring logic directly instead, against a real, client-side
+  IdentityEngine platform-admin user (the exact authority
+  organization-support-panel.js itself actually checks — see its own
+  header for why that, not the server session, is the real boundary it
+  composes).
+-->
+<html>
+<head><meta charset="utf-8"><title>CozyOS OrganizationSupportPanel — browser fixture</title></head>
+<body>
+  <script src="/core/shell/platform-event-bus.js"></script>
+  <script src="/core/organization/organization-registry.js"></script>
+  <script src="/core/organization/organization-membership.js"></script>
+  <script src="/core/organization/organization-support.js"></script>
+  <script src="/core/modules/identity/identity-engine.js"></script>
+  <script src="/core/organization/organization-support-panel.js"></script>
+  <div id="cozy-support-inbox-root"></div>
+</body>
+</html>

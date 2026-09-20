@@ -474,6 +474,12 @@
         <noscript>The CozyOS Administrator Workspace requires JavaScript.</noscript>
     </div>
 
+    <!-- Additive: real mount point for OrganizationSupportPanel (see
+         core/organization/organization-support-panel.js). Renders empty
+         for anyone who is not a real, verified platform admin — mounted
+         by the bootstrap script below, right after WorkspaceShell. -->
+    <div id="cozy-support-inbox-root"></div>
+
     <!-- CozyOS Shell UI Services (core/ui/). Loaded first: cozy-theme.js
          applies the active theme immediately on construction (reading the
          data-cozy-app="platform-admin" attribute already set on <html>
@@ -1083,6 +1089,13 @@
          to restrict their platform-admin override to a real, active
          grant rather than a standing override. -->
     <script src="core/organization/organization-support.js"></script>
+    <!-- LIVE INTEGRATION AUDIT — real UI for the above. OrganizationSupport
+         had a real, fully-tested authority engine with no way for a real
+         CozyOS platform administrator to actually see or act on a pending
+         support request anywhere on this page. This file only renders it
+         (see its own header) — mounted into #cozy-support-inbox-root by
+         the bootstrap script below, after WorkspaceShell mounts. -->
+    <script src="core/organization/organization-support-panel.js"></script>
     <script src="core/organization/organization-role.js"></script>
     <script src="core/organization/organization-hierarchy.js"></script>
     <script src="core/modules/ChurchOS/church-leadership-bridge.js"></script>
@@ -1881,7 +1894,17 @@
                         const identityReady = (identity && identity.ready && typeof identity.ready.then === "function")
                             ? identity.ready
                             : Promise.resolve();
-                        identityReady.catch(() => {}).then(() => window.CozyOS.WorkspaceShell.mount(root));
+                        identityReady.catch(() => {}).then(() => {
+                            window.CozyOS.WorkspaceShell.mount(root);
+                            // Real UI for OrganizationSupport (see that
+                            // file's own header) — mounted independently
+                            // of WorkspaceShell since it gates itself on
+                            // a real isPlatformAdmin() check and renders
+                            // nothing for anyone it isn't true for.
+                            if (window.CozyOS.OrganizationSupportPanel && typeof window.CozyOS.OrganizationSupportPanel.mount === "function") {
+                                try { window.CozyOS.OrganizationSupportPanel.mount(document.getElementById("cozy-support-inbox-root")); } catch (_err) { /* non-fatal */ }
+                            }
+                        });
                         return true;
                     } catch (err) {
                         console.error("[CozyOS] WorkspaceShell.mount() threw:", err);

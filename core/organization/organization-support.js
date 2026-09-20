@@ -292,6 +292,14 @@
                 .map((g) => this.#deepClone(g));
         }
 
+        /** listAllActiveGrants() — real, PLATFORM-facing visibility across every organization, same "never filtered" reasoning listPendingRequests() above already documents: a CozyOS Admin triaging active support sessions needs to see all of them, not one organization at a time. */
+        listAllActiveGrants() {
+            const nowMs = Date.now();
+            return Array.from(this.#grants.values())
+                .filter((g) => !g.revokedAt && new Date(g.expiresAt).getTime() > nowMs)
+                .map((g) => this.#deepClone(g));
+        }
+
         /** getAuditTrail(organizationId) — real, composes the SAME shared OrganizationRegistry history log every other organization-domain file writes into (see file header) — no second log. */
         getAuditTrail(organizationId) {
             const registry = this.#requireOrgRegistry();
