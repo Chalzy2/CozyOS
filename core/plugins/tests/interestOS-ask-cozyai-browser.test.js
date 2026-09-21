@@ -4,16 +4,22 @@
  * core/plugins/tests/interestOS-ask-cozyai-browser.test.js
  *
  * REAL browser test (Playwright + real Chromium at /opt/pw-browsers,
- * core/tests/browser/cozy-browser.js) for the "Ask CozyAI" control added
- * to My Business in InterestOS Full Completion Phase 2 (CozyAI
- * Integration). Drives the actual UI: create a table, tag roles, add a
- * row, then ask a real question and verify the real, computed answer
- * text — same pattern as interestOS-business-workspace-browser.test.js.
+ * core/tests/browser/cozy-browser.js) for InterestOS's "Ask CozyAI"
+ * button.
  *
- * Every answer below flows through the real, unmodified
- * window.CozyOS.CozyAnswerEngine.answer() -> CozyAI.getContext() ->
- * InterestOSBusinessWorkspace.computeSummary() chain; no mocked AI/
- * answer layer of its own.
+ * PHASE 4 (Universal Language Capability / "ONE Live Window" rule)
+ * REWRITE: this button used to be a whole embedded input+button+answer
+ * widget composing window.CozyOS.CozyAnswerEngine directly — a real,
+ * disclosed second conversational UI surface (never a second AI, since
+ * it reused the same CozyAnswerEngine, but a second entry point). Per
+ * the explicit Phase 4 requirement, it has been replaced with a single
+ * button that opens/focuses the ONE existing, canonical Live Window on
+ * dashboard.html via a real cross-page hand-off (sessionStorage) — this
+ * suite now proves THAT real navigation + real Live Window auto-open +
+ * real disclosure banner, not a business-data answer (that capability
+ * still works, unchanged, through the general Live Window itself —
+ * proven separately by core/living/tests/cozy-living-assistant-
+ * business-data-repair.test.js).
  */
 
 const { withBrowser, makeRunner } = require('../../tests/browser/cozy-browser');
@@ -34,76 +40,43 @@ async function main() {
         return { page, pageErrors, consoleErrors, failedRequests };
       }
 
-      async function addColumn(page, label, type, role) {
-        await page.fill('#ios-biz-new-col-label', label);
-        await page.selectOption('#ios-biz-new-col-type', type);
-        if (role) await page.selectOption('#ios-biz-new-col-role', role);
-        await page.click('#ios-biz-add-column-btn');
-        await page.waitForFunction((lbl) => {
-          const inputs = document.querySelectorAll('.ios-biz-col-label-input');
-          return [...inputs].some((i) => i.value === lbl);
-        }, label);
-      }
-
       for (const viewport of [{ width: 375, height: 812 }, { width: 1280, height: 900 }]) {
         const label = `${viewport.width}x${viewport.height}`;
-        const { page, pageErrors, consoleErrors, failedRequests } = await newPage(viewport);
+        const { page, pageErrors, consoleErrors } = await newPage(viewport);
 
-        await test(`[${label}] Ask CozyAI control renders inside My Business once a table exists`, async () => {
+        await test(`[${label}] the old embedded Ask CozyAI input/answer widget no longer exists — only the single button remains`, async () => {
+          const inputCount = await page.locator('#ios-biz-ask-input').count();
+          if (inputCount !== 0) throw new Error('expected the old embedded #ios-biz-ask-input to be removed');
+          const btnCount = await page.locator('#ios-biz-ask-btn').count();
+          if (btnCount !== 1) throw new Error('expected exactly one #ios-biz-ask-btn');
+        });
+
+        await test(`[${label}] the Ask CozyAI button becomes visible once a real table exists (same real #ios-biz-table-editor gate every other business control uses)`, async () => {
           await page.fill('#ios-biz-table-name-input', 'AI Shop');
           await page.click('#ios-biz-new-table-btn');
           await page.waitForSelector('#ios-biz-table-editor', { state: 'visible' });
-          const count = await page.locator('#ios-biz-ask-input').count();
-          if (count !== 1) throw new Error('Ask CozyAI input not found');
+          await page.waitForSelector('#ios-biz-ask-btn', { state: 'visible' });
         });
 
-        await test(`[${label}] asking before any row/role data still returns a real, honest (non-crashing) answer`, async () => {
-          await page.fill('#ios-biz-ask-input', 'What is my profit this month?');
-          await page.click('#ios-biz-ask-btn');
-          await page.waitForFunction(() => {
-            const el = document.getElementById('ios-biz-ask-answer');
-            return el && el.style.display !== 'none' && el.textContent.trim().length > 0 && el.textContent !== 'Thinking...';
-          });
-          const text = await page.textContent('#ios-biz-ask-answer');
-          if (!text || !text.trim()) throw new Error('expected a non-empty answer');
+        await test(`[${label}] clicking Ask CozyAI navigates to the real dashboard.html (the ONE canonical Live Window page)`, async () => {
+          await Promise.all([
+            page.waitForURL(/dashboard\.html/, { timeout: 15000 }),
+            page.click('#ios-biz-ask-btn')
+          ]);
+          if (!/dashboard\.html/.test(page.url())) throw new Error('expected navigation to dashboard.html, got: ' + page.url());
         });
 
-        await test(`[${label}] adding role-tagged columns and a row, then asking, returns a real computed profit figure`, async () => {
-          await addColumn(page, 'Date', 'DATE', 'DATE');
-          await addColumn(page, 'Sell', 'NUMBER', 'SELLING_PRICE');
-          await addColumn(page, 'Buy', 'NUMBER', 'BUYING_PRICE');
-          await page.click('#ios-biz-add-row-btn');
-          await page.waitForSelector('table.ios-biz-table tbody tr');
-          const inputs = page.locator('table.ios-biz-table tbody tr').first().locator('input');
-          const today = await page.evaluate(() => new Date().toISOString().slice(0, 10));
-          await inputs.nth(0).fill(today);
-          await inputs.nth(0).dispatchEvent('change');
-          await inputs.nth(1).fill('150');
-          await inputs.nth(1).dispatchEvent('change');
-          await inputs.nth(2).fill('90');
-          await inputs.nth(2).dispatchEvent('change');
-
-          await page.fill('#ios-biz-ask-input', 'What is my profit this month?');
-          await page.click('#ios-biz-ask-btn');
-          await page.waitForFunction(() => {
-            const el = document.getElementById('ios-biz-ask-answer');
-            return el && /profit 60/.test(el.textContent || '');
-          });
-          const text = await page.textContent('#ios-biz-ask-answer');
-          if (!/profit 60/.test(text)) throw new Error('expected the real computed profit of 60 (150-90) in the answer: ' + text);
+        await test(`[${label}] the real Live Window auto-opens on arrival, with a real disclosure banner mentioning InterestOS`, async () => {
+          await page.waitForSelector('#cozy-living-assistant-input', { timeout: 15000 });
+          const messages = await page.$$eval('#cozy-living-assistant-messages > *', (els) => els.map((e) => e.textContent.trim()));
+          const joined = messages.join(' | ');
+          if (!/InterestOS/i.test(joined)) throw new Error('expected a real disclosure banner mentioning InterestOS in: ' + joined);
         });
 
-        await test(`[${label}] an empty question is a no-op — no crash, no stale "Thinking..." left behind`, async () => {
-          await page.fill('#ios-biz-ask-input', '');
-          await page.click('#ios-biz-ask-btn');
-          const text = await page.textContent('#ios-biz-ask-answer');
-          if (text === 'Thinking...') throw new Error('empty question must not trigger a pending Thinking state');
-        });
-
-        await test(`[${label}] no unexpected console/page errors from Ask CozyAI`, async () => {
+        await test(`[${label}] no unexpected console/page errors from the Ask CozyAI hand-off`, async () => {
           if (pageErrors.length) throw new Error('page errors: ' + pageErrors.join(' | '));
           const unexpected = consoleErrors.filter((e) => !/status of 404.*Not Found|documents\/personal\/search/i.test(e));
-          if (unexpected.length) throw new Error('console errors: ' + unexpected.join(' | ') + ' | failed requests: ' + JSON.stringify(failedRequests));
+          if (unexpected.length) throw new Error('console errors: ' + unexpected.join(' | '));
         });
       }
     });

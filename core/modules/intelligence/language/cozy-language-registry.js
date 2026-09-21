@@ -74,6 +74,85 @@
 
     const ALL_LANGUAGES = Object.freeze(DEFAULT_LANGUAGES.concat(EXTENDED_LANGUAGES));
 
+    // PHASE 4 — Universal Language Capability. Two small, real,
+    // additive mutable structures — the first real mutators this file
+    // has ever had (its own header previously disclosed none existed:
+    // "this file has no mutator ... never calls one"). Neither touches
+    // the frozen static tables above.
+    //   registeredExtensions: newly REGISTERED languages not among the
+    //     11 static entries above (Phase 4's own "register" step).
+    //   stateOverrides: real, audited promotions to AVAILABLE for ANY
+    //     language (static or newly-registered) — set ONLY by
+    //     promoteToAvailable() below, and ONLY after that function
+    //     consults the real, existing Rule 82 gate
+    //     (window.CozyOS.CozyKnowledgeReview.evaluateRule82Gate,
+    //     cozy-knowledge-review.js) and receives promotion:"ELIGIBLE".
+    //     This file never marks a language AVAILABLE on its own
+    //     judgment — see that function's own comment.
+    const registeredExtensions = new Map();
+    const stateOverrides = new Map();
+
+    function baseEntry(code) {
+        const normalized = String(code || "").trim().toLowerCase();
+        return ALL_LANGUAGES.find((l) => l.code === normalized) || registeredExtensions.get(normalized) || null;
+    }
+
+    /**
+     * registerLanguage({ code, name, nativeName })
+     *   PHASE 4 — the "register" step of "register -> validate ->
+     *   VERIFIED + AVAILABLE". Real, disclosed, additive: rejects a
+     *   code already present among the 11 static entries or already
+     *   registered (never silently overwrites an existing language's
+     *   identity). Starts at "NOT_READY" — the exact same honest
+     *   initial state EXTENDED_LANGUAGES above already uses for a
+     *   registered-but-unverified language; only promoteToAvailable()
+     *   below can ever change that, and only via the real gate.
+     */
+    function registerLanguage(entry) {
+        const e = entry || {};
+        const code = String(e.code || "").trim().toLowerCase();
+        if (!code) return { success: false, reason: "A real language code is required." };
+        if (baseEntry(code)) return { success: false, reason: `"${code}" is already registered.` };
+        const record = Object.freeze({ code, name: e.name || code, nativeName: e.nativeName || e.name || code, state: "NOT_READY" });
+        registeredExtensions.set(code, record);
+        return { success: true, language: record };
+    }
+
+    /**
+     * promoteToAvailable(code, attestation)
+     *   PHASE 4 — the ONLY function in this file that can ever set a
+     *   language's effective state to "AVAILABLE". Composes the real,
+     *   existing Rule 82 gate read-only (never re-derives its own
+     *   promotion judgment) and records the override ONLY when that
+     *   gate itself reports promotion:"ELIGIBLE". `attestation` is the
+     *   same caller-supplied, never-inferred object
+     *   evaluateRule82Gate() already documents
+     *   ({resourcesAttestedBy, runtimeAttestedBy, testEvidence,
+     *   requiredKeys}) — this function adds no attestation fields of
+     *   its own and performs no verification of its own beyond what
+     *   the gate itself already checks.
+     */
+    function promoteToAvailable(code, attestation) {
+        const normalized = String(code || "").trim().toLowerCase();
+        const existing = baseEntry(normalized);
+        if (!existing) return { success: false, reason: `"${normalized}" is not registered.`, gate: null };
+        const c = window.CozyOS && window.CozyOS.CozyKnowledgeReview;
+        if (!c || typeof c.evaluateRule82Gate !== "function") {
+            return { success: false, reason: "The Rule 82 gate (CozyKnowledgeReview.evaluateRule82Gate) is not loaded — cannot honestly evaluate promotion.", gate: null };
+        }
+        const gate = c.evaluateRule82Gate(normalized, attestation);
+        if (!gate || gate.promotion !== "ELIGIBLE") {
+            return { success: false, reason: "NOT_ELIGIBLE — Rule 82 gate did not report ELIGIBLE.", gate };
+        }
+        stateOverrides.set(normalized, {
+            state: "AVAILABLE",
+            promotedAt: new Date().toISOString(),
+            promotedBy: (attestation && attestation.resourcesAttestedBy) || null,
+            gate
+        });
+        return { success: true, gate };
+    }
+
     // Safest-available fallback order (RP-027 §12 example: "I can
     // answer it in English or Kiswahili"). English first because it is
     // the one language every RP-026 regression test already depends on.
@@ -91,15 +170,27 @@
         US: "en", GB: "en", NG: "en", ZA: "en"
     });
 
+    /**
+     * getLanguage(code) — PHASE 4: now also resolves a newly
+     * registerLanguage()'d code (not only the 11 static entries), and
+     * applies a real promoteToAvailable() override's state on top when
+     * one exists. A language never previously registered or promoted
+     * behaves byte-identically to before this phase.
+     */
     function getLanguage(code) {
         if (!code) return null;
         const normalized = String(code).trim().toLowerCase();
-        return ALL_LANGUAGES.find((l) => l.code === normalized) || null;
+        const base = baseEntry(normalized);
+        if (!base) return null;
+        const override = stateOverrides.get(normalized);
+        return override ? Object.assign({}, base, { state: override.state, promotedAt: override.promotedAt, promotedBy: override.promotedBy }) : base;
     }
 
     function listLanguages(options = {}) {
         const includeExtended = options.includeExtended !== false;
-        return (includeExtended ? ALL_LANGUAGES : DEFAULT_LANGUAGES).map((l) => Object.assign({}, l));
+        const staticList = includeExtended ? ALL_LANGUAGES : DEFAULT_LANGUAGES;
+        const withExtensions = staticList.concat(includeExtended ? Array.from(registeredExtensions.values()) : []);
+        return withExtensions.map((l) => getLanguage(l.code) || Object.assign({}, l));
     }
 
     function isAvailable(code) {
@@ -174,7 +265,9 @@
         listLanguages,
         isAvailable,
         suggestFromCountry,
-        resolveLanguage
+        resolveLanguage,
+        registerLanguage,
+        promoteToAvailable
     });
 
     window.CozyOS.Modules["cozy-language-registry"] = Object.freeze({

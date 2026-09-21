@@ -400,6 +400,8 @@
      that file's own header, but is kept after it for readability. -->
 <script src="core/modules/intelligence/language/cozy-language-registry.js"></script>
 <script src="core/modules/intelligence/language/cozy-language-templates.js"></script>
+<!-- PHASE 4 (Universal Language Capability): cozy-language-realize.js — the generic realization seam composing the two files above. Read lazily at call time by cozy-teach-flow.js/cozy-living-assistant.js/cozy-learn.js/cozy-business-data-intent.js, so load order relative to those files does not matter. -->
+<script src="core/modules/intelligence/language/cozy-language-realize.js"></script>
 <!-- UNIVERSAL QUESTION UNDERSTANDING REPAIR (continuing the M363/PHASE
      6C class of fix above): two more real, fully-written, referenced-
      by-name files were never actually loaded on any real page.
@@ -442,6 +444,19 @@
 <script src="core/modules/intelligence/semantic-answer/evidence/source-adapters/cozy-memory-adapter.js"></script>
 <script src="core/modules/intelligence/semantic-answer/planning/semantic-answer-planner.js"></script>
 <script src="core/modules/cognitive/providers/semantic-answer-interpretation-provider.js"></script>
+<!-- COZY CONSTRUCTION SENTENCE ARCHITECTURE — SA-4/SA-5/SA-6, the real
+     realize->validate->repair pipeline (previously-missing contracts
+     for those three phases, plus the three real implementation files),
+     now actually consumed by CozyAnswerEngine itself (SA-7 — see that
+     file's own comment at its "semantic-answer-construction" authority)
+     rather than remaining the diagnostic-only artifact described in
+     the comment above this block. -->
+<script src="core/modules/intelligence/semantic-answer/contracts/language-realization-request-contract.js"></script>
+<script src="core/modules/intelligence/semantic-answer/contracts/candidate-sentence-contract.js"></script>
+<script src="core/modules/intelligence/semantic-answer/contracts/response-validation-result-contract.js"></script>
+<script src="core/modules/intelligence/semantic-answer/realization/language-realizer.js"></script>
+<script src="core/modules/intelligence/semantic-answer/validation/response-validator.js"></script>
+<script src="core/modules/intelligence/semantic-answer/repair/repair-loop.js"></script>
 <!-- Checkpoint K — the verified intelligence chain (Checkpoints F-J),
      real and previously reachable only from admin-workspace.html /
      Node tests. Wired here, in the same dependency order already
@@ -460,6 +475,18 @@
 <!-- PHASE 3 (Teach Cozy / Governed Learning): cozy-teach-intent.js (explicit teaching-marker detection) and cozy-teach-flow.js (the real create/confirm/promote conversational orchestrator, composing the CozyLearn state machine above) — both read lazily at answer-time by cozy-ai.js's getContext(), so load order relative to cozy-ai.js itself does not matter, but they must load after cozy-learn.js (CozyLearn) which they compose. -->
 <script src="core/living/cozy-teach-intent.js"></script>
 <script src="core/living/cozy-teach-flow.js"></script>
+<!-- PHASE 4 (Universal Language Capability): reciprocal learning — composes IdentityEngine (already loaded), CozyAfricanLanguageIntelligence + CozyLanguagePacks (loaded below), and CozyLanguageRealize (loaded above). Read lazily at call time. -->
+<script src="core/living/cozy-learning-intent.js"></script>
+<script src="core/living/cozy-reciprocal-learning.js"></script>
+<script src="core/living/cozy-learning-flow.js"></script>
+<!-- PHASE 4 (ENHANCED COZY BOUNDARY / Live Session Privacy): explicit
+     "send this to the pastor/moderator" workflow — composes
+     ChurchLiveSessionController/ChurchLiveModerationControls, loaded
+     below with the rest of the LDCE/ChurchOS moderation chain. Read
+     lazily at call time, same discipline as the reciprocal-learning
+     files above. -->
+<script src="core/living/cozy-pastor-question-intent.js"></script>
+<script src="core/living/cozy-pastor-question-flow.js"></script>
 <script src="core/modules/intelligence/providers/rule-based-conversational-provider.js"></script>
 <script src="core/ui/living-message-engine.js"></script>
 <script src="core/platform/application-visibility.js"></script>
@@ -584,6 +611,23 @@
      visible. Loaded before the player for the same reason
      admin-workspace.html already orders it that way. -->
 <script src="core/modules/ChurchOS/church-worship-session.js"></script>
+<!-- PHASE 4 — ENHANCED COZY BOUNDARY (Live Session Privacy): the real
+     LDCE/ChurchOS moderation chain (already loaded on admin-
+     workspace.html — same real files, same load order, never a second
+     copy) was never loaded here, so cozy-ai.js's own existing "Questions
+     ON/OFF" live-session fact and the new private pastor/moderator
+     question workflow (church-live-moderation-controls.js's
+     submitQuestion(), composed by core/living/cozy-pastor-question-
+     flow.js below) both silently no-op on the one page an ordinary
+     participant's Live Window actually runs on. Loaded here for the
+     same reason church-worship-session.js was: a real dependency this
+     page's own Live Window composition already reads, previously
+     missing only on this page. -->
+<script src="core/organization/organization-role.js"></script>
+<script src="core/modules/communication/ldce-session-engine.js"></script>
+<script src="core/modules/ChurchOS/church-live-moderation.js"></script>
+<script src="core/modules/ChurchOS/church-live-moderation-controls.js"></script>
+<script src="core/modules/ChurchOS/church-live-session-controller.js"></script>
 <script src="core/modules/ChurchOS/living-worship-player.js"></script>
 <!-- Dashboard Prompt 1: pure-logic navigation/AI-context module. Loads
      before user-dashboard.js, which now composes it for the real
@@ -607,6 +651,9 @@
      normalizer's presence at call time, so load order relative to it
      does not matter — this must simply be in place before any save). -->
 <script src="core/modules/intelligence/language-packs/cozy-language-pack-registry.js"></script>
+<!-- PHASE 4 (Universal Language Capability): cozy-african-language-intelligence.js — real six-level region/dialect routing + checkVerifiedGap(), composed by core/living/cozy-reciprocal-learning.js. Previously loaded only on cozy-media-intelligence-dashboard.html; this is the same "loaded vs. integrated" class of fix this repository has applied several times before (see cozy-learn.js/cozy-ai-semantic-intent.js's own Phase 6C history). cozy-knowledge-safety-gate.js is its own required real dependency for submitExpression() to ever leave QUARANTINED (was also not previously loaded here). -->
+<script src="core/modules/intelligence/knowledge/ui/cozy-knowledge-safety-gate.js"></script>
+<script src="core/modules/intelligence/language-packs/cozy-african-language-intelligence.js"></script>
 <script src="core/shell/dashboard-profile-language-contract.js"></script>
 <script src="core/shell/dashboard-profile-language-normalizer.js"></script>
 <!-- User Profile Phase 1: pure-logic Profile surface helpers (ISO country list, name mapping, validation). Loads before user-dashboard.js, which composes it. -->
@@ -615,6 +662,50 @@
 <script src="core/shell/learning-panel-ui.js"></script>
 <script src="core/shell/user-dashboard.js"></script>
 <script src="core/living/cozy-living-assistant.js"></script>
+<!-- PHASE 4 (Universal Language Capability / "ONE Live Window" rule):
+     real cross-page hand-off consumer for the real, disclosed
+     sessionStorage key InterestOS's own "Ask CozyAI" button sets (see
+     interestos.html's own comment) before navigating here. Opens the
+     SAME LivingAssistant singleton every other entry point already
+     uses via the real, existing announceContext() (Phase 4 addition,
+     same open()+#addMessage() pattern as enterTeachingMode()) — never a
+     second AI/window. Read-once: the key is removed immediately so a
+     later reload of this same page never re-fires it.
+
+     Deferred to DOMContentLoaded (same readyState guard
+     cozy-living-assistant.js's own auto-mount uses immediately above):
+     that file's mount() — which creates #button/#panel — is itself
+     deferred to DOMContentLoaded since its script tag runs while the
+     document is still parsing. Calling announceContext() synchronously
+     here, before mount() has run, hit open()'s use of
+     this.#button/this.#panel while both were still undefined; the
+     TypeError was swallowed by this script's own honest-no-op catch,
+     so the hand-off silently never opened the window. Listening for
+     DOMContentLoaded here (registered after cozy-living-assistant.js's
+     own listener on the same event) runs this after mount(), same
+     event-order guarantee, not a new synchronization mechanism. -->
+<script>
+(function () {
+  "use strict";
+  function consumeHandoff() {
+    try {
+      var raw = sessionStorage.getItem("cozy-live-window-open-context");
+      if (!raw) return;
+      sessionStorage.removeItem("cozy-live-window-open-context");
+      var ctx = JSON.parse(raw);
+      var assistant = window.CozyOS && window.CozyOS.LivingAssistant;
+      if (assistant && typeof assistant.announceContext === "function" && ctx && typeof ctx.hint === "string") {
+        assistant.announceContext(ctx.hint);
+      }
+    } catch (_err) { /* honest no-op — a malformed/absent hand-off never breaks the page */ }
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", consumeHandoff);
+  } else {
+    consumeHandoff();
+  }
+})();
+</script>
 <script src="core/shell/startup-orchestrator.js"></script>
 <script src="core/shell/launch-sequence.js?v=2"></script>
 <script>

@@ -272,7 +272,20 @@
             <p id="ios-biz-summary-note" class="ios-note"></p>
 
             <div class="ios-row">
-                <input type="text" id="ios-biz-ask-input" placeholder="Ask CozyAI about this table (e.g. What's my profit this month?)" />
+                <!-- PHASE 4 (Universal Language Capability / "ONE Live Window" rule):
+                     this used to be its own embedded input+button+answer
+                     widget composing window.CozyOS.CozyAnswerEngine
+                     directly — a real, disclosed second conversational
+                     surface (never a second AI/answer engine, since it
+                     reused the same CozyAnswerEngine, but a second UI
+                     entry point). Replaced with a single button that
+                     opens/focuses the ONE existing, canonical Live
+                     Window on dashboard.html — see this file's own
+                     #ios-biz-ask-btn handler below. Business-data
+                     questions ("What's my profit this month?") already
+                     work generically in that Live Window today (Phase 2's
+                     own free-text CozyBusinessDataIntent), so no context
+                     hand-off beyond a real disclosure banner is required. -->
                 <button id="ios-biz-ask-btn">Ask CozyAI</button>
             </div>
             <p id="ios-biz-ask-answer" class="ios-note" style="display:none;"></p>
@@ -1056,40 +1069,23 @@
             summaryNote.textContent = `${summary.rowsInPeriod} row(s) in this period. ${summary.cashBalanceAssumption}`;
         });
 
-        // "Ask CozyAI" — real composition through the same, single
-        // window.CozyOS.CozyAnswerEngine -> CozyAI.getContext() chain
-        // every other CozyOS surface uses (see cozy-ai.js's own header);
-        // no second AI, memory, or calculation engine of its own. The
-        // businessContext hook composes InterestOSBusinessWorkspace.
-        // computeSummary() for the currently selected table/period,
-        // which itself already enforces owner/visibility fail-closed.
-        const askInput = document.getElementById("ios-biz-ask-input");
+        // PHASE 4 — "Ask CozyAI" now opens/focuses the ONE real,
+        // existing Live Window (dashboard.html), never a second
+        // conversational surface. A real, disclosed cross-page hand-off
+        // (sessionStorage — same origin, same real browser session,
+        // never a second identity/context system) carries only a
+        // human-readable disclosure hint; dashboard.html's own bootstrap
+        // reads it once and auto-opens the SAME LivingAssistant every
+        // other entry point already uses. No new AI is instantiated.
         const askBtn = document.getElementById("ios-biz-ask-btn");
-        const askAnswer = document.getElementById("ios-biz-ask-answer");
-        askBtn.addEventListener("click", async () => {
-            const question = askInput.value.trim();
-            if (!question) return;
-            const answerEngine = window.CozyOS.CozyAnswerEngine;
-            askAnswer.style.display = "block";
-            if (!answerEngine || typeof answerEngine.answer !== "function") {
-                askAnswer.textContent = "CozyAI is not available in this environment.";
-                return;
-            }
-            if (!currentTableId) {
-                askAnswer.textContent = "Select or create a business table first.";
-                return;
-            }
-            askAnswer.textContent = "Thinking...";
-            const period = document.getElementById("ios-biz-period-select").value;
+        askBtn.addEventListener("click", () => {
             try {
-                const result = await answerEngine.answer(question, {
-                    actorId: owner,
-                    businessContext: { tableId: currentTableId, period },
-                });
-                askAnswer.textContent = result && result.answer ? result.answer : "No answer available.";
-            } catch (_err) {
-                askAnswer.textContent = "CozyAI could not answer that question right now.";
-            }
+                sessionStorage.setItem("cozy-live-window-open-context", JSON.stringify({
+                    source: "InterestOS",
+                    hint: "You're asking from InterestOS. You can ask about your business data (e.g. \"What's my profit this month?\") or anything else."
+                }));
+            } catch (_err) { /* sessionStorage unavailable — the Live Window still opens, just without the hint banner */ }
+            window.location.href = "../../dashboard.html";
         });
 
         refreshTableSelect(null);

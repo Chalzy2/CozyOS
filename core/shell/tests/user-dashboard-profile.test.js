@@ -463,7 +463,7 @@ test('INTEGRATION (real IdentityEngine): edit + Save persists to the "users" sto
   assert.equal(q('#cozy-ud-profile-fullname').getAttribute('value'), 'Ada Lovelace');
   await fillAndSave(q, { name: "Se\u00e1n O'Brien", country: 'IE', city: 'Cork' });
   assert.match(q('#cozy-ud-profile-status').textContent, /Profile saved/);
-  assert.deepEqual(IE.getProfile(reg.userId), { available: true, firstName: 'Se\u00e1n', lastName: 'O&#39;Brien', country: 'Ireland', city: 'Cork', motherLanguages: [], languagesKnown: [] }); // 2A-3: getProfile() also returns the two language lists ([] for a record that never had them)
+  assert.deepEqual(IE.getProfile(reg.userId), { available: true, firstName: 'Se\u00e1n', lastName: 'O&#39;Brien', country: 'Ireland', city: 'Cork', motherLanguages: [], languagesKnown: [], languageRoles: [] }); // 2A-3: getProfile() also returns the two language lists ([] for a record that never had them); PHASE 4: languageRoles (also [] for a record that never had it)
   assert.deepEqual(saves, [['users', reg.userId]]);
   assert.equal((await IE.login('integ1', 'Str0ng!Passw0rd')).available, true);
   // re-render: the stored (escaped) apostrophe is shown decoded, not double-escaped

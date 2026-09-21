@@ -75,7 +75,27 @@
         return exact ? exact.name : null;
     }
 
+    // PHASE 4 — Universal Language Capability. Every builder below now
+    // calls the real, generic CozyLanguageRealize.realize() seam first
+    // (composing the real, existing CozyLanguageTemplates table under
+    // the "teach:*" keys these exact strings were migrated to — see
+    // that file's own comment). Each keeps its OWN prior en/sw ternary
+    // as the ONLY fallback, used solely when the templates module isn't
+    // loaded at all (e.g. a Node unit test that doesn't load it) — the
+    // fallback text is otherwise never reached in any real page, since
+    // realize() returns the exact same en/sw content for those two
+    // languages. This is what lets a NEW language gain real Teach Cozy
+    // prompts the moment real template translations exist, with zero
+    // further change to this file.
+    function realize() {
+        const c = cozyOS();
+        return c && c.CozyLanguageRealize;
+    }
+
     function buildConfirmPrompt(claim, subject, language) {
+        const r = realize();
+        const realized = r && r.realize("teach:confirm-prompt", language, claim, subject);
+        if (realized) return realized;
         const subjectPhrase = subject ? (language === "sw" ? ` kuhusu ${subject}` : ` about ${subject}`) : "";
         return language === "sw"
             ? `Nimeelewa - unanifundisha${subjectPhrase}: "${claim}". Je, hii ni sahihi? (ndiyo/hapana)`
@@ -83,22 +103,34 @@
     }
 
     function buildConflictPrompt(claim, existingFact, language) {
+        const r = realize();
+        const realized = r && r.realize("teach:conflict-prompt", language, claim, existingFact);
+        if (realized) return realized;
         return language === "sw"
             ? `Ninalo tayari jibu lililothibitishwa kuhusu hili ambalo linapingana na ulichosema: "${existingFact}". Sikuweza kurekodi "${claim}" kama ilivyo kwa sasa.`
             : `I already have a verified answer about this that conflicts with what you said: "${existingFact}". I have not recorded "${claim}" as-is.`;
     }
 
     function buildTrustedPrompt(language) {
+        const r = realize();
+        const realized = r && r.realize("teach:trusted-prompt", language);
+        if (realized) return realized;
         return language === "sw"
             ? "Asante - nimehifadhi hili. Nitalitumia ninapojibu maswali yanayohusiana."
             : "Thank you - I've saved that. I'll use it when answering related questions.";
     }
 
     function buildRejectedPrompt(language) {
+        const r = realize();
+        const realized = r && r.realize("teach:rejected-prompt", language);
+        if (realized) return realized;
         return language === "sw" ? "Sawa, sitalikumbuka hilo." : "Okay, I won't remember that.";
     }
 
     function buildUnclearPrompt(claim, language) {
+        const r = realize();
+        const realized = r && r.realize("teach:unclear-prompt", language, claim);
+        if (realized) return realized;
         return language === "sw"
             ? `Samahani, sikuelewa. Je, "${claim}" ni sahihi? Tafadhali jibu ndiyo au hapana.`
             : `Sorry, I didn't understand. Is "${claim}" correct? Please answer yes or no.`;
@@ -115,7 +147,15 @@
      */
     function processTurn(question, options) {
         const opts = options || {};
-        const language = opts.language === "sw" ? "sw" : "en";
+        // PHASE 4 — previously collapsed to exactly "sw"/"en" (any 3rd
+        // language silently became "en"). Now passes through any real,
+        // caller-supplied language code as-is — the realization seam
+        // above honestly falls back to English text for a language with
+        // no template coverage yet (never a guess), so a genuinely
+        // registered 3rd language is tagged correctly throughout this
+        // turn's state (e.g. teachConversationState.pendingLanguage)
+        // even before its own templates exist.
+        const language = (typeof opts.language === "string" && opts.language.trim()) ? opts.language.trim().toLowerCase() : "en";
         const actorId = opts.actorId || null;
         const learn = cozyLearn();
         if (!learn) return { matched: false };
@@ -216,7 +256,8 @@
         const matches = learn.getTrustedTeachings(subject, { language: opts.language, scopes, actorId: opts.actorId || null });
         if (!matches || matches.length === 0) return null;
         const best = matches[matches.length - 1]; // most recently promoted
-        const prefix = opts.language === "sw" ? "Ulichonifundisha: " : "What you taught me: ";
+        const r = realize();
+        const prefix = (r && r.realize("teach:recall-prefix", opts.language)) || (opts.language === "sw" ? "Ulichonifundisha: " : "What you taught me: ");
         return { claim: best.claim, content: prefix + best.claim, scope: best.scope, candidateId: best.candidateId };
     }
 

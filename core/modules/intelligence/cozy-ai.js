@@ -543,6 +543,74 @@
             } catch (_err) { /* honest fall-through — never fabricate */ }
         }
 
+        // --- PHASE 4: Universal Language Capability — reciprocal
+        // learning ("I want to learn Kikuyu"). Checked right after Teach
+        // Cozy, for the same reason: an explicit learning statement is
+        // this turn's whole intent. Composes CozyLearningFlow (which
+        // itself composes CozyLearningIntent + CozyLanguageRealize +
+        // CozyReciprocalLearning, which in turn composes the real,
+        // existing IdentityEngine.getProfile() languageRoles field and
+        // CozyAfricanLanguageIntelligence.checkVerifiedGap()) — never a
+        // second AI/profile/language store. A message with no learning
+        // signal at all is a true no-op (matched:false).
+        const learningFlow = window.CozyOS.CozyLearningFlow;
+        if (learningFlow && typeof learningFlow.processTurn === "function") {
+            try {
+                const learningResult = learningFlow.processTurn(question, { actorId: effectiveActorId, language });
+                if (learningResult && learningResult.matched && learningResult.content) {
+                    return {
+                        success: true, isReal: true, question, actorId: effectiveActorId,
+                        found: true,
+                        results: [{
+                            authority: "cozy-learning",
+                            provenance: "window.CozyOS.CozyLearningFlow -> IdentityEngine.getProfile + CozyAfricanLanguageIntelligence.checkVerifiedGap",
+                            evidence: learningResult.evidence || "VERIFIED",
+                            content: learningResult.content
+                        }],
+                        businessDataConversationState: null,
+                        teachDataConversationState: null,
+                        note: "Composed from the real, existing CozyLearningFlow -> Profile/language-pack pipeline (Phase 4)."
+                    };
+                }
+            } catch (_err) { /* honest fall-through — never fabricate */ }
+        }
+
+        // --- PHASE 4: ENHANCED COZY BOUNDARY (Live Session Privacy) —
+        // explicit "send this to the pastor/moderator" ("Participant ->
+        // Private Cozy -> Submit to Pastor/Moderator" step of the spec's
+        // required workflow). Checked right after Teach Cozy/Learning,
+        // for the same reason: an explicit marker is this turn's whole
+        // intent. Composes CozyPastorQuestionFlow (which itself composes
+        // CozyPastorQuestionIntent + ChurchLiveSessionController +
+        // ChurchLiveModerationControls.submitQuestion(), the real,
+        // session-membership-checked, PRIVATE store this checkpoint
+        // added) — never a second AI/question store, never exposed to
+        // any other participant. A message with no explicit marker is a
+        // true no-op (matched:false); the participant's own PRIVATE Cozy
+        // conversation (this same getContext() call, every other
+        // authority below) is completely unaffected either way.
+        const pastorFlow = window.CozyOS.CozyPastorQuestionFlow;
+        if (pastorFlow && typeof pastorFlow.processTurn === "function") {
+            try {
+                const pastorResult = pastorFlow.processTurn(question, { actorId: effectiveActorId, language, liveSessionId });
+                if (pastorResult && pastorResult.matched && pastorResult.content) {
+                    return {
+                        success: true, isReal: true, question, actorId: effectiveActorId,
+                        found: true,
+                        results: [{
+                            authority: "cozy-pastor-question",
+                            provenance: "window.CozyOS.CozyPastorQuestionFlow -> ChurchLiveModerationControls.submitQuestion",
+                            evidence: pastorResult.evidence || "VERIFIED",
+                            content: pastorResult.content
+                        }],
+                        businessDataConversationState: null,
+                        teachDataConversationState: null,
+                        note: "Composed from the real, existing CozyPastorQuestionFlow -> ChurchLiveModerationControls pipeline (Phase 4 — Enhanced Cozy Boundary)."
+                    };
+                }
+            } catch (_err) { /* honest fall-through — never fabricate */ }
+        }
+
         // --- InterestOS business-DATA question (Phase 2: CozyAI + Live
         // Window Business-Data Q&A) — distinct from businessContext above
         // (that narrower hook only fires when a CALLER, e.g. InterestOS's

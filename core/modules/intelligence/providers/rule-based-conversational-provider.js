@@ -929,7 +929,21 @@
             // typo-normalization target — was never in this marker set.
             // Common, unambiguous, no English homograph risk, same
             // selection criteria as every marker above it.
-            "nani"
+            "nani",
+            // LIVE WINDOW LANGUAGE-REALIZATION REPAIR — real gap found
+            // via a live Kiswahili test-matrix question this repair's
+            // own spec required ("Nieleze kuhusu CozyOS." — a genuine,
+            // natural "explain to me about CozyOS" request): none of
+            // "nieleze"/"eleza"/"kuhusu" were in this marker set (the
+            // FAQ router's OWN, separate stopword list already
+            // recognized them as request-connective words — see
+            // cozyos-identity-faq-router.js's OVERLAP_STOPWORDS — but
+            // that is a different mechanism from THIS file's per-turn
+            // language detection, and stopwording them there does not
+            // register them here). Real, common, unambiguous Kiswahili
+            // words with no English homograph risk, same selection
+            // criteria as every marker above.
+            "nieleze", "eleza", "kuhusu"
         ]);
         const words = text.toLowerCase().match(/[a-zà-ÿ]+/g) || [];
         if (words.length === 0) return null;

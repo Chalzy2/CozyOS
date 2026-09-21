@@ -47,6 +47,10 @@
     window.CozyOS = window.CozyOS || {};
     const IE_VERSION = "1.5.0-ENTERPRISE"; // Milestone 375: getUserIdByUsername()/loginWithVerifiedPasskey() — real seam connecting the existing WebAuthnProvider (security-key factor) to login.html, following the exact #createRealSession(auditLabel) precedent already proven by login()/completeLoginWithOtp(). Prompt 7: loginWithVerifiedGoogle() — same precedent, for core/security/google-account-linkage.js's real, verified Google login candidates. Prompt 9A: getFactorSnapshotContext() — narrow, non-secret (hasPassword boolean, never the real hash) seam feeding AuthFactorSnapshot.buildFactorSnapshot(). Prompt 10 continuation: loginWithVerifiedPhone() — same #createRealSession() precedent, for phone-account-linkage.js's real, verified phone login candidates; the browser-side phone factor was the disclosed remaining gap (login-decision-engine.js already ranked "phone" but no session-establishment seam existed for it here).
     const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+    // PHASE 4 — Universal Language Capability. See #stageLanguageRoles()'s
+    // own comment for the real shape these gate.
+    const ALLOWED_LANGUAGE_ROLES = Object.freeze(["NATIVE", "FLUENT", "PROFICIENT", "CONVERSATIONAL", "LEARNING", "CONTRIBUTOR", "VALIDATOR"]);
+    const ALLOWED_LANGUAGE_ROLE_STATES = Object.freeze(["UNVERIFIED", "VERIFIED"]);
 
     class CozyOSIdentityEngine {
         #users = new Map(); #sessions = new Map(); #orgs = new Map(); #externalProviders = new Map(); #applicationAssignments = new Map();
@@ -1310,7 +1314,14 @@
                 firstName: user.firstName ?? null, lastName: user.lastName ?? null, country: user.country ?? null, city: user.city ?? null,
                 // Profile Phase 2A-3: always arrays. A record saved before these fields existed reads as [] / [].
                 motherLanguages: this.#storedLanguageList(user.motherLanguages),
-                languagesKnown: this.#storedLanguageList(user.languagesKnown)
+                languagesKnown: this.#storedLanguageList(user.languagesKnown),
+                // PHASE 4 — Universal Language Capability. Additive: a
+                // record saved before this field existed reads as [].
+                // Never replaces motherLanguages/languagesKnown above —
+                // both keep working exactly as before for every existing
+                // caller. See #stageLanguageRoles()'s own comment for
+                // the real shape and validation.
+                languageRoles: this.#storedLanguageRoles(user.languageRoles)
             };
         }
 
@@ -1349,6 +1360,79 @@
 
         #storedLanguageList(value) { return Array.isArray(value) ? value.filter((v) => typeof v === "string") : []; }
 
+        /**
+         * PHASE 4 — Universal Language Capability. Real per-user
+         * proficiency/role model, additive alongside the existing
+         * motherLanguages/languagesKnown two-bucket lists above (never
+         * replacing them — a caller that only reads/writes those two
+         * fields is completely unaffected). A user may hold MULTIPLE
+         * roles for the SAME language simultaneously (e.g. NATIVE +
+         * FLUENT + CONTRIBUTOR for Luo) and independently hold a
+         * different role set for a different language (e.g. LEARNING
+         * for Kikuyu) — this is exactly the "learn one language while
+         * contributing/validating another" requirement. Stored as one
+         * entry per language (never two entries for the same code — a
+         * duplicate is rejected below, not silently merged).
+         *
+         *   { language: "luo",
+         *     roles: ["NATIVE", "FLUENT", "CONTRIBUTOR"],
+         *     dialect: "..." | null,
+         *     region: "..." | null,
+         *     consent: true | false,          // explicit, never defaulted to true
+         *     state: "UNVERIFIED" | "VERIFIED" }  // a validator/admin attests VERIFIED; this engine never self-promotes it
+         */
+        #storedLanguageRoles(value) {
+            if (!Array.isArray(value)) return [];
+            return value.filter((entry) => entry && typeof entry.language === "string" && entry.language.length > 0 && Array.isArray(entry.roles))
+                .map((entry) => ({
+                    language: entry.language,
+                    roles: entry.roles.filter((r) => typeof r === "string"),
+                    dialect: typeof entry.dialect === "string" ? entry.dialect : null,
+                    region: typeof entry.region === "string" ? entry.region : null,
+                    consent: entry.consent === true,
+                    state: ALLOWED_LANGUAGE_ROLE_STATES.includes(entry.state) ? entry.state : "UNVERIFIED"
+                }));
+        }
+
+        /**
+         * #stageLanguageRoles(user, changes) — same all-or-nothing
+         * discipline as #stageLanguageFields() above, but this field's
+         * validation is its own (a role/proficiency record is a
+         * different shape than the two plain id lists, so it is not
+         * routed through DashboardProfileLanguageNormalizer, which owns
+         * a different, specific contract — see this repository's own
+         * "never force-fit a different shape into an existing
+         * normalizer" discipline). Never inferred: consent/state always
+         * come from the caller, defaulting to the least-privileged
+         * value (consent:false, state:"UNVERIFIED") when omitted.
+         */
+        #stageLanguageRoles(user, changes) {
+            const reject = (reason, rejected) => ({ ok: false, failure: { available: false, reason: `updateProfile(): language role fields were rejected (${reason}); nothing was saved.`, languageRoles: { ok: false, reason, rejected } } });
+            const raw = changes.languageRoles;
+            if (!Array.isArray(raw)) return reject("MUST_BE_ARRAY", []);
+            const seen = new Set();
+            const rejected = [];
+            const staged = [];
+            for (const entry of raw) {
+                const language = entry && typeof entry.language === "string" ? entry.language.trim().toLowerCase() : "";
+                const roles = entry && Array.isArray(entry.roles) ? entry.roles : null;
+                const validRoles = roles && roles.length > 0 && roles.every((r) => ALLOWED_LANGUAGE_ROLES.includes(r));
+                if (!language || !validRoles) { rejected.push({ entry, reason: !language ? "MISSING_LANGUAGE" : "INVALID_ROLES" }); continue; }
+                if (seen.has(language)) { rejected.push({ entry, reason: "DUPLICATE_LANGUAGE" }); continue; }
+                seen.add(language);
+                staged.push({
+                    language,
+                    roles: [...new Set(roles)],
+                    dialect: typeof entry.dialect === "string" && entry.dialect.trim() ? entry.dialect.trim() : null,
+                    region: typeof entry.region === "string" && entry.region.trim() ? entry.region.trim() : null,
+                    consent: entry.consent === true,
+                    state: ALLOWED_LANGUAGE_ROLE_STATES.includes(entry.state) ? entry.state : "UNVERIFIED"
+                });
+            }
+            if (rejected.length > 0) return reject("INVALID_ENTRIES", rejected);
+            return { ok: true, languageRoles: staged };
+        }
+
         #stageLanguageFields(user, changes) {
             const has = (k) => Object.prototype.hasOwnProperty.call(changes, k);
             const reject = (reason, rejected, text) => ({ ok: false, failure: { available: false, reason: `updateProfile(): ${text}`, languages: { ok: false, reason, rejected } } });
@@ -1386,9 +1470,10 @@
             const LIMITS = { firstName: 100, lastName: 100, country: 80, city: 80 };
             const NULLABLE = { firstName: false, lastName: false, country: true, city: true };
             const LANGUAGE_KEYS = ["motherLanguages", "languagesKnown"];
+            const LANGUAGE_ROLE_KEY = "languageRoles"; // PHASE 4 — its own, separate all-or-nothing field, see #stageLanguageRoles()
             const staged = {};
             for (const key of Object.keys(changes)) {
-                if (LANGUAGE_KEYS.includes(key)) continue; // validated as a pair by the normalizer, below
+                if (LANGUAGE_KEYS.includes(key) || key === LANGUAGE_ROLE_KEY) continue; // validated below
                 if (!Object.prototype.hasOwnProperty.call(LIMITS, key)) return { available: false, reason: `updateProfile(): field "${key}" is not an editable profile field.` };
                 const value = changes[key];
                 if (value === null) {
@@ -1403,13 +1488,20 @@
                 if (key === "lastName") staged[key] = this.#escapeHtml(clean);
                 else staged[key] = clean ? this.#escapeHtml(clean) : null;
             }
-            const languageRequest = LANGUAGE_KEYS.some((k) => Object.prototype.hasOwnProperty.call(changes, k));
-            if (languageRequest) {
+            const languageFieldsRequested = LANGUAGE_KEYS.some((k) => Object.prototype.hasOwnProperty.call(changes, k));
+            if (languageFieldsRequested) {
                 const lang = this.#stageLanguageFields(user, changes);
                 if (!lang.ok) return lang.failure;
                 staged.motherLanguages = lang.motherLanguages;
                 staged.languagesKnown = lang.languagesKnown;
             }
+            const languageRolesRequested = Object.prototype.hasOwnProperty.call(changes, LANGUAGE_ROLE_KEY);
+            if (languageRolesRequested) {
+                const roles = this.#stageLanguageRoles(user, changes);
+                if (!roles.ok) return roles.failure;
+                staged.languageRoles = roles.languageRoles;
+            }
+            const languageRequest = languageFieldsRequested || languageRolesRequested;
             const updated = Object.keys(staged);
             if (!updated.length) return { available: true, updated: [], persisted: true };
             const previous = languageRequest ? updated.map((k) => [k, Object.prototype.hasOwnProperty.call(user, k), user[k]]) : null;

@@ -204,35 +204,53 @@
         THIS_YEAR: { en: "this year", sw: "mwaka huu" },
     };
 
+    // PHASE 4 — Universal Language Capability. Every composer below now
+    // calls the real, generic CozyLanguageRealize.realize() seam first
+    // (composing the real, existing CozyLanguageTemplates table under
+    // the "business:*" keys these exact strings were migrated to). Each
+    // keeps its own prior en/sw ternary as the ONLY fallback, used
+    // solely when the templates module isn't loaded at all — byte-
+    // identical text either way for en/sw. METRIC_LABEL/RANGE_LABEL
+    // above are small vocabulary lookup tables, not sentence templates,
+    // and remain here unchanged (see this file's own Phase 4 comment).
+    function _realize() {
+        const c = window.CozyOS;
+        return c && c.CozyLanguageRealize;
+    }
+
     function _composeMetricAnswer(metric, timeRangeLabelKey, summary, lang) {
         const isSw = lang === "sw";
+        const r = _realize();
         const rangeText = RANGE_LABEL[timeRangeLabelKey] ? (isSw ? RANGE_LABEL[timeRangeLabelKey].sw : RANGE_LABEL[timeRangeLabelKey].en) : (isSw ? "kipindi hiki" : "this period");
         if (summary.rowsInPeriod === 0) {
-            return isSw
+            return (r && r.realize("business:metric-no-records", lang, rangeText)) || (isSw
                 ? `Hakuna rekodi za biashara zilizopatikana kwa ${rangeText}.`
-                : `No business records were found for ${rangeText}.`;
+                : `No business records were found for ${rangeText}.`);
         }
         const metricLabel = METRIC_LABEL[metric] ? (isSw ? METRIC_LABEL[metric].sw : METRIC_LABEL[metric].en) : metric;
         const value = summary[metric === "REVENUE" ? "revenue" : metric === "PROFIT" ? "profit" : metric === "EXPENSES" ? "expenses" : metric === "CASH_BALANCE" ? "cashBalance" : "savings"];
-        return isSw
+        return (r && r.realize("business:metric-answer", lang, metricLabel, rangeText, value)) || (isSw
             ? `${metricLabel.charAt(0).toUpperCase() + metricLabel.slice(1)} yako iliyorekodiwa kwa ${rangeText} ni ${value}.`
-            : `Your recorded ${metricLabel} for ${rangeText} was ${value}.`;
+            : `Your recorded ${metricLabel} for ${rangeText} was ${value}.`);
     }
 
     function _composeStockAnswer(summary, timeRangeLabelKey, lang) {
         const isSw = lang === "sw";
+        const r = _realize();
         const rangeText = RANGE_LABEL[timeRangeLabelKey] ? (isSw ? RANGE_LABEL[timeRangeLabelKey].sw : RANGE_LABEL[timeRangeLabelKey].en) : (isSw ? "kipindi hiki" : "this period");
         if (!summary.rolesUsed.productCol || !summary.rolesUsed.qtyCol) {
-            return isSw
+            return (r && r.realize("business:stock-no-columns", lang)) || (isSw
                 ? "Jedwali lako la biashara halina safu za bidhaa/wingi zilizowekwa alama, kwa hivyo taarifa za hisa haziwezi kuhesabiwa."
-                : "Your business table has no product/quantity columns tagged yet, so stock information can't be computed.";
+                : "Your business table has no product/quantity columns tagged yet, so stock information can't be computed.");
         }
         if (summary.stockMovement.length === 0) {
-            return isSw
+            return (r && r.realize("business:stock-no-movement", lang, rangeText)) || (isSw
                 ? `Hakuna mzunguko wa hisa uliorekodiwa kwa ${rangeText}.`
-                : `No stock movement was recorded for ${rangeText}.`;
+                : `No stock movement was recorded for ${rangeText}.`);
         }
         const lines = summary.stockMovement.map((s) => `${s.product}: ${s.quantity}`).join(", ");
+        const realized = r && r.realize("business:stock-answer", lang, rangeText, lines);
+        if (realized) return realized;
         const note = isSw
             ? "(Hii ni wingi uliorekodiwa kutoka mauzo/miamala, si kiwango cha sasa cha hisa iliyobaki — InterestOS haifuatilii hisa iliyobaki kwa sasa.)"
             : "(This is recorded movement from sales/transactions, not a current on-hand stock level — InterestOS does not track remaining inventory today.)";
@@ -243,16 +261,17 @@
 
     function _composeProductPerformanceAnswer(summary, timeRangeLabelKey, lang) {
         const isSw = lang === "sw";
+        const r = _realize();
         const rangeText = RANGE_LABEL[timeRangeLabelKey] ? (isSw ? RANGE_LABEL[timeRangeLabelKey].sw : RANGE_LABEL[timeRangeLabelKey].en) : (isSw ? "kipindi hiki" : "this period");
         if (!summary.rolesUsed.productCol || !summary.rolesUsed.qtyCol || summary.stockMovement.length === 0) {
-            return isSw
+            return (r && r.realize("business:product-performance-no-data", lang)) || (isSw
                 ? "Hakuna data ya kutosha ya bidhaa/wingi kuamua bidhaa iliyouza zaidi."
-                : "There isn't enough product/quantity data recorded to determine the best-selling product.";
+                : "There isn't enough product/quantity data recorded to determine the best-selling product.");
         }
         const best = summary.stockMovement.reduce((a, b) => (b.quantity > a.quantity ? b : a));
-        return isSw
+        return (r && r.realize("business:product-performance-answer", lang, rangeText, best.product, best.quantity)) || (isSw
             ? `Bidhaa iliyouza zaidi kwa ${rangeText} ni ${best.product} (${best.quantity} zilizouzwa).`
-            : `The best-selling product for ${rangeText} was ${best.product} (${best.quantity} sold).`;
+            : `The best-selling product for ${rangeText} was ${best.product} (${best.quantity} sold).`);
     }
 
     /**
@@ -272,16 +291,31 @@
         const parsed = parse(question, { conversationState });
         if (!parsed) return null;
 
-        const lang = language === "sw" ? "sw" : "en";
+        // PHASE 4 — relaxed collapse (was `language === "sw" ? "sw" : "en"`,
+        // which silently discarded any language other than Kiswahili
+        // before it ever reached the realize() seam below — the one
+        // straggler collapse site in this file, found while proving the
+        // "a new VERIFIED+AVAILABLE language reaches every already-
+        // migrated call site automatically" property for InterestOS's
+        // own business-data answer path). Same relaxed pattern already
+        // used by cozy-teach-flow.js/cozy-living-assistant.js/
+        // cozy-learn.js: pass the real requested language through
+        // untouched, defaulting to "en" only when none was supplied.
+        // isSw below (used only for this function's own literal-fallback
+        // ternaries when realize() itself returns null) is unaffected —
+        // en/sw output stays byte-identical either way.
+        const lang = (typeof language === "string" && language.trim()) ? language.trim().toLowerCase() : "en";
         const workspace = window.CozyOS.InterestOSBusinessWorkspace;
         if (!workspace) return null; // honest fall-through — this file invents no second workspace
+
+        const r = _realize();
 
         if (!actorId || actorId === "anonymous") {
             return {
                 matched: true,
-                content: lang === "sw"
+                content: (r && r.realize("business:sign-in-required", lang)) || (lang === "sw"
                     ? "Unahitaji kuingia katika akaunti yako ili kuona taarifa za biashara yako."
-                    : "You need to be signed in to see your business information.",
+                    : "You need to be signed in to see your business information."),
                 updatedConversationState: null
             };
         }
@@ -292,9 +326,9 @@
         if (tables.length === 0) {
             return {
                 matched: true,
-                content: lang === "sw"
+                content: (r && r.realize("business:no-tables", lang)) || (lang === "sw"
                     ? "Bado hujarekodi taarifa zozote za biashara katika InterestOS."
-                    : "You haven't recorded any business information in InterestOS yet.",
+                    : "You haven't recorded any business information in InterestOS yet."),
                 updatedConversationState: null
             };
         }
@@ -307,9 +341,9 @@
                 const names = tables.map((t) => t.name).join(", ");
                 return {
                     matched: true,
-                    content: lang === "sw"
+                    content: (r && r.realize("business:ambiguous-table", lang, names)) || (lang === "sw"
                         ? `Una majedwali kadhaa ya biashara (${names}). Unamaanisha jedwali gani?`
-                        : `You have more than one business table (${names}). Which one do you mean?`,
+                        : `You have more than one business table (${names}). Which one do you mean?`),
                     updatedConversationState: null
                 };
             }
@@ -319,9 +353,9 @@
         if (parsed.metricAmbiguous) {
             return {
                 matched: true,
-                content: lang === "sw"
+                content: (r && r.realize("business:ambiguous-metric", lang)) || (lang === "sw"
                     ? "Je, unamaanisha mauzo/mapato, faida, salio la fedha taslimu, au akiba?"
-                    : "Do you mean sales/revenue, profit, cash balance, or savings?",
+                    : "Do you mean sales/revenue, profit, cash balance, or savings?"),
                 updatedConversationState: { lastBusinessTableId: tableId, lastBusinessMetric: null, lastBusinessTimeRange: parsed.timeRange || null }
             };
         }
@@ -334,9 +368,9 @@
         if (!summary.available) {
             return {
                 matched: true,
-                content: lang === "sw"
+                content: (r && r.realize("business:summary-unavailable", lang)) || (lang === "sw"
                     ? "Taarifa za biashara hazipatikani kwa ombi hili kwa sasa."
-                    : "Business information is not available for this request right now.",
+                    : "Business information is not available for this request right now."),
                 updatedConversationState: null
             };
         }

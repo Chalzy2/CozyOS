@@ -144,7 +144,26 @@
     function persist(actorId, candidateId, record) {
         const memory = getMemory();
         if (memory && typeof memory.saveMemory === "function" && actorId) {
-            try { memory.saveMemory(actorId, `cozy-learn-candidate-${candidateId}`, record); return true; } catch (_err) { /* fall through to in-memory */ }
+            // PHASE 4 — ENHANCED COZY BOUNDARY (Live Session Privacy) FIX:
+            // a real, confirmed, pre-existing gap found while proving
+            // cross-participant isolation. This call never set `owner`,
+            // and CozyMemory's own #checkReadVisibility() treats an
+            // owner-less entry as open to ANY actorId ("an entry with no
+            // owner set is open to any actorId" — see that file's own
+            // #checkPermission() comment). getTrustedTeachings()'s own
+            // actorId-equality filter (this file, below) only protects
+            // ITS OWN read path — cozy-ai.js's separate, generic
+            // CozyMemory.recall() keyword fan-out (the "cozy-memory"
+            // authority in getContext()) goes straight through CozyMemory
+            // itself and was never scoped by that filter, so a taught
+            // candidate/record was readable by any other actorId whose
+            // question happened to keyword-match it. Passing the real
+            // owner here is the minimal fix: visibility stays "private"
+            // (saveMemory()'s own honest default, unchanged), and
+            // #checkReadVisibility() now actually enforces owner-only
+            // access for a USER-scope teaching, exactly as Phase 3's own
+            // documentation already claimed it did.
+            try { memory.saveMemory(actorId, `cozy-learn-candidate-${candidateId}`, record, { owner: actorId }); return true; } catch (_err) { /* fall through to in-memory */ }
         }
         memoryCandidates.set(candidateId, record);
         return false;
@@ -559,11 +578,22 @@
      *   correction candidate exists.
      */
     function buildClarificationMessage(unknownWord, suggestion, language) {
+        // PHASE 4 — migrated to the universal realization seam
+        // (window.CozyOS.CozyLanguageRealize, "learn:clarify-*" keys in
+        // cozy-language-templates.js). The literal en/sw ternary below
+        // remains only as the honest fallback for when that module
+        // isn't loaded (e.g. this file's own Node unit tests that don't
+        // load it) — byte-identical text either way for en/sw.
+        const realizer = window.CozyOS && window.CozyOS.CozyLanguageRealize;
         if (suggestion) {
+            const realized = realizer && realizer.realize("learn:clarify-with-suggestion", language, unknownWord, suggestion.candidate);
+            if (realized) return realized;
             return language === "sw"
                 ? `Nimeelewa muktadha wa swali lako, lakini neno "${unknownWord}" silitambui vizuri bado. Je, ulimaanisha "${suggestion.candidate}"?`
                 : `I understood the rest of your question, but I don't yet recognize "${unknownWord}". Did you mean "${suggestion.candidate}"?`;
         }
+        const realizedNoSuggestion = realizer && realizer.realize("learn:clarify-no-suggestion", language, unknownWord);
+        if (realizedNoSuggestion) return realizedNoSuggestion;
         return language === "sw"
             ? `Neno "${unknownWord}" silitambui katika muktadha huu. Unaweza kuniambia linamaanisha nini?`
             : `I don't recognize "${unknownWord}" in this context. Could you tell me what it means?`;

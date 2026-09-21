@@ -321,6 +321,8 @@
      that file's own header, but is kept after it for readability. -->
 <script src="core/modules/intelligence/language/cozy-language-registry.js"></script>
 <script src="core/modules/intelligence/language/cozy-language-templates.js"></script>
+<!-- PHASE 4 (Universal Language Capability): cozy-language-realize.js — the generic realization seam composing the two files above. Read lazily at call time, so load order relative to other files does not matter. -->
+<script src="core/modules/intelligence/language/cozy-language-realize.js"></script>
 <!-- UNIVERSAL QUESTION UNDERSTANDING REPAIR: same real, previously-
      disconnected files fixed in dashboard.html (see that file's own
      comment here) - cozy-language-directive.js (explicit "...in
@@ -354,6 +356,14 @@
 <script src="core/modules/intelligence/semantic-answer/evidence/source-adapters/cozy-memory-adapter.js"></script>
 <script src="core/modules/intelligence/semantic-answer/planning/semantic-answer-planner.js"></script>
 <script src="core/modules/cognitive/providers/semantic-answer-interpretation-provider.js"></script>
+<!-- COZY CONSTRUCTION SENTENCE ARCHITECTURE — SA-4/SA-5/SA-6, same
+     addition as dashboard.html's own identical comment. -->
+<script src="core/modules/intelligence/semantic-answer/contracts/language-realization-request-contract.js"></script>
+<script src="core/modules/intelligence/semantic-answer/contracts/candidate-sentence-contract.js"></script>
+<script src="core/modules/intelligence/semantic-answer/contracts/response-validation-result-contract.js"></script>
+<script src="core/modules/intelligence/semantic-answer/realization/language-realizer.js"></script>
+<script src="core/modules/intelligence/semantic-answer/validation/response-validator.js"></script>
+<script src="core/modules/intelligence/semantic-answer/repair/repair-loop.js"></script>
 <!-- Checkpoint K — the verified intelligence chain (Checkpoints F-J),
      real and previously reachable only from admin-workspace.html /
      Node tests. Wired here, in the same dependency order already
@@ -372,6 +382,18 @@
 <!-- PHASE 3 (Teach Cozy / Governed Learning): cozy-teach-intent.js (explicit teaching-marker detection) and cozy-teach-flow.js (the real create/confirm/promote conversational orchestrator, composing the CozyLearn state machine above) — both read lazily at answer-time by cozy-ai.js's getContext(), so load order relative to cozy-ai.js itself does not matter, but they must load after cozy-learn.js (CozyLearn) which they compose. -->
 <script src="core/living/cozy-teach-intent.js"></script>
 <script src="core/living/cozy-teach-flow.js"></script>
+<!-- PHASE 4 (Universal Language Capability): reciprocal learning — composes IdentityEngine (already loaded), CozyAfricanLanguageIntelligence + CozyLanguagePacks (loaded below), and CozyLanguageRealize (loaded above). Read lazily at call time. -->
+<script src="core/living/cozy-learning-intent.js"></script>
+<script src="core/living/cozy-reciprocal-learning.js"></script>
+<script src="core/living/cozy-learning-flow.js"></script>
+<!-- PHASE 4 (ENHANCED COZY BOUNDARY / Live Session Privacy): explicit
+     "send this to the pastor/moderator" workflow. Same graceful no-op
+     discipline as every other module here when its own real
+     dependencies (ChurchWorshipSession/LDCE, not loaded on this page)
+     are absent — added for consistency with dashboard.html, never a
+     second implementation. -->
+<script src="core/living/cozy-pastor-question-intent.js"></script>
+<script src="core/living/cozy-pastor-question-flow.js"></script>
 <script src="core/modules/intelligence/providers/rule-based-conversational-provider.js"></script>
 <script src="core/ui/living-message-engine.js"></script>
 <script src="core/platform/application-visibility.js"></script>
@@ -426,6 +448,9 @@
      normalizer's presence at call time, so load order relative to it
      does not matter — this must simply be in place before any save). -->
 <script src="core/modules/intelligence/language-packs/cozy-language-pack-registry.js"></script>
+<!-- PHASE 4 (Universal Language Capability): cozy-african-language-intelligence.js — real six-level region/dialect routing + checkVerifiedGap(), composed by core/living/cozy-reciprocal-learning.js. cozy-knowledge-safety-gate.js is its own required real dependency for submitExpression() to ever leave QUARANTINED. -->
+<script src="core/modules/intelligence/knowledge/ui/cozy-knowledge-safety-gate.js"></script>
+<script src="core/modules/intelligence/language-packs/cozy-african-language-intelligence.js"></script>
 <script src="core/shell/dashboard-profile-language-contract.js"></script>
 <script src="core/shell/dashboard-profile-language-normalizer.js"></script>
 <!-- User Profile Phase 1: pure-logic Profile surface helpers (ISO country list, name mapping, validation). Loads before user-dashboard.js, which composes it. -->

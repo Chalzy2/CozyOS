@@ -428,11 +428,32 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
          */
         enterTeachingMode() {
             this.open();
-            const language = this.#currentLanguage === "sw" ? "sw" : "en";
-            const banner = language === "sw"
+            const language = (this.#currentLanguage && String(this.#currentLanguage).trim()) ? String(this.#currentLanguage).trim().toLowerCase() : "en";
+            // PHASE 4 — migrated to the universal realization seam
+            // (window.CozyOS.CozyLanguageRealize, "teach:mode-banner" in
+            // cozy-language-templates.js); the en/sw literal ternary
+            // remains only as the honest fallback for when that module
+            // isn't loaded at all (byte-identical text either way).
+            const realizer = window.CozyOS && window.CozyOS.CozyLanguageRealize;
+            const banner = (realizer && realizer.realize("teach:mode-banner", language)) || (language === "sw"
                 ? "Uko kwenye hali ya kufundisha. Niambie jambo unalotaka nikumbuke (mfano: \"Nataka kukufundisha kwamba...\"), na nitakuuliza uthibitishe kabla sijalikumbuka."
-                : "You're in teaching mode. Tell me something you'd like me to remember (e.g. \"I want to teach you that...\"), and I'll ask you to confirm before I remember it.";
+                : "You're in teaching mode. Tell me something you'd like me to remember (e.g. \"I want to teach you that...\"), and I'll ask you to confirm before I remember it.");
             this.#addMessage("assistant", banner);
+        }
+
+        /**
+         * announceContext(hintText) — PHASE 4: the real function a
+         * cross-page "Ask CozyAI" hand-off (e.g. InterestOS's own real
+         * button — see interestos.html's own comment) calls after
+         * navigating here. Same two real, existing steps as
+         * enterTeachingMode() above: open() (never a second window) and
+         * #addMessage() (never a second message-rendering path). Sets no
+         * new mode/state anywhere in the answer chain — this is a plain
+         * disclosure banner, nothing more.
+         */
+        announceContext(hintText) {
+            this.open();
+            if (typeof hintText === "string" && hintText.trim()) this.#addMessage("assistant", hintText.trim());
         }
 
         /**

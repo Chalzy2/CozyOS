@@ -80,7 +80,16 @@
             sw: "Habari! Mimi ni Msaidizi wa CozyOS. Naweza kukusaidiaje?",
             fr: "Bonjour ! Je suis l'Assistant CozyOS. Comment puis-je vous aider ?",
             ar: "مرحبًا! أنا مساعد CozyOS. كيف يمكنني مساعدتك؟",
-            so: "Salaan! Waxaan ahay Kaaliyaha CozyOS. Sideen kuu caawin karaa?"
+            so: "Salaan! Waxaan ahay Kaaliyaha CozyOS. Sideen kuu caawin karaa?",
+            // PHASE 4 — P4-10 acceptance test only: "qtz" is an ISO 639
+            // private-use code (qaa-qtz range), registered via
+            // CozyLanguageRegistry.registerLanguage() purely to prove the
+            // propagation property (a new VERIFIED+AVAILABLE language
+            // reaches every already-migrated call site with zero
+            // application-file edits) without misrepresenting a real
+            // living language. Deliberately labeled "[QTZ TEST]" so it
+            // can never be mistaken for a genuine verified translation.
+            qtz: "[QTZ TEST] Hello! I'm the CozyOS Assistant. How can I help you?"
         }),
         "thanks": Object.freeze({
             en: "You're welcome! Let me know if there's anything else you need.",
@@ -460,6 +469,43 @@
             ar: (answer) => `بالإنجليزية (لا توجد بعد ترجمة عربية موثّقة لهذا النص): ${answer}`,
             so: (answer) => `Ingiriisi ahaan (weli ma jirto turjumaad Soomaali ah oo la xaqiijiyay oo qoraalkan ah): ${answer}`
         }),
+        // LIVE WINDOW LANGUAGE-REALIZATION REPAIR (Phase 4 correction) —
+        // real bug found via an actual Live Window run: "CozyOS ni nini?"
+        // (fully Kiswahili) returned a Kiswahili-realized identity answer
+        // from CozyIdentityFAQRouter correctly, but cozy-answer-engine.js's
+        // own multi-intent composition then spliced RAW English
+        // knowledge-registry prose onto it with a bare "Additionally:"
+        // connector, producing a mixed-language final answer. The
+        // knowledge-registry authority's raw fact content (from
+        // cozy-public-knowledge-source.js) is genuinely English-authored
+        // only this pass — see "why-use-cozyos:verified"/"differentiation:
+        // verified" above, which already use this exact disclosure
+        // pattern for their own single-piece case. This key generalizes
+        // the SAME already-established wrapper for cozy-answer-engine.js's
+        // multi-piece composition (synthesizeFromContext()), replacing
+        // its own hardcoded "Additionally: " English connector for any
+        // non-English target language — never a fabricated translation
+        // of the underlying content, only an honest disclosure around it,
+        // exactly like the two keys above.
+        "content:english-only-notice": Object.freeze({
+            en: (answer) => `Additionally: ${answer}`,
+            sw: (answer) => `Kwa Kiingereza (bado hatuna tafsiri iliyothibitishwa ya maandishi haya kwa Kiswahili): ${answer}`,
+            fr: (answer) => `En anglais (aucune traduction française vérifiée de ce texte n'existe encore) : ${answer}`,
+            ar: (answer) => `بالإنجليزية (لا توجد بعد ترجمة عربية موثّقة لهذا النص): ${answer}`,
+            so: (answer) => `Ingiriisi ahaan (weli ma jirto turjumaad Soomaali ah oo la xaqiijiyay oo qoraalkan ah): ${answer}`
+        }),
+        // Generic connective phrase between two already-realized answer
+        // pieces (cozy-answer-engine.js's own multi-piece join) — a
+        // structural sentence frame, same discipline as every other key
+        // in this table; never a translation of one specific fact.
+        "connector:additionally": Object.freeze({
+            en: "Additionally,",
+            sw: "Zaidi ya hayo,",
+            fr: "De plus,",
+            ar: "بالإضافة إلى ذلك،",
+            so: "Intaa waxaa dheer,"
+        }),
+
         "differentiation:not_found": Object.freeze({
             en: "I don't have a verified answer yet for how CozyOS differs from other options.",
             sw: "Sina bado jibu lililothibitishwa kuhusu jinsi CozyOS inavyotofautiana na chaguo zingine.",
@@ -750,6 +796,210 @@
             fr: (name) => `J'ai trouvé « ${name} », mais votre compte n'y a actuellement pas accès.`,
             ar: (name) => `وجدت "${name}"، لكن حسابك ليس لديه حاليًا إمكانية الوصول إليه.`,
             so: (name) => `Waxaan helay "${name}", laakiin xisaabtaadu weli ma haysato fasax aad ku isticmaasho.`
+        }),
+
+        // PHASE 4 — Universal Language Capability. The following
+        // "teach:*" keys are migrated verbatim (byte-identical en/sw
+        // content) from core/living/cozy-teach-flow.js's/
+        // cozy-living-assistant.js's own previously-hardcoded
+        // `language === "sw" ? A : B` ternaries (Phase 3's own code) —
+        // see this repository's Phase 4 audit for the full inventory.
+        // Moving them here, behind CozyLanguageRealize.realize(), means
+        // a future language gains real Teach Cozy prompts the moment
+        // real translations are added here — no code change at the
+        // call site ever again for these keys.
+        "teach:confirm-prompt": Object.freeze({
+            en: (claim, subject) => `Got it - you're teaching me${subject ? ` about ${subject}` : ""}: "${claim}". Is that correct? (yes/no)`,
+            sw: (claim, subject) => `Nimeelewa - unanifundisha${subject ? ` kuhusu ${subject}` : ""}: "${claim}". Je, hii ni sahihi? (ndiyo/hapana)`
+        }),
+        "teach:conflict-prompt": Object.freeze({
+            en: (claim, existingFact) => `I already have a verified answer about this that conflicts with what you said: "${existingFact}". I have not recorded "${claim}" as-is.`,
+            sw: (claim, existingFact) => `Ninalo tayari jibu lililothibitishwa kuhusu hili ambalo linapingana na ulichosema: "${existingFact}". Sikuweza kurekodi "${claim}" kama ilivyo kwa sasa.`
+        }),
+        "teach:trusted-prompt": Object.freeze({
+            en: "Thank you - I've saved that. I'll use it when answering related questions.",
+            sw: "Asante - nimehifadhi hili. Nitalitumia ninapojibu maswali yanayohusiana."
+        }),
+        "teach:rejected-prompt": Object.freeze({
+            en: "Okay, I won't remember that.",
+            sw: "Sawa, sitalikumbuka hilo."
+        }),
+        "teach:unclear-prompt": Object.freeze({
+            en: (claim) => `Sorry, I didn't understand. Is "${claim}" correct? Please answer yes or no.`,
+            sw: (claim) => `Samahani, sikuelewa. Je, "${claim}" ni sahihi? Tafadhali jibu ndiyo au hapana.`
+        }),
+        "teach:mode-banner": Object.freeze({
+            en: "You're in teaching mode. Tell me something you'd like me to remember (e.g. \"I want to teach you that...\"), and I'll ask you to confirm before I remember it.",
+            sw: "Uko kwenye hali ya kufundisha. Niambie jambo unalotaka nikumbuke (mfano: \"Nataka kukufundisha kwamba...\"), na nitakuuliza uthibitishe kabla sijalikumbuka.",
+            // PHASE 4 — P4-10 acceptance test only, see greeting-generic's
+            // own comment above.
+            qtz: "[QTZ TEST] You're in teaching mode. Tell me something you'd like me to remember."
+        }),
+        "teach:recall-prefix": Object.freeze({
+            en: "What you taught me: ",
+            sw: "Ulichonifundisha: "
+        }),
+        // PHASE 4 — migrated verbatim from core/living/cozy-learn.js's
+        // own previously-hardcoded buildClarificationMessage() ternary
+        // (Phase 6B code, pre-dating Phase 3/4).
+        "learn:clarify-with-suggestion": Object.freeze({
+            en: (unknownWord, suggestedCandidate) => `I understood the rest of your question, but I don't yet recognize "${unknownWord}". Did you mean "${suggestedCandidate}"?`,
+            sw: (unknownWord, suggestedCandidate) => `Nimeelewa muktadha wa swali lako, lakini neno "${unknownWord}" silitambui vizuri bado. Je, ulimaanisha "${suggestedCandidate}"?`
+        }),
+        "learn:clarify-no-suggestion": Object.freeze({
+            en: (unknownWord) => `I don't recognize "${unknownWord}" in this context. Could you tell me what it means?`,
+            sw: (unknownWord) => `Neno "${unknownWord}" silitambui katika muktadha huu. Unaweza kuniambia linamaanisha nini?`
+        }),
+
+        // PHASE 4 — migrated verbatim (byte-identical en/sw content) from
+        // core/modules/intelligence/business-data/cozy-business-data-intent.js's
+        // own previously-hardcoded `isSw` ternaries (Phase 2 code). The
+        // METRIC_LABEL/RANGE_LABEL word tables in that file remain there
+        // (small vocabulary lookups, not sentence templates — see this
+        // repository's Phase 4 audit for that distinction).
+        "business:sign-in-required": Object.freeze({
+            en: "You need to be signed in to see your business information.",
+            sw: "Unahitaji kuingia katika akaunti yako ili kuona taarifa za biashara yako."
+        }),
+        "business:no-tables": Object.freeze({
+            en: "You haven't recorded any business information in InterestOS yet.",
+            sw: "Bado hujarekodi taarifa zozote za biashara katika InterestOS.",
+            // PHASE 4 — P4-10 acceptance test only, see greeting-generic's
+            // own comment above. Chosen specifically because it proves
+            // propagation into InterestOS's own business-data answer path
+            // (core/modules/intelligence/business-data/cozy-business-data-intent.js)
+            // without that file, or interestos.html, ever being edited.
+            qtz: "[QTZ TEST] You haven't recorded any business information in InterestOS yet."
+        }),
+        "business:ambiguous-table": Object.freeze({
+            en: (names) => `You have more than one business table (${names}). Which one do you mean?`,
+            sw: (names) => `Una majedwali kadhaa ya biashara (${names}). Unamaanisha jedwali gani?`
+        }),
+        "business:ambiguous-metric": Object.freeze({
+            en: "Do you mean sales/revenue, profit, cash balance, or savings?",
+            sw: "Je, unamaanisha mauzo/mapato, faida, salio la fedha taslimu, au akiba?"
+        }),
+        "business:summary-unavailable": Object.freeze({
+            en: "Business information is not available for this request right now.",
+            sw: "Taarifa za biashara hazipatikani kwa ombi hili kwa sasa."
+        }),
+        "business:metric-no-records": Object.freeze({
+            en: (rangeText) => `No business records were found for ${rangeText}.`,
+            sw: (rangeText) => `Hakuna rekodi za biashara zilizopatikana kwa ${rangeText}.`
+        }),
+        "business:metric-answer": Object.freeze({
+            en: (metricLabel, rangeText, value) => `Your recorded ${metricLabel} for ${rangeText} was ${value}.`,
+            sw: (metricLabel, rangeText, value) => `${metricLabel.charAt(0).toUpperCase() + metricLabel.slice(1)} yako iliyorekodiwa kwa ${rangeText} ni ${value}.`
+        }),
+        "business:stock-no-columns": Object.freeze({
+            en: "Your business table has no product/quantity columns tagged yet, so stock information can't be computed.",
+            sw: "Jedwali lako la biashara halina safu za bidhaa/wingi zilizowekwa alama, kwa hivyo taarifa za hisa haziwezi kuhesabiwa."
+        }),
+        "business:stock-no-movement": Object.freeze({
+            en: (rangeText) => `No stock movement was recorded for ${rangeText}.`,
+            sw: (rangeText) => `Hakuna mzunguko wa hisa uliorekodiwa kwa ${rangeText}.`
+        }),
+        "business:stock-answer": Object.freeze({
+            en: (rangeText, lines) => `Recorded stock movement for ${rangeText}: ${lines}. (This is recorded movement from sales/transactions, not a current on-hand stock level — InterestOS does not track remaining inventory today.)`,
+            sw: (rangeText, lines) => `Mzunguko wa hisa uliorekodiwa kwa ${rangeText}: ${lines}. (Hii ni wingi uliorekodiwa kutoka mauzo/miamala, si kiwango cha sasa cha hisa iliyobaki — InterestOS haifuatilii hisa iliyobaki kwa sasa.)`
+        }),
+        "business:product-performance-no-data": Object.freeze({
+            en: "There isn't enough product/quantity data recorded to determine the best-selling product.",
+            sw: "Hakuna data ya kutosha ya bidhaa/wingi kuamua bidhaa iliyouza zaidi."
+        }),
+        "business:product-performance-answer": Object.freeze({
+            en: (rangeText, productName, quantity) => `The best-selling product for ${rangeText} was ${productName} (${quantity} sold).`,
+            sw: (rangeText, productName, quantity) => `Bidhaa iliyouza zaidi kwa ${rangeText} ni ${productName} (${quantity} zilizouzwa).`
+        }),
+
+        // PHASE 4 — migrated verbatim (byte-identical en/sw content) from
+        // core/modules/intelligence/knowledge/cozy-knowledge-registry.js's
+        // own previously-hardcoded `isSw` section-label ternaries.
+        "knowledge:verified-capabilities-label": Object.freeze({ en: "Verified capabilities", sw: "Uwezo ulioidhinishwa" }),
+        "knowledge:compare-intro": Object.freeze({
+            en: (appA, appB) => `Here is the real difference between ${appA} and ${appB}, based on each one's own verified purpose and capabilities - not an unsupported "better" claim.`,
+            sw: (appA, appB) => `Hapa kuna tofauti halisi kati ya ${appA} na ${appB}, kulingana na uwezo uliothibitishwa wa kila moja - si dai la "bora zaidi".`
+        }),
+        "knowledge:real-life-examples-label": Object.freeze({ en: "Real-life examples", sw: "Mifano halisi ya matumizi" }),
+        "knowledge:verified-today-label": Object.freeze({ en: "Verified today", sw: "Uwezo ulioidhinishwa leo" }),
+        "knowledge:awaiting-connection-label": Object.freeze({ en: "Already implemented but not yet connected", sw: "Zipo lakini hazijaunganishwa bado" }),
+        "knowledge:partially-implemented-label": Object.freeze({ en: "Partially implemented", sw: "Zimetekelezwa kwa sehemu" }),
+        "knowledge:vision-planned-label": Object.freeze({ en: "Vision/planned (not implemented yet)", sw: "Vision/yajayo (bado hayajatekelezwa)" }),
+
+        // PHASE 4 — reciprocal learning (core/living/cozy-learning-flow.js).
+        "learning:acknowledge-honest": Object.freeze({
+            en: (targetLanguage) => `Sure - let's learn ${targetLanguage} together. I can understand and respond for the areas currently supported by my verified language foundation, and that grows as more real, verified content is added.`,
+            sw: (targetLanguage) => `Sawa - hebu tujifunze ${targetLanguage} pamoja. Ninaweza kuelewa na kujibu kwa maeneo yanayoungwa mkono na msingi wangu wa lugha ulioidhinishwa kwa sasa, na hilo linaongezeka kadiri maudhui halisi yaliyothibitishwa yanavyoongezwa.`
+        }),
+        "learning:reciprocal-invitation": Object.freeze({
+            en: (contributorLanguage, expression) => `Also, since your profile shows you're a contributor for ${contributorLanguage}: I already have some evidence for "${expression}", but not yet enough to call it fully verified. Can you teach me how a fluent speaker would naturally confirm or improve it?`,
+            sw: (contributorLanguage, expression) => `Pia, kwa kuwa wasifu wako unaonyesha wewe ni mchangiaji wa ${contributorLanguage}: Ninalo baadhi ya ushahidi wa "${expression}", lakini bado haujatosha kuuita ulioidhinishwa kikamilifu. Unaweza kunifundisha jinsi mzungumzaji fasaha angethibitisha au kuboresha hili?`
+        }),
+
+        // PHASE 4 — ENHANCED COZY BOUNDARY (Live Session Privacy):
+        // core/living/cozy-pastor-question-flow.js's own confirmation/
+        // honest-refusal text for the explicit "send this to the pastor/
+        // moderator" workflow. Never broadcasts the question text itself
+        // back into this template (the question is already privately
+        // recorded by church-live-moderation-controls.js by the time
+        // this text is shown) — only a real status.
+        "pastor-question:submitted": Object.freeze({
+            en: "Your question has been sent privately to the pastor/moderator. Only they can see it - you'll see their reply here once they respond.",
+            sw: "Swali lako limetumwa kwa faragha kwa mchungaji/msimamizi. Ni wao pekee wanaoweza kuliona - utaona jibu lao hapa mara watakapojibu."
+        }),
+        "pastor-question:unavailable": Object.freeze({
+            en: (reason) => `I couldn't send that to the pastor/moderator right now: ${reason}`,
+            sw: (reason) => `Sikuweza kutuma hilo kwa mchungaji/msimamizi kwa sasa: ${reason}`
+        }),
+
+        // COZY CONSTRUCTION SENTENCE ARCHITECTURE (SA-4 — Language
+        // Realization): fixed, disclosed sentence-opening frames per
+        // goal, used ONLY when a SemanticAnswerPlan has more than one
+        // claim to introduce (core/modules/intelligence/semantic-answer/
+        // realization/language-realizer.js). A single-claim plan uses
+        // its one real evidence.claim sentence verbatim, with no intro —
+        // these frames exist purely to introduce a LIST of distinct,
+        // already-real claim sentences naturally, never to carry meaning
+        // of their own. EN/SW human-authored (this file's own
+        // established discipline); fr/ar/so intentionally omitted rather
+        // than guessed, same as "purchase-intent:not_found" above — a
+        // realization request for one of those languages honestly
+        // degrades (see the realizer's own fallback), never fabricates.
+        "semantic-answer:intro:HUMAN_BENEFIT": Object.freeze({
+            en: "Here's how this helps:",
+            sw: "Hivi ndivyo hii inavyosaidia:"
+        }),
+        "semantic-answer:intro:BENEFITS": Object.freeze({
+            en: "Here's how this helps:",
+            sw: "Hivi ndivyo hii inavyosaidia:"
+        }),
+        "semantic-answer:intro:CAPABILITY": Object.freeze({
+            en: "Here's what this can currently do:",
+            sw: "Hivi ndivyo inavyoweza kufanya kwa sasa:"
+        }),
+        "semantic-answer:intro:LIST": Object.freeze({
+            en: "Here's what this can currently do:",
+            sw: "Hivi ndivyo inavyoweza kufanya kwa sasa:"
+        }),
+        "semantic-answer:intro:IMPORTANCE": Object.freeze({
+            en: "Here's why this matters:",
+            sw: "Hii ndiyo sababu ni muhimu:"
+        }),
+        "semantic-answer:intro:VALUE": Object.freeze({
+            en: "Here's why this matters:",
+            sw: "Hii ndiyo sababu ni muhimu:"
+        }),
+        "semantic-answer:intro:PRACTICAL_WORK_CONTRIBUTION": Object.freeze({
+            en: "Here's how this contributes to real work:",
+            sw: "Hivi ndivyo hii inavyochangia kazi halisi:"
+        }),
+        "semantic-answer:intro:DEFINITION": Object.freeze({
+            en: "Here's what this is:",
+            sw: "Hivi ndivyo hii ilivyo:"
+        }),
+        "semantic-answer:no-realizable-evidence": Object.freeze({
+            en: "I have real evidence for this, but not yet in a form I can honestly construct a complete answer from in your language.",
+            sw: "Ninalo ushahidi halisi kuhusu hili, lakini bado sijauwezesho kwa namna ninayoweza kuunda jibu kamili kwa uaminifu katika lugha yako."
         })
     });
 

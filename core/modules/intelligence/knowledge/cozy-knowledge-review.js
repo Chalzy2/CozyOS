@@ -336,12 +336,30 @@
     // 3. RULE 82 — full five-part gate (extends RP-029-B's stub reporter)
     // -----------------------------------------------------------------
 
-    function checkTemplatesComplete(languageCode) {
+    /**
+     * checkTemplatesComplete(languageCode, requiredKeys)
+     *   PHASE 4 addition: `requiredKeys` (optional array) scopes the
+     *   completeness check to a caller-specified subset of
+     *   CozyLanguageTemplates.TEMPLATES's real keys, instead of always
+     *   requiring every one of them. Omitted (the default, and the ONLY
+     *   behavior for every call site that existed before this phase):
+     *   checks ALL keys, byte-identical to prior behavior — no existing
+     *   language's gate result changes. This exists because requiring
+     *   100% coverage of every historically-added intent (78 keys at
+     *   last count) before ANY new language can ever reach AVAILABLE
+     *   would make "add a language" mean "translate the entire
+     *   template table up front" — Phase 4's own capability-dimensions
+     *   requirement is explicit that a language can be AVAILABLE for a
+     *   real, honestly-SCOPED baseline without claiming complete
+     *   coverage; remaining keys stay real, disclosed gaps (see
+     *   missingIntents below), never silently hidden.
+     */
+    function checkTemplatesComplete(languageCode, requiredKeys) {
         const t = templatesMod();
         if (!t || !t.TEMPLATES) {
             return { checked: false, complete: false, note: "CozyLanguageTemplates is not loaded." };
         }
-        const keys = Object.keys(t.TEMPLATES);
+        const keys = Array.isArray(requiredKeys) && requiredKeys.length > 0 ? requiredKeys : Object.keys(t.TEMPLATES);
         const missing = keys.filter((k) => {
             const entry = t.TEMPLATES[k];
             return !entry || entry[languageCode] === undefined || entry[languageCode] === null || entry[languageCode] === "";
@@ -351,7 +369,8 @@
             complete: missing.length === 0,
             totalIntents: keys.length,
             coveredIntents: keys.length - missing.length,
-            missingIntents: missing
+            missingIntents: missing,
+            scoped: Array.isArray(requiredKeys) && requiredKeys.length > 0
         };
     }
 
@@ -380,7 +399,27 @@
      * evaluateRule82Gate(languageCode, attestation)
      *   attestation (optional, caller-supplied, never inferred):
      *     { resourcesAttestedBy: string,       // human/reviewer name or id
-     *       testEvidence: { file, passed, total, ranAt } }
+     *       runtimeAttestedBy: string,          // PHASE 4 addition — see below
+     *       testEvidence: { file, passed, total, ranAt },
+     *       requiredKeys: [string, ...] }       // PHASE 4 addition — see below
+     *
+     *   PHASE 4 additions (both optional; omitting either reproduces
+     *   this function's exact prior behavior byte-for-byte):
+     *     - runtimeAttestedBy: before this phase, runtimeBehaviorObserved
+     *       was a hardcoded `false` with NO attestation path at all —
+     *       meaning promotion:"ELIGIBLE" was structurally unreachable by
+     *       any caller, in any environment (confirmed by reading this
+     *       function's prior source). This mirrors the EXACT same
+     *       human-attestation discipline `resourcesAttestedBy` already
+     *       uses ("Human-supplied attestation, not independently
+     *       verified by this function") — a real person attesting they
+     *       observed real, passing browser/DOM behavior (e.g. this
+     *       repository's own established openLiveWindow()/ask() real-
+     *       Chromium test convention), never inferred or assumed here.
+     *     - requiredKeys: see checkTemplatesComplete()'s own comment —
+     *       scopes the templates-completeness check for THIS evaluation
+     *       only; every existing caller that omits it gets the exact
+     *       same "all keys required" behavior as before.
      */
     function evaluateRule82Gate(languageCode, attestation) {
         const att = attestation || {};
@@ -388,12 +427,12 @@
         const registryEntry = registry && typeof registry.getLanguage === "function" ? registry.getLanguage(languageCode) : null;
 
         const resourcesVerified = !!att.resourcesAttestedBy;
-        const templatesCheck = checkTemplatesComplete(languageCode);
+        const templatesCheck = checkTemplatesComplete(languageCode, att.requiredKeys);
         const translationCheck = checkNoUncontrolledTranslation(languageCode, templatesCheck);
         const testsCheck = att.testEvidence
             ? { checked: true, verified: !!(att.testEvidence.passed && att.testEvidence.total && att.testEvidence.passed === att.testEvidence.total), detail: att.testEvidence }
             : checkTestsExist();
-        const runtimeVerified = false; // NOT_TESTED_LIVE — no DOM/browser runtime here (Rule 81)
+        const runtimeVerified = !!att.runtimeAttestedBy; // PHASE 4: was a hardcoded false with no attestation path at all
 
         const requirements = {
             realLanguageResourcesExist: resourcesVerified
@@ -411,7 +450,9 @@
                 state: testsCheck.checked ? (testsCheck.verified ? "VERIFIED" : "FAILED_OR_INCOMPLETE") : "UNKNOWN",
                 detail: testsCheck.detail || testsCheck.note
             },
-            runtimeBehaviorObserved: { state: "NOT_TESTED_LIVE", note: "No browser/DOM runtime available in this environment (Rule 81)." }
+            runtimeBehaviorObserved: runtimeVerified
+                ? { state: "ATTESTED", by: att.runtimeAttestedBy, note: "Human-supplied attestation of real, observed browser/DOM behavior — not independently verified by this function." }
+                : { state: "NOT_TESTED_LIVE", note: "No browser/DOM runtime available in this environment (Rule 81); supply runtimeAttestedBy with a real, freshly-observed result to satisfy this requirement." }
         };
 
         const allTrue = resourcesVerified

@@ -1294,8 +1294,31 @@
      *   before this dependency, so existing English callers/tests are
      *   unaffected.
      */
+    /**
+     * _langSuffix(lang)
+     *   PHASE 4 — Universal Language Capability. Generalizes the
+     *   previously EN/SW-only `<field>`/`<field>Sw` data shape to
+     *   `<field><Lang>` for ANY language code, so adding a 3rd
+     *   language's real, committed data to APPLICATION_HUMAN_PURPOSE_DATA
+     *   never requires touching this resolver again. "en" (or no
+     *   language) keeps the exact untouched plain-field path below -
+     *   byte-identical to every call site that existed before this
+     *   phase. "sw" produces the EXACT same "Sw" suffix this file
+     *   already used, so every existing sw-suffixed data field on every
+     *   application record is unaffected. Any other language honestly
+     *   returns null from resolvePurposeForLanguage() below (fail-
+     *   closed) until real `<field><Lang>` data actually exists for it
+     *   - never a fabricated/English fallback presented as verified.
+     */
+    function _langSuffix(lang) {
+        if (!lang || lang === "en") return "";
+        const normalized = String(lang).trim().toLowerCase();
+        return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+    }
+
     function resolvePurposeForLanguage(data, lang) {
-        if (lang !== "sw") {
+        const suffix = _langSuffix(lang);
+        if (!suffix) {
             const englishOnly = {};
             SUBSTANCE_FIELDS.forEach((field) => { englishOnly[field] = data[field]; });
             englishOnly.visionSourceNote = data.visionSourceNote;
@@ -1303,7 +1326,7 @@
         }
         const swResolved = {};
         for (const field of SUBSTANCE_FIELDS) {
-            const swKey = field + "Sw";
+            const swKey = field + suffix;
             const swValue = data[swKey];
             const enValue = data[field];
             // UNIVERSAL QUESTION UNDERSTANDING REPAIR — real bug found via
@@ -1368,14 +1391,15 @@
         const b = getApplicationDetailedInfo(nameB, lang);
         if (a.evidence !== "VERIFIED" || b.evidence !== "VERIFIED") return { evidence: "NOT_FOUND", answer: null };
         const isSw = lang === "sw";
+        const realizer = window.CozyOS && window.CozyOS.CozyLanguageRealize;
         const describe = (key, detail) => {
-            const capLabel = isSw ? "Uwezo ulioidhinishwa" : "Verified capabilities";
+            const capLabel = (realizer && realizer.realize("knowledge:verified-capabilities-label", lang)) || (isSw ? "Uwezo ulioidhinishwa" : "Verified capabilities");
             const caps = detail.currentVerifiedCapabilities.length > 0 ? `${capLabel}: ${detail.currentVerifiedCapabilities.join("; ")}.` : "";
             return [`${key}`, detail.humanPurpose, caps].filter(Boolean).join("\n");
         };
-        const intro = isSw
+        const intro = (realizer && realizer.realize("knowledge:compare-intro", lang, a.detail.application, b.detail.application)) || (isSw
             ? `Hapa kuna tofauti halisi kati ya ${a.detail.application} na ${b.detail.application}, kulingana na uwezo uliothibitishwa wa kila moja - si dai la "bora zaidi".`
-            : `Here is the real difference between ${a.detail.application} and ${b.detail.application}, based on each one's own verified purpose and capabilities - not an unsupported "better" claim.`;
+            : `Here is the real difference between ${a.detail.application} and ${b.detail.application}, based on each one's own verified purpose and capabilities - not an unsupported "better" claim.`);
         return { evidence: "VERIFIED", answer: [intro, describe(a.detail.application, a.detail), describe(b.detail.application, b.detail)].join("\n\n") };
     }
 
@@ -1385,8 +1409,12 @@
         if (!data) return { evidence: "NOT_FOUND", detail: null };
         const resolved = resolvePurposeForLanguage(data, lang);
         if (!resolved) return { evidence: "NOT_FOUND", detail: null };
-        const isSw = lang === "sw";
-        const pick = (base) => (isSw && Array.isArray(data[base + "Sw"]) && data[base + "Sw"].length > 0) ? data[base + "Sw"] : (Array.isArray(data[base]) ? data[base] : []);
+        // PHASE 4 — generalized from the previous isSw-only pick(): uses
+        // the SAME _langSuffix() helper resolvePurposeForLanguage() uses
+        // above, so a 3rd language's real `<field><Lang>` data (once it
+        // exists) is picked up here too, with zero further code change.
+        const suffix = _langSuffix(lang);
+        const pick = (base) => (suffix && Array.isArray(data[base + suffix]) && data[base + suffix].length > 0) ? data[base + suffix] : (Array.isArray(data[base]) ? data[base] : []);
         return {
             evidence: "VERIFIED",
             detail: {
@@ -1415,27 +1443,24 @@
         if (result.evidence !== "VERIFIED") return { evidence: "NOT_FOUND", answer: null };
         const d = result.detail;
         const isSw = lang === "sw";
+        const realizer = window.CozyOS && window.CozyOS.CozyLanguageRealize;
+        const label = (key, en, sw) => (realizer && realizer.realize(key, lang)) || (isSw ? sw : en);
         const sections = [];
         sections.push(d.humanPurpose);
         if (d.realLifeExamples.length > 0) {
-            const label = isSw ? "Mifano halisi ya matumizi" : "Real-life examples";
-            sections.push(`${label}: ${d.realLifeExamples.join("; ")}.`);
+            sections.push(`${label("knowledge:real-life-examples-label", "Real-life examples", "Mifano halisi ya matumizi")}: ${d.realLifeExamples.join("; ")}.`);
         }
         if (d.currentVerifiedCapabilities.length > 0) {
-            const label = isSw ? "Uwezo ulioidhinishwa leo" : "Verified today";
-            sections.push(`${label}: ${d.currentVerifiedCapabilities.join("; ")}.`);
+            sections.push(`${label("knowledge:verified-today-label", "Verified today", "Uwezo ulioidhinishwa leo")}: ${d.currentVerifiedCapabilities.join("; ")}.`);
         }
         if (d.implementedAwaitingConnection.length > 0) {
-            const label = isSw ? "Zipo lakini hazijaunganishwa bado" : "Already implemented but not yet connected";
-            sections.push(`${label}: ${d.implementedAwaitingConnection.join(" | ")}`);
+            sections.push(`${label("knowledge:awaiting-connection-label", "Already implemented but not yet connected", "Zipo lakini hazijaunganishwa bado")}: ${d.implementedAwaitingConnection.join(" | ")}`);
         }
         if (d.partiallyImplemented.length > 0) {
-            const label = isSw ? "Zimetekelezwa kwa sehemu" : "Partially implemented";
-            sections.push(`${label}: ${d.partiallyImplemented.join(" | ")}`);
+            sections.push(`${label("knowledge:partially-implemented-label", "Partially implemented", "Zimetekelezwa kwa sehemu")}: ${d.partiallyImplemented.join(" | ")}`);
         }
         if (d.visionCapabilities.length > 0) {
-            const label = isSw ? "Vision/yajayo (bado hayajatekelezwa)" : "Vision/planned (not implemented yet)";
-            sections.push(`${label}: ${d.visionCapabilities.join("; ")}.`);
+            sections.push(`${label("knowledge:vision-planned-label", "Vision/planned (not implemented yet)", "Vision/yajayo (bado hayajatekelezwa)")}: ${d.visionCapabilities.join("; ")}.`);
         }
         return { evidence: "VERIFIED", answer: sections.join("\n\n") };
     }
@@ -1648,7 +1673,7 @@
         return {
             evidence: "VERIFIED",
             purpose: resolved,
-            source: "core/plugins/" + needle + "-core.js (committed human-purpose data, this dependency)" + (lang === "sw" ? " [sw substance]" : "")
+            source: "core/plugins/" + needle + "-core.js (committed human-purpose data, this dependency)" + (_langSuffix(lang) ? ` [${_langSuffix(lang).toLowerCase()} substance]` : "")
         };
     }
 

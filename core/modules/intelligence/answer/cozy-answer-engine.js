@@ -182,11 +182,149 @@
         return "GENERAL";
     }
 
-    function synthesizeFromContext(question, ctxResults) {
+    /**
+     * LIVE WINDOW LANGUAGE-REALIZATION REPAIR (Phase 4 correction) —
+     * real bug found via an actual Live Window run: a fully-Kiswahili
+     * question ("CozyOS ni nini?") correctly got a Kiswahili-realized
+     * answer from CozyIdentityFAQRouter, but this file then spliced RAW
+     * English "knowledge-registry" prose (from cozy-public-knowledge-
+     * source.js, English-authored this pass — see that file's own
+     * disclosure at the "why-use-cozyos:verified"/"differentiation:
+     * verified" template keys) onto it with a bare, hardcoded English
+     * "Additionally:" connector, producing a mixed-language final
+     * answer. Root cause: realization was applied only to the FAQ
+     * router's own single piece, never to the composed multi-piece
+     * result as a whole, and "knowledge-registry" content was
+     * concatenated with no language awareness at all.
+     *
+     * FIX — reuses the SAME existing disclosure pattern the two
+     * template keys above already use for their own single-piece case
+     * ("content:english-only-notice", cozy-language-templates.js),
+     * generalized to this file's multi-piece composition. Only
+     * "knowledge-registry" pieces are wrapped — that authority's raw
+     * fact content is the one confirmed, disclosed English-only source;
+     * "cozy-memory"/"living-memory" pieces (arbitrary user-typed
+     * content, unknown language) and "application-knowledge" pieces
+     * (already real EN/SW-resolved by getApplicationDetailedInfoFact())
+     * are left exactly as before — never presumptively mislabeled.
+     * English behavior (effLang==="en") is completely unchanged by
+     * either helper below.
+     */
+    function normalizeLanguage(language) {
+        return (typeof language === "string" && language.trim()) ? language.trim().toLowerCase() : "en";
+    }
+
+    function joinPiecesForLanguage(pieces, effLang) {
+        if (pieces.length === 0) return "";
+        if (pieces.length === 1) return pieces[0];
+        if (effLang === "en") return pieces.join(" Additionally, ");
+        const realizer = window.CozyOS && window.CozyOS.CozyLanguageRealize;
+        const connector = (realizer && realizer.realize("connector:additionally", effLang)) || "Additionally,";
+        return pieces.join(` ${connector} `);
+    }
+
+    /**
+     * COZY CONSTRUCTION SENTENCE ARCHITECTURE (SA-7 — Live Window
+     * Integration). The real SA-1..SA-6 pipeline (SemanticAnswerPlanner
+     * -> LanguageRealizer -> ResponseValidator -> RepairLoop) was fully
+     * built and independently tested (see core/modules/intelligence/
+     * semantic-answer/) but, until this integration, was never actually
+     * consumed by the live answer chain — confirmed by that planner's
+     * own header, which explicitly reserved live wiring for this exact
+     * phase. This function is the ONE place that composes it into a
+     * real answer.
+     *
+     * WHY THIS EXISTS, NOT A SECOND "DIRECT CONSTRUCTION" MECHANISM
+     * ALONGSIDE THE OLD synthesizeFromContext() PATH ABOVE
+     *   The old path (renderResultContent/synthesizeFromContext) reads
+     *   getContext()'s own generic `content` projection — already-joined
+     *   prose that was never separated into discrete claims+evidence,
+     *   so it has no way to construct a sentence FROM evidence per
+     *   language; it can only honestly wrap already-composed English
+     *   text when no Kiswahili exists (see this file's own
+     *   "content:english-only-notice" comment above). The SA pipeline is
+     *   architecturally different: SA-3's planner gathers real, GRANULAR
+     *   VerifiedEvidence (one record per real fact, already tagged with
+     *   its own real language) and SA-4 constructs the final sentence
+     *   DIRECTLY from whichever language's evidence was requested — for
+     *   an application-level goal with a real Kiswahili sibling
+     *   (APPLICATION_HUMAN_PURPOSE_DATA's own humanBenefitsSw/
+     *   humanPurposeSw etc.), this produces a genuine, validated,
+     *   directly-constructed Kiswahili sentence, never an English
+     *   sentence generated first and translated/wrapped second. Tried
+     *   ONLY when the FAQ router did not match (an identity/origin/
+     *   vision/mission/differentiation question about CozyOS itself has
+     *   no APPLICATION_HUMAN_PURPOSE_DATA entry — "CozyOS" is the
+     *   platform, not one of the registered applications this data
+     *   models — so it is correctly, honestly left to the FAQ router,
+     *   which already answers it directly and correctly in the user's
+     *   language; see this file's own delivery notes for the full
+     *   disclosure of this architectural boundary).
+     *
+     * GRACEFUL, ADDITIVE, NEVER A HARD DEPENDENCY
+     *   Every one of SA-3/SA-4/SA-5/SA-6's real modules is composed
+     *   read-only and defensively — if any is not loaded (e.g. every
+     *   existing Node unit test in this file's own test suite, none of
+     *   which load the semantic-answer/ chain), or the planner cannot
+     *   plan this question (no entity resolved, no evidence, a
+     *   CLARIFICATION/UNKNOWN goal, an ACTION goal, a language gap), or
+     *   the repair loop ultimately REJECTs/exhausts its attempts, this
+     *   function returns null and the EXISTING chain below runs exactly
+     *   as it did before this integration — byte-identical, zero
+     *   regression risk for every case this new pipeline declines.
+     */
+    async function tryConstructSemanticAnswer({ question, actorId, entityHint, language }) {
+        const planner = window.CozyOS.SemanticAnswerPlanner;
+        if (!planner || typeof planner.planAnswer !== "function") return null;
+
+        let planResult;
+        try { planResult = planner.planAnswer({ text: question, actorId, entityHint, requestedLanguage: language }); }
+        catch (_err) { return null; }
+        if (!planResult || !planResult.success) return null;
+
+        const plan = planResult.plan;
+        // CLARIFICATION/UNKNOWN/REFUSAL: SA-4 has no real evidence to
+        // construct from by definition — let the existing chain's own,
+        // already-tested honest-fallback text handle these, never a
+        // second, competing "I don't know" phrasing.
+        if (plan.goal === "CLARIFICATION" || plan.goal === "UNKNOWN" || plan.answerMode === "REFUSAL") return null;
+
+        const requestContract = window.CozyOS.LanguageRealizationRequestContract;
+        const repairLoop = window.CozyOS.RepairLoop;
+        if (!requestContract || typeof requestContract.create !== "function" || !repairLoop || typeof repairLoop.realizeValidated !== "function") return null;
+
+        const built = requestContract.create({
+            language: { languageId: plan.language },
+            semanticPlan: plan,
+            evidence: planResult.evidence || [],
+        });
+        if (!built.success) return null;
+
+        let outcome;
+        try {
+            outcome = repairLoop.realizeValidated({
+                request: built.request,
+                actorContext: (typeof actorId === "string" && actorId.trim() && actorId !== "anonymous") ? { actorId } : null,
+            });
+        } catch (_err) { return null; }
+        if (!outcome || !outcome.success) return null;
+
+        return { plan, candidate: outcome.candidate, evidence: planResult.evidence || [] };
+    }
+
+    function synthesizeFromContext(question, ctxResults, effLang) {
+        const lang = effLang || "en";
+        const realizer = window.CozyOS && window.CozyOS.CozyLanguageRealize;
         const pieces = [];
         for (const r of ctxResults) {
             const text = renderResultContent(r);
-            if (isNonEmptyString(text)) pieces.push(text);
+            if (!isNonEmptyString(text)) continue;
+            if (lang !== "en" && r.authority === "knowledge-registry") {
+                const wrapped = realizer && realizer.realize("content:english-only-notice", lang, text);
+                pieces.push(wrapped || `Additionally: ${text}`);
+            } else {
+                pieces.push(text);
+            }
         }
         return pieces;
     }
@@ -329,13 +467,25 @@
             // Multi-intent: fold in any DISTINCT, non-overlapping context
             // evidence (e.g. an applications/architecture fact alongside
             // an identity fact) rather than silently dropping it.
+            const effLang = normalizeLanguage(language);
             let combinedAnswer = faqResult.answer;
-            const extraPieces = synthesizeFromContext(question, ctxResults.filter(r => r.authority === "knowledge-registry" || r.authority === "cozy-memory" || r.authority === "living-memory"));
+            const extraPieces = synthesizeFromContext(question, ctxResults.filter(r => r.authority === "knowledge-registry" || r.authority === "cozy-memory" || r.authority === "living-memory"), effLang);
             let multiIntent = null;
             if (extraPieces.length > 0) {
                 const secondaryIntent = classifyContextIntent(ctxResults);
                 if (secondaryIntent !== "GENERAL" && secondaryIntent !== "ORIGIN_OR_STORY" && secondaryIntent !== "IDENTITY" && secondaryIntent !== "VISION") {
-                    combinedAnswer = `${faqResult.answer} Additionally: ${extraPieces.join(" ")}`;
+                    // LIVE WINDOW LANGUAGE-REALIZATION REPAIR — see
+                    // synthesizeFromContext()'s own header comment above
+                    // for the full root cause. English keeps the exact
+                    // prior literal "Additionally: " connector, byte-
+                    // identical; extraPieces above already individually
+                    // honest-wraps any "knowledge-registry" content for a
+                    // non-English effLang, so the non-English branch only
+                    // needs a language-aware connector between pieces
+                    // (or none at all for a single piece).
+                    combinedAnswer = effLang === "en"
+                        ? `${faqResult.answer} Additionally: ${extraPieces.join(" ")}`
+                        : `${faqResult.answer} ${joinPiecesForLanguage(extraPieces, effLang)}`;
                     multiIntent = secondaryIntent;
                     responseMode = "EXPLANATION";
                     for (const r of ctxResults) sources.push({ authority: r.authority, provenance: r.provenance, getter: r.getter, namespace: r.namespace, key: r.key, evidence: "VERIFIED" });
@@ -355,6 +505,31 @@
             };
         }
 
+        // --- COZY CONSTRUCTION SENTENCE ARCHITECTURE (SA-7) — tried only
+        // when the FAQ router did not match (see tryConstructSemanticAnswer()'s
+        // own header for the full rationale). A real, validated,
+        // directly-constructed answer takes priority over the older
+        // generic-context-concatenation path immediately below, for the
+        // application-level questions it can actually plan for; every
+        // question it declines falls through unchanged. ---
+        const semanticConstruction = await tryConstructSemanticAnswer({ question, actorId, entityHint, language });
+        if (semanticConstruction) {
+            const { plan, candidate, evidence } = semanticConstruction;
+            return {
+                answer: candidate.text,
+                intent: plan.goal,
+                responseMode: plan.answerMode,
+                evidenceState: "VERIFIED",
+                sources: dedupeSources(evidence.filter((ev) => candidate.evidenceIds.includes(ev.id)).map((ev) => ({
+                    authority: "semantic-answer-construction", provenance: (ev.source && ev.source.type) || "window.CozyOS.VerifiedEvidenceAdapter",
+                    getter: null, namespace: null, key: ev.id, evidence: (ev.verification && ev.verification.status) || "VERIFIED",
+                }))),
+                reasoningUsed: candidate.evidenceIds.length > 1,
+                contextUsed: ctxResults,
+                businessDataConversationState, teachDataConversationState,
+            };
+        }
+
         // --- No FAQ match: general Question-Understanding + Context path ---
         if (ctxResults.length === 0) {
             return {
@@ -366,7 +541,8 @@
         }
 
         const intent = classifyContextIntent(ctxResults);
-        const pieces = synthesizeFromContext(question, ctxResults);
+        const effLang = normalizeLanguage(language);
+        const pieces = synthesizeFromContext(question, ctxResults, effLang);
 
         if (pieces.length === 0) {
             return {
@@ -382,9 +558,15 @@
         else if (pieces.length > 1) responseMode = "EXPLANATION";
         else responseMode = "FACT";
 
-        const answerText = pieces.length > 1
-            ? pieces.join(" Additionally, ")
-            : pieces[0];
+        // LIVE WINDOW LANGUAGE-REALIZATION REPAIR — English keeps the
+        // exact prior literal " Additionally, " join, byte-identical;
+        // `pieces` above already individually honest-wraps any
+        // "knowledge-registry" content for a non-English effLang (see
+        // synthesizeFromContext()'s own header comment), so the non-
+        // English branch only needs a language-aware connector.
+        const answerText = effLang === "en"
+            ? (pieces.length > 1 ? pieces.join(" Additionally, ") : pieces[0])
+            : joinPiecesForLanguage(pieces, effLang);
 
         const sources = dedupeSources(ctxResults.map(r => ({
             authority: r.authority, provenance: r.provenance, getter: r.getter,

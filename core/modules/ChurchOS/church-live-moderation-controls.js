@@ -147,6 +147,22 @@
         #lastCommentAt = new Map();    // sessionId -> Map<userId, timestamp ms>
         #messages = new Map();         // sessionId -> Array<official moderator message>
         #history = new Map();          // sessionId -> Array<event>
+        // PHASE 4 — ENHANCED COZY BOUNDARY (Live Session Privacy). A
+        // genuinely new store — confirmed absent everywhere in this
+        // repository (repo-wide search for submitQuestion/askPastor/
+        // questionQueue returned nothing before this addition; the
+        // questions ON/OFF toggle above only ever gated a capability that
+        // had no actual submission path behind it). Deliberately its own
+        // Map, never merged into #messages/Checkpoint 1's #comments
+        // store: those are BOTH public-to-the-session by design
+        // (getViewerFeed() below, listComments()) and a pastor/moderator
+        // question is the opposite — private to (asker, moderators-of-
+        // this-session) only, never broadcast to other participants.
+        // Implements the explicit, separate workflow the spec requires:
+        // "Participant -> Private Cozy -> Submit to Pastor/Moderator ->
+        // Authorization/Moderation -> Recipient" — never an automatic
+        // exposure of a participant's ordinary private Cozy conversation.
+        #questions = new Map();        // sessionId -> Array<{questionId, askedBy, text, askedAt, status, answeredBy, answeredAt, answerText}>
         #nextSeq = 1;
 
         #requireLdce() {
@@ -176,6 +192,7 @@
             if (!this.#lastCommentAt.has(sessionId)) this.#lastCommentAt.set(sessionId, new Map());
             if (!this.#messages.has(sessionId)) this.#messages.set(sessionId, []);
             if (!this.#history.has(sessionId)) this.#history.set(sessionId, []);
+            if (!this.#questions.has(sessionId)) this.#questions.set(sessionId, []);
         }
 
         /**
@@ -466,6 +483,126 @@
             return record
                 ? Object.assign({ status: "OK", sessionId }, record)
                 : { status: "OK", sessionId, enabled: false, setBy: null, setAt: null };
+        }
+
+        /* ============================================================= *
+         * PRIVATE QUESTIONS TO THE PASTOR/MODERATOR (PHASE 4 — ENHANCED
+         * COZY BOUNDARY / Live Session Privacy). A participant's question
+         * intended for the pastor/moderator, submitted PRIVATELY — never
+         * a public comment (Checkpoint 1's postComment()/listComments()
+         * remain the separate, intentionally-public path for that). This
+         * is the "Submit to Pastor/Moderator" step of the spec's required
+         * workflow: Participant -> Private Cozy -> Submit to Pastor/
+         * Moderator -> Authorization/Moderation -> Recipient.
+         * ============================================================= */
+
+        /**
+         * submitQuestion(sessionId, actorId, text)
+         *   actorId must be a REAL participant of this exact session
+         *   (ldce.getParticipant(sessionId, actorId, actorId) — the same
+         *   real evidence #isAuthorizedModerator() already uses to
+         *   confirm an LDCE role) — never accepted from someone merely
+         *   claiming a sessionId. Requires questions to be genuinely
+         *   ENABLED for this session (getQuestionsEnabled) — mirrors
+         *   setQuestionsEnabled()'s own "never defaults to open" rule:
+         *   a disabled toggle blocks submission just as it already
+         *   blocked the (never-built) UI affordance for it.
+         */
+        submitQuestion(sessionId, actorId, text) {
+            const ldce = this.#requireLdce();
+            if (!ldce) return { status: "UNAVAILABLE", reason: "LDCESessionEngine is not available." };
+            const session = ldce.getSession(sessionId);
+            if (!session) return { status: "NOT_FOUND", reason: "Unknown LDCE session." };
+            if (!actorId) return { status: "NOT_AUTHORIZED", reason: "A real actorId is required." };
+            const participant = ldce.getParticipant(sessionId, actorId, actorId);
+            if (!participant) return { status: "NOT_AUTHORIZED", reason: "Only a real participant of this session may submit a question." };
+            if (!text || !text.trim()) return { status: "REJECTED", reason: "Empty question." };
+            const questionsState = this.getQuestionsEnabled(sessionId);
+            if (!questionsState.enabled) return { status: "REJECTED", reason: "The host/moderator has not enabled questions for this session." };
+
+            this.#ensureSession(sessionId);
+            const record = {
+                questionId: this.#freshId("q"),
+                askedBy: actorId,
+                text: text.trim(),
+                askedAt: new Date().toISOString(),
+                status: "PENDING",
+                answeredBy: null,
+                answeredAt: null,
+                answerText: null
+            };
+            this.#questions.get(sessionId).push(record);
+            const event = this.#recordEvent(sessionId, "QUESTION_SUBMITTED", { actorId, meta: { questionId: record.questionId } });
+            return { status: "OK", question: Object.assign({}, record), event: Object.assign({}, event) };
+        }
+
+        /**
+         * listMyQuestions(sessionId, actorId)
+         *   Privacy-scoped to the caller's OWN questions only — the
+         *   asker's own view of the Recipient step (their answer, once
+         *   the moderator has responded). Never returns another
+         *   participant's question, whatever actorId is passed.
+         */
+        listMyQuestions(sessionId, actorId) {
+            this.#ensureSession(sessionId);
+            if (!actorId) return { status: "OK", sessionId, questions: [] };
+            return {
+                status: "OK",
+                sessionId,
+                questions: this.#questions.get(sessionId).filter((q) => q.askedBy === actorId).map((q) => Object.assign({}, q))
+            };
+        }
+
+        /**
+         * listQuestionsForModerator(sessionId, actorId)
+         *   The pastor/moderator's private inbox — the "Authorization/
+         *   Moderation" step. Gated by the SAME real #isAuthorizedModerator()
+         *   check as every other moderator action in this file; a plain
+         *   participant calling this never sees another participant's
+         *   question.
+         */
+        listQuestionsForModerator(sessionId, actorId) {
+            const ldce = this.#requireLdce();
+            if (!ldce) return { status: "UNAVAILABLE", reason: "LDCESessionEngine is not available." };
+            const identity = this.#requireIdentity();
+            if (!identity) return { status: "UNAVAILABLE", reason: "IdentityEngine is not available." };
+            const session = ldce.getSession(sessionId);
+            if (!session) return { status: "NOT_FOUND", reason: "Unknown LDCE session." };
+            const authz = this.#isAuthorizedModerator(ldce, identity, actorId, sessionId, session.hostId);
+            if (!authz.authorized) return { status: "NOT_AUTHORIZED", reason: authz.reason };
+            this.#ensureSession(sessionId);
+            return { status: "OK", sessionId, questions: this.#questions.get(sessionId).map((q) => Object.assign({}, q)) };
+        }
+
+        /**
+         * answerQuestion(sessionId, actorId, questionId, answerText)
+         *   Moderator-only. Records the answer on the SAME private
+         *   record — visible afterward only to the original asker (via
+         *   listMyQuestions) and to moderators (via
+         *   listQuestionsForModerator), never broadcast to the session at
+         *   large. A moderator who wants an answer made public still uses
+         *   the separate, explicit postModeratorMessage()/submitComment()
+         *   paths above — this function itself never posts anywhere else.
+         */
+        answerQuestion(sessionId, actorId, questionId, answerText) {
+            const ldce = this.#requireLdce();
+            if (!ldce) return { status: "UNAVAILABLE", reason: "LDCESessionEngine is not available." };
+            const identity = this.#requireIdentity();
+            if (!identity) return { status: "UNAVAILABLE", reason: "IdentityEngine is not available." };
+            const session = ldce.getSession(sessionId);
+            if (!session) return { status: "NOT_FOUND", reason: "Unknown LDCE session." };
+            const authz = this.#isAuthorizedModerator(ldce, identity, actorId, sessionId, session.hostId);
+            if (!authz.authorized) return { status: "NOT_AUTHORIZED", reason: authz.reason };
+            if (!answerText || !answerText.trim()) return { status: "REJECTED", reason: "Empty answer." };
+            this.#ensureSession(sessionId);
+            const record = this.#questions.get(sessionId).find((q) => q.questionId === questionId);
+            if (!record) return { status: "NOT_FOUND", reason: "Unknown questionId." };
+            record.status = "ANSWERED";
+            record.answeredBy = actorId;
+            record.answeredAt = new Date().toISOString();
+            record.answerText = answerText.trim();
+            const event = this.#recordEvent(sessionId, "QUESTION_ANSWERED", { actorId, meta: { questionId } });
+            return { status: "OK", question: Object.assign({}, record), event: Object.assign({}, event) };
         }
 
         /* ============================================================= *

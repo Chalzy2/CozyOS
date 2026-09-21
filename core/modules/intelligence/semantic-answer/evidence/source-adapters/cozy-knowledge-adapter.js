@@ -70,6 +70,19 @@
         return match ? match[1] : String(fallbackName || "").trim().toLowerCase();
     }
 
+    // PHASE 4 — Universal Language Capability. Generalizes the previous
+    // `lang === "sw" ? "Sw" : ""` suffix builder (this is an internal
+    // audit-trail `path` annotation, never user-facing text, so it is
+    // generalized here rather than migrated to the language-realization
+    // seam — see cozy-knowledge-registry.js's own matching `_langSuffix()`
+    // helper, which this mirrors for the exact same
+    // `<field>`/`<field>Sw`/`<field><Lang>` data shape it reads from.
+    function _langSuffix(lang) {
+        if (!lang || lang === "en") return "";
+        const normalized = String(lang).trim().toLowerCase();
+        return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+    }
+
     function buildEvidence({ canonicalId, field, index, text, lang, status, confidence, provenance, evidenceContract }) {
         const idParts = ["application-human-purpose", canonicalId, field, lang];
         if (index !== undefined && index !== null) idParts.splice(3, 0, String(index));
@@ -77,7 +90,7 @@
         const fields = {
             id,
             claim: text,
-            source: Object.freeze({ type: SOURCE_TYPE.APPLICATION_HUMAN_PURPOSE, id: canonicalId, path: `APPLICATION_HUMAN_PURPOSE_DATA.${canonicalId}.${field}${lang === "sw" ? "Sw" : ""}` }),
+            source: Object.freeze({ type: SOURCE_TYPE.APPLICATION_HUMAN_PURPOSE, id: canonicalId, path: `APPLICATION_HUMAN_PURPOSE_DATA.${canonicalId}.${field}${_langSuffix(lang)}` }),
             verification: Object.freeze({ status, confidence }),
             sensitivity: "PUBLIC",
             language: lang,

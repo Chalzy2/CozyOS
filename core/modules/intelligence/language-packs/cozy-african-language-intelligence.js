@@ -275,6 +275,61 @@
         return { status: "CANDIDATE_SUBMITTED", identity, submission: submitted };
     }
 
+    /**
+     * checkVerifiedGap({ languageId, expression, region, dialect })
+     *   PHASE 4 — Universal Language Capability. Extends this file's
+     *   own real learnUnknownTerm()/listExpressions() pre-check (never
+     *   duplicates it) into the 5-state verified-gap classification
+     *   your spec requires, so a caller (e.g. reciprocal-learning
+     *   composition) can decide whether to ask a human at all BEFORE
+     *   ever doing so:
+     *     VERIFIED    — real, strong evidence already exists (this
+     *                   registry's own real evidenceBand() reports
+     *                   STRONG or HIGHLY_VALIDATED for the matching
+     *                   record(s)) — never ask a contributor about this.
+     *     PARTIAL     — some real evidence exists (CANDIDATE/EMERGING
+     *                   band) but is not yet strong — a contributor MAY
+     *                   be asked to strengthen it.
+     *     CONFLICTING — two or more records at the EXACT SAME
+     *                   language+region+dialect+expression carry
+     *                   genuinely different, non-empty `meaning` text —
+     *                   a real contradiction at the same specificity
+     *                   (never flagged merely for different regions/
+     *                   dialects, which this registry's own matchKeyFor()
+     *                   already treats as legitimate coexisting
+     *                   variants, not a conflict).
+     *     UNVERIFIED  — records exist but the registry's own evidence
+     *                   band reports NONE despite a non-zero count (a
+     *                   genuinely unusual state; treated as needing
+     *                   confirmation, not as UNKNOWN).
+     *     UNKNOWN     — no record exists at all yet.
+     *   Never fabricates evidence: every state above traces to a real,
+     *   composed CozyLanguagePacks function call, never a guess.
+     */
+    function checkVerifiedGap(input) {
+        const e = input || {};
+        const api = packsApi();
+        if (!api) return { status: "UNKNOWN", reason: "CAPABILITY_UNAVAILABLE" };
+        const languageId = e.languageId ? String(e.languageId).toLowerCase() : null;
+        if (!languageId || !e.expression) return { status: "UNKNOWN", reason: "INSUFFICIENT_INPUT" };
+        const region = regionKey(e.region, e.community);
+        const matches = api.listExpressions({ languageId, region, dialect: e.dialect || null })
+            .filter((r) => r.expression && r.expression.toLowerCase() === String(e.expression).toLowerCase());
+        if (matches.length === 0) return { status: "UNKNOWN", languageId, expression: e.expression, missing: ["any_record"] };
+
+        const sameSpecificity = matches.filter((r) => (r.region || null) === region && (r.dialect || null) === (e.dialect || null));
+        const distinctMeanings = new Set(sameSpecificity.map((r) => (r.meaning || "").trim().toLowerCase()).filter(Boolean));
+        if (distinctMeanings.size > 1) {
+            return { status: "CONFLICTING", languageId, expression: e.expression, variants: sameSpecificity.map((r) => ({ recordId: r.recordId, meaning: r.meaning, region: r.region, dialect: r.dialect })) };
+        }
+
+        const evidenceCount = sameSpecificity.reduce((sum, r) => sum + (typeof r.evidenceCount === "number" ? r.evidenceCount : 1), 0);
+        const band = typeof api.evidenceBand === "function" ? api.evidenceBand(evidenceCount) : null;
+        if (band === "STRONG" || band === "HIGHLY_VALIDATED") return { status: "VERIFIED", languageId, expression: e.expression, evidenceBand: band, recordIds: matches.map((r) => r.recordId) };
+        if (band === "CANDIDATE" || band === "EMERGING") return { status: "PARTIAL", languageId, expression: e.expression, evidenceBand: band, missing: ["stronger_evidence"], recordIds: matches.map((r) => r.recordId) };
+        return { status: "UNVERIFIED", languageId, expression: e.expression, evidenceBand: band, recordIds: matches.map((r) => r.recordId) };
+    }
+
     /* ------------------------------------------------------------------ */
     /* 5. MEDIA INTEGRATION (RP-034 Phase 4, composed read-only)           */
     /* ------------------------------------------------------------------ */
@@ -462,6 +517,7 @@
         resolveLanguageIdentity,
         getLanguagePack, getRegionalPack, getCommunityPack, getBestAvailablePack,
         learnUnknownTerm,
+        checkVerifiedGap,
         routeMediaAnalysisJob,
         registerASRProvider, unregisterASRProvider, transcribeAudio,
         analyzeConversationSegments,
