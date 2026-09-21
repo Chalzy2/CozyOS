@@ -491,13 +491,57 @@
      *   view; corrective action still goes through those same existing,
      *   real, permission-checked engines, never a new one.
      */
-    async function getContext(question, { actorId = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null, businessContext = null, language = null, businessConversationState = null } = {}) {
+    async function getContext(question, { actorId = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null, businessContext = null, language = null, businessConversationState = null, teachConversationState = null } = {}) {
         if (typeof question !== "string" || !question.trim()) {
             return { success: false, reason: "A real, non-empty question is required." };
         }
         const effectiveActorId = (typeof actorId === "string" && actorId.trim()) ? actorId : "anonymous";
         const results = [];
         let businessDataConversationState = null;
+        let teachDataConversationState = null;
+
+        // --- PHASE 3: Teach Cozy / Governed Learning — checked FIRST,
+        // ahead of every other authority below. Two real reasons: (1) a
+        // pending yes/no confirmation reply (teachConversationState.
+        // pendingCandidateId set) must never be shadowed by an unrelated
+        // authority that happens to fuzzy-match the same short reply
+        // text; (2) an explicit "I want to teach you..." statement is
+        // this turn's whole intent — answering it with unrelated public
+        // knowledge instead would be wrong. Composes CozyTeachFlow (which
+        // itself composes the real, existing CozyLearn governed state
+        // machine) — never a second AI/governance engine. A question
+        // with no teaching signal at all is a true no-op (matched:false)
+        // and every authority below runs exactly as before this phase.
+        const teachFlow = window.CozyOS.CozyTeachFlow;
+        if (teachFlow && typeof teachFlow.processTurn === "function") {
+            try {
+                const teachResult = teachFlow.processTurn(question, { actorId: effectiveActorId, language, teachConversationState });
+                if (teachResult && teachResult.matched && teachResult.content) {
+                    teachDataConversationState = teachResult.updatedConversationState || null;
+                    // Returned immediately, ahead of every other authority
+                    // below (see this block's own header comment) — a
+                    // teaching statement or a pending confirmation reply
+                    // is this turn's whole intent; composing unrelated
+                    // public-knowledge/business/etc. content into the
+                    // SAME answer would only ever add confusing noise to
+                    // a real confirm/reject/conflict exchange, never a
+                    // needed second fact.
+                    return {
+                        success: true, isReal: true, question, actorId: effectiveActorId,
+                        found: true,
+                        results: [{
+                            authority: "cozy-teach",
+                            provenance: "window.CozyOS.CozyTeachFlow -> window.CozyOS.CozyLearn",
+                            evidence: teachResult.evidence || "VERIFIED",
+                            content: teachResult.content
+                        }],
+                        businessDataConversationState: null,
+                        teachDataConversationState,
+                        note: "Composed from the real, existing CozyTeachFlow -> CozyLearn governed-learning pipeline (Phase 3)."
+                    };
+                }
+            } catch (_err) { /* honest fall-through — never fabricate */ }
+        }
 
         // --- InterestOS business-DATA question (Phase 2: CozyAI + Live
         // Window Business-Data Q&A) — distinct from businessContext above
@@ -597,6 +641,35 @@
                         });
                     }
                 } catch (_err) { /* honest fall-through — never fabricate */ }
+            }
+
+            // --- PHASE 3: answer FROM previously TRUSTED taught
+            // knowledge ("EXISTING COZYAI USES APPROVED KNOWLEDGE") —
+            // distinct from the "cozy-teach" authority above (which only
+            // ever fires for an in-progress teaching exchange itself).
+            // Only ever composed for a named, resolved subject — never a
+            // generic platform-wide question — and only via CozyLearn's
+            // own fail-closed getTrustedTeachings() (USER-scope entries
+            // require this exact actorId; see cozy-learn.js's own
+            // comment). A real "add-on" fact, never a replacement for the
+            // application-knowledge block above — both may legitimately
+            // appear together.
+            if (namedApplication) {
+                const teachFlowForAnswer = window.CozyOS.CozyTeachFlow;
+                if (teachFlowForAnswer && typeof teachFlowForAnswer.answerFromTrustedTeaching === "function") {
+                    try {
+                        const taught = teachFlowForAnswer.answerFromTrustedTeaching(namedApplication.name, { actorId: effectiveActorId, language, scopes: ["USER", "GLOBAL"] });
+                        if (taught && taught.content) {
+                            results.push({
+                                authority: "cozy-teach-knowledge",
+                                provenance: "window.CozyOS.CozyTeachFlow -> window.CozyOS.CozyLearn (TRUSTED)",
+                                applicationName: namedApplication.name,
+                                evidence: "TAUGHT",
+                                content: taught.content
+                            });
+                        }
+                    } catch (_err) { /* honest fall-through — never fabricate */ }
+                }
             }
 
             for (const getterName of getterNames) {
@@ -847,7 +920,7 @@
 
         return {
             success: true, isReal: true, question, actorId: effectiveActorId,
-            found: results.length > 0, results, businessDataConversationState,
+            found: results.length > 0, results, businessDataConversationState, teachDataConversationState,
             note: results.length > 0
                 ? "Composed from existing, unmodified authorities: CozyKnowledge (VERIFIED facts only, includes Public Story via FounderStory.getPublicStory()) and CozyMemory (owner/visibility/organisation-enforced search, split into cozy-memory / living-memory by namespace)."
                 : "No context genuinely matched in any composed authority — honest empty state, not a fabricated answer."

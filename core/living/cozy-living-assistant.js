@@ -309,6 +309,16 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
         // doesn't own. Page-lifetime only, never persisted, never a
         // second CozyMemory — same discipline as #currentLanguage below.
         #businessConversationState = null;
+        // Phase 3: Teach Cozy / Governed Learning — SAME pattern as
+        // #businessConversationState immediately above: a separate
+        // private field carrying CozyTeachFlow's own real, previously-
+        // returned { pendingCandidateId, pendingClaim, pendingLanguage }
+        // so a pending yes/no teaching-confirmation exchange survives to
+        // the next turn without depending on the unrelated rule-based
+        // provider's own #conversationState. Page-lifetime only, never
+        // persisted here (CozyLearn's own candidate persistence, via
+        // CozyMemory, is the real durable store — see cozy-learn.js).
+        #teachConversationState = null;
         #root = null;
         #windowHandle = null; // M366.7 - the real WindowManager handle for the panel, once opened
         #panel = null;
@@ -396,6 +406,33 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
             this.#button.setAttribute("aria-expanded", "false");
             if (this.#windowHandle) this.#windowHandle.close();
             else this.#panel.hidden = true;
+        }
+
+        /**
+         * enterTeachingMode() — PHASE 3: Teach Cozy / Governed Learning.
+         *   The real Profile "Teach Cozy" entry point calls this (see
+         *   user-dashboard.js's #renderProfileSurface()). It does exactly
+         *   two things, both already real and existing: (1) this.open() —
+         *   the SAME open() above every other entry point into this Live
+         *   Window already uses, never a second chat surface/window; (2)
+         *   seeds a real disclosure message via #addMessage(), the SAME
+         *   mechanism #seedWelcomeMessage() already uses. It sets no new
+         *   mode flag anywhere in the answer chain — the teaching flow
+         *   below is driven entirely by the user's own next message
+         *   actually containing an explicit teaching statement (see
+         *   cozy-teach-intent.js's own header on why explicit-marker-only
+         *   detection is used) or a reply to a pending confirmation. This
+         *   banner exists purely so the user knows what phrasing to use;
+         *   removing it would not change what CozyAI does or does not
+         *   learn.
+         */
+        enterTeachingMode() {
+            this.open();
+            const language = this.#currentLanguage === "sw" ? "sw" : "en";
+            const banner = language === "sw"
+                ? "Uko kwenye hali ya kufundisha. Niambie jambo unalotaka nikumbuke (mfano: \"Nataka kukufundisha kwamba...\"), na nitakuuliza uthibitishe kabla sijalikumbuka."
+                : "You're in teaching mode. Tell me something you'd like me to remember (e.g. \"I want to teach you that...\"), and I'll ask you to confirm before I remember it.";
+            this.#addMessage("assistant", banner);
         }
 
         /**
@@ -719,7 +756,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
                 // chain can answer a named-application question in the
                 // SAME language the user actually asked in, instead of
                 // defaulting to English. No new language detector.
-                const answerResult = await answerEngine.answer(text, { actorId, entityHint: contextualEntityName, liveSessionId: effectiveLiveSessionId, supportScope, language: this.#currentLanguage, businessConversationState: this.#businessConversationState });
+                const answerResult = await answerEngine.answer(text, { actorId, entityHint: contextualEntityName, liveSessionId: effectiveLiveSessionId, supportScope, language: this.#currentLanguage, businessConversationState: this.#businessConversationState, teachConversationState: this.#teachConversationState });
                 // Phase 2: CozyAI + Live Window Business-Data Q&A — only
                 // update when this turn's real business-data flow
                 // actually returned a fresh state (see cozy-ai.js's own
@@ -730,6 +767,15 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
                 if (answerResult.businessDataConversationState) {
                     this.#businessConversationState = answerResult.businessDataConversationState;
                 }
+                // Phase 3: Teach Cozy / Governed Learning — same
+                // carry-forward discipline as businessDataConversationState
+                // immediately above, but this one DOES need to clear on a
+                // falsy return (CozyTeachFlow returns null once a pending
+                // candidate is confirmed/rejected/trusted — see that
+                // file's own comment): an unrelated later turn must never
+                // keep re-asking a yes/no question about an already-
+                // resolved candidate.
+                this.#teachConversationState = answerResult.teachDataConversationState || null;
                 if (advisor && typeof advisor.advise === "function") {
                     const advice = advisor.advise({ question: text, answerResult });
                     // Domain 4B (AI Integration discovery): CozyAdvisor's

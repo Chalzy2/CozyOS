@@ -190,7 +190,19 @@
             createdAt: new Date().toISOString(),
             validatedAt: null,
             validatedBy: null,
-            version: 1
+            version: 1,
+            // PHASE 3 (Teach Cozy / Governed Learning) — additive, optional
+            // fields. A candidate created by every caller before this
+            // phase never set these, and every existing function above
+            // (confirm/reject/promote/getLearnedSynonyms/applySynonyms)
+            // works byte-identically whether they are null or set. Never
+            // a second record shape - the SAME candidate record, SAME
+            // state machine, SAME persist()/load() plumbing.
+            subject: input.subject || null, // what/who the claim is about (e.g. an application name) - null for a plain word/synonym candidate
+            claim: input.claim || null, // the free-text statement being taught, distinct from the narrower observedForm/canonicalForm synonym pair
+            category: input.category || null, // e.g. "TAUGHT_FACT" - honest label, not a new taxonomy engine
+            provenance: input.provenance ? { actorId: input.actorId || null, capturedVia: input.provenance.capturedVia || "unknown", capturedAt: new Date().toISOString() } : null,
+            conflictsWith: input.conflictsWith || null // set by a caller that already ran checkConflict() before creating this candidate - never computed here
         };
         persist(input.actorId, candidateId, record);
         return record;
@@ -252,6 +264,7 @@
         record.validatedBy = opts.validatedBy || null;
         persist(opts.actorId, candidateId, record);
         registerTrustedSynonym(record);
+        registerTrustedTeaching(record);
         return { success: true, candidate: record };
     }
 
@@ -268,6 +281,203 @@
         if (!record.canonicalForm || !record.language) return; // nothing safe to apply without both
         const key = `${record.language}:${record.observedForm.toLowerCase()}`;
         trustedSynonymsByScope[record.scope].set(key, { canonicalForm: record.canonicalForm, candidateId: record.candidateId, semanticConcept: record.semanticConcept || null });
+    }
+
+    // ---- Trusted TAUGHT FACTS (Phase 3 — Teach Cozy / Governed Learning) ----
+    // Same scope-keyed shape as trustedSynonymsByScope above, and the
+    // SAME safety rule: getTrustedTeachings() defaults to GLOBAL-only,
+    // never silently leaking a private scope. This is separate from
+    // trustedSynonymsByScope because a taught fact/claim has no
+    // canonicalForm (it is not a word-substitution mapping) - it is
+    // never stored in, or read from, that structure.
+    const trustedTeachingsByScope = { USER: new Map(), SESSION: new Map(), COMMUNITY: new Map(), ORGANIZATION: new Map(), APPLICATION: new Map(), GLOBAL: new Map() };
+
+    // PERSISTENCE ACROSS A NEW CONVERSATION/SESSION — real gap found via
+    // a real two-browser-session test: CozyMemory (the existing,
+    // repository-wide memory abstraction persist()/load() above already
+    // composes) has NO durable backend anywhere in this repository today
+    // (confirmed by reading cozy-memory-engine.js in full — an in-memory
+    // Map only, page-lifetime, a PRE-EXISTING characteristic of every
+    // CozyMemory namespace, not something Phase 3 introduces). Without
+    // more, a promoted TRUSTED taught fact would vanish the moment the
+    // page reloads — failing the Phase 3 requirement that approved
+    // learning survive into a genuinely new conversation. Rather than
+    // build durable storage into CozyMemory itself (a repository-wide
+    // change touching every feature that uses it, far outside this
+    // phase's scope) or invent a second learning database, this adds
+    // ONE small, disclosed, additive localStorage write-through
+    // SPECIFICALLY for the TRUSTED-teaching cache this phase itself
+    // introduces — nothing else in CozyLearn is touched by this. Fails
+    // closed/honestly: if localStorage is unavailable (Node tests, a
+    // privacy-restricted browser context), teachings simply behave as
+    // they did before this addition (page-lifetime only) — never throws.
+    const TRUSTED_TEACHINGS_STORAGE_KEY = "cozy-learn-trusted-teachings-v1";
+
+    function getLocalStorage() {
+        try {
+            if (typeof window !== "undefined" && window.localStorage) return window.localStorage;
+        } catch (_err) { /* some contexts throw merely accessing localStorage */ }
+        return null;
+    }
+
+    function persistTrustedTeachingsToStorage() {
+        const storage = getLocalStorage();
+        if (!storage) return;
+        try {
+            const serializable = {};
+            for (const scope of Object.keys(trustedTeachingsByScope)) {
+                serializable[scope] = Array.from(trustedTeachingsByScope[scope].entries());
+            }
+            storage.setItem(TRUSTED_TEACHINGS_STORAGE_KEY, JSON.stringify(serializable));
+        } catch (_err) { /* honest no-op — a write failure never breaks the in-memory path */ }
+    }
+
+    function loadTrustedTeachingsFromStorage() {
+        const storage = getLocalStorage();
+        if (!storage) return;
+        try {
+            const raw = storage.getItem(TRUSTED_TEACHINGS_STORAGE_KEY);
+            if (!raw) return;
+            const parsed = JSON.parse(raw);
+            for (const scope of Object.keys(trustedTeachingsByScope)) {
+                const entries = Array.isArray(parsed[scope]) ? parsed[scope] : [];
+                for (const [key, value] of entries) trustedTeachingsByScope[scope].set(key, value);
+            }
+        } catch (_err) { /* honest no-op — a corrupt/foreign value never throws, just starts empty */ }
+    }
+
+    loadTrustedTeachingsFromStorage(); // rehydrate once, at module load — before any candidate in THIS session is promoted
+
+    function registerTrustedTeaching(record) {
+        if (!record.claim) return; // nothing safe to expose without an actual claim
+        const subjectKey = (record.subject || record.observedForm || "").toLowerCase();
+        if (!subjectKey) return;
+        const actorId = record.provenance && record.provenance.actorId ? record.provenance.actorId : null;
+        // USER scope is this actor's own private data — the key
+        // includes actorId so a second user teaching the same subject
+        // at USER scope never collides with, or overwrites, the first
+        // user's own entry (unlike trustedSynonymsByScope above, which
+        // pre-dates Phase 3 and has no such per-actor claim data to
+        // partition by). Non-USER scopes are not actor-partitioned —
+        // same convention as the rest of this file.
+        const key = record.scope === "USER"
+            ? `${record.language || "*"}:${subjectKey}:${actorId || "unknown"}`
+            : `${record.language || "*"}:${subjectKey}`;
+        trustedTeachingsByScope[record.scope].set(key, {
+            candidateId: record.candidateId,
+            subject: record.subject || record.observedForm,
+            claim: record.claim,
+            language: record.language || null,
+            category: record.category || null,
+            provenance: record.provenance || null,
+            validatedAt: record.validatedAt,
+            actorId
+        });
+        persistTrustedTeachingsToStorage();
+    }
+
+    /**
+     * getTrustedTeachings(subject, { language, scopes, actorId })
+     *   Phase 3. scopes defaults to ["GLOBAL"] only - same privacy
+     *   boundary as getLearnedSynonyms() above. Returns the TRUSTED
+     *   taught-fact records (never CANDIDATE/USER_CONFIRMED ones) whose
+     *   subject matches (case-insensitive), across the requested scopes.
+     *   FAIL-CLOSED PRIVACY RULE: when "USER" is requested, an entry is
+     *   only returned when its own recorded actorId matches the
+     *   caller-supplied actorId exactly — a missing/mismatched actorId
+     *   never sees another user's USER-scoped taught fact, and a caller
+     *   that passes no actorId sees no USER-scoped entries at all.
+     */
+    function getTrustedTeachings(subject, options) {
+        const opts = options || {};
+        const scopes = (Array.isArray(opts.scopes) && opts.scopes.length) ? opts.scopes : ["GLOBAL"];
+        const subjectKey = String(subject || "").toLowerCase();
+        if (!subjectKey) return [];
+        const matches = [];
+        for (const scope of scopes) {
+            if (!trustedTeachingsByScope[scope]) continue;
+            for (const [key, value] of trustedTeachingsByScope[scope].entries()) {
+                if (scope === "USER" && (!opts.actorId || value.actorId !== opts.actorId)) continue;
+                const parts = key.split(":");
+                const lang = parts[0];
+                const keySubject = parts[1];
+                if (keySubject !== subjectKey) continue;
+                if (opts.language && lang !== "*" && lang !== opts.language) continue;
+                matches.push(Object.assign({ scope }, value));
+            }
+        }
+        return matches;
+    }
+
+    /**
+     * checkConflict({ subject, claim, language })
+     *   Phase 3. A real, disclosed, narrow heuristic - NOT a general
+     *   contradiction detector (no such thing exists honestly in this
+     *   repository). It composes window.CozyOS.CozyKnowledge's
+     *   existing getApplicationDetailedInfoFact(name, lang) - the SAME
+     *   verified application-fact source the rest of CozyAI already
+     *   uses - and only flags a conflict when (a) a VERIFIED fact for
+     *   that exact subject already exists, AND (b) that fact's own text
+     *   contains a real, disclosed "capability unavailable" marker, AND
+     *   (c) the proposed claim affirmatively asserts a matching
+     *   capability keyword without itself containing a negation word.
+     *   Returns { conflict: false, reason: "NO_EXISTING_FACT" | "NO_MARKER_MATCH" }
+     *   or { conflict: true, existingFact, matchedKeyword }. Never
+     *   throws, never silently promotes past a real conflict - callers
+     *   (e.g. cozy-teach-flow.js) decide what to do with the result.
+     */
+    // Deliberately narrow: only the specific, reserved
+    // "CAPABILITY_UNAVAILABLE" disclosure token this repository already
+    // uses for exactly this purpose (see cozy-knowledge-registry.js's
+    // own ChurchOS broadcast-limit fact). A real false positive was
+    // found via the real-browser test suite when this list also
+    // included the generic phrase "not implemented": a multi-paragraph
+    // application fact's own unrelated "Vision/planned (not implemented
+    // yet)" section made an unrelated, true claim about a DIFFERENT,
+    // already-implemented capability look like a conflict purely
+    // because the word "not implemented" appeared anywhere at all in
+    // the fact text. The generic phrase is too broad to safely imply
+    // "this specific claim is about the same unavailable capability" -
+    // removed rather than patched further, matching this file's own
+    // "never guess, honestly under-detect rather than false-positive"
+    // discipline.
+    const UNAVAILABLE_MARKERS = ["CAPABILITY_UNAVAILABLE"];
+    const NEGATION_WORDS_EN = ["not", "cannot", "can't", "doesn't", "does not", "no ", "never"];
+    const NEGATION_WORDS_SW = ["hai", "hawezi", "haiwezi", "hazi", "hapana", "sio", "si "];
+
+    function checkConflict(fields) {
+        const f = fields || {};
+        const registry = window.CozyOS && window.CozyOS.CozyKnowledge;
+        if (!registry || typeof registry.getApplicationDetailedInfoFact !== "function" || !f.subject) {
+            return { conflict: false, reason: "NO_EXISTING_FACT" };
+        }
+        let result = null;
+        try { result = registry.getApplicationDetailedInfoFact(f.subject, f.language || "en"); } catch (_err) { return { conflict: false, reason: "NO_EXISTING_FACT" }; }
+        if (!result || result.evidence !== "VERIFIED" || !result.answer) return { conflict: false, reason: "NO_EXISTING_FACT" };
+
+        const factText = String(result.answer);
+        const matchedMarker = UNAVAILABLE_MARKERS.find((m) => factText.toLowerCase().includes(m.toLowerCase()));
+        if (!matchedMarker) return { conflict: false, reason: "NO_MARKER_MATCH" };
+
+        const claimLower = String(f.claim || "").toLowerCase();
+        const negations = (f.language === "sw") ? NEGATION_WORDS_SW : NEGATION_WORDS_EN;
+        const claimIsNegated = negations.some((n) => claimLower.includes(n));
+        if (claimIsNegated) return { conflict: false, reason: "NO_MARKER_MATCH" }; // claim itself already agrees the capability is unavailable
+
+        // The claim must share at least one real, disclosed content word
+        // (length >= 5, not a stopword, and NOT the subject's own name -
+        // which would trivially appear in almost any fact about that
+        // subject and cause a false conflict for an unrelated claim like
+        // "ChurchOS has a nice logo") with the unavailable fact's own
+        // text to count as "about the same capability" - never a bare
+        // "any application fact exists" false positive.
+        const subjectWords = String(f.subject || "").toLowerCase().match(/[a-z]+/g) || [];
+        const claimWords = (claimLower.match(/[a-z]+/g) || []).filter((w) => !subjectWords.includes(w));
+        const factLower = factText.toLowerCase();
+        const sharedWord = claimWords.find((w) => w.length >= 5 && factLower.includes(w));
+        if (!sharedWord) return { conflict: false, reason: "NO_MARKER_MATCH" };
+
+        return { conflict: true, existingFact: result.answer, matchedKeyword: sharedWord };
     }
 
     /**
@@ -373,6 +583,8 @@
         promoteCandidate,
         getLearnedSynonyms,
         applySynonyms,
+        getTrustedTeachings,
+        checkConflict,
         getVersion() { return MODULE_VERSION; }
     });
 

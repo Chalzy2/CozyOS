@@ -1116,6 +1116,23 @@
                 fieldsSection = `<p class="cozy-disclosure-note">Profile editing is not available right now.</p>`;
             }
 
+            // PHASE 3 (Teach Cozy / Governed Learning) — the real Profile
+            // entry point this phase adds, filling the "Teach CozyAI"
+            // slot Profile Phase 1 itself explicitly deferred (see this
+            // method's own file header). Distinct from the existing,
+            // unmodified Community "Teach Cozy AI" button (#wireTeachButton
+            // above, RP-031 Phase 2A) which navigates to a separate
+            // structured-contribution form page — this one opens the
+            // SAME real Live Window this dashboard already has, via
+            // window.CozyOS.LivingAssistant.enterTeachingMode(), never a
+            // second chat surface.
+            const teachSection = `
+                <section id="cozy-ud-profile-teach" class="cozy-ud-profile-block">
+                    <h4>Teach Cozy</h4>
+                    <p class="cozy-disclosure-note">Tell CozyAI something in a normal conversation and it will ask you to confirm before remembering it — nothing is learned without your explicit yes.</p>
+                    <button type="button" class="cozy-btn" id="cozy-ud-profile-teach-btn">Teach Cozy</button>
+                </section>`;
+
             host.innerHTML = `
                 <h3>Profile</h3>
                 <div id="cozy-ud-profile-card">
@@ -1125,9 +1142,29 @@
                         <h4>Account</h4>
                         ${accountLines}
                     </section>
+                    ${teachSection}
                 </div>
             `;
             if (core) this.#wireProfileSurface(host, core, identity);
+            this.#wireProfileTeachButton(host);
+        }
+
+        /** #wireProfileTeachButton() — routes to the real, existing Live Window's enterTeachingMode() (Phase 3). Honest degrade: if the Live Window isn't loaded on this page, the button says so instead of doing nothing silently. */
+        #wireProfileTeachButton(host) {
+            const btn = host.querySelector("#cozy-ud-profile-teach-btn");
+            if (!btn) return;
+            btn.addEventListener("click", () => {
+                const assistant = window.CozyOS && window.CozyOS.LivingAssistant;
+                if (assistant && typeof assistant.enterTeachingMode === "function") {
+                    assistant.enterTeachingMode();
+                    return;
+                }
+                const status = host.querySelector("#cozy-ud-profile-teach") || host;
+                const note = document.createElement("p");
+                note.className = "cozy-disclosure-note";
+                note.textContent = "The Live Window is not available on this page right now.";
+                status.appendChild(note);
+            });
         }
 
         /** #wireProfileSurface() — picture preview + Save handlers. Every message goes through escapeHtml; nothing here reads GPS/IP/locale. */

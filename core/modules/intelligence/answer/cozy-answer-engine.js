@@ -172,6 +172,11 @@
         // honestly as private business data, distinct from public
         // application knowledge (see cozy-ai.js's own comment).
         if (ctxResults.some(r => r.authority === "interestos-business-data")) return "BUSINESS_DATA";
+        // Phase 3: Teach Cozy / Governed Learning — "cozy-teach" is the
+        // live create/confirm/reject/conflict exchange itself;
+        // "cozy-teach-knowledge" is a later question answered FROM a
+        // previously TRUSTED taught fact (see cozy-ai.js's own comment).
+        if (ctxResults.some(r => r.authority === "cozy-teach" || r.authority === "cozy-teach-knowledge")) return "TEACHING";
         if (ctxResults.some(r => r.authority === "live-worship-session")) return "LIVE_WORSHIP";
         if (ctxResults.some(r => r.authority === "cozy-memory" || r.authority === "living-memory")) return "PROJECT_KNOWLEDGE";
         return "GENERAL";
@@ -215,13 +220,21 @@
      *   assistant.js) to carry into the NEXT turn — the same existing
      *   #conversationState mechanism lastDiscussedApplication already
      *   uses, never a second memory/context system.
+     *   teachConversationState (Phase 3: Teach Cozy / Governed Learning
+     *   addition) — same pattern as businessConversationState immediately
+     *   above: passed straight through to CozyAI.getContext(), which
+     *   passes it straight through to CozyTeachFlow, so a pending
+     *   yes/no teaching-confirmation exchange survives to the next turn.
+     *   The returned teachDataConversationState field is CozyTeachFlow's
+     *   own real, disclosed updated state for the caller to carry
+     *   forward — this file adds no teaching/governance logic of its own.
      */
-    async function answer(question, { actorId = null, language = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null, businessContext = null, businessConversationState = null } = {}) {
+    async function answer(question, { actorId = null, language = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null, businessContext = null, businessConversationState = null, teachConversationState = null } = {}) {
         if (typeof question !== "string" || !question.trim()) {
             return {
                 answer: "A real, non-empty question is required.",
                 intent: "INVALID_INPUT", responseMode: "INSUFFICIENT_EVIDENCE",
-                evidenceState: "INSUFFICIENT_DATA", sources: [], reasoningUsed: false, contextUsed: [], businessDataConversationState: null
+                evidenceState: "INSUFFICIENT_DATA", sources: [], reasoningUsed: false, contextUsed: [], businessDataConversationState: null, teachDataConversationState: null
             };
         }
 
@@ -232,7 +245,7 @@
             return {
                 answer: "The answer composition authorities (CozyIdentityFAQRouter / CozyAI) are not loaded in this environment.",
                 intent: "UNKNOWN", responseMode: "INSUFFICIENT_EVIDENCE",
-                evidenceState: "UNAVAILABLE", sources: [], reasoningUsed: false, contextUsed: [], businessDataConversationState: null
+                evidenceState: "UNAVAILABLE", sources: [], reasoningUsed: false, contextUsed: [], businessDataConversationState: null, teachDataConversationState: null
             };
         }
 
@@ -262,9 +275,27 @@
         // below — applying it here too, honestly extending the router's
         // own stated scope rule to context-implied applications, not
         // only textually-named ones.
+        // PHASE 3 (Teach Cozy / Governed Learning) — a pending yes/no
+        // teaching-confirmation reply must NEVER be intercepted by the
+        // FAQ router below. Real bug found via the real-browser test
+        // suite: CozyIdentityFAQRouter has its own honest low-confidence
+        // fallback (isReal:false, "I don't have a canonical answer for
+        // that...") that can still report matched:true for a short,
+        // ambiguous reply like "ndiyo" - which would otherwise replace
+        // CozyTeachFlow's real confirm/reject/pending reply with that
+        // unrelated fallback text, even though the real candidate was
+        // still correctly confirmed/promoted behind the scenes (this
+        // file adds no teaching logic of its own; CozyTeachFlow's real
+        // state machine call already happened inside ai.getContext()
+        // regardless of what gets returned here — only the user-visible
+        // TEXT was at risk of being wrong). Same "checked first, ahead
+        // of every other authority" discipline as cozy-ai.js's own
+        // getContext() composition order.
+        const skipFaqRouterForPendingTeach = !!(teachConversationState && teachConversationState.pendingCandidateId);
+
         let faqResult = null;
         const skipFaqRouterForNamedApp = typeof entityHint === "string" && entityHint.trim().length > 0;
-        if (router && typeof router.resolve === "function" && !skipFaqRouterForNamedApp) {
+        if (router && typeof router.resolve === "function" && !skipFaqRouterForNamedApp && !skipFaqRouterForPendingTeach) {
             try { faqResult = await router.resolve(question, { language }); } catch (_err) { faqResult = null; }
         }
         const faqMatched = !!(faqResult && faqResult.matched);
@@ -275,10 +306,11 @@
         // half, e.g. "What is CozyOS and what applications does it have?") ---
         let ctx = { success: false, results: [] };
         if (ai && typeof ai.getContext === "function") {
-            try { ctx = await ai.getContext(question, { actorId, memoryQuery, entityHint, liveSessionId, supportScope, businessContext, language, businessConversationState }); } catch (_err) { ctx = { success: false, results: [] }; }
+            try { ctx = await ai.getContext(question, { actorId, memoryQuery, entityHint, liveSessionId, supportScope, businessContext, language, businessConversationState, teachConversationState }); } catch (_err) { ctx = { success: false, results: [] }; }
         }
         const ctxResults = (ctx && Array.isArray(ctx.results)) ? ctx.results : [];
         const businessDataConversationState = (ctx && ctx.businessDataConversationState) || null;
+        const teachDataConversationState = (ctx && ctx.teachDataConversationState) || null;
 
         if (faqMatched) {
             const isReal = faqResult.isReal !== false;
@@ -318,7 +350,8 @@
                 sources: dedupeSources(sources),
                 reasoningUsed: !!multiIntent,
                 contextUsed: ctxResults,
-                businessDataConversationState
+                businessDataConversationState,
+                teachDataConversationState
             };
         }
 
@@ -328,7 +361,7 @@
                 answer: "I don't have verified information to answer that yet. Please rephrase, or this may not be something CozyOS has documented/verified.",
                 intent: "UNKNOWN", responseMode: "INSUFFICIENT_EVIDENCE",
                 evidenceState: (ai && typeof ai.getContext === "function") ? "INSUFFICIENT_DATA" : "UNAVAILABLE",
-                sources: [], reasoningUsed: false, contextUsed: [], businessDataConversationState
+                sources: [], reasoningUsed: false, contextUsed: [], businessDataConversationState, teachDataConversationState
             };
         }
 
@@ -339,7 +372,7 @@
             return {
                 answer: "Some related context exists, but nothing in it could be honestly rendered as a verified answer.",
                 intent, responseMode: "INSUFFICIENT_EVIDENCE",
-                evidenceState: "INSUFFICIENT_DATA", sources: [], reasoningUsed: false, contextUsed: ctxResults, businessDataConversationState
+                evidenceState: "INSUFFICIENT_DATA", sources: [], reasoningUsed: false, contextUsed: ctxResults, businessDataConversationState, teachDataConversationState
             };
         }
 
@@ -366,7 +399,8 @@
             sources,
             reasoningUsed: pieces.length > 1 || responseMode === "WHY_REASONING" || responseMode === "COMPARISON",
             contextUsed: ctxResults,
-            businessDataConversationState
+            businessDataConversationState,
+            teachDataConversationState
         };
     }
 
