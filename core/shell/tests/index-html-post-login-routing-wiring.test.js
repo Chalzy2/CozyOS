@@ -35,9 +35,22 @@ function read(relPath) {
 }
 
 function extractInlineScript(html) {
+    // UPDATE: index.html originally carried exactly one bare <script>
+    // block (the routing/bootstrap script below), so "exactly one" was
+    // a safe assumption at the time. It has since legitimately gained
+    // several other small, independent, single-purpose bare inline
+    // <script> blocks (e.g. CozyMediaIntelligence core-app
+    // registration, the SA-3B bridge composition note) added by later,
+    // separately-authorized milestones — none of which touch post-login
+    // routing. Selecting by content (the one block that actually
+    // references PostLoginRoutingCore, the real collaborator this file
+    // tests) is robust to that legitimate growth, instead of assuming
+    // position or count.
     const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
-    assert.equal(scripts.length, 1, 'expected exactly one inline <script> block in index.html — extraction logic must be revisited if this changes');
-    return scripts[0][1];
+    assert.ok(scripts.length >= 1, 'expected at least one inline <script> block in index.html');
+    const routingScript = scripts.find(([, body]) => body.includes('PostLoginRoutingCore'));
+    assert.ok(routingScript, 'expected to find the inline <script> block that references PostLoginRoutingCore — extraction logic must be revisited if this changes');
+    return routingScript[1];
 }
 
 /**

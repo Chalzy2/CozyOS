@@ -21,9 +21,18 @@ const path = require('node:path');
 function freshInstance() {
   // Each test gets an isolated window/CozyOS + a fresh require of the
   // production file, since it self-registers a singleton on load.
-  delete require.cache[require.resolve('./document-understanding.js')];
-  global.window = { CozyOS: {} };
-  require('./document-understanding.js');
+  // registerCoordinator is stubbed as a no-op here (distinct from the
+  // dedicated registration test below, which supplies its own spy) so
+  // the production file's real, deliberate registration-retry loop
+  // (setInterval, up to 50s, for pages where the ServiceRegistry loads
+  // late) resolves on its FIRST attempt instead of spinning for the
+  // full 50s per test — tests that don't care about registration
+  // behavior would otherwise each leave a live timer running, which is
+  // what made this suite hang well past every individual test already
+  // reporting pass/fail.
+  delete require.cache[require.resolve('../document-understanding.js')];
+  global.window = { CozyOS: { registerCoordinator: () => {} } };
+  require('../document-understanding.js');
   return global.window.CozyOS.DocumentUnderstanding;
 }
 
@@ -52,8 +61,8 @@ test('coordinator self-registers with the ServiceRegistry when present', () => {
   global.window = { CozyOS: {} };
   const registered = [];
   global.window.CozyOS.registerCoordinator = (descriptor) => registered.push(descriptor);
-  delete require.cache[require.resolve('./document-understanding.js')];
-  require('./document-understanding.js');
+  delete require.cache[require.resolve('../document-understanding.js')];
+  require('../document-understanding.js');
   assert.equal(registered.length, 1);
   assert.equal(registered[0].name, 'DocumentUnderstanding');
   assert.ok(!registered[0].capabilities.includes('document-classification'));

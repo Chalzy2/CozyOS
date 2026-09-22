@@ -39,9 +39,16 @@ function read(relPath) {
 }
 
 function extractInlineScript(html) {
+    // UPDATE: same fix, and for the same reason, as the identical helper
+    // in index-html-post-login-routing-wiring.test.js — index.html has
+    // legitimately gained several other small, independent bare inline
+    // <script> blocks since this assumed exactly one; select by content
+    // (the block that actually references PostLoginRoutingCore) instead.
     const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
-    assert.equal(scripts.length, 1, 'expected exactly one inline <script> block in index.html');
-    return scripts[0][1];
+    assert.ok(scripts.length >= 1, 'expected at least one inline <script> block in index.html');
+    const routingScript = scripts.find(([, body]) => body.includes('PostLoginRoutingCore'));
+    assert.ok(routingScript, 'expected to find the inline <script> block that references PostLoginRoutingCore');
+    return routingScript[1];
 }
 
 /**

@@ -17,7 +17,12 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const RENDER_YAML_PATH = path.resolve(__dirname, '../../render.yaml');
+// UPDATE: this file's own header still says "test/deployment/
+// render-yaml.test.js" (its path when '../../render.yaml' was written,
+// two levels below the repo root); it now lives at the repo root
+// itself, where '../../render.yaml' resolves outside the repo entirely
+// (confirmed: ENOENT on /home/render.yaml). __dirname IS the repo root now.
+const RENDER_YAML_PATH = path.resolve(__dirname, 'render.yaml');
 const raw = fs.readFileSync(RENDER_YAML_PATH, 'utf8');
 
 test('render.yaml exists and is non-empty', () => {
@@ -57,16 +62,25 @@ test('enables Secure cookies in production', () => {
   assert.match(raw, /COZY_WEBAUTHN_COOKIE_SECURE\s*\n\s*value:\s*"1"/);
 });
 
-test('COZY_RP_ID and COZY_RP_ORIGIN are never hardcoded to a guessed domain', () => {
-  // These two must depend on the still-open same-origin routing decision
-  // (see docs/render-deployment.md) rather than a value invented here.
-  // `sync: false` is Render's way of requiring a human to set them in
-  // the dashboard instead of reading a baked-in value from this file.
-  for (const key of ['COZY_RP_ID', 'COZY_RP_ORIGIN']) {
+test('COZY_RP_ID and COZY_RP_ORIGIN are pinned to the confirmed production domain, never a different/guessed one', () => {
+  // UPDATE: this test ORIGINALLY required sync:false (no baked-in
+  // value), deferring to "the still-open same-origin routing decision"
+  // — that decision is no longer open. docs/render-deployment.md now
+  // documents, as a completed, verified step: "Sets COZY_RP_ID=cozyos.org
+  // and COZY_RP_ORIGIN=https://cozyos.org — the production hostname was
+  // confirmed reachable and serving the real CozyOS site... See
+  // render-yaml.test.js for the guard that fails loudly if this drifts
+  // from that exact value" — i.e. that doc already expects THIS test to
+  // guard the real, chosen value, not require its absence. Updated
+  // accordingly: still fails loudly (real security guard, RP ID is
+  // WebAuthn-origin-binding-critical) on any OTHER value or a reversion
+  // to no value at all — it only stops treating the one confirmed,
+  // documented domain as if it were an accidental guess.
+  const expected = { COZY_RP_ID: 'cozyos.org', COZY_RP_ORIGIN: 'https://cozyos.org' };
+  for (const [key, value] of Object.entries(expected)) {
     const block = raw.match(new RegExp(`- key: ${key}\\n(\\s*(?:value|sync):[^\\n]*\\n?)+`));
     assert.ok(block, `${key} block not found`);
-    assert.match(block[0], /sync:\s*false/, `${key} must be sync:false, not a hardcoded value, until a production hostname is chosen`);
-    assert.doesNotMatch(block[0], /value:\s*\S/, `${key} must not have a hardcoded value in render.yaml`);
+    assert.match(block[0], new RegExp(`value:\\s*${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`), `${key} must be pinned to the confirmed, documented production value "${value}" (see docs/render-deployment.md), not drifted to something else`);
   }
 });
 

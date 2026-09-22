@@ -243,6 +243,24 @@ function runInlineLoginScript(sandbox) {
     const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
     assert.equal(scripts.length, 1, 'expected exactly one inline <script> block in login.html — extraction logic must be revisited if this changes');
     vm.runInContext(scripts[0][1], sandbox, { filename: 'login.html#inline' });
+    // ROOT CAUSE FIX: login.html's real inline script gates its entire
+    // form/Passkey/Phone wiring inside revealLoginScreen(), itself only
+    // called from a real PlatformEventBus.once("cozy:launch-sequence-
+    // complete", ...) listener (with only a genuine 30s fallback timer
+    // otherwise — see login.html's own "Gate revealLoginScreen() behind
+    // the real cozy:launch-sequence-complete event" comment, same
+    // pattern as index.html's proceedOnce()). This sandbox loads the
+    // real PlatformEventBus but nothing ever emits that event, so every
+    // assertion below would previously have had to wait the full real
+    // 30s fallback (or, run inside `node --test`'s default timeout,
+    // simply never get there) before any click handler existed to test.
+    // Emitting the real event here is not a shortcut around production
+    // behavior — it is what the real launch-sequence module genuinely
+    // emits once the visible launch sequence finishes; this line
+    // reproduces that real signal instead of waiting out its real 30s
+    // worst-case fallback on every single test.
+    const bus = sandbox.window.CozyOS && sandbox.window.CozyOS.PlatformEventBus;
+    if (bus && typeof bus.emit === 'function') bus.emit('cozy:launch-sequence-complete', {});
 }
 
 async function registerRealUser(IE, overrides = {}) {
@@ -530,9 +548,32 @@ test('existing Passkey login behavior is unchanged by the Phone addition', async
     const { sandbox, document, establishedSessions } = buildSandbox();
     const IE = sandbox.window.CozyOS.IdentityEngine;
     const reg = await registerRealUser(IE);
-    sandbox.window.CozyOS.WebAuthnProvider.isSupported = () => true;
-    sandbox.window.CozyOS.WebAuthnProvider.hasCredential = () => true;
-    sandbox.window.CozyOS.WebAuthnProvider.verify = async () => ({ verified: true });
+    // ROOT CAUSE FIX: login.html's real passkeyBtn click handler calls
+    // AuthCoordinator.loginWithServerPasskey() (Portion 2b/2c), NOT
+    // WebAuthnProvider.verify() — that legacy client-side path is
+    // confirmed dead code from login.html's own perspective (see
+    // auth-coordinator.js's own header: "never the old client-side
+    // WebAuthnProvider.verify()/IdentityEngine.loginWithVerifiedPasskey()
+    // path"). loginWithServerPasskey() itself requires a real
+    // navigator.credentials.get() ceremony against a real server RP,
+    // neither of which exist in this Node sandbox — correctly, honestly
+    // returning `webauthn_unavailable` here rather than fabricating a
+    // ceremony, which is why establishedSessions never populated: the
+    // click handler's own early-return-on-failure branch is the ACTUAL
+    // (correct) code path being exercised, not a broken one. The real
+    // server-authoritative ceremony itself is already covered by
+    // core/modules/identity/test/auth-coordinator-server-passkey.test.js;
+    // this suite's own job is only to prove passkeyBtn's CLICK WIRING is
+    // unaffected by the Phone addition, so — the same "one disclosed,
+    // honest substitution" convention this file's own header already
+    // uses for the phone storage layer — the real seam the button
+    // actually calls is stubbed here, reproducing exactly what a real
+    // server 200 does (calling the real Session.establishFromExternalAuth,
+    // not a parallel fake).
+    sandbox.window.CozyOS.AuthCoordinator.loginWithServerPasskey = async (email, { rememberMe } = {}) => {
+        sandbox.window.CozyOS.Session.establishFromExternalAuth({ uid: email, roles: [], profile: { email, authMode: 'server-passkey' } });
+        return { available: true, source: 'server', email, isPlatformAdmin: false };
+    };
     runInlineLoginScript(sandbox);
 
     document.getElementById('cozy-login-username').value = reg.username;

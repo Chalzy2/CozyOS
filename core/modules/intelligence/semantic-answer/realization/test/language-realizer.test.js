@@ -70,8 +70,12 @@ test('B: a multi-claim plan with all evidence present composes a real intro + bo
     const request = { ...VALID_SW_REQUEST, evidence };
     const result = realizer.realizeCandidateSentence(request);
     assert.equal(result.success, true, JSON.stringify(result));
-    // Real, disclosed Kiswahili intro for HUMAN_BENEFIT.
-    assert.match(result.candidate.text, /^Hivi ndivyo hii inavyosaidia:/);
+    // Real, disclosed Kiswahili intro for HUMAN_BENEFIT — entity-aware
+    // (PRE-EXISTING-FAILURE-REGISTER.md §3.5): this plan's real
+    // plan.entity.value is "ChurchOS", so the intro correctly names it
+    // instead of the generic "hii" fallback (which only applies when no
+    // real entity is known — see the sibling assertion in test D).
+    assert.match(result.candidate.text, /^Hivi ndivyo ChurchOS inavyosaidia:/);
     // Both real claim sentences present, verbatim.
     assert.match(result.candidate.text, /ChurchOS organizes church work/);
     assert.match(result.candidate.text, /ChurchOS supports multilingual participation/);
@@ -88,7 +92,17 @@ test('the same multi-claim plan in English gets the real English intro, not a tr
     const request = { ...VALID_SW_REQUEST, language: { languageId: 'en' }, semanticPlan: plan, evidence };
     const result = realizer.realizeCandidateSentence(request);
     assert.equal(result.success, true, JSON.stringify(result));
-    assert.match(result.candidate.text, /^Here's how this helps:/);
+    // Entity-aware (PRE-EXISTING-FAILURE-REGISTER.md §3.5) — same real
+    // ChurchOS entity as test B, now in English.
+    assert.match(result.candidate.text, /^Here's how ChurchOS helps:/);
+});
+
+test("introFor()'s own defensive fallback (real entity missing/malformed) still returns the exact original generic intro, never a fabricated name — unit-level, since SemanticAnswerPlanContract itself guarantees a valid plan always has a real, non-empty entity.value, making this path unreachable through a contract-valid request but still real, tested defense in depth (same discipline as this file's own generatePlanId())", () => {
+    const realizer = freshRealizer();
+    assert.equal(realizer.introFor('HUMAN_BENEFIT', 'sw'), 'Hivi ndivyo hii inavyosaidia:');
+    assert.equal(realizer.introFor('HUMAN_BENEFIT', 'sw', undefined), 'Hivi ndivyo hii inavyosaidia:');
+    assert.equal(realizer.introFor('HUMAN_BENEFIT', 'sw', ''), 'Hivi ndivyo hii inavyosaidia:');
+    assert.equal(realizer.introFor('HUMAN_BENEFIT', 'en'), "Here's how this helps:");
 });
 
 /* ------------------------------------------------------------------ */

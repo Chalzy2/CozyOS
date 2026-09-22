@@ -303,10 +303,24 @@ test('admin-workspace.html: real script order — IdentityEngine → CozyAutomat
     // no ordering constraint is asserted between them in either direction.
 });
 
-test('admin-workspace.html: dashboard.html-only surface is untouched by this milestone (no coordinator/panel tags there)', () => {
+test('admin-workspace.html: dashboard.html never loads the admin-only Administrative Requests PANEL — its own "Request an Application" coordinator wiring is a real, later, separately-authorized end-user feature, not this milestone\'s admin UI leaking', () => {
+    // UPDATE: this test ORIGINALLY asserted dashboard.html referenced
+    // neither administrative-request-coordinator.js NOR
+    // administrative-request-panel.js NOR policy-engine.js at all — a
+    // blanket "this milestone never touches dashboard.html" guarantee.
+    // dashboard.html now carries a real, later, separately-authorized
+    // "Request an Application" end-user flow (see its own inline
+    // comment directly above its <script src="...
+    // administrative-request-coordinator.js"> tag: "AdministrativeRequest
+    // Coordinator's own header states it fail-closed-refuses to attach
+    // unless PolicyEngine, IdentityEngine, and WorkflowEngine are all
+    // present first"), which legitimately loads the COORDINATOR (and its
+    // real dependency chain: policy-engine.js, cozy-automation.js,
+    // cozy-workflow-runtime.js) so end users can submit a request. That is
+    // not an admin-UI leak: the actual invariant this test protects — the
+    // ADMIN-ONLY PANEL never reaching the end-user dashboard — is
+    // re-asserted below and still holds today.
     const dashboardPath = path.join(path.dirname(ADMIN_WORKSPACE_HTML_PATH), 'dashboard.html');
     const dashboardHtml = fs.readFileSync(dashboardPath, 'utf8');
-    assert.doesNotMatch(dashboardHtml, /administrative-request-coordinator\.js/);
-    assert.doesNotMatch(dashboardHtml, /administrative-request-panel\.js/);
-    assert.doesNotMatch(dashboardHtml, /policy\/policy-engine\.js/);
+    assert.doesNotMatch(dashboardHtml, /administrative-request-panel\.js/, 'dashboard.html (end-user surface) must never load the admin-only Administrative Requests panel UI');
 });

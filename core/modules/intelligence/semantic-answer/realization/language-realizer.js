@@ -86,11 +86,24 @@
         return c && c.CozyLanguageRealize;
     }
 
-    /** introFor(goal, language) — real, disclosed, composed via the existing Phase 4 seam. null when no intro exists for this goal (e.g. DEFINITION with a single claim needs none) or the seam/key isn't available — callers must degrade honestly, never fabricate an intro. */
-    function introFor(goal, language) {
+    /**
+     * introFor(goal, language, entityName)
+     *   Real, disclosed, composed via the existing Phase 4 seam. null
+     *   when no intro exists for this goal (e.g. DEFINITION with a
+     *   single claim needs none) or the seam/key isn't available —
+     *   callers must degrade honestly, never fabricate an intro.
+     *   `entityName` (optional, the plan's own real plan.entity.value —
+     *   see the one real call site below) is passed straight through as
+     *   a realize() param: PRE-EXISTING-FAILURE-REGISTER.md §3.5's
+     *   fix — the templates now name the real entity being discussed
+     *   instead of a generic "this"/"hii" when one is genuinely known,
+     *   and fall back to the exact original generic wording when it
+     *   isn't (entityName omitted or empty).
+     */
+    function introFor(goal, language, entityName) {
         const seam = realizeSeam();
         if (!seam) return null;
-        return seam.realize(`semantic-answer:intro:${goal}`, language) || null;
+        return seam.realize(`semantic-answer:intro:${goal}`, language, entityName) || null;
     }
 
     /**
@@ -103,9 +116,9 @@
      *   period — never a fabricated grammatical merge, only real,
      *   already-verified sentences placed next to each other honestly.
      */
-    function composeClaims(pieces, goal, language) {
+    function composeClaims(pieces, goal, language, entityName) {
         if (pieces.length === 1) return pieces[0];
-        const intro = introFor(goal, language);
+        const intro = introFor(goal, language, entityName);
         const body = pieces.map((p) => p.trim().replace(/\.+$/, "")).join(". ") + ".";
         return intro ? `${intro} ${body}` : body;
     }
@@ -172,7 +185,12 @@
             };
         }
 
-        const text = composeClaims(pieces, plan.goal, language);
+        // PRE-EXISTING-FAILURE-REGISTER.md §3.5 fix — the SAME real
+        // plan.entity.value already read by generatePlanId() below,
+        // reused (not re-derived) so the intro can honestly name what
+        // the plan is actually about when SA-3 resolved a real entity.
+        const entityName = (plan.entity && isNonEmptyString(plan.entity.value)) ? plan.entity.value : null;
+        const text = composeClaims(pieces, plan.goal, language, entityName);
         return buildCandidate({ text, language, plan, evidenceIds: usedEvidenceIds, attempt });
     }
 

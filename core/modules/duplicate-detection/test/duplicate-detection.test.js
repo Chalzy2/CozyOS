@@ -11,9 +11,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 function freshInstance() {
-  delete require.cache[require.resolve('./duplicate-detection.js')];
-  global.window = { CozyOS: {} };
-  require('./duplicate-detection.js');
+  // registerCoordinator is stubbed as a no-op (same fix as the sibling
+  // document-understanding.test.js) so the production file's real
+  // registration-retry setInterval resolves on its first attempt
+  // instead of leaving a live timer running for up to 50s per test.
+  delete require.cache[require.resolve('../duplicate-detection.js')];
+  global.window = { CozyOS: { registerCoordinator: () => {} } };
+  require('../duplicate-detection.js');
   return global.window.CozyOS.DuplicateDetection;
 }
 
@@ -38,8 +42,8 @@ test('registers with capabilities matching spec, nothing fabricated', () => {
   global.window = { CozyOS: {} };
   const registered = [];
   global.window.CozyOS.registerCoordinator = (d) => registered.push(d);
-  delete require.cache[require.resolve('./duplicate-detection.js')];
-  require('./duplicate-detection.js');
+  delete require.cache[require.resolve('../duplicate-detection.js')];
+  require('../duplicate-detection.js');
   assert.deepEqual(registered[0].capabilities.sort(), ['duplicate-detection', 'fingerprinting', 'similarity-analysis', 'version-detection'].sort());
 });
 

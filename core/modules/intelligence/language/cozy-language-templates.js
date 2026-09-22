@@ -965,37 +965,53 @@
         // than guessed, same as "purchase-intent:not_found" above — a
         // realization request for one of those languages honestly
         // degrades (see the realizer's own fallback), never fabricates.
+        //
+        // UPDATE (PRE-EXISTING-FAILURE-REGISTER.md §3.5): these were
+        // originally fixed, entity-agnostic strings ("this"/"hii"),
+        // which meant an otherwise-correct, evidence-backed answer could
+        // never actually name the application it was describing. Each
+        // entry is now a function taking an optional real `entityName`
+        // (the SAME plan.entity.value the realizer already reads for
+        // generatePlanId() — no new data, no invention) via the EXISTING
+        // realize(key, language, ...params) seam's own already-supported
+        // function-template mechanism (see cozy-language-realize.js's
+        // own realize() — this is not a new capability, just the first
+        // caller in this file to use params). Calling with no entityName
+        // (every pre-existing call site that hasn't been updated to
+        // pass one) reproduces the exact original generic wording,
+        // byte-for-byte — zero behavior change for any caller that
+        // doesn't opt in.
         "semantic-answer:intro:HUMAN_BENEFIT": Object.freeze({
-            en: "Here's how this helps:",
-            sw: "Hivi ndivyo hii inavyosaidia:"
+            en: (entityName) => entityName ? `Here's how ${entityName} helps:` : "Here's how this helps:",
+            sw: (entityName) => entityName ? `Hivi ndivyo ${entityName} inavyosaidia:` : "Hivi ndivyo hii inavyosaidia:"
         }),
         "semantic-answer:intro:BENEFITS": Object.freeze({
-            en: "Here's how this helps:",
-            sw: "Hivi ndivyo hii inavyosaidia:"
+            en: (entityName) => entityName ? `Here's how ${entityName} helps:` : "Here's how this helps:",
+            sw: (entityName) => entityName ? `Hivi ndivyo ${entityName} inavyosaidia:` : "Hivi ndivyo hii inavyosaidia:"
         }),
         "semantic-answer:intro:CAPABILITY": Object.freeze({
-            en: "Here's what this can currently do:",
-            sw: "Hivi ndivyo inavyoweza kufanya kwa sasa:"
+            en: (entityName) => entityName ? `Here's what ${entityName} can currently do:` : "Here's what this can currently do:",
+            sw: (entityName) => entityName ? `Hivi ndivyo ${entityName} inavyoweza kufanya kwa sasa:` : "Hivi ndivyo inavyoweza kufanya kwa sasa:"
         }),
         "semantic-answer:intro:LIST": Object.freeze({
-            en: "Here's what this can currently do:",
-            sw: "Hivi ndivyo inavyoweza kufanya kwa sasa:"
+            en: (entityName) => entityName ? `Here's what ${entityName} can currently do:` : "Here's what this can currently do:",
+            sw: (entityName) => entityName ? `Hivi ndivyo ${entityName} inavyoweza kufanya kwa sasa:` : "Hivi ndivyo inavyoweza kufanya kwa sasa:"
         }),
         "semantic-answer:intro:IMPORTANCE": Object.freeze({
-            en: "Here's why this matters:",
-            sw: "Hii ndiyo sababu ni muhimu:"
+            en: (entityName) => entityName ? `Here's why ${entityName} matters:` : "Here's why this matters:",
+            sw: (entityName) => entityName ? `Hii ndiyo sababu ${entityName} ni muhimu:` : "Hii ndiyo sababu ni muhimu:"
         }),
         "semantic-answer:intro:VALUE": Object.freeze({
-            en: "Here's why this matters:",
-            sw: "Hii ndiyo sababu ni muhimu:"
+            en: (entityName) => entityName ? `Here's why ${entityName} matters:` : "Here's why this matters:",
+            sw: (entityName) => entityName ? `Hii ndiyo sababu ${entityName} ni muhimu:` : "Hii ndiyo sababu ni muhimu:"
         }),
         "semantic-answer:intro:PRACTICAL_WORK_CONTRIBUTION": Object.freeze({
-            en: "Here's how this contributes to real work:",
-            sw: "Hivi ndivyo hii inavyochangia kazi halisi:"
+            en: (entityName) => entityName ? `Here's how ${entityName} contributes to real work:` : "Here's how this contributes to real work:",
+            sw: (entityName) => entityName ? `Hivi ndivyo ${entityName} inavyochangia kazi halisi:` : "Hivi ndivyo hii inavyochangia kazi halisi:"
         }),
         "semantic-answer:intro:DEFINITION": Object.freeze({
-            en: "Here's what this is:",
-            sw: "Hivi ndivyo hii ilivyo:"
+            en: (entityName) => entityName ? `Here's what ${entityName} is:` : "Here's what this is:",
+            sw: (entityName) => entityName ? `Hivi ndivyo ${entityName} ilivyo:` : "Hivi ndivyo hii ilivyo:"
         }),
         "semantic-answer:no-realizable-evidence": Object.freeze({
             en: "I have real evidence for this, but not yet in a form I can honestly construct a complete answer from in your language.",

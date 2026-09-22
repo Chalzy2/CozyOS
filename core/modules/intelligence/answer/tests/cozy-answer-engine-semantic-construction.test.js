@@ -109,7 +109,11 @@ test('A: "ChurchOS inasaidiaje mtu?" is answered by the REAL, live-wired SA cons
     // text (the benefit sentences correctly name "kanisa"/church
     // generically, not the English brand string "ChurchOS", exactly as
     // the real, committed humanBenefitsSw content actually reads).
-    assert.match(result.answer, /^Hivi ndivyo hii inavyosaidia:/);
+    // The INTRO sentence (PRE-EXISTING-FAILURE-REGISTER.md §3.5's fix)
+    // now names the real, resolved entity ("ChurchOS") instead of the
+    // generic "hii" — this is additive to, not a replacement of, the
+    // claims' own established generic-church phrasing style above.
+    assert.match(result.answer, /^Hivi ndivyo ChurchOS inavyosaidia:/);
     assert.match(result.answer, /kanisa/);
     assert.doesNotMatch(result.answer, /\bthe\b|\band\b|\bAdditionally\b/i); // no stray English connective words
 });
