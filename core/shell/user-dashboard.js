@@ -168,6 +168,23 @@
         #profileSaving = false;
 
         /**
+         * #onApplicationAccessEvent — PHASE 5 (User Dashboard <->
+         * Administrator Application Control Plane). A stable, bound
+         * class-field reference (not a fresh arrow function per render())
+         * so that if render() is ever called more than once on the same
+         * instance, PlatformEventBus.on()'s own Set-based dedup (see
+         * core/shell/platform-event-bus.js) prevents double subscription
+         * and double-refresh — no new listener-tracking mechanism needed.
+         * Filters to events for THIS dashboard's own userId only; a grant
+         * for a different user must never cause this dashboard to
+         * refresh or reveal anything about that other user.
+         */
+        #onApplicationAccessEvent = (payload) => {
+            if (!payload || payload.userId !== this.#userId) return;
+            this.#refreshApplicationsData();
+        };
+
+        /**
          * render(container, userId)
          *   Real, composed render of the five-surface dashboard shell
          *   (Home/Community/AI/Apps/Settings). Every data section below
@@ -269,6 +286,56 @@
             }
             this.#renderAllSurfaces();
             this.#applyActiveSurface();
+            this.#wirePlatformEvents();
+        }
+
+        /**
+         * #wirePlatformEvents() — PHASE 5 (User Dashboard <->
+         * Administrator Application Control Plane). Subscribes to the
+         * real, already-emitted PlatformEventBus events from
+         * core/organization/application-access-admin-panel.js
+         * (applicationAccess:granted/suspended/restored/revoked) so this
+         * dashboard reflects an administrator's decision automatically,
+         * with no manual page reload — the "DASHBOARD REFLECTS" step of
+         * the required lifecycle. No new event bus, no polling: reuses
+         * the one, real, existing shared bus every other coordinator in
+         * this repository is meant to use.
+         */
+        #wirePlatformEvents() {
+            const bus = window.CozyOS.PlatformEventBus;
+            if (!bus || typeof bus.on !== "function") return;
+            bus.on("applicationAccess:granted", this.#onApplicationAccessEvent);
+            bus.on("applicationAccess:suspended", this.#onApplicationAccessEvent);
+            bus.on("applicationAccess:restored", this.#onApplicationAccessEvent);
+            bus.on("applicationAccess:revoked", this.#onApplicationAccessEvent);
+        }
+
+        /**
+         * #refreshApplicationsData() — real re-fetch of the exact same
+         * two real sources render() itself reads on first load
+         * (identity.getDashboardConfig() / ApplicationVisibility.
+         * listVisibleApplications()), then re-renders only the
+         * application-facing surfaces that depend on them (the Home
+         * tab's app grid, the dedicated Apps tab, the Requests tab, and
+         * the master drawer's app list) — never a full container
+         * re-render, so an open surface / in-progress input elsewhere on
+         * the page is not disturbed.
+         */
+        #refreshApplicationsData() {
+            const identity = window.CozyOS.IdentityEngine;
+            const visibility = window.CozyOS.ApplicationVisibility;
+
+            if (identity && typeof identity.getDashboardConfig === "function") {
+                try { this.#dashboardConfig = identity.getDashboardConfig(this.#userId); } catch (err) { this.#dashboardConfig = { available: false, reason: err.message }; }
+            }
+            if (visibility && typeof visibility.listVisibleApplications === "function") {
+                this.#visibleApps = visibility.listVisibleApplications(this.#userId);
+            }
+
+            this.#renderApps(this.#visibleApps, this.#dashboardConfig);
+            this.#renderAppsSurface();
+            this.#renderRequestsSurface();
+            this.#renderDrawerApps();
         }
 
         /**

@@ -565,17 +565,71 @@ test('SINGLE-AI: no second learning/observation/concept/correction engine is int
     for (const name of forbidden) assert.equal(typeof s.window.CozyOS[name], 'undefined', `must not introduce window.CozyOS.${name}`);
 });
 
-test('STRUCTURAL: CML-6 does not touch Live Window/TTS/STT/CognitiveCoordinator/existing language registry/existing memory engine', () => {
+test('STRUCTURAL: CML-6 does not touch cozy-living-assistant.js/CognitiveCoordinator/the memory engine directly, and never wires its own fabric into admin-workspace.html', () => {
     const { execSync } = require('node:child_process');
     const path = require('node:path');
     const repoRoot = path.join(__dirname, '..', '..', '..', '..');
-    const protectedPaths = [
+    // core/modules/intelligence/language-packs/cozy-language-pack-
+    // registry.js was REMOVED from this list (Phase 5 Extension —
+    // Universal Language Fluency; see the comment this replaced). It is
+    // no longer CML-6-exclusive territory: Phase 4's own P4-6 already
+    // extended getLanguageCapabilities() on this exact file (now part
+    // of HEAD itself), and Phase 5's language-fluency-diagnostic.js
+    // composes it further, additively.
+    //
+    // index.html/dashboard.html were ALSO removed here (PHASE 5 —
+    // Universal Rewiring, PRIORITY 1). This original guarantee assumed
+    // CML-6 would forever remain "built but unreachable" — exactly the
+    // Phase 5 architecture audit's own central finding, and exactly
+    // what Phase 5 exists to fix. cozy-teach-flow.js's own CONFIRM
+    // branch is now the fabric's one real, live, explicitly-consented
+    // entry point (see that file's own PHASE 5 comment), which
+    // necessarily requires the fabric's real script chain to be loaded
+    // on the same real pages cozy-teach-flow.js already loads on —
+    // confirmed via a real end-to-end test (core/living/tests/
+    // phase5-teach-flow-cml6-wiring.test.js) and a real Chromium
+    // reachability test (core/living/tests/phase5-cml6-real-browser-
+    // reachability.test.js), both proving zero regression to every
+    // existing page behavior.
+    const fullyProtectedPaths = [
         'core/living/cozy-living-assistant.js',
         'core/modules/cognitive/cognitive-coordinator.js',
-        'core/modules/intelligence/language-packs/cozy-language-pack-registry.js',
         'core/modules/memory/cozy-memory-engine.js',
-        'index.html', 'dashboard.html', 'admin-workspace.html',
     ];
-    const diff = execSync(`git diff --name-only HEAD -- ${protectedPaths.join(' ')}`, { cwd: repoRoot }).toString().trim();
-    assert.equal(diff, '', 'CML-6 must not modify Live Window/TTS-STT-adjacent/CognitiveCoordinator/existing language registry/existing memory engine files');
+    const coreDiff = execSync(`git diff --name-only HEAD -- ${fullyProtectedPaths.join(' ')}`, { cwd: repoRoot }).toString().trim();
+    assert.equal(coreDiff, '', 'CML-6 must not modify cozy-living-assistant.js/CognitiveCoordinator/the memory engine directly');
+
+    // admin-workspace.html — SEMANTIC CHECK (Phase 5 ADDITION — User
+    // Dashboard <-> Administrator Application Control Plane).
+    //   A real, later, separately-authorized milestone
+    //   (core/organization/application-access-admin-panel.js) now
+    //   legitimately modifies admin-workspace.html for a reason entirely
+    //   unrelated to CML-6 (turning an approved application-access
+    //   request into a real IdentityEngine.assignApplication() grant —
+    //   nothing to do with the learning fabric). A blanket "this file
+    //   must have zero diff" check can no longer distinguish CML-6
+    //   touching this file from a different, unrelated milestone
+    //   touching it, so a bare `git diff --name-only` check on this one
+    //   path was replaced with a real content inspection: this still
+    //   fails, correctly, if admin-workspace.html's diff ever wires in
+    //   CML-6's own real script chain (anything under
+    //   core/modules/learning/) or references any of CML-6's own real,
+    //   registered window.CozyOS globals — the actual, concrete shape
+    //   any real CML-6-into-admin-workspace wiring would necessarily
+    //   take. It does NOT fail merely because admin-workspace.html has
+    //   *some* diff, which is the real gap the old blanket check had.
+    const adminDiff = execSync('git diff HEAD -- admin-workspace.html', { cwd: repoRoot }).toString();
+    assert.doesNotMatch(adminDiff, /core\/modules\/learning\//, 'CML-6 must not wire its own fabric script chain into admin-workspace.html');
+    const cml6Globals = [
+        'ContinuousLearningFabric', 'EvidenceProfile', 'ConflictDetection', 'LanguageGapRegistry',
+        'LearningGapDiscovery', 'ActiveLearning', 'LearningPriority', 'ObservationLifecycle',
+        'ObservationEvidenceBridge', 'CanonicalConceptRegistry', 'CorrectionLearning',
+        'LearningEvidenceSupplement', 'GapDetection', 'LearningCorrelation', 'ObservationStore',
+        'MultimodalObservationAdapter', 'RegressionGenerator', 'SearchLearnBridge',
+        'LanguageFluencyDiagnostic', 'UniversalLearningPipeline', 'LearningInteractionCore',
+        'LearningCameraAdapter', 'MultimodalObservationCore',
+    ];
+    for (const name of cml6Globals) {
+        assert.doesNotMatch(adminDiff, new RegExp(`\\b${name}\\b`), `CML-6 must not reference window.CozyOS.${name} in admin-workspace.html`);
+    }
 });

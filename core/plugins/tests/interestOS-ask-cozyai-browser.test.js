@@ -20,6 +20,22 @@
  * still works, unchanged, through the general Live Window itself —
  * proven separately by core/living/tests/cozy-living-assistant-
  * business-data-repair.test.js).
+ *
+ * PHASE 5 addition: every test above loads interestos.html as a
+ * standalone TOP-LEVEL page. The real production path is different —
+ * core/shell/application-launcher.js embeds interestos.html inside a
+ * real <iframe> (it has its own <head>, so the launcher's own
+ * isStandalone check routes it through the iframe path, not a plain
+ * fragment). A Phase 5 architecture audit found the button's real
+ * `window.location.href` navigation only ever navigated the IFRAME's
+ * own window in that embedding — loading a second, nested dashboard.html
+ * (and a second Live Window) inside the iframe instead of reusing the
+ * parent dashboard's already-mounted singleton. The fix (this same
+ * commit) makes the button navigate `window.top` when embedded. The
+ * test below reproduces the REAL embedding (dashboard.html as the top
+ * frame, interestos.html as a genuine child iframe inside it) and
+ * proves the TOP frame — not a nested copy — ends up on dashboard.html
+ * with exactly one Live Window.
  */
 
 const { withBrowser, makeRunner } = require('../../tests/browser/cozy-browser');
@@ -77,6 +93,86 @@ async function main() {
           if (pageErrors.length) throw new Error('page errors: ' + pageErrors.join(' | '));
           const unexpected = consoleErrors.filter((e) => !/status of 404.*Not Found|documents\/personal\/search/i.test(e));
           if (unexpected.length) throw new Error('console errors: ' + unexpected.join(' | '));
+        });
+      }
+
+      // PHASE 5 — the REAL embedded-iframe scenario (see file header).
+      // Parent = dashboard.html (already mounts its own Live Window, the
+      // exact real production entry point). Child = interestos.html,
+      // injected as a genuine <iframe>, matching
+      // core/shell/application-launcher.js's own real isStandalone/iframe
+      // path for any app page carrying its own <head>.
+      {
+        const { page, pageErrors } = await openPage({ viewport: { width: 1280, height: 900 } });
+        await page.addInitScript(() => {
+          window.CozyOS = window.CozyOS || {};
+          window.CozyOS.Session = { current: () => ({ uid: 'ask-cozyai-iframe-test-owner' }) };
+        });
+        await page.goto(serverURL('/dashboard.html'));
+        // Confirms the parent's real, singleton Live Window is genuinely
+        // mounted BEFORE the child iframe exists — the exact real
+        // precondition this test exists to protect. It starts collapsed
+        // (no sessionStorage hand-off context yet), so we only wait for
+        // the floating launcher button here, not the (closed) input.
+        await page.waitForSelector('#cozy-living-assistant-btn', { timeout: 15000 });
+        // The real Stage 1-6 launch-sequence overlay (core/shell/
+        // launch-sequence.css, z-index 999999) sits above every other
+        // fixed-position surface, including this test's own dynamically
+        // injected iframe, until it fades out — wait for its real
+        // "finished" class (pointer-events:none) before interacting.
+        await page.waitForSelector('#cozy-launch-screen.cozy-launch-hidden', { timeout: 20000 }).catch(() => { /* some pages skip the overlay entirely — real DOM interactions below will fail loudly if genuinely blocked */ });
+
+        await test('[embedded-iframe] interestos.html embedded as a real iframe inside dashboard.html, Ask CozyAI navigates the TOP frame (not a nested copy)', async () => {
+          await page.evaluate(() => {
+            const iframe = document.createElement('iframe');
+            iframe.id = 'phase5-interestos-iframe-probe';
+            iframe.src = 'applications/InterestOS/interestos.html';
+            iframe.style.cssText = 'width:100%;height:600px;border:0;';
+            document.body.appendChild(iframe);
+          });
+          const childFrame = await new Promise((resolve, reject) => {
+            const start = Date.now();
+            (function poll() {
+              const f = page.frames().find((fr) => /interestos\.html/.test(fr.url()));
+              if (f) return resolve(f);
+              if (Date.now() - start > 15000) return reject(new Error('interestos.html iframe never appeared'));
+              setTimeout(poll, 100);
+            })();
+          });
+          await childFrame.waitForSelector('#ios-engine-status');
+          await childFrame.fill('#ios-biz-table-name-input', 'AI Shop Iframe');
+          await childFrame.click('#ios-biz-new-table-btn');
+          await childFrame.waitForSelector('#ios-biz-table-editor', { state: 'visible' });
+          await childFrame.waitForSelector('#ios-biz-ask-btn', { state: 'visible' });
+
+          await Promise.all([
+            page.waitForURL(/dashboard\.html/, { timeout: 15000 }),
+            childFrame.click('#ios-biz-ask-btn')
+          ]);
+          // The TOP page itself navigated (not just the child frame) —
+          // confirmed by page.url() (the top frame's own URL) landing on
+          // dashboard.html, and the child iframe being gone (a top-level
+          // navigation unloads every child frame with it).
+          if (!/dashboard\.html/.test(page.url())) throw new Error('expected the TOP frame to navigate to dashboard.html, got: ' + page.url());
+          const remainingInterestOSFrames = page.frames().filter((fr) => /interestos\.html/.test(fr.url()));
+          if (remainingInterestOSFrames.length !== 0) throw new Error('expected the interestos.html iframe to be gone after a real top-level navigation, found ' + remainingInterestOSFrames.length);
+
+          await page.waitForSelector('#cozy-living-assistant-input', { timeout: 15000 });
+          const liveWindowCount = await page.locator('#cozy-living-assistant-input').count();
+          if (liveWindowCount !== 1) throw new Error('expected exactly ONE Live Window input on the real top-level page, found ' + liveWindowCount);
+          const messages = await page.$$eval('#cozy-living-assistant-messages > *', (els) => els.map((e) => e.textContent.trim()));
+          if (!/InterestOS/i.test(messages.join(' | '))) throw new Error('expected the real disclosure banner mentioning InterestOS on the top-level Live Window');
+        });
+
+        await test('[embedded-iframe] no unexpected page errors from the real embedded hand-off', async () => {
+          // Same allowlist discipline as the per-viewport console-error
+          // check above: a real dashboard.html page load attempts a
+          // dynamic import from an external CDN (Firebase), which this
+          // sandboxed test environment's network policy blocks —
+          // pre-existing, unrelated to this hand-off, not something this
+          // fix introduced or could resolve.
+          const unexpected = pageErrors.filter((e) => !/gstatic\.com|firebase-app\.js|Failed to fetch dynamically imported module/i.test(e));
+          if (unexpected.length) throw new Error('page errors: ' + unexpected.join(' | '));
         });
       }
     });

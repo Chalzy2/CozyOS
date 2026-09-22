@@ -1000,6 +1000,30 @@
         "semantic-answer:no-realizable-evidence": Object.freeze({
             en: "I have real evidence for this, but not yet in a form I can honestly construct a complete answer from in your language.",
             sw: "Ninalo ushahidi halisi kuhusu hili, lakini bado sijauwezesho kwa namna ninayoweza kuunda jibu kamili kwa uaminifu katika lugha yako."
+        }),
+
+        // PHASE 5 — real, remaining language violations found by the
+        // architecture audit: two call sites that composed complete,
+        // human-authored en/sw sentences directly, with no realize()
+        // seam call at all (so a future VERIFIED+AVAILABLE language
+        // would never reach them automatically). Migrated here with the
+        // exact prior text preserved, byte-identical for en/sw — see
+        // core/identity/cozyai-identity.js's answerWhoCreatedYou() and
+        // core/living/cozy-ai-semantic-intent.js's
+        // buildClarificationQuestion(), each call site's own comment.
+        "identity:who-created-you": Object.freeze({
+            en: (officialName, knownAsJoined, country, rolesJoined) =>
+                `CozyOS and CozyAI were founded by ${officialName} (also known as ${knownAsJoined}) from ${country}, who serves as ${rolesJoined}.`,
+            sw: (officialName, knownAsJoined, country, rolesSwJoined) =>
+                `CozyOS na CozyAI vilianzishwa na ${officialName} (anayejulikana pia kama ${knownAsJoined}) kutoka ${country}, ambaye ni ${rolesSwJoined}.`
+        }),
+        "semantic-intent:clarification:purchase-vs-benefits": Object.freeze({
+            en: (name) => `Do you want to buy ${name}, or would you like to understand how it helps you first?`,
+            sw: (name) => `Unataka kununua ${name}, au kwanza ungependa kujua jinsi inavyokusaidia?`
+        }),
+        "semantic-intent:clarification:generic": Object.freeze({
+            en: (name) => `Could you tell me more specifically what you'd like to know about ${name}?`,
+            sw: (name) => `Unamaanisha nini hasa kuhusu ${name}?`
         })
     });
 

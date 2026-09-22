@@ -382,6 +382,49 @@
 <!-- PHASE 3 (Teach Cozy / Governed Learning): cozy-teach-intent.js (explicit teaching-marker detection) and cozy-teach-flow.js (the real create/confirm/promote conversational orchestrator, composing the CozyLearn state machine above) — both read lazily at answer-time by cozy-ai.js's getContext(), so load order relative to cozy-ai.js itself does not matter, but they must load after cozy-learn.js (CozyLearn) which they compose. -->
 <script src="core/living/cozy-teach-intent.js"></script>
 <script src="core/living/cozy-teach-flow.js"></script>
+<!-- PHASE 5 (Universal Rewiring): the CML-6 Continuous Multimodal
+     Learning Fabric — real, tested, CERTIFIED code (see
+     core/modules/learning/test/continuous-learning-fabric.test.js)
+     that was never <script>-included on any page before this pass, the
+     exact "built but unreachable" gap Phase 5's own architecture audit
+     found. This is the SAME dependency order already proven together
+     by core/modules/learning/test/_test-helpers.js's own
+     loadFullStackWithFabric() — no new file, no new engine, no new
+     governance authority. Loaded after cozy-teach-flow.js because
+     cozy-teach-flow.js's own CONFIRM branch is this fabric's one real,
+     live entry point (see that file's own PHASE 5 comment): the exact
+     moment a user has just given real, explicit, informed consent for
+     their specific statement to become learning evidence — never wired
+     to passive/ordinary conversation, which has no real consent basis
+     anywhere in this repository today. -->
+<script src="core/modules/intelligence/language-packs/cozy-language-acquisition-pipeline.js"></script>
+<script src="core/modules/intelligence/language-packs/cozy-language-knowledge-model.js"></script>
+<script src="core/modules/learning/contracts/multimodal-observation-contract.js"></script>
+<script src="core/modules/learning/contracts/canonical-concept-contract.js"></script>
+<script src="core/modules/learning/adapters/observation-adapter.js"></script>
+<script src="core/modules/learning/adapters/observation-lifecycle.js"></script>
+<script src="core/modules/learning/adapters/observation-evidence-bridge.js"></script>
+<script src="core/modules/learning/adapters/canonical-concept-registry.js"></script>
+<script src="core/modules/learning/adapters/observation-store.js"></script>
+<script src="core/modules/learning/adapters/learning-correlation.js"></script>
+<script src="core/modules/learning/adapters/correction-learning.js"></script>
+<script src="core/engines/search/search-engine.js"></script>
+<script src="core/modules/learning/adapters/search-learn-bridge.js"></script>
+<script src="core/modules/learning/adapters/gap-detection.js"></script>
+<script src="core/modules/learning/adapters/regression-generator.js"></script>
+<script src="core/modules/learning/adapters/learning-evidence-supplement.js"></script>
+<script src="core/modules/learning/adapters/evidence-profile.js"></script>
+<script src="core/modules/learning/adapters/conflict-detection.js"></script>
+<script src="core/modules/learning/adapters/language-gap-registry.js"></script>
+<script src="core/modules/learning/adapters/learning-gap-discovery.js"></script>
+<script src="core/modules/learning/adapters/active-learning.js"></script>
+<script src="core/modules/learning/adapters/learning-priority.js"></script>
+<script src="core/modules/learning/continuous-learning-fabric.js"></script>
+<!-- PHASE 5 EXTENSION (Universal Language Fluency): the self-audit
+     composer over the real capability/gap/pending-question state above
+     — see that file's own header. Loaded last in this block since it
+     reads, never writes, everything above. -->
+<script src="core/modules/learning/language-fluency-diagnostic.js"></script>
 <!-- PHASE 4 (Universal Language Capability): reciprocal learning — composes IdentityEngine (already loaded), CozyAfricanLanguageIntelligence + CozyLanguagePacks (loaded below), and CozyLanguageRealize (loaded above). Read lazily at call time. -->
 <script src="core/living/cozy-learning-intent.js"></script>
 <script src="core/living/cozy-reciprocal-learning.js"></script>

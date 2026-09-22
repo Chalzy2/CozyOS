@@ -55,6 +55,51 @@
     function cozyLearn() { const c = cozyOS(); return c && c.CozyLearn; }
 
     /**
+     * observeIntoFabric({ claim, language, actorId, candidateId, subject, promoted })
+     *   PHASE 5 — Universal Rewiring. Real, additive wiring of the CML-6
+     *   Continuous Learning Fabric (core/modules/learning/continuous-
+     *   learning-fabric.js) into this file's own real, existing CONFIRM
+     *   branch — the ONE point in this file with a genuine, explicit,
+     *   non-fabricated consent basis: the user just replied "yes" to
+     *   this EXACT claim, in this EXACT turn. That reply is the real
+     *   consent this function builds (`{authorized:true, scope:"SELF",
+     *   grantedBy:actorId}`) — never asserted for any other turn, never
+     *   inferred from silence or from ordinary conversation.
+     *
+     *   Never gates, blocks, or alters the real reply text or the real
+     *   CozyLearn confirm/promote calls this file already makes — those
+     *   are complete and correct on their own (Phase 3, unchanged). This
+     *   is purely additive: the SAME confirmed claim also becomes real
+     *   evidence for CML-6's own repeated-evidence/gap/active-learning
+     *   machinery, which previously had no live caller anywhere. A
+     *   missing/failing fabric degrades honestly (real, caught, never
+     *   thrown into the caller) and never changes this turn's outcome.
+     */
+    function observeIntoFabric({ claim, language, actorId, candidateId, subject, promoted } = {}) {
+        try {
+            const c = cozyOS();
+            const fabric = c && c.ContinuousLearningFabric;
+            if (!fabric || typeof fabric.observeEvent !== "function") return { success: false, reason: "ContinuousLearningFabric is not loaded." };
+            if (!actorId) return { success: false, reason: "A real actorId is required for real consent — never observed anonymously." };
+            return fabric.observeEvent({
+                kind: "TEXT",
+                text: claim,
+                term: claim,
+                candidateLanguage: language,
+                application: "live-window",
+                actorId,
+                contributorId: actorId,
+                contextLabel: subject || "teach-cozy",
+                context: { source: "live-window-teach", candidateId, subject: subject || null, promoted: !!promoted },
+                consent: { authorized: true, scope: "SELF", grantedBy: actorId },
+                learningScope: "PERSONAL",
+            });
+        } catch (err) {
+            return { success: false, reason: err && err.message ? err.message : String(err) };
+        }
+    }
+
+    /**
      * resolveSubject(text) — same two-source lookup, same exact-
      * substring pass, as cozy-ai.js's own _resolveNamedApplication()
      * first pass (never the fuzzy/Levenshtein second pass here — a
@@ -173,6 +218,9 @@
                     return { matched: true, content: buildRejectedPrompt(pendingLanguage), evidence: "REJECTED", updatedConversationState: null };
                 }
                 const promoteResult = learn.promoteCandidate(candidateId, { actorId, validatedBy: actorId, scope: confirmResult.candidate.scope });
+                // PHASE 5 — see observeIntoFabric()'s own header. Purely
+                // additive; its result never affects this turn's reply.
+                observeIntoFabric({ claim: pendingClaim, language: pendingLanguage, actorId, candidateId, subject: opts.teachConversationState.pendingSubject, promoted: promoteResult.success });
                 return {
                     matched: true,
                     content: buildTrustedPrompt(pendingLanguage),

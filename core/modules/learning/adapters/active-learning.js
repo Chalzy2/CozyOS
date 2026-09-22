@@ -123,8 +123,31 @@
         return { success: true, question, observation: observationResult.observation };
     }
 
+    /**
+     * listPendingQuestions({ language, actorId })
+     *   PHASE 5 EXTENSION — Universal Language Fluency. Real, additive
+     *   read helper (no new storage, no new state) composing this
+     *   file's own existing NAMESPACE the exact same way language-gap-
+     *   registry.js's own listOpenGaps() already reads its namespace.
+     *   Lets a language-capability diagnostic honestly report "what is
+     *   Cozy currently waiting on a contributor to answer" for a given
+     *   language, without inventing a second question store.
+     */
+    function listPendingQuestions({ language = null, actorId = "system" } = {}) {
+        const memory = memoryOrNull();
+        if (!memory || typeof memory.listKeys !== "function") return [];
+        const norm = isNonEmptyString(language) ? language.trim().toLowerCase() : null;
+        const entries = memory.listKeys(NAMESPACE, (e) => {
+            const q = e.value;
+            if (!q || q.status !== "PENDING") return false;
+            if (norm && q.language !== norm) return false;
+            return true;
+        }, actorId) || [];
+        return entries.map((e) => e.value).filter(Boolean);
+    }
+
     const ActiveLearning = Object.freeze({
-        NAMESPACE, evaluateAmbiguity, createClarificationQuestion, submitAnswer, getVersion: () => MODULE_VERSION,
+        NAMESPACE, evaluateAmbiguity, createClarificationQuestion, submitAnswer, listPendingQuestions, getVersion: () => MODULE_VERSION,
     });
     window.CozyOS.ActiveLearning = ActiveLearning;
     window.CozyOS.Modules["active-learning"] = Object.freeze({

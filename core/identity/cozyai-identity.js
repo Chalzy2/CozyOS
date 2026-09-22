@@ -102,24 +102,38 @@
         // ── Canonical public Q&A contract ───────────────────────────
         // Matches the Milestone 180 "Public Answers" section: each
         // named question is answered from exactly one canonical part.
+        // PHASE 5 — routed through the universal language-realization
+        // seam (core/modules/intelligence/language/cozy-language-realize.js,
+        // template key "identity:who-created-you") instead of a bare
+        // language==="sw" branch, so a future VERIFIED+AVAILABLE language
+        // reaches this answer automatically once real template content
+        // exists for it. The exact prior en/sw text is preserved
+        // verbatim as this function's own fallback — byte-identical
+        // output when the realize seam isn't loaded (e.g. this file
+        // required standalone in a narrow unit test).
         answerWhoCreatedYou(lang) {
+            const realize = window.CozyOS && window.CozyOS.CozyLanguageRealize;
             if (lang === "sw") {
                 const rolesSw = profile.roles.map((r) => ROLE_SW[r] || r);
-                return {
-                    known: true,
-                    answer:
-                        `CozyOS na CozyAI vilianzishwa na ${profile.officialName} ` +
-                        `(anayejulikana pia kama ${profile.knownAs.join(" / ")}) kutoka ${profile.country}, ` +
-                        `ambaye ni ${rolesSw.join(", ")}.`,
-                    source: "profile",
-                };
+                const answer = (realize && realize.realize(
+                    "identity:who-created-you", "sw", profile.officialName, profile.knownAs.join(" / "), profile.country, rolesSw.join(", ")
+                )) || (
+                    `CozyOS na CozyAI vilianzishwa na ${profile.officialName} ` +
+                    `(anayejulikana pia kama ${profile.knownAs.join(" / ")}) kutoka ${profile.country}, ` +
+                    `ambaye ni ${rolesSw.join(", ")}.`
+                );
+                return { known: true, answer, source: "profile" };
             }
+            const answer = (realize && realize.realize(
+                "identity:who-created-you", "en", profile.officialName, profile.knownAs.join(" / "), profile.country, profile.roles.join(", ")
+            )) || (
+                `CozyOS and CozyAI were founded by ${profile.officialName} ` +
+                `(also known as ${profile.knownAs.join(" / ")}) from ${profile.country}, ` +
+                `who serves as ${profile.roles.join(", ")}.`
+            );
             return {
                 known: true,
-                answer:
-                    `CozyOS and CozyAI were founded by ${profile.officialName} ` +
-                    `(also known as ${profile.knownAs.join(" / ")}) from ${profile.country}, ` +
-                    `who serves as ${profile.roles.join(", ")}.`,
+                answer,
                 source: "profile",
             };
         },

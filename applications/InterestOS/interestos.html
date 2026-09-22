@@ -1077,6 +1077,31 @@
         // human-readable disclosure hint; dashboard.html's own bootstrap
         // reads it once and auto-opens the SAME LivingAssistant every
         // other entry point already uses. No new AI is instantiated.
+        //
+        // PHASE 5 — real, embedded-iframe fix. This page is registered
+        // in core/modules/module-registry.js with its own <head>, so
+        // core/shell/application-launcher.js's real isStandalone check
+        // (`/<head[\s>]/i.test(htmlText)`) embeds it via a real
+        // <iframe src="applications/InterestOS/interestos.html">, not a
+        // plain fragment — confirmed by reading application-launcher.js
+        // directly. A plain `window.location.href` navigation inside
+        // that iframe navigates ONLY the iframe's own window, not the
+        // dashboard shell that embeds it — loading a SECOND, nested
+        // dashboard.html (and a second Live Window instance) inside the
+        // iframe instead of reusing the parent dashboard's already-
+        // mounted, singleton Live Window. Phase 4's own real-browser
+        // verification only exercised interestos.html as a standalone
+        // top-level page (never through the real iframe embedding), so
+        // this genuine "single global launcher" violation was never
+        // caught until Phase 5's architecture audit. Fix: when this
+        // page is running inside a same-origin iframe (`window.top !==
+        // window.self`), navigate the TOP window instead — the exact
+        // same sessionStorage hand-off contract dashboard.html's own
+        // consumer already reads correctly, now reaching the real,
+        // already-mounted top-level Live Window rather than creating a
+        // nested duplicate. When this page IS the top-level window
+        // (the already-tested standalone entry point), `window.top ===
+        // window.self` and behavior is byte-identical to before.
         const askBtn = document.getElementById("ios-biz-ask-btn");
         askBtn.addEventListener("click", () => {
             try {
@@ -1085,7 +1110,8 @@
                     hint: "You're asking from InterestOS. You can ask about your business data (e.g. \"What's my profit this month?\") or anything else."
                 }));
             } catch (_err) { /* sessionStorage unavailable — the Live Window still opens, just without the hint banner */ }
-            window.location.href = "../../dashboard.html";
+            const topWindow = (window.top && window.top !== window.self) ? window.top : window;
+            topWindow.location.href = "../../dashboard.html";
         });
 
         refreshTableSelect(null);

@@ -386,18 +386,27 @@
      *   a genuinely natural but more generic bilingual fallback rather
      *   than a fabricated "translation" of every possible pair.
      */
+    // PHASE 5 — routed through the universal language-realization seam
+    // (cozy-language-realize.js, keys "semantic-intent:clarification:
+    // purchase-vs-benefits" / ":generic") instead of bare language==="sw"
+    // ternaries, matching the sibling functions in cozy-learn.js/
+    // cozy-teach-flow.js that already do this. The exact prior en/sw
+    // text is kept as this function's own fallback — byte-identical
+    // output when the realize seam isn't loaded.
     function buildClarificationQuestion(intentA, intentB, entityName, language) {
         const pair = [intentA, intentB].sort();
         const isPurchaseBenefits = pair.includes(INTENTS.PURCHASE_INTENT) && pair.includes(INTENTS.APP_BENEFITS);
         const name = entityName || "hii";
+        const lang = language === "sw" ? "sw" : "en";
+        const realize = window.CozyOS && window.CozyOS.CozyLanguageRealize;
         if (isPurchaseBenefits) {
-            return language === "sw"
+            return (realize && realize.realize("semantic-intent:clarification:purchase-vs-benefits", lang, name)) || (lang === "sw"
                 ? `Unataka kununua ${name}, au kwanza ungependa kujua jinsi inavyokusaidia?`
-                : `Do you want to buy ${name}, or would you like to understand how it helps you first?`;
+                : `Do you want to buy ${name}, or would you like to understand how it helps you first?`);
         }
-        return language === "sw"
+        return (realize && realize.realize("semantic-intent:clarification:generic", lang, name)) || (lang === "sw"
             ? `Unamaanisha nini hasa kuhusu ${name}?`
-            : `Could you tell me more specifically what you'd like to know about ${name}?`;
+            : `Could you tell me more specifically what you'd like to know about ${name}?`);
     }
 
     function extractEntity(text, context) {

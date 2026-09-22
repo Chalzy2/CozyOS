@@ -480,6 +480,13 @@
          by the bootstrap script below, right after WorkspaceShell. -->
     <div id="cozy-support-inbox-root"></div>
 
+    <!-- PHASE 5 — real mount point for ApplicationAccessAdminPanel (see
+         core/organization/application-access-admin-panel.js). Same real
+         "renders nothing unless isPlatformAdmin()" discipline as the
+         support inbox above — mounted by the bootstrap script below,
+         right alongside it. -->
+    <div id="cozy-appaccess-panel-root"></div>
+
     <!-- CozyOS Shell UI Services (core/ui/). Loaded first: cozy-theme.js
          applies the active theme immediately on construction (reading the
          data-cozy-app="platform-admin" attribute already set on <html>
@@ -1096,6 +1103,24 @@
          (see its own header) — mounted into #cozy-support-inbox-root by
          the bootstrap script below, after WorkspaceShell mounts. -->
     <script src="core/organization/organization-support-panel.js"></script>
+    <!-- PHASE 5 (Universal Rewiring) — the User Dashboard <-> Administrator
+         Application Control Plane's one real missing link: turning an
+         approved core/shell/user-dashboard.js "Request an Application"
+         submission (already real, already composes
+         AdministrativeRequestCoordinator.submitRequest()) into a real
+         IdentityEngine.assignApplication() grant. See this file's own
+         header for the full reuse/ownership review. Depends on
+         AdministrativeRequestCoordinator, IdentityEngine, ServiceRegistry,
+         CozyMemory, PlatformEventBus — every real accessor this file
+         calls (coordinator()/identity()/registry()/memory()/bus()) reads
+         window.CozyOS lazily at call time, so it does not matter that
+         AdministrativeRequestCoordinator's own script tag (below,
+         Support Integration section) and CozyMemory's
+         (core/modules/memory/cozy-memory-engine.js) happen to load AFTER
+         this one — none of them are read until the bootstrap script's
+         own tryMount() actually calls mount(), well after every script
+         on this page has finished loading. -->
+    <script src="core/organization/application-access-admin-panel.js"></script>
     <!-- SUPPORT INTEGRATION addition — tiny, disclosed hand-off variable
          (see its own header) so cozy-living-assistant.js's Live Window
          can read which live session/scope the panel above just set via
@@ -1930,6 +1955,13 @@
                             // nothing for anyone it isn't true for.
                             if (window.CozyOS.OrganizationSupportPanel && typeof window.CozyOS.OrganizationSupportPanel.mount === "function") {
                                 try { window.CozyOS.OrganizationSupportPanel.mount(document.getElementById("cozy-support-inbox-root")); } catch (_err) { /* non-fatal */ }
+                            }
+                            // PHASE 5 — real UI for ApplicationAccessAdminPanel
+                            // (see that file's own header). Mounted the same
+                            // way, right alongside OrganizationSupportPanel —
+                            // gates itself on a real isPlatformAdmin() check.
+                            if (window.CozyOS.ApplicationAccessAdminPanel && typeof window.CozyOS.ApplicationAccessAdminPanel.mount === "function") {
+                                try { window.CozyOS.ApplicationAccessAdminPanel.mount(document.getElementById("cozy-appaccess-panel-root")); } catch (_err) { /* non-fatal */ }
                             }
                         });
                         return true;
