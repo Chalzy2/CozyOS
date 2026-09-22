@@ -273,13 +273,30 @@
      *   as it did before this integration — byte-identical, zero
      *   regression risk for every case this new pipeline declines.
      */
-    async function tryConstructSemanticAnswer({ question, actorId, entityHint, language }) {
+    async function tryConstructSemanticAnswer({ question, actorId, entityHint, language, cognitiveResult }) {
         const planner = window.CozyOS.SemanticAnswerPlanner;
         if (!planner || typeof planner.planAnswer !== "function") return null;
 
+        // WAVE 1 (Cognitive-to-Answer Contract) — reuse CognitiveCoordinator's
+        // own already-computed SA-3 plan for this exact turn when it is
+        // genuinely present and structurally valid (real success:true,
+        // real plan.goal), rather than calling planner.planAnswer() a
+        // second time with the same input. This is the fix for the
+        // repository's own confirmed, documented redundancy ("SA-3's
+        // planner invoked twice per turn... confirmed redundant, not
+        // harmful, but wasted work"). Never blindly trusted: any
+        // precomputed result missing a real success/plan falls straight
+        // through to the exact same fresh planAnswer() call this
+        // function has always made, so a caller that never supplies
+        // cognitiveResult (every existing test, every pre-Wave-1 call
+        // site) sees byte-identical behavior.
         let planResult;
-        try { planResult = planner.planAnswer({ text: question, actorId, entityHint, requestedLanguage: language }); }
-        catch (_err) { return null; }
+        if (cognitiveResult && cognitiveResult.success === true && cognitiveResult.plan && cognitiveResult.plan.goal) {
+            planResult = cognitiveResult;
+        } else {
+            try { planResult = planner.planAnswer({ text: question, actorId, entityHint, requestedLanguage: language }); }
+            catch (_err) { return null; }
+        }
         if (!planResult || !planResult.success) return null;
 
         const plan = planResult.plan;
@@ -310,6 +327,53 @@
         if (!outcome || !outcome.success) return null;
 
         return { plan, candidate: outcome.candidate, evidence: planResult.evidence || [] };
+    }
+
+    /**
+     * buildCognitiveContext(cognitiveResult)
+     *   WAVE 1 (Cognitive-to-Answer Contract) — a best-effort, honest
+     *   summary of whatever CognitiveCoordinator's real SA-3
+     *   SemanticAnswerPlanner.planAnswer() output actually contains for
+     *   this turn, extending answer()'s existing return shape additively
+     *   (a new field alongside answer/intent/responseMode/... — never a
+     *   new contract file, never a second answer/cognitive system).
+     *   Every field here traces to real, already-computed data on
+     *   `cognitiveResult` (SA-1's own SemanticAnswerPlanContract shape
+     *   plus SA-3's own diagnostics shape, both already real and used
+     *   elsewhere in this codebase — see semantic-answer-interpretation-
+     *   provider.js's own buildInterpretation() for the same field
+     *   paths). Fields this repository genuinely does not compute
+     *   anywhere yet (dialect/region, situation, a real capability
+     *   graph, a derived advice/next-step requirement) are left `null`
+     *   rather than fabricated — see MULTILINGUAL-INTELLIGENCE-AUDIT.md
+     *   §5 for the same, already-disclosed gaps. Returns null when no
+     *   real cognitive result was ever supplied, so a caller can tell
+     *   "genuinely nothing available" apart from "available but empty."
+     */
+    function buildCognitiveContext(cognitiveResult) {
+        if (!cognitiveResult || typeof cognitiveResult !== "object") return null;
+        const plan = cognitiveResult.plan || null;
+        const diagnostics = cognitiveResult.diagnostics || null;
+        if (!plan && !diagnostics) return null;
+        const cognitiveStatus = diagnostics ? diagnostics.cognitiveStatus || null : null;
+        return {
+            language: (plan && plan.language) || null,
+            dialectRegion: null, // not modeled anywhere in this repository yet — honestly unknown, never guessed
+            intent: (plan && plan.goal) || null,
+            entities: (plan && plan.entity) ? [plan.entity] : [],
+            goal: (plan && plan.goal) || null,
+            situation: null, // not modeled anywhere in this repository yet
+            conversationContext: (plan && plan.conversationContext) || null,
+            ambiguity: cognitiveStatus ? (cognitiveStatus === "AMBIGUOUS" || cognitiveStatus === "CLARIFICATION_REQUIRED") : null,
+            evidenceClaimCount: (plan && Array.isArray(plan.claims)) ? plan.claims.length : null,
+            uncertainty: (diagnostics && diagnostics.intentResult && diagnostics.intentResult.confidence) ? diagnostics.intentResult.confidence.overall || null : null,
+            relevantCapabilities: null, // no real capability graph exists yet — see audit §5 (Rule 37 MISSING)
+            reasoningResult: cognitiveStatus,
+            responseMode: (plan && plan.answerMode) || null,
+            clarificationRequired: cognitiveStatus === "CLARIFICATION_REQUIRED",
+            adviceRequired: null, // CozyAdvisor makes this determination independently today, not derived from the cognitive result
+            nextStepRequired: null, // not modeled anywhere in this repository yet
+        };
     }
 
     function synthesizeFromContext(question, ctxResults, effLang) {
@@ -367,12 +431,20 @@
      *   own real, disclosed updated state for the caller to carry
      *   forward — this file adds no teaching/governance logic of its own.
      */
-    async function answer(question, { actorId = null, language = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null, businessContext = null, businessConversationState = null, teachConversationState = null } = {}) {
+    async function answer(question, { actorId = null, language = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null, businessContext = null, businessConversationState = null, teachConversationState = null, cognitiveResult = null } = {}) {
+        // WAVE 1 (Cognitive-to-Answer Contract) — computed once, honestly,
+        // from whatever the caller actually supplied (cozy-living-
+        // assistant.js passes CognitiveCoordinator's real per-turn result;
+        // every pre-Wave-1 caller passes nothing, so this is null and
+        // every return below carries cognitiveContext: null, unchanged).
+        // See buildCognitiveContext()'s own header for exactly which
+        // fields are real vs. honestly unknown.
+        const cognitiveContext = buildCognitiveContext(cognitiveResult);
         if (typeof question !== "string" || !question.trim()) {
             return {
                 answer: "A real, non-empty question is required.",
                 intent: "INVALID_INPUT", responseMode: "INSUFFICIENT_EVIDENCE",
-                evidenceState: "INSUFFICIENT_DATA", sources: [], reasoningUsed: false, contextUsed: [], businessDataConversationState: null, teachDataConversationState: null
+                evidenceState: "INSUFFICIENT_DATA", sources: [], reasoningUsed: false, contextUsed: [], businessDataConversationState: null, teachDataConversationState: null, cognitiveContext
             };
         }
 
@@ -383,7 +455,7 @@
             return {
                 answer: "The answer composition authorities (CozyIdentityFAQRouter / CozyAI) are not loaded in this environment.",
                 intent: "UNKNOWN", responseMode: "INSUFFICIENT_EVIDENCE",
-                evidenceState: "UNAVAILABLE", sources: [], reasoningUsed: false, contextUsed: [], businessDataConversationState: null, teachDataConversationState: null
+                evidenceState: "UNAVAILABLE", sources: [], reasoningUsed: false, contextUsed: [], businessDataConversationState: null, teachDataConversationState: null, cognitiveContext
             };
         }
 
@@ -501,7 +573,8 @@
                 reasoningUsed: !!multiIntent,
                 contextUsed: ctxResults,
                 businessDataConversationState,
-                teachDataConversationState
+                teachDataConversationState,
+                cognitiveContext
             };
         }
 
@@ -512,7 +585,7 @@
         // generic-context-concatenation path immediately below, for the
         // application-level questions it can actually plan for; every
         // question it declines falls through unchanged. ---
-        const semanticConstruction = await tryConstructSemanticAnswer({ question, actorId, entityHint, language });
+        const semanticConstruction = await tryConstructSemanticAnswer({ question, actorId, entityHint, language, cognitiveResult });
         if (semanticConstruction) {
             const { plan, candidate, evidence } = semanticConstruction;
             return {
@@ -527,6 +600,7 @@
                 reasoningUsed: candidate.evidenceIds.length > 1,
                 contextUsed: ctxResults,
                 businessDataConversationState, teachDataConversationState,
+                cognitiveContext
             };
         }
 
@@ -536,7 +610,7 @@
                 answer: "I don't have verified information to answer that yet. Please rephrase, or this may not be something CozyOS has documented/verified.",
                 intent: "UNKNOWN", responseMode: "INSUFFICIENT_EVIDENCE",
                 evidenceState: (ai && typeof ai.getContext === "function") ? "INSUFFICIENT_DATA" : "UNAVAILABLE",
-                sources: [], reasoningUsed: false, contextUsed: [], businessDataConversationState, teachDataConversationState
+                sources: [], reasoningUsed: false, contextUsed: [], businessDataConversationState, teachDataConversationState, cognitiveContext
             };
         }
 
@@ -548,7 +622,7 @@
             return {
                 answer: "Some related context exists, but nothing in it could be honestly rendered as a verified answer.",
                 intent, responseMode: "INSUFFICIENT_EVIDENCE",
-                evidenceState: "INSUFFICIENT_DATA", sources: [], reasoningUsed: false, contextUsed: ctxResults, businessDataConversationState, teachDataConversationState
+                evidenceState: "INSUFFICIENT_DATA", sources: [], reasoningUsed: false, contextUsed: ctxResults, businessDataConversationState, teachDataConversationState, cognitiveContext
             };
         }
 
@@ -582,7 +656,8 @@
             reasoningUsed: pieces.length > 1 || responseMode === "WHY_REASONING" || responseMode === "COMPARISON",
             contextUsed: ctxResults,
             businessDataConversationState,
-            teachDataConversationState
+            teachDataConversationState,
+            cognitiveContext
         };
     }
 
@@ -591,6 +666,6 @@
 
     window.CozyOS.Modules["cozy-answer-engine"] = Object.freeze({
         version: VERSION,
-        description: "Micro-Milestone H — AnswerEngine. Composes the existing, unmodified CozyIdentityFAQRouter (identity/origin/vision/mission/differentiation/etc., tried first) and CozyAI.getContext() (CozyKnowledge VERIFIED facts + CozyMemory/Living Memory search) into one structured {answer,intent,responseMode,evidenceState,sources,reasoningUsed,contextUsed} result. No new memory/knowledge/story authority. No FounderStory reference anywhere in this file — the public/private boundary is structural, not a permission check. Never defaults actorId to \"system\"."
+        description: "Micro-Milestone H — AnswerEngine. Composes the existing, unmodified CozyIdentityFAQRouter (identity/origin/vision/mission/differentiation/etc., tried first) and CozyAI.getContext() (CozyKnowledge VERIFIED facts + CozyMemory/Living Memory search) into one structured {answer,intent,responseMode,evidenceState,sources,reasoningUsed,contextUsed,cognitiveContext} result. No new memory/knowledge/story authority. No FounderStory reference anywhere in this file — the public/private boundary is structural, not a permission check. Never defaults actorId to \"system\". WAVE 1 (Cognitive-to-Answer Contract) — answer() now accepts an optional cognitiveResult (CognitiveCoordinator's real, already-computed SA-3 plan for this turn); when present and valid, tryConstructSemanticAnswer() reuses it instead of calling SemanticAnswerPlanner.planAnswer() a second time, and buildCognitiveContext() surfaces an honest summary of it on every return. Absent for every pre-Wave-1 caller — behavior is byte-identical when cognitiveResult is not supplied."
     });
 })();

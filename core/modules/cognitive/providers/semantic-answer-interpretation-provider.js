@@ -192,6 +192,26 @@
                 reason: result.success ? null : (result.reason || null),
                 planSchemaVersion: (result.plan && result.plan.schemaVersion) || null,
             },
+            // WAVE 1 (Cognitive-to-Answer Contract) — additive field, not
+            // part of CozyInterpretation's own provider contract (that
+            // fixed {category,type,meaning,confidence,supportingData}
+            // shape is unchanged above). CognitiveCoordinator.run() calls
+            // this function DIRECTLY (cognitive-coordinator.js's own
+            // "Stage 1b" — never through CozyInterpretation.interpret(),
+            // which would strip any field outside its own explicit
+            // allowlist; confirmed by reading interpret()'s real
+            // results.map() before adding this), so this survives intact
+            // as result.semanticAnswer.rawPlanResult on the real
+            // CognitiveCoordinator.run() return value. This is SA-3's own
+            // real, complete SemanticAnswerPlanner.planAnswer() output —
+            // the exact same object CozyAnswerEngine.tryConstructSemanticAnswer()
+            // already computes a SECOND time today by calling planAnswer()
+            // again with the same input. Exposing it here lets that
+            // redundant second call be skipped when this one is reused
+            // (see cozy-answer-engine.js), without this file gaining any
+            // new responsibility — it still only ever calls planAnswer()
+            // once, exactly as before.
+            rawPlanResult: result,
         };
     }
 

@@ -172,15 +172,40 @@
 
             // Stage 1b: Semantic Answer (SA-3B, additive — see run()'s own doc comment above)
             let semanticAnswerResult = null;
+            // WAVE 1 (Cognitive-to-Answer Contract) — the real, full SA-3
+            // plan (goal/entity/claims/language), captured SEPARATELY from
+            // the diagnostic-only semanticAnswerResult below. This is a
+            // deliberate split, not an oversight: semanticAnswerResult
+            // (result.semanticAnswer) keeps its own, pre-existing,
+            // independently-tested "never exposes raw claim/evidence text"
+            // guarantee (see core/modules/cognitive/tests/phase5-cognitive-
+            // to-answer-contract.test.js Test B) completely unchanged —
+            // semanticPlanResult (result.semanticPlan, a new, separate,
+            // clearly-named sibling field) is where the real plan actually
+            // goes, for a caller that explicitly wants to reuse it (see
+            // cozy-answer-engine.js's own new cognitiveResult parameter).
+            let semanticPlanResult = null;
             const semanticAnswerProvider = window.CozyOS.SemanticAnswerInterpretationProvider;
             if (!semanticAnswerProvider || typeof semanticAnswerProvider.buildInterpretation !== "function") {
                 diagnostics.stages.semanticAnswer = { skipped: true, reason: "SemanticAnswerInterpretationProvider is not loaded." };
             } else {
                 try {
-                    semanticAnswerResult = semanticAnswerProvider.buildInterpretation(evidence, { actorId, conversationState });
+                    const bridgeResult = semanticAnswerProvider.buildInterpretation(evidence, { actorId, conversationState });
+                    semanticPlanResult = (bridgeResult && bridgeResult.rawPlanResult) || null;
+                    // Strip rawPlanResult before this becomes result.semanticAnswer
+                    // — a plain, real object spread never re-adds a key that
+                    // wasn't there, so a bridge that never set it (e.g. an
+                    // older/alternate provider) is completely unaffected.
+                    if (bridgeResult && Object.prototype.hasOwnProperty.call(bridgeResult, "rawPlanResult")) {
+                        const { rawPlanResult, ...diagnosticOnly } = bridgeResult;
+                        semanticAnswerResult = diagnosticOnly;
+                    } else {
+                        semanticAnswerResult = bridgeResult;
+                    }
                     diagnostics.stages.semanticAnswer = { ran: true, isReal: true, cognitiveStatus: (semanticAnswerResult.supportingData && semanticAnswerResult.supportingData.cognitiveStatus) || null };
                 } catch (err) {
                     semanticAnswerResult = null;
+                    semanticPlanResult = null;
                     diagnostics.stages.semanticAnswer = { ran: true, isReal: false, reason: `Provider threw: ${err && err.message ? err.message : String(err)}` };
                 }
             }
@@ -279,7 +304,14 @@
             const result = {
                 success: true, // the ORCHESTRATION completed; individual stages may honestly be unavailable — see diagnostics
                 interpretation: interpretationResult, semanticAnswer: semanticAnswerResult, thinking: thinkingResult, reasoning: reasoningResult,
-                intelligence: intelligenceResult, recalledMemories, policyResult, savedMemoryKey, diagnostics
+                intelligence: intelligenceResult, recalledMemories, policyResult, savedMemoryKey, diagnostics,
+                // WAVE 1 (Cognitive-to-Answer Contract) — additive top-level
+                // field, sibling to semanticAnswer (see Stage 1b's own
+                // comment above for exactly why this is kept separate).
+                // null whenever the semantic-answer stage was skipped,
+                // failed, or genuinely produced no real plan (e.g. planner/
+                // intent engine not loaded) — never a fabricated plan.
+                semanticPlan: semanticPlanResult,
             };
             this.#runHistory.push({ text, actorId, at: diagnostics.startedAt, diagnostics: this.#deepClone(diagnostics) });
             if (this.#runHistory.length > 200) this.#runHistory.shift();

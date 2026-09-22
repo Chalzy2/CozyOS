@@ -592,12 +592,33 @@ test('STRUCTURAL: CML-6 does not touch cozy-living-assistant.js/CognitiveCoordin
     // reachability.test.js), both proving zero regression to every
     // existing page behavior.
     const fullyProtectedPaths = [
-        'core/living/cozy-living-assistant.js',
-        'core/modules/cognitive/cognitive-coordinator.js',
         'core/modules/memory/cozy-memory-engine.js',
     ];
     const coreDiff = execSync(`git diff --name-only HEAD -- ${fullyProtectedPaths.join(' ')}`, { cwd: repoRoot }).toString().trim();
-    assert.equal(coreDiff, '', 'CML-6 must not modify cozy-living-assistant.js/CognitiveCoordinator/the memory engine directly');
+    assert.equal(coreDiff, '', 'CML-6 must not modify the memory engine directly');
+
+    // cozy-living-assistant.js / cognitive-coordinator.js — SEMANTIC
+    // CHECK (WAVE 1 — Universal Native Multilingual Intelligence phase,
+    // Cognitive-to-Answer Contract). These two files were REMOVED from
+    // the blanket-empty-diff list above for the same reason
+    // admin-workspace.html was, just below: a real, later, separately-
+    // authorized milestone (Wave 1's own `semanticPlan` pass-through —
+    // see cognitive-coordinator.js's own "WAVE 1" Stage 1b comment and
+    // cozy-living-assistant.js's own "WAVE 1 (Cognitive-to-Answer
+    // Contract)" comment) now legitimately modifies both files for a
+    // reason entirely unrelated to CML-6 (reusing CognitiveCoordinator's
+    // own already-computed semantic plan in the answer path — nothing to
+    // do with the learning fabric). A bare "these files must have zero
+    // diff" check can no longer distinguish CML-6 touching them from a
+    // different, unrelated milestone touching them, so — exactly like
+    // admin-workspace.html below — the blanket check was replaced with a
+    // real content inspection: this still fails, correctly, if either
+    // file's diff ever wires in CML-6's own real script chain or
+    // references any of CML-6's own real, registered window.CozyOS
+    // globals. It does NOT fail merely because these files have *some*
+    // diff, which is the real gap the old blanket check had.
+    const livingAssistantAndCoordinatorDiff = execSync('git diff HEAD -- core/living/cozy-living-assistant.js core/modules/cognitive/cognitive-coordinator.js', { cwd: repoRoot }).toString();
+    assert.doesNotMatch(livingAssistantAndCoordinatorDiff, /core\/modules\/learning\//, 'CML-6 must not wire its own fabric script chain into cozy-living-assistant.js/cognitive-coordinator.js');
 
     // admin-workspace.html — SEMANTIC CHECK (Phase 5 ADDITION — User
     // Dashboard <-> Administrator Application Control Plane).
@@ -631,5 +652,6 @@ test('STRUCTURAL: CML-6 does not touch cozy-living-assistant.js/CognitiveCoordin
     ];
     for (const name of cml6Globals) {
         assert.doesNotMatch(adminDiff, new RegExp(`\\b${name}\\b`), `CML-6 must not reference window.CozyOS.${name} in admin-workspace.html`);
+        assert.doesNotMatch(livingAssistantAndCoordinatorDiff, new RegExp(`\\b${name}\\b`), `CML-6 must not reference window.CozyOS.${name} in cozy-living-assistant.js/cognitive-coordinator.js`);
     }
 });

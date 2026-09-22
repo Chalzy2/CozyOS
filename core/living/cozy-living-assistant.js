@@ -699,6 +699,28 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
                 this.#currentLanguage = result.result.language;
             }
 
+            // WAVE 1 (Cognitive-to-Answer Contract) — result.result.pipeline
+            // is the real, already-computed CognitiveCoordinator.run()
+            // output (rule-based-conversational-provider.js's think()
+            // attaches it on every real return; see that file's own
+            // "pipeline: pipelineResult" lines). Its own semanticPlan field
+            // (a new, separate sibling of the pre-existing, diagnostic-only
+            // semanticAnswer field — see cognitive-coordinator.js's own
+            // Stage 1b comment for why they're kept apart) already ran
+            // SA-3's real SemanticAnswerPlanner.planAnswer() for THIS exact
+            // turn's text — previously computed and then completely
+            // discarded (this repository's own confirmed, documented gap:
+            // "the cognitive coordination stage is a diagnostics sink").
+            // Extracted here, honestly, only when genuinely present — never
+            // fabricated — and passed straight through to the real answer
+            // chain below so it can be reused instead of recomputed. Every
+            // other real side effect above (conversationState/currentLanguage
+            // carry-forward, the rule-based fallback reply chain further
+            // down) is completely unchanged by this addition.
+            const cognitiveResult = (result && result.success && result.result && result.result.pipeline
+                && result.result.pipeline.semanticPlan)
+                || null;
+
             // CHECKPOINT K — the real conversational-answer source:
             // the verified chain proven in
             // core/modules/intelligence/advisor/tests/
@@ -777,7 +799,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
                 // chain can answer a named-application question in the
                 // SAME language the user actually asked in, instead of
                 // defaulting to English. No new language detector.
-                const answerResult = await answerEngine.answer(text, { actorId, entityHint: contextualEntityName, liveSessionId: effectiveLiveSessionId, supportScope, language: this.#currentLanguage, businessConversationState: this.#businessConversationState, teachConversationState: this.#teachConversationState });
+                const answerResult = await answerEngine.answer(text, { actorId, entityHint: contextualEntityName, liveSessionId: effectiveLiveSessionId, supportScope, language: this.#currentLanguage, businessConversationState: this.#businessConversationState, teachConversationState: this.#teachConversationState, cognitiveResult });
                 // Phase 2: CozyAI + Live Window Business-Data Q&A — only
                 // update when this turn's real business-data flow
                 // actually returned a fresh state (see cozy-ai.js's own

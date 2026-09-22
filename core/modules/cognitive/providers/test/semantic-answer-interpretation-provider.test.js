@@ -239,10 +239,37 @@ test('E27: a topic switch (explicit new entity) overrides stale conversationStat
     assert.equal(result.semanticAnswer.meaning, 'DEFINITION — QuarryOS');
 });
 
-test('E28: existing turn-aware behavior (rule-based-conversational-provider.js\'s own conversationState propagation) is completely unmodified by SA-3B — confirmed by an empty git diff on that file', () => {
+test('E28: existing turn-aware behavior (rule-based-conversational-provider.js\'s own conversationState propagation) and LivingAI are completely unmodified by SA-3B/Wave 1 — confirmed by an empty git diff on those two files', () => {
+    // UPDATE — WAVE 1 (Universal Native Multilingual Intelligence phase,
+    // Cognitive-to-Answer Contract): this test ORIGINALLY asserted an
+    // empty diff across all three files below, encoding SA-3B's own
+    // promise not to touch the real Live Window entry point at all. That
+    // promise still holds for rule-based-conversational-provider.js and
+    // cozy-living-ai.js — checked below, unchanged. cozy-living-assistant.js
+    // is the ONE file Wave 1 was explicitly authorized to extend (to
+    // carry CognitiveCoordinator's own already-computed semanticPlan
+    // through to the answer path instead of discarding it — see that
+    // file's own "WAVE 1 (Cognitive-to-Answer Contract)" comment). Rather
+    // than deleting this regression guard, it now also verifies that
+    // file's diff is real, genuinely marked as the Wave 1 change, and
+    // stays small/additive — so this test still fails loudly if a future
+    // change touches cozy-living-assistant.js for an unrelated reason.
     const { execSync } = require('node:child_process');
-    const diff = execSync('git diff --stat HEAD -- core/modules/intelligence/providers/rule-based-conversational-provider.js core/living/cozy-living-assistant.js core/living/cozy-living-ai.js', { cwd: require('node:path').join(__dirname, '..', '..', '..', '..', '..') }).toString().trim();
-    assert.equal(diff, '', 'SA-3B must not modify the real Live Window entry point, LivingAI, or the rule-based provider');
+    const repoRoot = require('node:path').join(__dirname, '..', '..', '..', '..', '..');
+
+    const untouchedDiff = execSync('git diff --stat HEAD -- core/modules/intelligence/providers/rule-based-conversational-provider.js core/living/cozy-living-ai.js', { cwd: repoRoot }).toString().trim();
+    assert.equal(untouchedDiff, '', 'SA-3B/Wave 1 must not modify the rule-based provider or LivingAI');
+
+    const livingAssistantDiff = execSync('git diff HEAD -- core/living/cozy-living-assistant.js', { cwd: repoRoot }).toString();
+    if (livingAssistantDiff.trim() === '') return; // nothing staged yet to compare against (e.g. a clean checkout) — nothing to verify
+    assert.match(livingAssistantDiff, /WAVE 1 \(Cognitive-to-Answer Contract\)/, 'expected the cozy-living-assistant.js diff to be the documented, authorized Wave 1 change, not an unrelated/undocumented edit');
+    assert.match(livingAssistantDiff, /cognitiveResult/, 'expected the diff to be about the cognitiveResult pass-through specifically');
+    const statOutput = execSync('git diff --stat HEAD -- core/living/cozy-living-assistant.js', { cwd: repoRoot }).toString();
+    const statMatch = statOutput.match(/(\d+) insertions?\(\+\).*?(?:(\d+) deletions?\(-\))?/);
+    const insertions = statMatch ? Number(statMatch[1]) : 0;
+    const deletions = statMatch && statMatch[2] ? Number(statMatch[2]) : 0;
+    assert.ok(insertions <= 40, `expected a small, additive Wave 1 diff (<=40 insertions), got ${insertions}`);
+    assert.ok(deletions <= 5, `expected a near-zero-deletion, additive Wave 1 diff (<=5 deletions), got ${deletions}`);
 });
 
 // =====================================================================

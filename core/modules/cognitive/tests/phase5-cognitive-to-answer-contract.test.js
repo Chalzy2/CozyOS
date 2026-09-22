@@ -16,22 +16,45 @@
  * test proves that equivalence directly, rather than asserting it from
  * code reading alone.
  *
- * WHY NO CODE CHANGE WAS MADE (this test documents the decision, it
- * does not silently accept a gap): SA-3B's own bridge deliberately
- * reshapes the plan into a diagnostic-only summary (goal/entitySource/
- * claimCount — never raw claim text) specifically so CognitiveCoordinator
- * never becomes a second source of user-facing answer content (see
- * semantic-answer-interpretation-provider.js's own header, "OUTPUT —
- * deliberately diagnostic, never a final answer"). Threading the raw
- * plan object through from CognitiveCoordinator into CozyAnswerEngine
- * purely to avoid recomputing it would touch the single most heavily
- * verified file in this repository (cozy-answer-engine.js, zero-leak-
- * verified in Phase 4) for a pure efficiency gain with no behavior
- * change (planAnswer() is a deterministic, pure function — recomputing
- * it produces byte-identical output). Per this phase's own "PRESERVE →
- * REUSE → RECONCILE → REWIRE → EXTEND → VERIFY" discipline, verifying
- * the two paths already agree is the correct, lower-risk action; wiring
- * them together for a cosmetic optimization is not.
+ * UPDATE — WAVE 1 (Universal Native Multilingual Intelligence phase,
+ * Cognitive-to-Answer Contract): this file's ORIGINAL decision (preserved
+ * below for the historical record) was NOT to wire the two paths
+ * together, treating their agreement as sufficient proof. That decision
+ * has since been explicitly superseded by an authorized Wave 1 repair:
+ * the real gap it left — CognitiveCoordinator's own real semantic result
+ * being computed every turn and then discarded, with the Live Window
+ * answering only from a second, redundant planAnswer() call — is exactly
+ * the architectural gap Wave 1 fixes. The fix keeps Test B's own
+ * guarantee below COMPLETELY intact: result.semanticAnswer (the
+ * diagnostic-only field this file already tests) still never carries raw
+ * claim/evidence text. What changed is a NEW, separate, clearly-named
+ * sibling field — result.semanticPlan — added to CognitiveCoordinator.run()'s
+ * own return value specifically to carry the real, full SA-3 plan for a
+ * caller that explicitly wants to reuse it (cozy-answer-engine.js's own
+ * new `cognitiveResult` parameter). Test E below proves this new field
+ * exists and is real; Test B is unchanged and still passes, proving the
+ * split actually holds.
+ *
+ * ORIGINAL RATIONALE (historical — superseded, not deleted, per this
+ * repository's own "restore/preserve, never silently erase" discipline):
+ * SA-3B's own bridge deliberately reshapes the plan into a diagnostic-only
+ * summary (goal/entitySource/claimCount — never raw claim text)
+ * specifically so CognitiveCoordinator never becomes a second source of
+ * user-facing answer content (see semantic-answer-interpretation-
+ * provider.js's own header, "OUTPUT — deliberately diagnostic, never a
+ * final answer"). Threading the raw plan object through from
+ * CognitiveCoordinator into CozyAnswerEngine purely to avoid recomputing
+ * it would touch the single most heavily verified file in this repository
+ * (cozy-answer-engine.js, zero-leak-verified in Phase 4) for a pure
+ * efficiency gain with no behavior change (planAnswer() is a
+ * deterministic, pure function — recomputing it produces byte-identical
+ * output). Per this phase's own "PRESERVE → REUSE → RECONCILE → REWIRE →
+ * EXTEND → VERIFY" discipline, verifying the two paths already agree was
+ * judged the correct, lower-risk action at the time; Wave 1's own explicit
+ * authorization is what changed the calculus — the "cosmetic optimization"
+ * framing no longer applies once the real goal is making the cognitive
+ * result actually influence the answer, not merely avoiding a redundant
+ * call.
  *
  * The OTHER cognitive stages (Thinking/Reasoning/Intelligence) are
  * separately confirmed, by direct reading of core/modules/intelligence/
@@ -126,4 +149,28 @@ test('D: a real Memory-stage save under the shared CozyMemory store is genuinely
     } else {
         assert.equal(result.diagnostics.stages.memorySave.skipped, true, 'expected an honest, disclosed skip reason when no real isReal:true outcome existed to save');
     }
+});
+
+test('E (WAVE 1): result.semanticPlan carries the REAL, full SA-3 plan — the same real plan/claims/goal/language a direct planAnswer() call for the same question produces — while result.semanticAnswer (Test B, unchanged) still never does', async () => {
+    const { coordinator, planner } = loadFullStack();
+    const text = 'How does ChurchOS help people?';
+    const actorId = 'phase5-contract-test-actor-5';
+
+    const result = await coordinator.run({ text, actorId });
+    const directPlanResult = planner.planAnswer({ text, actorId });
+
+    assert.ok(result.semanticPlan, 'expected a real, non-null result.semanticPlan when the semantic-answer stage genuinely ran');
+    assert.equal(result.semanticPlan.success, directPlanResult.success, 'expected the same real success value as a direct planAnswer() call');
+    if (directPlanResult.plan) {
+        assert.ok(result.semanticPlan.plan, 'expected a real .plan object on result.semanticPlan');
+        assert.equal(result.semanticPlan.plan.goal, directPlanResult.plan.goal, 'expected the SAME real goal');
+        assert.equal(result.semanticPlan.plan.language, directPlanResult.plan.language, 'expected the SAME real resolved language');
+        assert.deepEqual(result.semanticPlan.plan.claims, directPlanResult.plan.claims, 'expected the SAME real claims array — this is genuinely the reusable plan, not a re-derived approximation');
+    }
+
+    // The split itself: semanticPlan is a sibling of, not nested inside,
+    // semanticAnswer — confirming the two are genuinely separate fields,
+    // not the same object exposed twice under different names.
+    assert.notEqual(result.semanticPlan, result.semanticAnswer, 'expected semanticPlan and semanticAnswer to be distinct objects');
+    assert.equal('rawPlanResult' in (result.semanticAnswer || {}), false, 'expected result.semanticAnswer to never carry a rawPlanResult key — Test B\'s guarantee must hold for the field itself, not just its serialized text');
 });
