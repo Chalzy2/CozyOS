@@ -861,10 +861,10 @@
                 "Ulinganishaji wa kiotomatiki wa \"mtu yuleyule\" katika ushuhuda: muunganiko wa searchByPersonReference() hapo juu unaweza kuruhusu kanisa kutafuta kwa JINA la mtu, lakini tabia inayotakiwa ya kutambua/kulinganisha kiotomatiki USO au SAUTI ya mtu fulani katika video (\"kuchanganua na kutoa mtu yuleyule kwa sekunde\") inahitaji utambuzi wa uso/sauti, ambao Media Intelligence ya hazina hii haitekelezi popote waziwazi (sehemu ya \"NO FABRICATION\", cozy-media-intelligence.js) - ni nusu ya wazo hili inayotegemea jina pekee ndiyo ina utekelezaji halisi wa kuunganisha."
             ]),
             currentVerifiedCapabilitiesSw: Object.freeze([
-                "setupChurch() — hutumia tena OrganizationRegistry halisi iliyopo, hakuna mfumo wa pili wa shirika",
-                "uundaji, upatikanaji, na uorodheshaji wa wanachama",
-                "uorodheshaji wa wanachama uliochujwa kwa nchi",
-                "uripoti wa uanachama (publishMembershipReport())"
+                "kuanzisha kanisa (setupChurch()) — hutumia tena OrganizationRegistry halisi iliyopo, hakuna mfumo wa pili wa shirika",
+                "uundaji, upatikanaji, na uorodheshaji wa wanachama wa kanisa",
+                "uorodheshaji wa wanachama wa kanisa uliochujwa kwa nchi",
+                "uripoti wa uanachama wa kanisa (publishMembershipReport())"
             ]),
             visionCapabilities: Object.freeze([
                 "sermon/testimony knowledge preservation and search",

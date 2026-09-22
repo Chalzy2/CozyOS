@@ -352,29 +352,65 @@
      *   `authoritative` (VerifiedEvidenceContract.isAuthoritative() —
      *   VERIFIED/CURATED/APPROVED, safe to assert as a claim),
      *   `conflicted` (verification.status === "CONFLICTED" — never
-     *   silently chosen, see planAnswer()'s own handling below), and
-     *   `other` (UNVERIFIED/DEPRECATED — never used as a claim either).
-     *   Every real evidence record SA-2's adapters produce today for the
-     *   fields SA-3 maps (humanPurpose/humanBenefits/
-     *   currentVerifiedCapabilities/realLifeProblems, never
+     *   silently chosen, see planAnswer()'s own handling below),
+     *   `restricted` (structurally authoritative but NOT sensitivity
+     *   "PUBLIC" — see WAVE 6 below), and `other` (UNVERIFIED/DEPRECATED —
+     *   never used as a claim either). Every real evidence record SA-2's
+     *   adapters produce today for the fields SA-3 maps (humanPurpose/
+     *   humanBenefits/currentVerifiedCapabilities/realLifeProblems, never
      *   visionCapabilities) is already VERIFIED, so this is a real,
      *   wired safety net rather than a behavior change for today's real
      *   data — it exists so a future evidence source (SA-2 memory
      *   evidence is CURATED; a future LIF adapter could be UNVERIFIED/
      *   CONFLICTED) can never silently become an asserted claim.
+     *
+     *   WAVE 6 (privacy/visibility enforcement layer) — the audit that
+     *   preceded this addition (PRE-EXISTING-FAILURE-REGISTER.md §7.1)
+     *   found that every real VerifiedEvidence record ALREADY carries a
+     *   required, disclosed `sensitivity` field (SA-1's own
+     *   VerifiedEvidenceContract.SENSITIVITY enum —
+     *   PUBLIC/ORGANIZATION/PRIVATE/ADMIN/SYSTEM/SECRET, already
+     *   populated correctly by every real SA-2 adapter today), but no
+     *   code anywhere in SA-3/SA-4/SA-5 ever actually READ it — today's
+     *   real non-leakage is a side effect of every evidence source SA-3
+     *   currently draws from (CozyKnowledge's APPLICATION_HUMAN_PURPOSE_
+     *   DATA) defaulting to PUBLIC, not an enforced control. This is the
+     *   minimal, reusable fix: a non-PUBLIC evidence record — structurally
+     *   authoritative or not — is now NEVER placed in `authoritative`, so
+     *   it can never become a plan claim, regardless of which evidence
+     *   source it came from. No new classification taxonomy (reuses
+     *   SA-1's own SENSITIVITY enum, unchanged), no new evidence field
+     *   (every real evidence record already carries `sensitivity`), no
+     *   new authorization/access-check system, no second AI/response
+     *   engine/database. A future goal that legitimately needs
+     *   non-PUBLIC evidence (e.g. a memory-backed goal drawing PRIVATE
+     *   CozyMemory evidence for its own actor) is a real, separate,
+     *   explicitly-approved design decision for whenever such a goal is
+     *   actually built — this layer's job is only to make sure that
+     *   never happens BY ACCIDENT, via GOAL_FIELD_MAP silently mapping a
+     *   new goal onto a non-PUBLIC-only field, or a future evidence
+     *   source starting to return non-PUBLIC records for a field that is
+     *   already wired. Fails closed: a record with a missing or
+     *   unrecognized sensitivity value is treated as non-PUBLIC (never
+     *   promoted), never assumed safe by default.
      */
     function partitionEvidenceByAuthority(evidenceArray) {
         const evidenceContract = window.CozyOS.VerifiedEvidenceContract;
         const authoritative = [];
         const conflicted = [];
+        const restricted = [];
         const other = [];
         for (const ev of evidenceArray) {
             const status = ev && ev.verification && ev.verification.status;
+            const isPublic = !!ev && ev.sensitivity === "PUBLIC";
             if (status === "CONFLICTED") conflicted.push(ev);
-            else if (evidenceContract && typeof evidenceContract.isAuthoritative === "function" && evidenceContract.isAuthoritative(ev)) authoritative.push(ev);
+            else if (evidenceContract && typeof evidenceContract.isAuthoritative === "function" && evidenceContract.isAuthoritative(ev)) {
+                if (isPublic) authoritative.push(ev);
+                else restricted.push(ev);
+            }
             else other.push(ev);
         }
-        return { authoritative, conflicted, other };
+        return { authoritative, conflicted, restricted, other };
     }
 
     /**
@@ -436,6 +472,14 @@
             case "goal-not-plannable": return "UNKNOWN";
             case "language-gap": return "LANGUAGE_GAP";
             case "no-evidence": return "INSUFFICIENT_EVIDENCE";
+            // WAVE 6 — reuses the existing INSUFFICIENT_EVIDENCE status
+            // (no new PLAN_STATUS value added to the certified contract):
+            // from the requester's perspective, no evidence it is
+            // authorized to be told exists, which is what that status
+            // honestly means. `reason: "RESTRICTED_EVIDENCE_ONLY"` on the
+            // outer planAnswer() result (not this enum) is what keeps
+            // this distinguishable from a genuine data-absence gap.
+            case "restricted-evidence": return "INSUFFICIENT_EVIDENCE";
             case "evidence-conflict": return "EVIDENCE_CONFLICT";
             case "understood-with-conflict": return "EVIDENCE_CONFLICT";
             case "understood": return "UNDERSTOOD";
@@ -551,7 +595,15 @@
             return { success: false, reason: "NO_EVIDENCE_AVAILABLE", goal, goalSource, entity: entityValue, language, errors: evidenceResult.errors, diagnostics: { intentResult, entitySource, cognitiveStatus: classifyCognitiveStatus({ kind: "no-evidence" }) } };
         }
 
-        const { authoritative, conflicted } = partitionEvidenceByAuthority(sourceEvidence);
+        const { authoritative, conflicted, restricted } = partitionEvidenceByAuthority(sourceEvidence);
+        if (authoritative.length === 0 && restricted.length > 0) {
+            // WAVE 6 — real, honest, distinct outcome: usable evidence
+            // exists but is not PUBLIC, so it is never asserted. Never
+            // conflated with EVIDENCE_CONFLICT (which means the evidence
+            // itself disagrees, not that it is access-restricted) or
+            // silently treated as if nothing were found at all.
+            return { success: false, reason: "RESTRICTED_EVIDENCE_ONLY", goal, goalSource, entity: entityValue, language, restrictedEvidenceIds: restricted.map((ev) => ev.id), diagnostics: { intentResult, entitySource, cognitiveStatus: classifyCognitiveStatus({ kind: "restricted-evidence" }) } };
+        }
         if (authoritative.length === 0) {
             return { success: false, reason: "EVIDENCE_CONFLICT", goal, goalSource, entity: entityValue, language, conflictedEvidenceIds: conflicted.map((ev) => ev.id), diagnostics: { intentResult, entitySource, cognitiveStatus: classifyCognitiveStatus({ kind: "evidence-conflict" }) } };
         }

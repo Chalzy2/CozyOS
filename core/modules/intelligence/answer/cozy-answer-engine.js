@@ -290,8 +290,46 @@
         // function has always made, so a caller that never supplies
         // cognitiveResult (every existing test, every pre-Wave-1 call
         // site) sees byte-identical behavior.
+        //
+        // WAVE 7a (multi-turn entity-switching repair) — root cause,
+        // traced through the real, live call chain rather than assumed:
+        // cognitiveResult is computed EARLY in the turn by SA-3B's bridge
+        // (semantic-answer-interpretation-provider.js's buildInterpretation(),
+        // called from CognitiveCoordinator.run() inside rule-based-
+        // conversational-provider.js's think()) — which calls
+        // planner.planAnswer({text, conversationState, actorId}) with NO
+        // entityHint at all (confirmed by reading that file directly).
+        // Its own entity resolution therefore depends entirely on
+        // SemanticIntentEngine's real, disclosed-incomplete KNOWN_ENTITIES
+        // spotting plus SA-3's own resolveContextualEntity() conversation-
+        // state-inheritance fallback (semantic-answer-planner.js) — when
+        // the CURRENT turn names an entity that engine doesn't recognize,
+        // that fallback honestly (and correctly, from SA-3's own narrow
+        // view) inherits the PREVIOUS turn's lastDiscussedApplication
+        // instead, producing a structurally VALID but wrong-entity plan.
+        // Separately and independently, cozy-living-assistant.js's own
+        // `entityHint` (`contextualEntityName`, #send()) is computed AFTER
+        // this turn's conversationState is updated and is the correct,
+        // already-tested signal for what the CURRENT turn actually named.
+        // Reusing cognitiveResult without ever comparing the two lets a
+        // stale, previous-turn entity silently win over the correct one —
+        // this is the exact, reproduced "answers the previous app instead
+        // of the one just asked about" defect. The minimum fix: only
+        // reuse cognitiveResult when its own resolved entity agrees with
+        // entityHint (or no entityHint was supplied at all, preserving
+        // every pre-Wave-7a caller's exact behavior); otherwise fall
+        // through to the SAME fresh planAnswer() call below that already
+        // correctly threads entityHint through SA-3's real entityHint
+        // priority (see semantic-answer-planner.js's own
+        // resolveContextualEntity(), which checks entityHint FIRST).
+        // No new entity-resolution system, no new comparison authority —
+        // this reuses the exact two signals the real call chain already,
+        // separately, computes.
         let planResult;
-        if (cognitiveResult && cognitiveResult.success === true && cognitiveResult.plan && cognitiveResult.plan.goal) {
+        const cachedEntityValue = cognitiveResult && cognitiveResult.plan && cognitiveResult.plan.entity && cognitiveResult.plan.entity.value;
+        const cachedEntityAgreesWithThisTurn = !isNonEmptyString(entityHint)
+            || (isNonEmptyString(cachedEntityValue) && cachedEntityValue.trim().toLowerCase() === entityHint.trim().toLowerCase());
+        if (cognitiveResult && cognitiveResult.success === true && cognitiveResult.plan && cognitiveResult.plan.goal && cachedEntityAgreesWithThisTurn) {
             planResult = cognitiveResult;
         } else {
             try { planResult = planner.planAnswer({ text: question, actorId, entityHint, requestedLanguage: language }); }
