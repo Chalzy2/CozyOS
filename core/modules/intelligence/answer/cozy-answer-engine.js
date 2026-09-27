@@ -786,6 +786,46 @@
 
         // --- No FAQ match: general Question-Understanding + Context path ---
         if (ctxResults.length === 0) {
+            // SA-8 Phase 1 (Clarification Intelligence) — Universal CozyAI
+            // directive: never answer a genuinely underspecified question
+            // with a generic "I don't know" when a real, useful
+            // clarifying question can honestly be asked instead. Before
+            // falling back to the generic no-evidence text below, check
+            // window.CozyOS.SemanticIntentEngine — the SAME real, pre-
+            // existing authority rule-based-conversational-provider.js
+            // already uses for its own COMPETING-goal clarification (see
+            // that file's own "the live assistant must ask, never guess"
+            // comment). Its clarificationQuestion is built by that
+            // engine's own buildClarificationQuestion() — never
+            // fabricated here, only surfaced in a path (this file's own
+            // final context-less fallback) that previously never saw it.
+            // Scope, disclosed honestly: today the engine only builds a
+            // real question for the "competing_goals" ambiguity reason;
+            // other ambiguity reasons (e.g. a bare, low-evidence
+            // utterance with no entity at all) still fall through to the
+            // generic text below, since there is nothing concrete yet to
+            // ask a useful clarifying question about.
+            const semanticEngine = window.CozyOS && window.CozyOS.SemanticIntentEngine;
+            let semanticResult = null;
+            if (semanticEngine && typeof semanticEngine.analyze === "function") {
+                try {
+                    semanticResult = semanticEngine.analyze(question, {
+                        previousEntity: (typeof entityHint === "string" && entityHint.trim()) ? entityHint.trim() : null,
+                        applyCozyLearnSynonyms: true,
+                        allowProvisionalCorrections: true,
+                        cozyLearnScopes: ["GLOBAL"]
+                    });
+                } catch (_err) { semanticResult = null; } // fail closed to the existing generic fallback — never lets a semantic-engine bug block a reply
+            }
+            if (semanticResult && semanticResult.clarification && semanticResult.clarification.required && isNonEmptyString(semanticResult.clarification.question)) {
+                return {
+                    answer: semanticResult.clarification.question,
+                    intent: "CLARIFICATION_NEEDED", responseMode: "INSUFFICIENT_EVIDENCE",
+                    evidenceState: "INSUFFICIENT_DATA",
+                    sources: [{ authority: "semantic-intent-clarification", provenance: "window.CozyOS.SemanticIntentEngine.analyze", evidence: "VERIFIED" }],
+                    reasoningUsed: false, contextUsed: [], businessDataConversationState, teachDataConversationState, cognitiveContext
+                };
+            }
             // UNIVERSAL LANGUAGE SEAM — previously always English regardless
             // of the real, already-resolved `language` (KISWAHILI-FIRST-
             // READINESS-REPORT.md §2.1: "Nina duka."/"Unaweza kunisaidia?"
