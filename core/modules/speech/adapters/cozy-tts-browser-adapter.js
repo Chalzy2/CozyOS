@@ -113,7 +113,28 @@
             // voice with no explanation. Never fabricates a voice -
             // findVoiceForLanguage() itself is completely unchanged.
             let dedicatedVoiceMatched = false;
-            if (resolvedLanguage) {
+            // Voice Catalog integration — real, optional, additive
+            // override only. When config.voiceURI names a currently-
+            // installed voice EXACTLY (VoiceCatalog.selectVoice() only
+            // ever stores a voiceURI it just verified against a live
+            // synth.getVoices() call), that specific voice is used in
+            // place of the language-prefix lookup below. Never
+            // fabricated: if no installed voice actually matches the
+            // supplied voiceURI, this honestly falls through to the
+            // exact same, unmodified language-based lookup as before
+            // this pass — never silently drops the request.
+            let explicitVoice = null;
+            if (config.voiceURI) {
+                try {
+                    const voices = synth.getVoices() || [];
+                    explicitVoice = voices.find((v) => v.voiceURI === config.voiceURI) || null;
+                } catch (_err) { explicitVoice = null; }
+            }
+            if (explicitVoice) {
+                utterance.voice = explicitVoice;
+                dedicatedVoiceMatched = true;
+                utterance.lang = resolvedLanguage || explicitVoice.lang;
+            } else if (resolvedLanguage) {
                 const matchedVoice = findVoiceForLanguage(synth, resolvedLanguage);
                 if (matchedVoice) { utterance.voice = matchedVoice; dedicatedVoiceMatched = true; }
                 utterance.lang = resolvedLanguage;

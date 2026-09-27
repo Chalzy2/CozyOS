@@ -1359,6 +1359,15 @@
     <script src="core/modules/speech/voice-manager.js"></script>
     <script src="core/modules/speech/providers/charles-voice-provider.js"></script>
     <script src="core/modules/speech/providers/stub-voice-providers.js"></script>
+    <!-- Voice Catalog — real, honest voice metadata + presentation-only
+         selection layer over VoiceManager's existing provider registry
+         and this browser's real installed Web Speech API voices. Loaded
+         after voice-manager.js and its providers, before
+         voice-settings-panel.js so that UI can optionally consume it in
+         a future pass — this file does not modify voice-settings-panel.js
+         itself. No new TTS engine, provider registry, or fallback chain
+         — see the file's own header. -->
+    <script src="core/modules/speech/voice-catalog.js"></script>
     <script src="core/modules/speech/voice-settings-panel.js"></script>
     <!-- Living TTS — composes CozySpeech + VoiceManager into one honest
          speak() facade for Living experiences (login gate consumes this

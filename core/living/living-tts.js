@@ -177,6 +177,11 @@
                     context: request.context,
                     providerId: request.providerId,
                     settingsId,
+                    // Voice Catalog integration — real, optional,
+                    // additive field only (see voice-catalog.js). undefined
+                    // for every pre-existing caller; behavior for them is
+                    // byte-for-byte unchanged.
+                    voiceURI: request.voiceURI,
                 })
             );
 

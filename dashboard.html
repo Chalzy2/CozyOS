@@ -91,7 +91,22 @@
 <script src="core/modules/speech/cozy-speech.js"></script>
 <script src="core/modules/speech/adapters/cozy-tts-browser-adapter.js"></script>
 <script src="core/modules/speech/providers/charles-voice-provider.js"></script>
+<!-- Added for parity with admin-workspace.html (confirmed already loaded
+     there, never loaded here — real gap, not fabricated). Registers the
+     existing, honest "not yet installed" stub provider entries
+     (google/microsoft/swahili-pack/female-pack/ai-studio/community) with
+     VoiceManager so VoiceCatalog below can list them here too, same as
+     on the admin workspace. No new provider logic — verbatim reuse. -->
+<script src="core/modules/speech/providers/stub-voice-providers.js"></script>
 <script src="core/modules/speech/voice-manager.js"></script>
+<!-- Voice Catalog — real, honest voice metadata + presentation-only
+     selection layer over VoiceManager's existing provider registry and
+     this browser's real installed Web Speech API voices. Loaded after
+     voice-manager.js (its one real dependency) and after the provider
+     files above so their registrations are already visible to it. No
+     new TTS engine, provider registry, or fallback chain — see the
+     file's own header. -->
+<script src="core/modules/speech/voice-catalog.js"></script>
 <!-- CP16A (Kiswahili -> English Translation Foundation) — real,
      existing translation provider registry + the real NLLB-200 bridge
      provider (confirmed present, unmodified, before this checkpoint;

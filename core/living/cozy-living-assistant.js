@@ -1007,7 +1007,19 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
             // (no real conversational language resolved yet), this is
             // simply omitted, preserving the existing default behavior
             // exactly as before this change.
-            if (vm && typeof vm.speak === "function") { try { vm.speak(this.#currentLanguage ? { text, language: this.#currentLanguage } : { text }); } catch (_err) { /* honest no-op */ } }
+            let request = this.#currentLanguage ? { text, context: "assistant", language: this.#currentLanguage } : { text, context: "assistant" };
+            // Voice Catalog integration — real, optional, presentation-
+            // only preference resolution (voice-catalog.js). Honestly
+            // no-ops (request unchanged) if VoiceCatalog isn't loaded, or
+            // if no browser-voice preference is set for this context, or
+            // if a set preference's own declared language doesn't match
+            // #currentLanguage (language continuity is never overridden
+            // by a presentation preference — see voice-catalog.js).
+            const catalog = window.CozyOS && window.CozyOS.VoiceCatalog;
+            if (catalog && typeof catalog.resolveSpeakRequest === "function") {
+                try { request = catalog.resolveSpeakRequest(request); } catch (_err) { /* honest no-op — falls back to the request built above */ }
+            }
+            if (vm && typeof vm.speak === "function") { try { vm.speak(request); } catch (_err) { /* honest no-op */ } }
         }
 
         /** #wireVoiceInput() — composes the real SpeechRecognitionAdapter (singleton, per-tab, same real engine already used elsewhere in this codebase). Honestly disables the mic button if unavailable, never fakes listening. */

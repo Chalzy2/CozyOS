@@ -322,7 +322,14 @@
                 this.#diagnostics.fallbacksToBrowser++;
                 this.#logAudit("fallback-to-browser", { from: requestedProviderId });
                 try {
-                    const result = await browserAdapter.speakPreview({ text: request.text, settingsId: request.settingsId, language: request.language });
+                    // Voice Catalog integration — real, optional,
+                    // additive field only. When a caller (e.g.
+                    // VoiceCatalog.resolveSpeakRequest()) has supplied a
+                    // specific installed browser voiceURI, it is passed
+                    // through unchanged; when absent (every pre-existing
+                    // caller), this is undefined and behavior is
+                    // byte-for-byte identical to before this pass.
+                    const result = await browserAdapter.speakPreview({ text: request.text, settingsId: request.settingsId, language: request.language, voiceURI: request.voiceURI });
                     if (result.played) { this.#lastSpokenProviderId = "browser"; return { available: true, played: true, providerId: "browser", reason: "Fell back to this browser's generic system voice — not Charles.", dedicatedVoiceMatched: result.dedicatedVoiceMatched, requestedLanguage: result.requestedLanguage }; }
                 } catch (_err) { /* falls through to honest unavailable below */ }
             }
