@@ -838,7 +838,18 @@
         // this intent and app-importance's own "what can X help"
         // shape) is the pronoun exclusion on APP_IMPORTANCE_PATTERN
         // itself, above — not reordering this array.
-        { id: "help", pattern: /\bhelp\b|\bwhat\s+can\s+you\s+(?:do|help\s+me\s+with)\b|\bwhat\s+can\s+i\s+ask\s+you\b|\bwhat\s+questions\s+can\s+you\s+answer\b|\bnisaidie\b|\bmsaada\b|\bunaweza\s+kufanya\s+nini\b|\bunaweza\s+kujibu\s+maswali\s+gani\b|\bnaweza\s+kukuuliza\s+nini\b|\bunaweza\s+kunisaidia\s+na\s+nini\b|\bni\s+mambo\s+gani\s+unaweza\s+kunisaidia\b|\bhayo\s+maswali\s*(?:ni\s+gani\s+)?unaweza\s+(?:kuulizwa|kujibu)\b|\b(?:hayo\s+)?maswali\s+unaweza\s+kujibu\s+ni\s+gani\b/i }
+        { id: "help", pattern: /\bhelp\b|\bwhat\s+can\s+you\s+(?:do|help\s+me\s+with)\b|\bwhat\s+can\s+i\s+ask\s+you\b|\bwhat\s+questions\s+can\s+you\s+answer\b|\bnisaidie\b|\bmsaada\b|\bunaweza\s+kufanya\s+nini\b|\bunaweza\s+kujibu\s+maswali\s+gani\b|\bnaweza\s+kukuuliza\s+nini\b|\bunaweza\s+kunisaidia\s+na\s+nini\b|\bni\s+mambo\s+gani\s+unaweza\s+kunisaidia\b|\bhayo\s+maswali\s*(?:ni\s+gani\s+)?unaweza\s+(?:kuulizwa|kujibu)\b|\b(?:hayo\s+)?maswali\s+unaweza\s+kujibu\s+ni\s+gani\b/i },
+        // KISWAHILI GEOGRAPHY/CULTURE SEMANTIC IMPLEMENTATION — new,
+        // additive intent rules, appended at the END of this array
+        // (per the existing comment above: not reordering any earlier
+        // entry), so they only ever fire when nothing earlier already
+        // matched. Real Kiswahili geographic constructions (section 9
+        // of the geography brief) and proverb/idiom trigger words —
+        // NOT a hard-coded list of specific place names, so novel
+        // sentences using these constructions with any place name in
+        // the new geo-index still classify correctly.
+        { id: "geography-query", pattern: /\b(?:kutoka\s+.+?\s+(?:hadi|mpaka)\s+.+|kwenda\s+\w+|kuelekea\s+\w+|karibu\s+na\s+\w+|iko\s+(?:katika\s+)?(?:eneo|mkoa|kaunti)\s+gani|ipo\s+(?:katika\s+)?(?:eneo|mkoa|kaunti)\s+gani|miji\s+(?:gani\s+)?mikubwa\s+\w+|ninatoka\s+\w+|anatoka\s+\w+|natoka\s+\w+)\b/i },
+        { id: "kiswahili-culture-query", pattern: /\bmethali\b|\bmsemo\b|\bmisemo\b|\bvitendawili\b|\bkitendawili\b/i }
     ]);
 
     /**
@@ -956,6 +967,45 @@
         // genuinely novel Kiswahili verb forms this word list was never
         // going to enumerate one at a time.
         if (words.some((w) => w.length > 4 && w.endsWith("je"))) return "sw";
+
+        // KISWAHILI STRUCTURAL LAYER (new, additive) — composed only as
+        // a fallback AFTER the marker list above finds nothing, so no
+        // existing marker/test behavior changes. cozy-kiswahili-
+        // structural-analysis.js scores real morphological evidence
+        // (subject/negation/tense-aspect/object/root decomposition,
+        // clause markers) rather than one more word to memorize, and
+        // was regression-tested (see its own test file) to never flag
+        // ordinary English sentences. Honestly degrades to this file's
+        // existing "no signal -> null" behavior if that module hasn't
+        // loaded on this page.
+        const structural = window.CozyOS && window.CozyOS.CozyKiswahiliStructuralAnalysis;
+        if (structural && typeof structural.scoreLanguageEvidence === "function") {
+            const evidence = structural.scoreLanguageEvidence(text);
+            if (evidence.language === "sw" && (evidence.confidence === "HIGH" || evidence.confidence === "MEDIUM")) {
+                return "sw";
+            }
+        }
+
+        // GEOGRAPHY/CULTURE SEMANTIC LAYER (new, additive) — same
+        // fallback discipline as the structural layer immediately
+        // above: consulted only AFTER every existing marker/heuristic
+        // above has already found nothing, so no existing behavior
+        // changes. A recognized Kiswahili geographic construction
+        // (core/modules/intelligence/knowledge/geography/geo-index.js)
+        // or a recognized proverb/idiom
+        // (core/modules/intelligence/knowledge/culture/kiswahili-
+        // culture-index.js) is real, additional evidence that the
+        // input is Kiswahili. Honestly degrades to this file's
+        // existing "no signal -> null" behavior if neither new module
+        // has loaded on this page.
+        const geoIndex = window.CozyOS && window.CozyOS.CozyGeographyIndex;
+        if (geoIndex && typeof geoIndex.resolveQuery === "function") {
+            if (geoIndex.resolveQuery(text, "sw")) return "sw";
+        }
+        const cultureIndex = window.CozyOS && window.CozyOS.CozyKiswahiliCulture;
+        if (cultureIndex && typeof cultureIndex.recognizeExpression === "function") {
+            if (cultureIndex.recognizeExpression(text)) return "sw";
+        }
         return null;
     }
 
@@ -1356,6 +1406,113 @@
         let match = apps.find((a) => a && typeof a.name === "string" && a.name.toLowerCase().replace(/\s+/g, "") === needle);
         if (!match) match = apps.find((a) => a && typeof a.name === "string" && new RegExp(`\\b${needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(a.name.replace(/\s+/g, "")));
         return match ? { id: match.id, name: match.name } : null;
+    }
+
+    /**
+     * composeGeographyAnswer(result, lang) — new, additive.
+     *   Turns a real geo-index.js resolveQuery() result into a
+     *   composed sentence. Pure string composition from the
+     *   structured record fields already returned by that module —
+     *   never invents a place, country, or relationship not present
+     *   in `result`. Returns null (never guesses) when `result` is an
+     *   unrecognized shape, so the caller falls back to the existing
+     *   "unsupported-clarify"/"unsupported" behavior.
+     */
+    function composeGeographyAnswer(result, lang) {
+        if (!result || typeof result !== "object") return null;
+        const en = lang !== "sw";
+        function nameOf(part) {
+            return part && part.entity ? part.entity.name : null;
+        }
+        function unknown(part) {
+            return part && part.unknownLocation ? (part.raw || "?") : null;
+        }
+        switch (result.intent) {
+            case "travel": {
+                const originName = nameOf(result.origin) || unknown(result.origin);
+                const destName = nameOf(result.destination) || unknown(result.destination);
+                if (!originName && !destName) return null;
+                const originUnknown = result.origin && result.origin.unknownLocation;
+                const destUnknown = result.destination && result.destination.unknownLocation;
+                if (en) {
+                    let s = `Travel: from ${originName || "an unrecognized place"} to ${destName || "an unrecognized place"}.`;
+                    if (result.relation && result.relation.comparable) {
+                        s += result.relation.sameCountry ? " Both places are in the same country." : " These places are in different countries.";
+                    }
+                    if (originUnknown || destUnknown) s += " I don't have that place in my geography index yet, so I can't confirm its details.";
+                    return s;
+                }
+                let s = `Safari: kutoka ${originName || "mahali nisipopajua"} hadi ${destName || "mahali nisipopajua"}.`;
+                if (result.relation && result.relation.comparable) {
+                    s += result.relation.sameCountry ? " Maeneo haya yako nchi moja." : " Maeneo haya yako nchi tofauti.";
+                }
+                if (originUnknown || destUnknown) s += " Sina mahali hapo kwenye orodha yangu ya kijiografia bado, kwa hivyo siwezi kuthibitisha maelezo yake.";
+                return s;
+            }
+            case "travel_mention": {
+                const names = Array.isArray(result.entities) ? result.entities.map((e) => e.entity && e.entity.name).filter(Boolean) : [];
+                if (!names.length) return null;
+                return en ? `Places mentioned: ${names.join(", ")}.` : `Maeneo yaliyotajwa: ${names.join(", ")}.`;
+            }
+            case "proximity": {
+                const subjectName = nameOf(result.subject) || unknown(result.subject);
+                const refName = nameOf(result.reference) || unknown(result.reference);
+                if (!refName) return null;
+                if (!result.subject || !result.subject.entity || !result.reference || !result.reference.entity) {
+                    return en
+                        ? `I don't have enough information in my geography index to confirm the proximity of ${subjectName || "that place"} to ${refName}.`
+                        : `Sina taarifa za kutosha kwenye orodha yangu ya kijiografia kuthibitisha ukaribu wa ${subjectName || "mahali hapo"} na ${refName}.`;
+                }
+                const sameCountry = result.relation && result.relation.sameCountry;
+                return en
+                    ? `${subjectName} and ${refName} are both in ${result.relation.originCountry[0] || "the same country"}.${sameCountry ? "" : ""}`
+                    : `${subjectName} na ${refName} vyote viko ${result.relation.originCountry[0] || "nchi moja"}.`;
+            }
+            case "location_question": {
+                const entity = result.subject && result.subject.entity;
+                if (!entity) {
+                    return en
+                        ? `I don't recognize "${result.subject ? result.subject.raw : "that place"}" in my geography index yet.`
+                        : `Sijui mahali "${result.subject ? result.subject.raw : "hapo"}" kwenye orodha yangu ya kijiografia bado.`;
+                }
+                const regionField = entity.region || entity.zone || entity.country;
+                return en
+                    ? `${entity.name} is in ${regionField}, ${entity.country || entity.name}.`
+                    : `${entity.name} iko ${regionField}, ${entity.country || entity.name}.`;
+            }
+            case "list_query": {
+                if (!result.items || !result.items.length) return null;
+                const countryName = nameOf(result.country) || "?";
+                return en
+                    ? `Known towns/regional capitals in ${countryName}: ${result.items.join(", ")}.`
+                    : `Miji/makao makuu ya mikoa ninayoyajua kwa ${countryName}: ${result.items.join(", ")}.`;
+            }
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * composeCultureAnswer(result, lang) — new, additive.
+     *   Turns a real kiswahili-culture-index.js recognizeExpression()
+     *   result into a composed explanation, using only the fields
+     *   already present on the matched record.
+     */
+    function composeCultureAnswer(result, lang) {
+        if (!result || !result.record) return null;
+        const en = lang !== "sw";
+        const r = result.record;
+        if (result.type === "proverb") {
+            return en
+                ? `"${r.expression}" — ${r.englishExplanation || r.figurativeMeaning}`
+                : `"${r.expression}" — maana yake: ${r.figurativeMeaning}`;
+        }
+        if (result.type === "idiom") {
+            return en
+                ? `"${r.expression}" — ${r.englishMeaning || r.figurativeInterpretation}`
+                : `"${r.expression}" — maana yake: ${r.figurativeInterpretation}`;
+        }
+        return null;
     }
 
     async function composeReply(intent, lang, rawText, options = {}) {
@@ -2014,6 +2171,37 @@
             case "help":
             case "meta-verified-vs-planned":
                 return template(intent, lang) || RP026_ENGLISH_FALLBACK[intent];
+            // KISWAHILI GEOGRAPHY/CULTURE SEMANTIC IMPLEMENTATION — new,
+            // additive cases. Each defensively no-ops to the SAME
+            // existing "unsupported-clarify"/"unsupported" fallback
+            // immediately below if its module hasn't loaded or found
+            // no real match — never a fabricated answer.
+            case "geography-query": {
+                const geoIndex = window.CozyOS && window.CozyOS.CozyGeographyIndex;
+                const geoResult = geoIndex && typeof geoIndex.resolveQuery === "function"
+                    ? geoIndex.resolveQuery(rawText, lang === "sw" ? "sw" : lang)
+                    : null;
+                const geoAnswer = geoResult ? composeGeographyAnswer(geoResult, lang) : null;
+                if (geoAnswer) return geoAnswer;
+                if (lang === "en" || lang === "sw") {
+                    const clarify = template("unsupported-clarify", lang);
+                    if (clarify) return clarify;
+                }
+                return template("unsupported", lang) || RP026_ENGLISH_FALLBACK.unsupported;
+            }
+            case "kiswahili-culture-query": {
+                const cultureIndex = window.CozyOS && window.CozyOS.CozyKiswahiliCulture;
+                const cultureResult = cultureIndex && typeof cultureIndex.recognizeExpression === "function"
+                    ? cultureIndex.recognizeExpression(rawText)
+                    : null;
+                const cultureAnswer = cultureResult ? composeCultureAnswer(cultureResult, lang) : null;
+                if (cultureAnswer) return cultureAnswer;
+                if (lang === "en" || lang === "sw") {
+                    const clarify = template("unsupported-clarify", lang);
+                    if (clarify) return clarify;
+                }
+                return template("unsupported", lang) || RP026_ENGLISH_FALLBACK.unsupported;
+            }
             default:
                 // M360 ASK-AND-LEARN: for EN/SW specifically (the only
                 // languages with a real, human-authored clarifying
