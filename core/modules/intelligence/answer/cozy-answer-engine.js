@@ -95,6 +95,21 @@
 
     const WHY_PATTERN = /\bwhy\b/i;
     const COMPARISON_PATTERN = /\b(differ|different|compare|comparison|versus|\bvs\.?\b|better than|unlike|compared to)\b/i;
+    // Universal CozyOS Voice — Application Integration Matrix, Media
+    // Intelligence row (VOICE-APPLICATION-INTEGRATION-AUDIT.md §5.4).
+    // window.CozyOS.CozyMediaIntelligence.answerMediaQuestion() has its
+    // own real keyword matching against RESEARCH_TYPES (TESTIMONY/
+    // HEALING/PRAYER/SERMON/ANNOUNCEMENT/GRADUATION/WORSHIP/TEACHING/
+    // EVENT/MEETING/CONFERENCE/OTHER) and real language names — several
+    // of those type words (TEACHING/EVENT/MEETING) are ordinary English
+    // words this file's OTHER real intents already use for unrelated
+    // platform questions, so calling it on every question would risk
+    // exactly the same kind of false-positive hijack this file's own
+    // header already documents for CozyIdentityFAQRouter's fuzzy word-
+    // overlap scorer. This narrow, disclosed gate — unambiguous media-
+    // research vocabulary only — decides WHETHER to consult that real
+    // authority; it never supplies or alters the evidence itself.
+    const MEDIA_INTELLIGENCE_PATTERN = /\b(testimony|testimonies|sermon|sermons|recording|recordings|footage|clip|clips|worship service|worship recording)\b/i;
 
     function isNonEmptyString(v) { return typeof v === "string" && v.trim().length > 0; }
 
@@ -138,6 +153,29 @@
         }
         if (isNonEmptyString(raw.answer)) return raw.answer;
         return null;
+    }
+
+    /**
+     * renderMediaIntelligenceSentence(mediaResult)
+     *   mediaResult is CozyMediaIntelligence.answerMediaQuestion()'s own
+     *   real, unmodified return value (already confirmed status:"OK",
+     *   answer:"FOUND" by the caller). Builds one honest sentence from
+     *   ONLY the real fields that result actually carries
+     *   (resultCount/matchedType/matchedLanguage) — never a description
+     *   of any individual result's content, and never a language
+     *   DISPLAY name this file has no verified source for (the raw
+     *   languageId, e.g. "sw", is reported as-is rather than guessing a
+     *   pretty name).
+     */
+    function renderMediaIntelligenceSentence(mediaResult) {
+        const count = typeof mediaResult.resultCount === "number" ? mediaResult.resultCount : 0;
+        const typeLower = isNonEmptyString(mediaResult.matchedType) ? mediaResult.matchedType.toLowerCase() : null;
+        const lang = isNonEmptyString(mediaResult.matchedLanguage) ? mediaResult.matchedLanguage : null;
+        const noun = count === 1 ? "result" : "results";
+        if (typeLower && lang) return `I found ${count} ${typeLower} ${noun} in language "${lang}".`;
+        if (typeLower) return `I found ${count} ${typeLower} ${noun}.`;
+        if (lang) return `I found ${count} ${noun} in language "${lang}".`;
+        return `I found ${count} matching ${noun}.`;
     }
 
     /** Real substring dedup by authority+getter/namespace+key — never drops a genuinely distinct source. */
@@ -569,6 +607,39 @@
             // below rather than fabricate a comparison. A genuinely
             // unrecognized name still gets whatever honest response the
             // rest of this function would otherwise produce.
+        }
+
+        // --- Step: MEDIA INTELLIGENCE EVIDENCE (Universal CozyOS Voice
+        // — Application Integration Matrix, Media Intelligence row) —
+        // checked EARLY for the same reason as the comparison step
+        // above. window.CozyOS.CozyMediaIntelligence — real, pre-
+        // existing, unmodified (core/modules/intelligence/media/
+        // cozy-media-intelligence.js) — remains the sole media-evidence
+        // authority; this file only decides WHETHER a question is
+        // media-research-shaped (MEDIA_INTELLIGENCE_PATTERN, defined
+        // above) before ever calling answerMediaQuestion(), and composes
+        // its already-real result. Only answer:"FOUND" (real indexed
+        // evidence exists) is ever returned here — "UNKNOWN"/
+        // "NOT_AVAILABLE" honestly fall through to every other path
+        // below, exactly like an unresolved comparison name above.
+        if (MEDIA_INTELLIGENCE_PATTERN.test(question)) {
+            const mediaIntelligence = window.CozyOS && window.CozyOS.CozyMediaIntelligence;
+            let mediaResult = null;
+            if (mediaIntelligence && typeof mediaIntelligence.answerMediaQuestion === "function") {
+                try { mediaResult = mediaIntelligence.answerMediaQuestion(question); } catch (_err) { mediaResult = null; }
+            }
+            if (mediaResult && mediaResult.status === "OK" && mediaResult.answer === "FOUND") {
+                return {
+                    answer: renderMediaIntelligenceSentence(mediaResult),
+                    intent: "MEDIA_INTELLIGENCE",
+                    responseMode: "FACT",
+                    evidenceState: "VERIFIED",
+                    sources: [{ authority: "media-intelligence", provenance: "window.CozyOS.CozyMediaIntelligence.answerMediaQuestion", evidence: "VERIFIED" }],
+                    reasoningUsed: false,
+                    contextUsed: [],
+                    businessDataConversationState: null, teachDataConversationState: null, cognitiveContext
+                };
+            }
         }
 
         // --- Step: existing FAQ/Knowledge path (identity/origin/vision/etc.) ---

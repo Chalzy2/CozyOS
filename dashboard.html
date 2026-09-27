@@ -268,6 +268,35 @@
 <script src="core/modules/intelligence/business-data/cozy-business-data-intent.js"></script>
 <script src="core/plugins/pharmacyOS-core.js"></script>
 <script src="core/modules/Cozy-Authenticator/authenticator.js"></script>
+<!-- Universal CozyOS Voice — Application Integration Matrix, Media
+     Intelligence row (VOICE-APPLICATION-INTEGRATION-AUDIT.md 5.4):
+     CozyMediaIntelligence's own facade was already loaded on this page,
+     but 15 of its 23 real composed engines were not - so
+     answerMediaQuestion()/discoverTestimonies() always reported
+     CAPABILITY_UNAVAILABLE here, the same "facade loaded, engine not"
+     gap already found and closed for Live Camera Capture. Same real
+     dependency chain cozy-media-intelligence-dashboard.html already
+     proves works. cozy-knowledge-safety-gate.js/cozy-language-pack-
+     registry.js/cozy-african-language-intelligence.js are already
+     loaded elsewhere on this page and are not duplicated here; every
+     file below composes its own dependencies lazily at call time (this
+     codebase's universal accessor convention), so load order among
+     them does not matter. -->
+<script src="core/modules/intelligence/media/cozy-media-connector.js"></script>
+<script src="core/modules/intelligence/language-packs/cozy-optional-language-pack-discovery.js"></script>
+<script src="core/modules/intelligence/language-packs/cozy-language-country-metadata.js"></script>
+<script src="core/modules/intelligence/media/cozy-remote-media-index.js"></script>
+<script src="core/modules/intelligence/media/cozy-remote-media-search.js"></script>
+<script src="core/connectivity/cozy-living-connectivity.js"></script>
+<script src="core/connectivity/cozy-connectivity-transport.js"></script>
+<script src="core/modules/intelligence/media/cozy-remote-media-analysis.js"></script>
+<script src="core/modules/intelligence/privacy/cozy-intelligence-privacy.js"></script>
+<script src="core/modules/intelligence/sync/cozy-intelligence-offline-sync.js"></script>
+<script src="core/modules/intelligence/media/cozy-rp034-integration.js"></script>
+<script src="core/modules/intelligence/media/cozy-media-analysis-link.js"></script>
+<script src="core/modules/intelligence/media/cozy-research-intelligence.js"></script>
+<script src="core/modules/intelligence/media/cozy-research-search.js"></script>
+<script src="core/modules/intelligence/media/cozy-media-evidence.js"></script>
 <script src="core/modules/intelligence/media/cozy-media-intelligence.js"></script>
 <!-- Universal CozyOS Voice — Application Integration Matrix, Live
      Camera Capture row (VOICE-APPLICATION-INTEGRATION-AUDIT.md 5.1):
