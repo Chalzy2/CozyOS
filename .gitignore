@@ -1,0 +1,6 @@
+# Auto-generated CDP/Chromium launch diagnostic scratch directories
+# (created by this repo's own browser-launch diagnostic tooling when a
+# real browser launch is probed — timestamped, PID/stderr dumps, never
+# meant to be committed; an earlier one, cozy-taskbar-cdp-diagnostic-1789096050090,
+# already predates version control here and was never tracked).
+cozy-taskbar-cdp-diagnostic-*/
