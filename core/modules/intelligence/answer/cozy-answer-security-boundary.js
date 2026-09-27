@@ -9,9 +9,23 @@
  * syntax, or internal architecture class-name vocabulary (Engine/Registry/
  * Adapter/Provider/Coordinator/Contract/Realizer/Planner-suffixed
  * identifiers). This is ONE reusable sanitization boundary —
- * window.CozyOS.AnswerSecurityBoundary — applied once, at the single
- * authoritative final-text choke point (cozy-answer-engine.js's answer()
- * outer wrapper), never duplicated per response path.
+ * window.CozyOS.AnswerSecurityBoundary — never reimplemented per caller.
+ *
+ * NEXT PHASE (HUMAN-FIRST SECURITY BOUNDARY) correction — real, traced,
+ * not assumed: this file's own original claim that cozy-answer-engine.js's
+ * answer() wrapper is "the single authoritative final-text choke point"
+ * was incomplete. cozy-living-assistant.js has its OWN honest fallback
+ * text paths (the rule-based-conversational-provider reply, the unknown-
+ * request fallback, the image/OCR reply) that never flow through
+ * answer() at all — they reach the user directly. The TRUE single
+ * UI-facing choke point is cozy-living-assistant.js's own #addMessage(),
+ * which every one of those paths (plus the answer() path) converges
+ * through before touching the DOM/VoiceManager — this module is now
+ * composed there too (see that file's own #addMessage()/sanitizeForUser()
+ * comment). Composing the SAME sanitize() function at two real
+ * convergence points is not duplication of THIS module's logic — it
+ * remains one reusable function, called from every real place text
+ * actually reaches a user.
  *
  * WHY THIS EXISTS — traced, not assumed
  *   Empirically confirmed against the real dashboard.html (SA-8 Phase 3

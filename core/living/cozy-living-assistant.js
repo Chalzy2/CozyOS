@@ -141,6 +141,22 @@ const NO_CONVERSATIONAL_ENGINE_FALLBACK = "I heard you, but CozyOS's real conver
 function isNonEmptyReplyText(v) { return typeof v === "string" && v.trim().length > 0; }
 
 /**
+ * sanitizeForUser(text)
+ *   HUMAN-FIRST SECURITY BOUNDARY — composes the real, existing
+ *   window.CozyOS.AnswerSecurityBoundary (SA-8 Phase 3) rather than
+ *   reimplementing any redaction logic here. Honest degrade: when that
+ *   module isn't loaded (an older page, or a Node-side test that
+ *   intentionally excludes it), returns the text unchanged — the exact
+ *   same fallback discipline this file already uses elsewhere for an
+ *   optional composed dependency.
+ */
+function sanitizeForUser(text) {
+    if (typeof text !== "string" || !text) return text;
+    const boundary = typeof window !== "undefined" && window.CozyOS && window.CozyOS.AnswerSecurityBoundary;
+    return (boundary && typeof boundary.sanitize === "function") ? boundary.sanitize(text) : text;
+}
+
+/**
  * renderAdvisorReply(advice)
  *   CHECKPOINT K — pure. `advice` is the real, unmodified return value
  *   of window.CozyOS.CozyAdvisor.advise({question, answerResult}) (see
@@ -205,7 +221,7 @@ function shouldLaunchApplication(result) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-    module.exports = { resolveConversationalReply, NO_CONVERSATIONAL_ENGINE_FALLBACK, renderAdvisorReply, isNonEmptyReplyText, shouldLaunchApplication };
+    module.exports = { resolveConversationalReply, NO_CONVERSATIONAL_ENGINE_FALLBACK, renderAdvisorReply, isNonEmptyReplyText, shouldLaunchApplication, sanitizeForUser };
 }
 
 // The rest of this file mounts a real, live UI component and touches
@@ -612,13 +628,34 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
 
         /** #addMessage() — mirrors cozy-workspace.js's own real .cozy-event-row/.cozy-living-card row convention (Notification Center), not a new rendering framework. */
         #addMessage(role, text) {
-            const entry = { role, text, timestamp: new Date().toISOString() };
+            // HUMAN-FIRST SECURITY BOUNDARY — real, traced gap closed here.
+            // window.CozyOS.AnswerSecurityBoundary (SA-8 Phase 3) was
+            // previously applied only inside cozy-answer-engine.js's own
+            // answer() wrapper — but this function, not that one, is the
+            // TRUE single point every assistant-facing reply in this file
+            // converges through before reaching the DOM/#speak() (the
+            // verified CozyAnswerEngine path, the rule-based-provider
+            // fallback, the image/OCR reply path, and every static
+            // hint/search/notification string above all call
+            // #addMessage("assistant", ...)). Sanitizing HERE, once, is
+            // strictly additive: sanitize() is a no-op on text that
+            // already contains no file-path/function-call/internal-class
+            // vocabulary (confirmed by reading that module directly), so
+            // every existing, already-clean reply is byte-for-byte
+            // unchanged. Only ever applied to the assistant's own text —
+            // never to a user's own typed message.
+            const safeText = role === "assistant" ? sanitizeForUser(text) : text;
+            const entry = { role, text: safeText, timestamp: new Date().toISOString() };
             this.#messages.push(entry);
             const row = document.createElement("div");
             row.className = `cozy-living-card cozy-event-row cozy-living-assistant-msg cozy-living-assistant-msg-${role === "user" ? "user" : "assistant"}`;
-            row.textContent = text;
+            row.textContent = safeText;
             this.#messagesEl.appendChild(row);
             this.#messagesEl.scrollTop = this.#messagesEl.scrollHeight;
+            // Returned so a caller that also speaks this same reply
+            // (this.#speak()) can reuse the IDENTICAL sanitized text —
+            // text and voice must never diverge (no second answer).
+            return safeText;
         }
 
         #wireForm() {
@@ -987,8 +1024,8 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
                     replyText = ruleBasedReply || NO_CONVERSATIONAL_ENGINE_FALLBACK;
                 }
             }
-            this.#addMessage("assistant", replyText);
-            this.#speak(replyText);
+            const sanitizedReplyText = this.#addMessage("assistant", replyText);
+            this.#speak(sanitizedReplyText);
 
             // RP-036 — if the classified intent is a real, known
             // navigation action, actually perform it (via the existing,
@@ -1236,8 +1273,8 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
             } else {
                 replyText = resolveConversationalReply(result) || NO_CONVERSATIONAL_ENGINE_FALLBACK;
             }
-            this.#addMessage("assistant", replyText);
-            this.#speak(replyText);
+            const sanitizedReplyText = this.#addMessage("assistant", replyText);
+            this.#speak(sanitizedReplyText);
         }
 
         /** #wireLivingAIState() — subscribes to LivingAI's own real, existing state machine (idle/thinking/speaking) to reflect it visually. No new state machine. */
