@@ -1030,7 +1030,50 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
          * previous call before starting, so a new reply's speech always
          * takes over immediately — never a second, independent request.
          */
+        /**
+         * #looksLikeAuthenticationSecret(text) — static, stateless,
+         * additive safety net (see #speak()'s own comment for the full
+         * rationale). Real, disclosed, closed pattern family only —
+         * never a general "sounds sensitive" heuristic:
+         *   - the EXACT recovery-code shape OtpProvider.
+         *     generateRawRecoveryCode() produces (5-5-6 Base32 groups,
+         *     e.g. "ABCD1-EFGH2-JKLMN")
+         *   - a 6-digit TOTP code (grouped "123 456" as
+         *     authenticator.js's own #tickCodes() displays it, or
+         *     ungrouped "123456") appearing alongside a real,
+         *     authentication-context keyword (code/OTP/verification/
+         *     recovery/authenticat*) — the keyword requirement is
+         *     deliberate: a bare 6-digit number alone (a price, an ID,
+         *     a year range) is NOT flagged, only the combination that
+         *     actually looks like a spoken authentication secret.
+         * Returns false (never blocks) for anything that doesn't match
+         * one of these two disclosed shapes — honest, not paranoid.
+         */
+        static #looksLikeAuthenticationSecret(text) {
+            if (typeof text !== "string" || !text) return false;
+            if (/\b[A-Z2-7]{5}-[A-Z2-7]{5}-[A-Z2-7]{6}\b/i.test(text)) return true;
+            const hasCodeShape = /\b\d{3}\s?\d{3}\b/.test(text);
+            const hasAuthKeyword = /\b(otp|verification code|recovery code|authenticat\w*)\b/i.test(text);
+            return hasCodeShape && hasAuthKeyword;
+        }
+
         #speak(text) {
+            // Universal CozyOS Voice — Application Integration Matrix,
+            // Authenticator row: a structural safety net, not a fix to
+            // an active bug (traced: no caller anywhere in this
+            // repository's real conversational chain produces an OTP
+            // code or recovery code as reply text today —
+            // Authenticator's own #tickCodes() renders the live TOTP
+            // code to DOM text only, never through this file). Voice
+            // must never read an authentication secret aloud even if a
+            // future intent handler were ever wired to one, so this
+            // check runs BEFORE any real dispatch, on the exact text
+            // that would otherwise be spoken. Only blocks SPEECH — the
+            // visible text reply is completely unaffected (Accessibility
+            // requirement: voice is a presentation layer, and disabling
+            // it here never hides information from the user, only from
+            // an unintended listener overhearing it spoken aloud).
+            if (LivingAssistant.#looksLikeAuthenticationSecret(text)) return;
             const vm = window.CozyOS && window.CozyOS.VoiceManager;
             // TTS language-propagation dependency (output-side counterpart
             // to Dependency #2's mic wiring) — reuses the exact same
