@@ -107,18 +107,33 @@
     }
 
     /**
-     * composeClaims(pieces, goal, language)
+     * composeClaims(pieces, goal, language, entityName, detailLevel)
      *   Real COMPOSED-mode construction: a single claim is returned
      *   verbatim (it is already a real, complete, human-authored
      *   sentence in the target language — adding an intro would only
      *   dilute it). Multiple claims get a real, disclosed per-goal intro
-     *   (see introFor()) followed by each claim sentence, joined with a
-     *   period — never a fabricated grammatical merge, only real,
-     *   already-verified sentences placed next to each other honestly.
+     *   (see introFor()) followed by each claim sentence.
+     *
+     *   PAA-4 addition — detailLevel (SA-1's own pre-existing, previously
+     *   unused optional plan field; no contract change) only ever
+     *   changes HOW multiple pieces are JOINED, never WHICH pieces or
+     *   what they say (still zero new wording, still GENERATION_MODE
+     *   "COMPOSED"): "DEEP_EXPLANATION" joins them as a real bullet list
+     *   (one already-verified sentence per line) instead of a run-on,
+     *   period-joined paragraph — because SA-3's own DEEP_EXPLANATION
+     *   claims are already pre-composed "Topic — explanation. Benefit:
+     *   ..." units (see cozy-knowledge-registry.js's `benefitAreas`
+     *   field), which read naturally as list items, not as a paragraph.
+     *   Every other detailLevel (including undefined, the default)
+     *   reproduces the exact prior period-joined behavior, byte-for-byte.
      */
-    function composeClaims(pieces, goal, language, entityName) {
+    function composeClaims(pieces, goal, language, entityName, detailLevel) {
         if (pieces.length === 1) return pieces[0];
         const intro = introFor(goal, language, entityName);
+        if (detailLevel === "DEEP_EXPLANATION") {
+            const bullets = pieces.map((p) => `\n• ${p.trim().replace(/\.+$/, "")}.`).join("");
+            return intro ? `${intro}${bullets}` : bullets.trim();
+        }
         const body = pieces.map((p) => p.trim().replace(/\.+$/, "")).join(". ") + ".";
         return intro ? `${intro} ${body}` : body;
     }
@@ -190,7 +205,7 @@
         // reused (not re-derived) so the intro can honestly name what
         // the plan is actually about when SA-3 resolved a real entity.
         const entityName = (plan.entity && isNonEmptyString(plan.entity.value)) ? plan.entity.value : null;
-        const text = composeClaims(pieces, plan.goal, language, entityName);
+        const text = composeClaims(pieces, plan.goal, language, entityName, plan.detailLevel);
         return buildCandidate({ text, language, plan, evidenceIds: usedEvidenceIds, attempt });
     }
 

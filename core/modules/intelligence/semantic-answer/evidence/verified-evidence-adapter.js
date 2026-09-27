@@ -97,6 +97,23 @@
         return adapter.adaptApplicationHumanPurpose(applicationName, { languages, accessContext });
     }
 
+    /**
+     * collectApplicationBenefitAreasEvidence(applicationName, {language})
+     *   PAA-4 — thin delegation to CozyKnowledgeEvidenceAdapter, same
+     *   no-selection-logic discipline as every other collect*() method
+     *   here. See that adapter's adaptApplicationBenefitAreas() for why
+     *   this is a real, isolated field, never routed through
+     *   getApplicationHumanPurposeFact()'s own SUBSTANCE_FIELDS
+     *   mechanism.
+     */
+    function collectApplicationBenefitAreasEvidence(applicationName, { language } = {}) {
+        const adapter = window.CozyOS.CozyKnowledgeEvidenceAdapter;
+        if (!adapter || typeof adapter.adaptApplicationBenefitAreas !== "function") {
+            return { success: false, evidence: [], errors: ["CozyKnowledgeEvidenceAdapter is not loaded."] };
+        }
+        return adapter.adaptApplicationBenefitAreas(applicationName, { language });
+    }
+
     /** collectApplicationKnowledgeEvidence(applicationName) — thin delegation, see collectApplicationHumanPurposeEvidence()'s own comment on why no selection logic lives here. */
     function collectApplicationKnowledgeEvidence(applicationName) {
         const adapter = window.CozyOS.CozyKnowledgeEvidenceAdapter;
@@ -139,6 +156,7 @@
     const VerifiedEvidenceAdapter = Object.freeze({
         SOURCE_TYPE,
         collectApplicationHumanPurposeEvidence,
+        collectApplicationBenefitAreasEvidence,
         collectApplicationKnowledgeEvidence,
         collectSystemFactEvidence,
         collectMemoryEvidence,

@@ -834,6 +834,35 @@
                 "matumizi bora ya taarifa za kanisa kusaidia maamuzi halali",
                 "mwendelezo kati ya shughuli za moja kwa moja za kanisa na maarifa yaliyohifadhiwa/yanayoweza kutafutwa"
             ]),
+            // PAA-4 (Depth-Adaptive Cognitive Composition) addition —
+            // ADDITIVE ONLY, never a replacement for humanBenefits/
+            // realLifeProblems above (both remain byte-identical, still
+            // the real evidence source for every existing question
+            // shape). This reorganizes the SAME already-verified facts
+            // above (fragmented church/member information -> "Members";
+            // administrative workload/event organization -> "Church
+            // activities"; sermon/testimony/history preservation ->
+            // "Church knowledge"; multilingual/remote participation ->
+            // "Communication and participation") into named topic units,
+            // each pre-composed as one real "Topic — explanation.
+            // Benefit: ..." sentence — no new fact, no fabrication, only
+            // a different, human-centered organization of facts already
+            // committed above. Consumed only by the semantic-answer
+            // planner's explicit DEEP_EXPLANATION depth path (see
+            // semantic-answer-planner.js's classifyAnswerDepth()) —
+            // every other question shape is completely unaffected.
+            benefitAreas: Object.freeze([
+                "Members — Helps a church keep useful member information organized and easier to access. Benefit: Church leaders can spend less time searching for information.",
+                "Church activities — Helps organize important church work, events and information. Benefit: Less fragmented administration and better coordination.",
+                "Church knowledge — Helps preserve useful church knowledge, sermons and testimonies for future access. Benefit: Important information doesn't depend only on one person's memory.",
+                "Communication and participation — Supports people participating across languages and locations where the relevant capability is available. Benefit: More people can take part more easily."
+            ]),
+            benefitAreasSw: Object.freeze([
+                "Wanachama — Husaidia kupanga na kupata taarifa muhimu za wanachama. Faida: Viongozi hutumia muda mfupi kutafuta taarifa.",
+                "Shughuli za kanisa — Husaidia kupanga na kusimamia taarifa za shughuli na matukio mbalimbali. Faida: Kazi zinakuwa rahisi kuratibu.",
+                "Maarifa ya kanisa — Husaidia kuhifadhi maarifa muhimu, mahubiri na ushuhuda ili yaweze kupatikana baadaye. Faida: Maarifa hayategemei kumbukumbu ya mtu mmoja pekee.",
+                "Mawasiliano na ushiriki — Husaidia watu kushiriki kwa urahisi zaidi pale ambapo uwezo huo unapatikana. Faida: Watu wengi zaidi wanaweza kushiriki."
+            ]),
             currentVerifiedCapabilities: Object.freeze([
                 "setupChurch() — reuses the real, existing OrganizationRegistry, no second organization system",
                 "member creation, retrieval, and listing",
@@ -1677,6 +1706,41 @@
         };
     }
 
+    /**
+     * getApplicationBenefitAreasFact(name, lang)
+     *   PAA-4 (Depth-Adaptive Cognitive Composition) — real, deliberately
+     *   ISOLATED getter for the optional, per-application "benefitAreas"/
+     *   "benefitAreasSw" fields (see those fields' own comment on the
+     *   ChurchOS record above). Reads the field directly rather than
+     *   going through SUBSTANCE_FIELDS/resolvePurposeForLanguage() above
+     *   — that resolver's own fail-closed rule requires EVERY
+     *   SUBSTANCE_FIELDS entry to have a real "<field>Sw" sibling before
+     *   it returns anything at all for "sw", so adding "benefitAreas" to
+     *   that shared list would have silently broken Kiswahili human-
+     *   purpose lookups for every OTHER application that has not yet
+     *   authored this new, optional field — a real regression this
+     *   isolation deliberately avoids. Honestly returns NOT_FOUND (never
+     *   an empty array dressed as VERIFIED) when the field genuinely
+     *   isn't authored yet for this application/language.
+     */
+    function getApplicationBenefitAreasFact(name, lang) {
+        const needle = (typeof name === "string" ? name : "").trim().toLowerCase()
+            .replace(/^(?:pro\w*|application|app)\s+(?:ya\s+)?/i, "")
+            .replace(/\s+app$/i, "")
+            .replace(/\s+/g, "");
+        const data = needle && APPLICATION_HUMAN_PURPOSE_DATA[needle];
+        if (!data) return { evidence: "NOT_FOUND", areas: null, source: null };
+        const suffix = _langSuffix(lang);
+        const key = "benefitAreas" + suffix;
+        const areas = data[key];
+        if (!Array.isArray(areas) || areas.length === 0) return { evidence: "NOT_FOUND", areas: null, source: null };
+        return {
+            evidence: "VERIFIED",
+            areas,
+            source: "core/plugins/" + needle + "-core.js (committed benefitAreas data, PAA-4)" + (suffix ? ` [${suffix.toLowerCase()} substance]` : "")
+        };
+    }
+
     function getApplicationFact(name) {
         const lister =
             (window.CozyOS && typeof window.CozyOS.listApplications === "function" && window.CozyOS.listApplications) ||
@@ -1755,6 +1819,7 @@
         lookupLexiconTermFact,
         getApplicationFact,
         getApplicationHumanPurposeFact,
+        getApplicationBenefitAreasFact,
         listApplicationHumanPurposeNamesFact,
         getApplicationDetailedInfo,
         getApplicationDetailedInfoFact,

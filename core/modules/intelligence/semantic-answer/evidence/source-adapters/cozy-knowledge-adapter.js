@@ -172,6 +172,38 @@
     }
 
     /**
+     * adaptApplicationBenefitAreas(applicationName, {language})
+     *   PAA-4 (Depth-Adaptive Cognitive Composition) — real, additive,
+     *   narrow adapter for the optional, per-application "benefitAreas"
+     *   field, composing CozyKnowledge.getApplicationBenefitAreasFact()
+     *   (deliberately isolated from getApplicationHumanPurposeFact()'s
+     *   own SUBSTANCE_FIELDS mechanism — see that getter's own header
+     *   for why). Same one-VerifiedEvidence-record-per-real-fact
+     *   discipline as adaptApplicationHumanPurpose() above; honestly
+     *   returns success:false when the field isn't authored yet for
+     *   this application/language, never a fabricated area.
+     */
+    function adaptApplicationBenefitAreas(applicationName, { language = "en" } = {}) {
+        const knowledge = window.CozyOS.CozyKnowledge;
+        const evidenceContract = window.CozyOS.VerifiedEvidenceContract;
+        if (!knowledge || typeof knowledge.getApplicationBenefitAreasFact !== "function") {
+            return { success: false, evidence: [], errors: ["window.CozyOS.CozyKnowledge is not loaded, or getApplicationBenefitAreasFact() is unavailable."] };
+        }
+        if (!isNonEmptyString(applicationName)) return { success: false, evidence: [], errors: ["A real, non-empty applicationName is required."] };
+
+        const result = knowledge.getApplicationBenefitAreasFact(applicationName, language);
+        if (result.evidence !== "VERIFIED" || !Array.isArray(result.areas)) {
+            return { success: false, evidence: [], errors: [`No real, VERIFIED benefitAreas evidence for "${applicationName}" in language "${language}".`] };
+        }
+        const canonicalId = extractCanonicalId(result.source, applicationName);
+        const evidence = result.areas.map((text, index) => {
+            if (!isNonEmptyString(text)) return null;
+            return buildEvidence({ canonicalId, field: "benefitAreas", index, text, lang: language, status: "VERIFIED", confidence: "HIGH", provenance: result.source, evidenceContract });
+        }).filter(Boolean);
+        return { success: evidence.length > 0, evidence, errors: [] };
+    }
+
+    /**
      * adaptApplicationKnowledge(applicationName)
      *   Real. Composes CozyKnowledge.getApplicationFact(name) — the
      *   generic (non-human-purpose) real application registration fact
@@ -247,7 +279,7 @@
     }
 
     const CozyKnowledgeEvidenceAdapter = Object.freeze({
-        SOURCE_TYPE, adaptApplicationHumanPurpose, adaptApplicationKnowledge, adaptSystemFact,
+        SOURCE_TYPE, adaptApplicationHumanPurpose, adaptApplicationBenefitAreas, adaptApplicationKnowledge, adaptSystemFact,
         getVersion: () => MODULE_VERSION,
     });
     window.CozyOS.CozyKnowledgeEvidenceAdapter = CozyKnowledgeEvidenceAdapter;

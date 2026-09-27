@@ -460,6 +460,83 @@
     }
 
     /**
+     * PAA-4 (Depth-Adaptive Cognitive Composition) — DEPTH_MARKER_PATTERNS
+     * + classifyAnswerDepth(goal, normalizedText).
+     *
+     * Real, disclosed, OPT-IN ONLY signal detection — same narrow-marker-
+     * table discipline as SUPPLEMENTARY_GOAL_PATTERNS above, deliberately
+     * NOT a semantic "depth engine" (no such capability exists anywhere
+     * in this repository — confirmed absent by direct audit of
+     * cozy-ai-semantic-intent.js before writing this). Per Phase 6's own
+     * "depth must come from intent... not simply counting words"
+     * requirement: goal SHAPE is the PRIMARY signal (a DEFINITION/
+     * UNDERSTAND_CONCEPT question is already, structurally, a single-
+     * fact request — humanPurpose is a string field, never an array,
+     * so it already produces exactly one claim today with zero code
+     * here); an explicit depth marker is the only SECONDARY override,
+     * and only for the goals this phase actually extends (HUMAN_BENEFIT/
+     * BENEFITS — see planAnswer() below).
+     *
+     * DELIBERATE, TESTED REGRESSION-SAFETY DECISION: the ABSENCE of a
+     * marker returns "STRUCTURED_EXPLANATION" for HUMAN_BENEFIT/BENEFITS
+     * — i.e. TODAY'S EXISTING, UNCHANGED, ALL-claims behavior remains
+     * the default for every bare "inasaidiaje"/"how does X help"
+     * phrasing (this file's own existing test suite has multiple real
+     * fixtures — semantic-answer-planner.test.js's "CONVERGENCE 1/3" and
+     * "SA-2 boundary preserved" tests — asserting claims.length > 1/> 3
+     * for exactly this bare phrasing, to prove SA-3 is real planning,
+     * never single-string retrieval; a SHORT default here would have
+     * broken that real, load-bearing guarantee). DIRECT (brief) and
+     * DEEP_EXPLANATION (detailed/structured) are both purely additive,
+     * explicit opt-ins layered on top — never the default.
+     */
+    const DEPTH_MARKER_PATTERNS = Object.freeze({
+        DEEP_EXPLANATION: {
+            en: [/\bin[\s-]?depth\b/i, /\bin detail\b/i, /\bexplain\b.*\bdetail/i, /\bmore detail\b/i, /\btell me more\b/i],
+            sw: [/\bkwa undani\b/i, /\bkwa kina\b/i, /\bkwa kirefu\b/i, /\beleza kwa kina\b/i],
+        },
+        DIRECT: {
+            en: [/\bbriefly\b/i, /\bin short\b/i, /\bquick(?:ly)?\b/i, /\bshort answer\b/i],
+            sw: [/\bkwa ufupi\b/i, /\bkwa haraka\b/i],
+        },
+    });
+    const DEPTH_ADAPTIVE_GOALS = new Set(["HUMAN_BENEFIT", "BENEFITS"]);
+
+    function matchesAnyPattern(text, patternsByLang) {
+        for (const lang of ["en", "sw"]) {
+            for (const re of patternsByLang[lang] || []) if (re.test(text)) return true;
+        }
+        return false;
+    }
+
+    function classifyAnswerDepth(goal, normalizedText) {
+        const text = isNonEmptyString(normalizedText) ? normalizedText : "";
+        if (goal === "DEFINITION" || goal === "UNDERSTAND_CONCEPT") return "SHORT_EXPLANATION";
+        if (!DEPTH_ADAPTIVE_GOALS.has(goal)) return "STRUCTURED_EXPLANATION";
+        if (matchesAnyPattern(text, DEPTH_MARKER_PATTERNS.DEEP_EXPLANATION)) return "DEEP_EXPLANATION";
+        if (matchesAnyPattern(text, DEPTH_MARKER_PATTERNS.DIRECT)) return "DIRECT";
+        return "STRUCTURED_EXPLANATION";
+    }
+
+    /**
+     * gatherBenefitAreasEvidence(entityValue, language)
+     *   PAA-4 — real, narrow, additive evidence gather scoped ONLY to
+     *   the "benefitAreas" field (see cozy-knowledge-registry.js's own
+     *   comment on that field), used ONLY by planAnswer()'s
+     *   DEEP_EXPLANATION path below. Composes the SAME real
+     *   VerifiedEvidenceAdapter call gatherEvidenceForGoal() already
+     *   uses — never a second evidence authority. Honestly returns an
+     *   empty result (never throws, never fabricates) when the entity
+     *   has no benefitAreas authored yet — planAnswer()'s own fallback
+     *   then uses the existing, unchanged humanBenefits claims instead.
+     */
+    function gatherBenefitAreasEvidence(entityValue, language) {
+        const adapter = window.CozyOS.VerifiedEvidenceAdapter;
+        if (!adapter || typeof adapter.collectApplicationBenefitAreasEvidence !== "function") return { success: false, evidence: [] };
+        return adapter.collectApplicationBenefitAreasEvidence(entityValue, { language });
+    }
+
+    /**
      * gatherEvidenceForGoal(goal, entityValue, language)
      *   Real. Composes ONLY window.CozyOS.VerifiedEvidenceAdapter — this
      *   file never reads CozyKnowledge/CozyMemory itself. Returns the
@@ -895,12 +972,39 @@
             return { success: false, reason: "EVIDENCE_CONFLICT", goal, goalSource, entity: entityValue, language, conflictedEvidenceIds: conflicted.map((ev) => ev.id), diagnostics: { intentResult, entitySource, cognitiveStatus: classifyCognitiveStatus({ kind: "evidence-conflict" }) } };
         }
 
-        const unrankedClaims = authoritative.map((ev, index) => ({
+        const questionText = intentResult.normalizedText || text;
+        const depth = classifyAnswerDepth(goal, questionText);
+
+        // PAA-4 — depth-adaptive claim selection, scoped ONLY to
+        // HUMAN_BENEFIT/BENEFITS (see classifyAnswerDepth()'s own header
+        // for why every other goal, and the default/no-marker case for
+        // these two goals, is completely unaffected — this only ever
+        // narrows or supplements `authoritative`, never widens it beyond
+        // real, partitioned-authoritative evidence).
+        let claimSourceEvidence = authoritative;
+        if (DEPTH_ADAPTIVE_GOALS.has(goal) && depth === "DEEP_EXPLANATION") {
+            const areas = gatherBenefitAreasEvidence(entityValue, language);
+            if (areas.success) {
+                const { authoritative: authoritativeAreas } = partitionEvidenceByAuthority(areas.evidence);
+                if (authoritativeAreas.length > 0) claimSourceEvidence = authoritativeAreas;
+                // else: no real, authoritative benefitAreas evidence for
+                // this entity yet — honest fallback to the unchanged
+                // `authoritative` (today's real humanBenefits claims),
+                // never a fabricated structure.
+            }
+        }
+
+        const unrankedClaims = claimSourceEvidence.map((ev, index) => ({
             claimId: `claim-${index}`,
             text: ev.claim,
             evidenceIds: [ev.id],
         }));
-        const claims = rankClaimsByRelevance(unrankedClaims, intentResult.normalizedText || text);
+        let claims = rankClaimsByRelevance(unrankedClaims, questionText);
+        if (DEPTH_ADAPTIVE_GOALS.has(goal) && depth === "DIRECT" && claims.length > 1) {
+            claims = claims.slice(0, 1);
+        } else if (DEPTH_ADAPTIVE_GOALS.has(goal) && depth === "DEEP_EXPLANATION") {
+            claims = claims.slice(0, 6);
+        }
 
         const built = window.CozyOS.SemanticAnswerPlanContract.create({
             goal,
@@ -908,13 +1012,28 @@
             entity: { type: goal === "UNDERSTAND_CONCEPT" ? "taught-term" : "application", value: entityValue, canonicalValue: intentResult.entity.canonicalValue || entityValue },
             claims,
             language,
+            detailLevel: depth,
         });
 
         if (!built.success) return { success: false, reason: "PLAN_CONTRACT_VALIDATION_FAILED", errors: built.errors, diagnostics: { intentResult, entitySource } };
 
         const cognitiveStatus = classifyCognitiveStatus({ kind: conflicted.length > 0 ? "understood-with-conflict" : "understood" });
         return {
-            success: true, plan: built.plan, evidence: authoritative,
+            // PAA-4 fix: this MUST be claimSourceEvidence, not the outer
+            // `authoritative` — a real bug found via the real Live
+            // Window (not just this file's own unit tests, which never
+            // exercised the returned `evidence` field's downstream use):
+            // when DEEP_EXPLANATION substitutes benefitAreas evidence for
+            // the claims themselves, the plan's claims reference THOSE
+            // evidence ids — returning the original `authoritative`
+            // (humanBenefits-sourced) set here left SA-4's realizer with
+            // no matching evidence record for any claim, causing an
+            // honest but wrong NO_REALIZABLE_EVIDENCE_IN_LANGUAGE
+            // failure that silently fell through to an older, unrelated
+            // answer path. For every other case claimSourceEvidence IS
+            // authoritative (unchanged), so this is a strict correction,
+            // never a behavior change for the default path.
+            success: true, plan: built.plan, evidence: claimSourceEvidence,
             diagnostics: { intentResult, goalSource, entitySource, cognitiveStatus, learnedSupplementUsed, conflictedEvidenceIds: conflicted.length > 0 ? conflicted.map((ev) => ev.id) : undefined },
         };
     }
@@ -922,11 +1041,12 @@
     const SemanticAnswerPlanner = Object.freeze({
         INTENT_TO_INFO_GOAL, SUPPLEMENTARY_GOAL_PATTERNS, GOAL_FIELD_MAP, GOAL_TO_ANSWER_MODE, ACTION_GOALS,
         resolveGoal, resolveContextualEntity, extractWordMeaningTerm, partitionEvidenceByAuthority, detectLanguageGap, classifyCognitiveStatus,
+        classifyAnswerDepth, DEPTH_MARKER_PATTERNS, DEPTH_ADAPTIVE_GOALS,
         planAnswer, getVersion: () => MODULE_VERSION,
     });
     window.CozyOS.SemanticAnswerPlanner = SemanticAnswerPlanner;
     window.CozyOS.Modules["semantic-answer-planner"] = Object.freeze({
         version: MODULE_VERSION,
-        description: "SA-3 — Semantic Answer Planner (+ SA-3 EXTENSION: cognitive context resolution, evidence-conflict handling, language-gap detection, action-vs-information classification, cognitiveStatus reporting via contracts/cognitive-decision-contract.js) (+ CML: an optional, narrow, disclosed window.CozyOS.LearningEvidenceSupplement fallback — real, governed, VERIFIED multimodal-learning evidence only, consulted only when the primary CozyKnowledge-backed evidence found nothing; diagnostics.learnedSupplementUsed reports when it fired) (+ PHASE 5: a WORD_MEANING goal — extracts a taught TERM directly from the question text via extractWordMeaningTerm(), bypassing application-entity resolution entirely, and relies entirely on LearningEvidenceSupplement's own CozyLearn TRUSTED-teaching bridge for evidence). Wires the real, existing SemanticIntentEngine into an actual SemanticAnswerPlan, backed by real, authorized VerifiedEvidence from SA-2 (primary) and CML (supplementary). No sentence construction, no translation, no CognitiveCoordinator/CozyThinking/CozyReasoning/CozyInterpretation registration, no Live Window/TTS/CozyBuilder wiring. Not <script>-included by any page."
+        description: "SA-3 — Semantic Answer Planner (+ SA-3 EXTENSION: cognitive context resolution, evidence-conflict handling, language-gap detection, action-vs-information classification, cognitiveStatus reporting via contracts/cognitive-decision-contract.js) (+ CML: an optional, narrow, disclosed window.CozyOS.LearningEvidenceSupplement fallback — real, governed, VERIFIED multimodal-learning evidence only, consulted only when the primary CozyKnowledge-backed evidence found nothing; diagnostics.learnedSupplementUsed reports when it fired) (+ PHASE 5: a WORD_MEANING goal — extracts a taught TERM directly from the question text via extractWordMeaningTerm(), bypassing application-entity resolution entirely, and relies entirely on LearningEvidenceSupplement's own CozyLearn TRUSTED-teaching bridge for evidence) (+ PAA-4: depth-adaptive claim selection for HUMAN_BENEFIT/BENEFITS via classifyAnswerDepth() — an explicit brief marker selects one top-ranked claim (DIRECT), an explicit detail marker selects real, topic-grouped 'benefitAreas' evidence when authored for the entity (DEEP_EXPLANATION), and the absence of either marker reproduces today's existing, unchanged, all-claims behavior exactly (STRUCTURED_EXPLANATION default) — sets the plan's own pre-existing, previously-unused optional detailLevel field, no contract change). Wires the real, existing SemanticIntentEngine into an actual SemanticAnswerPlan, backed by real, authorized VerifiedEvidence from SA-2 (primary) and CML (supplementary). No sentence construction, no translation, no CognitiveCoordinator/CozyThinking/CozyReasoning/CozyInterpretation registration, no Live Window/TTS/CozyBuilder wiring. Not <script>-included by any page."
     });
 })();

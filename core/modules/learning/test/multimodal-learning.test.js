@@ -449,7 +449,7 @@ test('INTEGRATION: only a real, governed VERIFIED observation may become Verifie
     assert.notEqual(evidence.evidence.verification.status, 'VERIFIED', 'must never inflate to SA-1\'s own VERIFIED status, reserved for platform-authored facts');
 });
 
-test('INTEGRATION: no bypass — the bridge composes SA-1\'s real VerifiedEvidenceContract.create() directly; SA-1/SA-2 and every SA-3 file except the one disclosed CML hook are never modified (structural check)', () => {
+test('INTEGRATION: no bypass — the bridge composes SA-1\'s real VerifiedEvidenceContract.create() directly; SA-1/SA-2 and every SA-3 file except the disclosed, itemized extension points below are never modified (structural check)', () => {
     const { execSync } = require('node:child_process');
     const path = require('node:path');
     const repoRoot = path.join(__dirname, '..', '..', '..', '..');
@@ -460,12 +460,44 @@ test('INTEGRATION: no bypass — the bridge composes SA-1\'s real VerifiedEviden
     // permits exactly ONE narrow, additive, tested hook into the SA-3
     // planner (window.CozyOS.LearningEvidenceSupplement, consulted only
     // when the real primary evidence found nothing — see that file's own
-    // header). Every other SA-1/SA-2/SA-3 file — including the plan/
-    // evidence contracts and adapters this test's own earlier assertions
-    // exercise — must remain byte-identical.
-    const permitted = ['core/modules/intelligence/semantic-answer/planning/semantic-answer-planner.js'];
+    // header).
+    //
+    // PAA-4 (Depth-Adaptive Cognitive Composition) — a separate,
+    // independently disclosed extension, added the same way CML's own
+    // hook was: itemized here, never a blanket loosening of this check.
+    // Real, narrow, additive changes only:
+    //   - planning/semantic-answer-planner.js: classifyAnswerDepth() +
+    //     depth-adaptive claim selection for HUMAN_BENEFIT/BENEFITS —
+    //     the default (no explicit depth marker) path is byte-identical
+    //     to before this phase (see that file's own PAA-4 comments and
+    //     semantic-answer-planner-paa4-depth.test.js's own regression
+    //     fixtures, which re-assert the pre-existing CONVERGENCE/SA-2-
+    //     boundary claim counts are unchanged).
+    //   - evidence/source-adapters/cozy-knowledge-adapter.js: one new,
+    //     additive function (adaptApplicationBenefitAreas) reading a
+    //     new, optional, per-application "benefitAreas" field — every
+    //     existing exported function/field list on this file is
+    //     unchanged.
+    //   - evidence/verified-evidence-adapter.js: one new, thin,
+    //     no-selection-logic delegation (collectApplicationBenefitAreasEvidence),
+    //     same discipline as every other collect*() method already on
+    //     this file — added to the export, nothing else changed.
+    //   - realization/language-realizer.js: composeClaims() gained one
+    //     new, optional detailLevel parameter that only changes HOW
+    //     multiple already-verified claims are JOINED (bullets instead
+    //     of a period-joined paragraph) when a plan explicitly sets
+    //     detailLevel to "DEEP_EXPLANATION" (SA-1's own pre-existing,
+    //     previously-unused optional plan field — no contract change).
+    //     Every call with no detailLevel reproduces the exact prior
+    //     behavior, byte-for-byte.
+    const permitted = [
+        'core/modules/intelligence/semantic-answer/planning/semantic-answer-planner.js',
+        'core/modules/intelligence/semantic-answer/evidence/source-adapters/cozy-knowledge-adapter.js',
+        'core/modules/intelligence/semantic-answer/evidence/verified-evidence-adapter.js',
+        'core/modules/intelligence/semantic-answer/realization/language-realizer.js',
+    ];
     const unexpected = changedFiles.filter((f) => !permitted.includes(f));
-    assert.deepEqual(unexpected, [], 'only the disclosed SA-3 planner CML hook may change; every other SA-1/SA-2/SA-3 file must remain untouched');
+    assert.deepEqual(unexpected, [], 'only the disclosed SA-3 planner CML hook and the disclosed PAA-4 extension points may change; every other SA-1/SA-2/SA-3 file must remain untouched');
 });
 
 // =====================================================================
