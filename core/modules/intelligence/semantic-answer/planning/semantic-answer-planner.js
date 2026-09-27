@@ -242,6 +242,43 @@
     });
 
     /**
+     * PAA-3 (Conversational-Context Follow-ups) — TOPIC_CONTINUATION_PATTERNS.
+     *
+     * Real, disclosed, narrow, OPT-IN-BY-SHAPE gap-closer — same small-
+     * marker-table discipline as SUPPLEMENTARY_GOAL_PATTERNS itself.
+     * Root cause traced via the real Live Window (not assumed): "What
+     * about members specifically?" / "Na kuhusu wanachama?" after a
+     * ChurchOS benefit question contain NO goal-indicating vocabulary at
+     * all ("help"/"saidia"/"benefit"/etc.) — the real, primary
+     * SemanticIntentEngine finds nothing (goal===null,
+     * ambiguity.clarificationRequired===true), and this file's OWN
+     * pre-existing supplementary patterns above ALSO find nothing, so
+     * resolveGoal() would otherwise concede to CLARIFICATION even
+     * though entity resolution (resolveContextualEntity(), unaffected
+     * by this addition) already correctly inherits the active
+     * ChurchOS/etc. entity from conversationState — the SAME turn that
+     * should continue the PREVIOUS topic instead loses it entirely.
+     *
+     * This pattern matches ONLY the "what about X"/"na kuhusu X"-shaped
+     * TOPIC-SHIFT phrasing itself — never a claim about what X means.
+     * resolveGoal() only ever consults it when a real conversationState
+     * with an active entity already exists (see the call site below) —
+     * with no active entity, this correctly still falls through to
+     * CLARIFICATION, exactly as before. The inherited goal is always
+     * HUMAN_BENEFIT — a disclosed, bounded default (this product's
+     * single most common continuation shape), never a full intent-
+     * carryover system; rankClaimsByRelevance (already real, already
+     * wired) then does the actual work of surfacing whichever real,
+     * already-verified claim best matches the NEW subtopic word (e.g.
+     * "wanachama"/"members") against the inherited entity's own
+     * evidence — no new ranking logic, no fabricated claim.
+     */
+    const TOPIC_CONTINUATION_PATTERNS = Object.freeze({
+        en: [/^(?:what|how)\s+about\b/i],
+        sw: [/^na\s+kuhusu\b/i, /^kuhusu\b/i],
+    });
+
+    /**
      * WORD_MEANING_EXTRACTION_PATTERNS + extractWordMeaningTerm(text, language)
      *   Real, disclosed, narrow term extraction — same small-marker-
      *   table discipline as SUPPLEMENTARY_GOAL_PATTERNS itself, just
@@ -368,15 +405,18 @@
     }
 
     /**
-     * resolveGoal(intentResult, normalizedText)
+     * resolveGoal(intentResult, normalizedText, conversationState)
      *   Real. Returns {goal, goalSource, clarificationQuestion}.
      *   goalSource is one of "semantic-intent-engine" |
-     *   "supplementary-pattern" | "clarification" | "unknown" — a real,
-     *   disclosed provenance trail, never surfaced as part of the plan
-     *   itself (SA-1's own schema has no such field) but returned
-     *   alongside it for test/diagnostic visibility.
+     *   "supplementary-pattern" | "topic-continuation" | "clarification"
+     *   | "unknown" — a real, disclosed provenance trail, never surfaced
+     *   as part of the plan itself (SA-1's own schema has no such field)
+     *   but returned alongside it for test/diagnostic visibility.
+     *   conversationState (PAA-3, optional) is consulted ONLY for the
+     *   topic-continuation branch below — see TOPIC_CONTINUATION_PATTERNS'
+     *   own header.
      */
-    function resolveGoal(intentResult, normalizedText) {
+    function resolveGoal(intentResult, normalizedText, conversationState) {
         if (intentResult.goal) {
             const refined = INTENT_TO_INFO_GOAL[intentResult.primaryIntent] || intentResult.goal;
             return { goal: refined, goalSource: "semantic-intent-engine", clarificationQuestion: null };
@@ -400,6 +440,16 @@
         const isCompetingGoals = !!(intentResult.ambiguity && intentResult.ambiguity.reasons && intentResult.ambiguity.reasons.includes("competing_goals"));
         const supplementary = isCompetingGoals ? null : matchSupplementaryGoal(normalizedText);
         if (supplementary) return { goal: supplementary, goalSource: "supplementary-pattern", clarificationQuestion: null };
+
+        // PAA-3 — see TOPIC_CONTINUATION_PATTERNS' own header. Only ever
+        // consulted when there is a real, active entity to continue
+        // (conversationState.lastDiscussedApplication) — with no active
+        // entity, "what about X" has nothing to continue and correctly
+        // still falls through to CLARIFICATION below, unchanged.
+        if (!isCompetingGoals && conversationState && isNonEmptyString(conversationState.lastDiscussedApplication)
+            && matchesAnyPattern(normalizedText, TOPIC_CONTINUATION_PATTERNS)) {
+            return { goal: "HUMAN_BENEFIT", goalSource: "topic-continuation", clarificationQuestion: null };
+        }
 
         if (intentResult.ambiguity && intentResult.ambiguity.clarificationRequired) {
             return { goal: "CLARIFICATION", goalSource: "clarification", clarificationQuestion: (intentResult.clarification && intentResult.clarification.question) || null };
@@ -849,7 +899,7 @@
         let { entityValue, entitySource } = resolveContextualEntity(entityHint, intentResult, conversationState);
         const language = requestedLanguage || intentResult.language;
 
-        let { goal, goalSource, clarificationQuestion } = resolveGoal(intentResult, intentResult.normalizedText);
+        let { goal, goalSource, clarificationQuestion } = resolveGoal(intentResult, intentResult.normalizedText, conversationState);
 
         // PHASE 5 — WORD_MEANING is fundamentally not about "which known
         // application" (resolveContextualEntity()'s own KNOWN_ENTITIES-
@@ -992,6 +1042,23 @@
                 // `authoritative` (today's real humanBenefits claims),
                 // never a fabricated structure.
             }
+        } else if (DEPTH_ADAPTIVE_GOALS.has(goal) && goalSource === "topic-continuation") {
+            // PAA-3 — a topic-continuation follow-up ("what about
+            // members specifically?") names a SUBTOPIC, not a request
+            // for the full benefit list again. Real, topic-labeled
+            // benefitAreas evidence (when authored for this entity) is
+            // ADDED to the candidate pool — never replacing
+            // humanBenefits — purely so rankClaimsByRelevance (already
+            // real, already wired, unmodified) has a real, verified
+            // claim whose own text literally names the subtopic to rank
+            // to the top. When benefitAreas isn't authored for this
+            // entity, the pool is honestly just the unchanged
+            // humanBenefits set — same graceful degrade as DEEP_EXPLANATION.
+            const areas = gatherBenefitAreasEvidence(entityValue, language);
+            if (areas.success) {
+                const { authoritative: authoritativeAreas } = partitionEvidenceByAuthority(areas.evidence);
+                if (authoritativeAreas.length > 0) claimSourceEvidence = authoritative.concat(authoritativeAreas);
+            }
         }
 
         const unrankedClaims = claimSourceEvidence.map((ev, index) => ({
@@ -1004,6 +1071,11 @@
             claims = claims.slice(0, 1);
         } else if (DEPTH_ADAPTIVE_GOALS.has(goal) && depth === "DEEP_EXPLANATION") {
             claims = claims.slice(0, 6);
+        } else if (DEPTH_ADAPTIVE_GOALS.has(goal) && goalSource === "topic-continuation" && claims.length > 2) {
+            // A subtopic follow-up warrants a short, targeted answer —
+            // the top 1-2 real, already-ranked claims — never the full,
+            // unranked dump a bare re-ask of the original question gets.
+            claims = claims.slice(0, 2);
         }
 
         const built = window.CozyOS.SemanticAnswerPlanContract.create({
