@@ -478,6 +478,32 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
         }
 
         /**
+         * announceStatus(text) — Universal CozyOS Voice, Application
+         * Integration Matrix (Live Session / Live Camera Capture rows):
+         * the one real, additive entry point a non-conversational
+         * caller (a status/event bridge for an application with no
+         * CozyAI-mediated reply text of its own) uses to reach the SAME
+         * voice authority every reply already goes through. Calls the
+         * existing private #speak() directly — same authentication-
+         * secret guardrail, same language propagation, same
+         * VoiceCatalog resolution, same progressive dispatch — never a
+         * second speak path, never a second VoiceManager.
+         *
+         * Deliberately does NOT open() the window or call #addMessage():
+         * this is an accessibility announcement (like an ARIA live
+         * region), not a conversation turn, so a background status
+         * event (e.g. a live session pausing) must not spam the visible
+         * chat thread every time it fires. A caller that also wants a
+         * visible record of the same text should call announceContext()
+         * itself — the two are independent, composable primitives, not
+         * a hidden coupling.
+         */
+        announceStatus(text) {
+            if (typeof text !== "string" || !text.trim()) return;
+            this.#speak(text.trim());
+        }
+
+        /**
          * #renderQuickActions() — real quick actions, composing only
          * existing services. No new feed, search index, help system, or
          * navigation mechanism is created:

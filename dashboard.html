@@ -743,6 +743,14 @@
 <script src="core/shell/learning-panel-ui.js"></script>
 <script src="core/shell/user-dashboard.js"></script>
 <script src="core/living/cozy-living-assistant.js"></script>
+<!-- Universal CozyOS Voice — Application Integration Matrix, Live
+     Session row: subscribes to LDCESessionEngine's real, already-
+     existing lifecycle events (loaded above) and forwards them through
+     LivingAssistant.announceStatus() (also loaded above), the one real
+     entry point into the existing #speak()->VoiceManager chain. Placed
+     after both dependencies so its own auto-install() call finds them
+     already attached to window.CozyOS. See that file's own header. -->
+<script src="core/shell/live/live-session-voice-bridge.js"></script>
 <!-- PHASE 4 (Universal Language Capability / "ONE Live Window" rule):
      real cross-page hand-off consumer for the real, disclosed
      sessionStorage key InterestOS's own "Ask CozyAI" button sets (see
