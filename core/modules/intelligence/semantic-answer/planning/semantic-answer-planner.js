@@ -209,7 +209,83 @@
         PRACTICAL_WORK_CONTRIBUTION: { sw: [/changia/i, /\bmchango\b/i, /punguza/i], en: [/\bcontribut(?:e|es|ion|ing)\b.*\bwork\b/i, /\bhelps?\s+with\s+(?:our|my|the|daily)\s+work\b/i, /\breduc(?:e|es|ing)\b.*\bwork\b/i] },
         DIFFERENTIATION: { sw: [/\btofauti\s+na\b/i], en: [/\bdifferen(?:t|ce)s?\s+from\b/i, /\bdiffers?\s+from\b/i] },
         VALUE: { sw: [/\bthamani\b/i], en: [/\bworth\s+it\b/i, /\bvalue\b/i] },
+        // PHASE 5 (Continuous Learning & Knowledge Growth) addition —
+        // real trace, not assumed: this goal only ever fires when
+        // SemanticIntentEngine's own primary GOAL_MAP found nothing
+        // (same discipline as every other entry above). Reuses the
+        // REAL, EXISTING "UNDERSTAND_CONCEPT" goal value — already
+        // present in semantic-answer-plan-contract.js's own
+        // EXISTING_SEMANTIC_GOALS (it is SemanticIntentEngine's own
+        // real GOAL_MAP value for EXPLANATION_REQUEST/"explain X" /
+        // "nieleze X" — see cozy-ai-semantic-intent.js:106) rather than
+        // inventing a new goal name, per this repository's own tested
+        // structural boundary (multimodal-learning.test.js's
+        // "INTEGRATION: no bypass" check) that only
+        // semantic-answer-planner.js itself, never SA-1's contracts,
+        // may change for this phase. UNDERSTAND_CONCEPT was already a
+        // real, valid goal value before this phase — just never
+        // reachable past GOAL_NOT_YET_PLANNABLE (no GOAL_FIELD_MAP entry
+        // existed for it). This entry catches the phrasings the primary
+        // engine's own EXPLANATION_REQUEST patterns do NOT (they require
+        // "explain"/"nieleze"/"teach me" — not "what does X mean"/
+        // "maana ya X"). extractWordMeaningTerm() below pulls the TERM
+        // being asked about directly out of the question text itself
+        // — for EITHER entry path, see planAnswer()'s own fallback.
+        // gatherEvidenceForGoal()'s own special case never queries
+        // CozyKnowledge for this goal (a taught word's meaning is never
+        // in APPLICATION_HUMAN_PURPOSE_DATA) and instead relies entirely
+        // on the LearningEvidenceSupplement fallback below.
+        UNDERSTAND_CONCEPT: {
+            sw: [/\bmaana ya\b/i, /\bmaana yake ni nini\b/i, /\bni nini maana\b/i],
+            en: [/\bwhat does\b.+\bmean\b/i, /\bmeaning of\b/i, /\bdefine\b/i, /\bwhat is the meaning of\b/i],
+        },
     });
+
+    /**
+     * WORD_MEANING_EXTRACTION_PATTERNS + extractWordMeaningTerm(text, language)
+     *   Real, disclosed, narrow term extraction — same small-marker-
+     *   table discipline as SUPPLEMENTARY_GOAL_PATTERNS itself, just
+     *   with a capturing group. Only ever consulted (see planAnswer()
+     *   below) after the goal has already resolved to
+     *   UNDERSTAND_CONCEPT (or DEFINITION with no entity — see that
+     *   fallback) — never runs speculatively against arbitrary text.
+     *   Honest default: returns null (no term found) rather than
+     *   guessing. Also covers "explain X"/"nieleze X" — the primary
+     *   engine's own real EXPLANATION_REQUEST phrasing, which already
+     *   produces goal=UNDERSTAND_CONCEPT today but, before this phase,
+     *   had no field mapping and was always GOAL_NOT_YET_PLANNABLE.
+     */
+    const WORD_MEANING_EXTRACTION_PATTERNS = Object.freeze({
+        en: [
+            /\bwhat does\s+["']?([\w'-]+(?:[\s-][\w'-]+){0,3})["']?\s+mean\b/i,
+            /\bmeaning of\s+["']?([\w'-]+(?:[\s-][\w'-]+){0,3})["']?/i,
+            /\bdefine\s+["']?([\w'-]+(?:[\s-][\w'-]+){0,3})["']?/i,
+            /\bexplain\s+["']?([\w'-]+(?:[\s-][\w'-]+){0,3})["']?/i,
+        ],
+        sw: [
+            // Tried BEFORE the bare "maana ya X" pattern below: greedy
+            // backtracking here correctly stops the captured term right
+            // before the interrogative "ni nini" tail (proven, not
+            // assumed — a bare greedy capture with no required tail
+            // would otherwise swallow "ni nini" as part of the term).
+            /\bmaana ya\s+["']?([\w'-]+(?:[\s-][\w'-]+){0,3})["']?\s+ni\s+nini\b/i,
+            /\bmaana ya\s+["']?([\w'-]+(?:[\s-][\w'-]+){0,3})["']?/i,
+            /^["']?([\w'-]+(?:[\s-][\w'-]+){0,3})["']?\s+maana yake ni nini\b/i,
+            /\bnieleze(?:e)?\s+["']?([\w'-]+(?:[\s-][\w'-]+){0,3})["']?/i,
+        ],
+    });
+
+    function extractWordMeaningTerm(text, language) {
+        if (!isNonEmptyString(text)) return null;
+        const patterns = language === "sw"
+            ? WORD_MEANING_EXTRACTION_PATTERNS.sw.concat(WORD_MEANING_EXTRACTION_PATTERNS.en)
+            : WORD_MEANING_EXTRACTION_PATTERNS.en.concat(WORD_MEANING_EXTRACTION_PATTERNS.sw);
+        for (const re of patterns) {
+            const m = text.match(re);
+            if (m && m[1] && m[1].trim()) return m[1].trim();
+        }
+        return null;
+    }
 
     /**
      * GOAL_FIELD_MAP — real, disclosed correspondence between a
@@ -243,6 +319,16 @@
         HOW_TO: Object.freeze([]), // no real procedural-steps evidence source exists yet
         CLARIFICATION: Object.freeze([]),
         UNKNOWN: Object.freeze([]),
+        // PHASE 5 — special-cased in planAnswer()'s own field-check
+        // (alongside DIFFERENTIATION) and in gatherEvidenceForGoal()
+        // below: UNDERSTAND_CONCEPT never has a real CozyKnowledge-backed
+        // field (a taught word's meaning is never in
+        // APPLICATION_HUMAN_PURPOSE_DATA), so this stays honestly empty
+        // and the goal relies entirely on the LearningEvidenceSupplement
+        // fallback. (UNDERSTAND_CONCEPT is a pre-existing, real goal
+        // value — see SUPPLEMENTARY_GOAL_PATTERNS' own comment above —
+        // simply never given a field mapping until this phase.)
+        UNDERSTAND_CONCEPT: Object.freeze([]),
     });
 
     const GOAL_TO_ANSWER_MODE = Object.freeze({
@@ -250,6 +336,7 @@
         IMPORTANCE: "DIRECT_ANSWER", VALUE: "DIRECT_ANSWER", PRACTICAL_WORK_CONTRIBUTION: "DIRECT_ANSWER",
         DEFINITION: "DIRECT_ANSWER", LIST: "LIST", COMPARISON: "COMPARISON", DIFFERENTIATION: "COMPARISON",
         HOW_TO: "HOW_TO_STEPS", CLARIFICATION: "CLARIFICATION_REQUEST", UNKNOWN: "REFUSAL",
+        UNDERSTAND_CONCEPT: "DIRECT_ANSWER",
     });
 
     /**
@@ -389,6 +476,15 @@
 
         if (goal === "DIFFERENTIATION") {
             return adapter.collectSystemFactEvidence("getDifferentiationFact");
+        }
+
+        // PHASE 5 — a taught word's meaning is never a real
+        // APPLICATION_HUMAN_PURPOSE_DATA field; honestly report "no
+        // primary evidence" so planAnswer()'s own fallback unconditionally
+        // consults LearningEvidenceSupplement next, exactly as it already
+        // does for every other goal when primary evidence is absent.
+        if (goal === "UNDERSTAND_CONCEPT") {
+            return { success: false, evidence: [], errors: ["WORD_MEANING has no CozyKnowledge-backed evidence source; relies on LearningEvidenceSupplement."] };
         }
 
         const fields = GOAL_FIELD_MAP[goal] || [];
@@ -673,10 +769,54 @@
         const inheritedPreviousEntity = conversationState && isNonEmptyString(conversationState.lastDiscussedApplication) ? conversationState.lastDiscussedApplication : null;
         const intentResult = intentEngine.analyze(text, { previousEntity: entityHint || previousEntity || inheritedPreviousEntity || null });
 
-        const { entityValue, entitySource } = resolveContextualEntity(entityHint, intentResult, conversationState);
+        let { entityValue, entitySource } = resolveContextualEntity(entityHint, intentResult, conversationState);
         const language = requestedLanguage || intentResult.language;
 
-        const { goal, goalSource, clarificationQuestion } = resolveGoal(intentResult, intentResult.normalizedText);
+        let { goal, goalSource, clarificationQuestion } = resolveGoal(intentResult, intentResult.normalizedText);
+
+        // PHASE 5 — WORD_MEANING is fundamentally not about "which known
+        // application" (resolveContextualEntity()'s own KNOWN_ENTITIES-
+        // rooted resolution above is irrelevant here). The TERM being
+        // asked about is extracted directly from THIS turn's own
+        // question text. A term extracted this way can never collide
+        // with textNamesADifferentKnownApplication()'s own guard,
+        // because the extraction patterns themselves only ever match
+        // the OBJECT of "mean"/"maana ya", not a real application name
+        // used as a subject elsewhere in the sentence.
+        //
+        // Real trace, not assumed: SemanticIntentEngine's OWN primary
+        // GOAL_MAP already recognizes some Kiswahili "maana ya X ni
+        // nini"-shaped questions as a real, non-null goal (its own
+        // APP_IDENTITY/UNDERSTAND_ENTITY intent, refined by
+        // INTENT_TO_INFO_GOAL to "DEFINITION") even when X is not a
+        // known application — with entity.value left null (the engine
+        // honestly found no KNOWN_ENTITIES match). Before this fix, that
+        // real, non-null primary goal short-circuited resolveGoal() at
+        // its very first branch, so this file's own WORD_MEANING
+        // supplementary pattern never even ran for that exact phrasing —
+        // "define X" style questions about a taught, non-application
+        // term were silently unanswerable in Kiswahili specifically,
+        // while the identical EN phrasing ("what does X mean") worked
+        // (the primary engine has no equivalent EN pattern to shadow
+        // it). The fix: DEFINITION and WORD_MEANING are the same real
+        // request shape (an explanation of what something means) when no
+        // application entity was resolved — reuse the SAME extraction
+        // fallback for both, and treat the result as WORD_MEANING (this
+        // file's own supplementary-source path) rather than DEFINITION
+        // (SA-2's application-only evidence path, which has no field for
+        // an arbitrary taught term). A DEFINITION goal that DID resolve a
+        // real application entity is completely unaffected — the
+        // `!isNonEmptyString(entityValue)` guard below only ever applies
+        // when there is nothing real to lose.
+        if ((goal === "UNDERSTAND_CONCEPT" || goal === "DEFINITION") && !isNonEmptyString(entityValue)) {
+            const extractedTerm = extractWordMeaningTerm(intentResult.normalizedText, language);
+            if (extractedTerm) {
+                entityValue = extractedTerm;
+                entitySource = "word-meaning-extraction";
+                goal = "UNDERSTAND_CONCEPT";
+                goalSource = "word-meaning-extraction";
+            }
+        }
 
         if (goal === "CLARIFICATION" || goal === "UNKNOWN") {
             const kind = goal === "CLARIFICATION" ? "clarification" : "unknown";
@@ -701,7 +841,7 @@
             return { success: false, reason: "NO_ENTITY_RESOLVED", goal, goalSource, diagnostics: { intentResult, entitySource, cognitiveStatus: classifyCognitiveStatus({ kind: "no-entity" }) } };
         }
 
-        if (!(goal in GOAL_FIELD_MAP) || (GOAL_FIELD_MAP[goal].length === 0 && goal !== "DIFFERENTIATION")) {
+        if (!(goal in GOAL_FIELD_MAP) || (GOAL_FIELD_MAP[goal].length === 0 && goal !== "DIFFERENTIATION" && goal !== "UNDERSTAND_CONCEPT")) {
             return { success: false, reason: "GOAL_NOT_YET_PLANNABLE", goal, goalSource, diagnostics: { intentResult, entitySource, cognitiveStatus: classifyCognitiveStatus({ kind: "goal-not-plannable" }) } };
         }
 
@@ -726,7 +866,7 @@
             // unchanged).
             const supplement = window.CozyOS.LearningEvidenceSupplement;
             if (supplement && typeof supplement.collectLearnedEvidence === "function") {
-                const learned = supplement.collectLearnedEvidence({ goal, entityValue, language });
+                const learned = supplement.collectLearnedEvidence({ goal, entityValue, language, actorId });
                 if (learned && learned.success && Array.isArray(learned.evidence) && learned.evidence.length > 0) {
                     sourceEvidence = learned.evidence;
                     learnedSupplementUsed = true;
@@ -765,7 +905,7 @@
         const built = window.CozyOS.SemanticAnswerPlanContract.create({
             goal,
             answerMode: GOAL_TO_ANSWER_MODE[goal] || "DIRECT_ANSWER",
-            entity: { type: "application", value: entityValue, canonicalValue: intentResult.entity.canonicalValue || entityValue },
+            entity: { type: goal === "UNDERSTAND_CONCEPT" ? "taught-term" : "application", value: entityValue, canonicalValue: intentResult.entity.canonicalValue || entityValue },
             claims,
             language,
         });
@@ -781,12 +921,12 @@
 
     const SemanticAnswerPlanner = Object.freeze({
         INTENT_TO_INFO_GOAL, SUPPLEMENTARY_GOAL_PATTERNS, GOAL_FIELD_MAP, GOAL_TO_ANSWER_MODE, ACTION_GOALS,
-        resolveGoal, resolveContextualEntity, partitionEvidenceByAuthority, detectLanguageGap, classifyCognitiveStatus,
+        resolveGoal, resolveContextualEntity, extractWordMeaningTerm, partitionEvidenceByAuthority, detectLanguageGap, classifyCognitiveStatus,
         planAnswer, getVersion: () => MODULE_VERSION,
     });
     window.CozyOS.SemanticAnswerPlanner = SemanticAnswerPlanner;
     window.CozyOS.Modules["semantic-answer-planner"] = Object.freeze({
         version: MODULE_VERSION,
-        description: "SA-3 — Semantic Answer Planner (+ SA-3 EXTENSION: cognitive context resolution, evidence-conflict handling, language-gap detection, action-vs-information classification, cognitiveStatus reporting via contracts/cognitive-decision-contract.js) (+ CML: an optional, narrow, disclosed window.CozyOS.LearningEvidenceSupplement fallback — real, governed, VERIFIED multimodal-learning evidence only, consulted only when the primary CozyKnowledge-backed evidence found nothing; diagnostics.learnedSupplementUsed reports when it fired). Wires the real, existing SemanticIntentEngine into an actual SemanticAnswerPlan, backed by real, authorized VerifiedEvidence from SA-2 (primary) and CML (supplementary). No sentence construction, no translation, no CognitiveCoordinator/CozyThinking/CozyReasoning/CozyInterpretation registration, no Live Window/TTS/CozyBuilder wiring. Not <script>-included by any page."
+        description: "SA-3 — Semantic Answer Planner (+ SA-3 EXTENSION: cognitive context resolution, evidence-conflict handling, language-gap detection, action-vs-information classification, cognitiveStatus reporting via contracts/cognitive-decision-contract.js) (+ CML: an optional, narrow, disclosed window.CozyOS.LearningEvidenceSupplement fallback — real, governed, VERIFIED multimodal-learning evidence only, consulted only when the primary CozyKnowledge-backed evidence found nothing; diagnostics.learnedSupplementUsed reports when it fired) (+ PHASE 5: a WORD_MEANING goal — extracts a taught TERM directly from the question text via extractWordMeaningTerm(), bypassing application-entity resolution entirely, and relies entirely on LearningEvidenceSupplement's own CozyLearn TRUSTED-teaching bridge for evidence). Wires the real, existing SemanticIntentEngine into an actual SemanticAnswerPlan, backed by real, authorized VerifiedEvidence from SA-2 (primary) and CML (supplementary). No sentence construction, no translation, no CognitiveCoordinator/CozyThinking/CozyReasoning/CozyInterpretation registration, no Live Window/TTS/CozyBuilder wiring. Not <script>-included by any page."
     });
 })();

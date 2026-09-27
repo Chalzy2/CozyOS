@@ -360,17 +360,40 @@
             const parsed = JSON.parse(raw);
             for (const scope of Object.keys(trustedTeachingsByScope)) {
                 const entries = Array.isArray(parsed[scope]) ? parsed[scope] : [];
-                for (const [key, value] of entries) trustedTeachingsByScope[scope].set(key, value);
+                for (const [key, value] of entries) {
+                    // PHASE 5 — a pre-Phase-5 browser may still have the
+                    // OLD single-object-per-key shape in localStorage.
+                    // Wrap it honestly rather than crash getTrustedTeachings()'s
+                    // new for-of-over-array iteration on it.
+                    trustedTeachingsByScope[scope].set(key, Array.isArray(value) ? value : [value]);
+                }
             }
         } catch (_err) { /* honest no-op — a corrupt/foreign value never throws, just starts empty */ }
     }
 
     loadTrustedTeachingsFromStorage(); // rehydrate once, at module load — before any candidate in THIS session is promoted
 
+    // PHASE 5 (Continuous Learning & Knowledge Growth) — real, traced fix.
+    // Before this change, each key in trustedTeachingsByScope held ONE
+    // claim object, and a second promotion under the SAME key (same
+    // scope+language+subjectOrObservedForm+actorId) silently OVERWROTE
+    // the first via Map.set() — a real violation of the "same word,
+    // genuinely different meaning must be preserved as multiple senses,
+    // never silently replaced" requirement. No existing test asserted or
+    // relied on that overwrite behavior (confirmed by reading
+    // phase3-cozylearn-teaching.test.js: every existing case uses a
+    // DISTINCT key per teaching). This is now array-valued per key —
+    // callers of getTrustedTeachings() below see the exact same flat,
+    // per-entry object shape as before (this file flattens the array),
+    // so no existing caller needs to change.
+    function normalizeForSenseComparison(text) {
+        return String(text || "").toLowerCase().replace(/\s+/g, " ").trim();
+    }
+
     function registerTrustedTeaching(record) {
-        if (!record.claim) return; // nothing safe to expose without an actual claim
+        if (!record.claim) return { added: false, reason: "NO_CLAIM" }; // nothing safe to expose without an actual claim
         const subjectKey = (record.subject || record.observedForm || "").toLowerCase();
-        if (!subjectKey) return;
+        if (!subjectKey) return { added: false, reason: "NO_SUBJECT_KEY" };
         const actorId = record.provenance && record.provenance.actorId ? record.provenance.actorId : null;
         // USER scope is this actor's own private data — the key
         // includes actorId so a second user teaching the same subject
@@ -382,7 +405,15 @@
         const key = record.scope === "USER"
             ? `${record.language || "*"}:${subjectKey}:${actorId || "unknown"}`
             : `${record.language || "*"}:${subjectKey}`;
-        trustedTeachingsByScope[record.scope].set(key, {
+        const bucket = trustedTeachingsByScope[record.scope];
+        const existingSenses = bucket.get(key) || [];
+        const normalizedNewClaim = normalizeForSenseComparison(record.claim);
+        const duplicateSense = existingSenses.find((s) => normalizeForSenseComparison(s.claim) === normalizedNewClaim);
+        if (duplicateSense) {
+            // Same word, same meaning, already TRUSTED — never duplicated.
+            return { added: false, reason: "DUPLICATE_MEANING", existing: duplicateSense };
+        }
+        const entry = {
             candidateId: record.candidateId,
             subject: record.subject || record.observedForm,
             claim: record.claim,
@@ -391,8 +422,15 @@
             provenance: record.provenance || null,
             validatedAt: record.validatedAt,
             actorId
-        });
+        };
+        // Same word, GENUINELY different meaning — appended as an
+        // additional sense under the same key, never overwriting
+        // existingSenses[0..n]. A caller with zero prior senses under
+        // this key gets an array of length 1 — byte-identical
+        // observable behavior to the old single-object store.
+        bucket.set(key, existingSenses.concat([entry]));
         persistTrustedTeachingsToStorage();
+        return { added: true, isNewSense: existingSenses.length > 0, entry };
     }
 
     /**
@@ -415,14 +453,22 @@
         const matches = [];
         for (const scope of scopes) {
             if (!trustedTeachingsByScope[scope]) continue;
-            for (const [key, value] of trustedTeachingsByScope[scope].entries()) {
-                if (scope === "USER" && (!opts.actorId || value.actorId !== opts.actorId)) continue;
+            for (const [key, senses] of trustedTeachingsByScope[scope].entries()) {
                 const parts = key.split(":");
                 const lang = parts[0];
                 const keySubject = parts[1];
                 if (keySubject !== subjectKey) continue;
                 if (opts.language && lang !== "*" && lang !== opts.language) continue;
-                matches.push(Object.assign({ scope }, value));
+                // PHASE 5 — senses is an array (possibly multiple TRUSTED
+                // meanings for the same word/subject at this key, never
+                // silently collapsed to one — see registerTrustedTeaching()
+                // above). Every entry under a USER-scope key shares the
+                // SAME actorId (it is baked into the key itself), so the
+                // fail-closed privacy check applies uniformly per entry.
+                for (const value of senses) {
+                    if (scope === "USER" && (!opts.actorId || value.actorId !== opts.actorId)) continue;
+                    matches.push(Object.assign({ scope }, value));
+                }
             }
         }
         return matches;
@@ -615,6 +661,7 @@
         applySynonyms,
         getTrustedTeachings,
         checkConflict,
+        normalizeForSenseComparison,
         getVersion() { return MODULE_VERSION; }
     });
 

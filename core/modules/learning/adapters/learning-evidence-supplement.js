@@ -56,6 +56,75 @@
     }
 
     /**
+     * collectCozyLearnTaughtEvidence(entityValue, actorId)
+     *   PHASE 5 — Continuous Learning & Knowledge Growth. Real, second
+     *   composed source alongside the canonical-concept-registry path
+     *   above — window.CozyOS.CozyLearn.getTrustedTeachings(entityValue,
+     *   ...), the SAME real, already-existing, already-governed
+     *   OBSERVED->CANDIDATE->USER_CONFIRMED->TRUSTED store
+     *   cozy-teach-flow.js's own answerFromTrustedTeaching() already
+     *   reads (that function is subject-agnostic — it works for an
+     *   application name OR an arbitrary taught term identically; this
+     *   is the same real lookup, just surfaced into SA-3's own current
+     *   pipeline instead of the separate legacy cozy-ai.js call site).
+     *   Never filters by language — a term's TAUGHT meaning is useful
+     *   regardless of which language it is asked about in; language-
+     *   appropriate WORDING is SA-4's job, not evidence filtering.
+     *   Scopes default to ["USER","GLOBAL"] (never a bare GLOBAL-only
+     *   default here specifically because a caller that already knows
+     *   its own actorId is entitled to see its OWN USER-scope
+     *   teachings — getTrustedTeachings() itself still fails closed on
+     *   any USER entry whose actorId does not match). Multiple TRUSTED
+     *   senses for the same term (see cozy-learn.js's own multi-sense
+     *   fix) become MULTIPLE evidence records here — never collapsed
+     *   to one, and never picked among.
+     */
+    function collectCozyLearnTaughtEvidence(entityValue, actorId) {
+        const cozyLearn = window.CozyOS.CozyLearn;
+        const contract = window.CozyOS.VerifiedEvidenceContract;
+        if (!cozyLearn || typeof cozyLearn.getTrustedTeachings !== "function" || !contract) return [];
+        let taught = [];
+        try {
+            taught = cozyLearn.getTrustedTeachings(entityValue, { scopes: ["USER", "GLOBAL"], actorId: actorId || null }) || [];
+        } catch (_err) { return []; }
+        const evidence = [];
+        for (const t of taught) {
+            if (!t || !isNonEmptyString(t.claim) || !isNonEmptyString(t.candidateId)) continue;
+            const built = contract.create({
+                id: "cozy-learn:" + t.candidateId,
+                claim: t.claim,
+                source: { type: "CozyLearn", id: t.candidateId },
+                verification: { status: "VERIFIED", confidence: "MEDIUM", verifiedAt: t.validatedAt || undefined },
+                // Real, traced, NOT a privacy downgrade: getTrustedTeachings()
+                // above has ALREADY performed the real access check before
+                // `taught` is even populated (a USER-scope entry is only
+                // ever returned when its own actorId matches THIS caller's
+                // actorId — see cozy-learn.js's own fail-closed rule). By
+                // the time an entry reaches this loop, it is already
+                // authorized for THIS specific requester, so labeling it
+                // "PUBLIC" here means "safe to assert in THIS answer" —
+                // the exact same accurate-label convention this
+                // repository's own SA-2 cozy-knowledge-adapter.js already
+                // uses for CozyKnowledge facts (see verified-evidence-
+                // contract.js's own header). Mislabeling it "PRIVATE" here
+                // would be WRONG, not safer: partitionEvidenceByAuthority()
+                // treats ANY non-PUBLIC sensitivity as globally
+                // un-assertable regardless of requester, which would make
+                // a USER-scope teaching permanently unanswerable even to
+                // its own teacher — a real functional bug, not a real
+                // privacy improvement (the privacy boundary already lives,
+                // correctly, in getTrustedTeachings()'s own query filter).
+                sensitivity: "PUBLIC",
+                language: t.language || undefined,
+                entityId: entityValue,
+                provenance: "window.CozyOS.CozyLearn (TRUSTED taught knowledge)"
+            });
+            if (built.success) evidence.push(built.evidence);
+        }
+        return evidence;
+    }
+
+    /**
      * collectLearnedEvidence({goal, entityValue, language, actorId})
      *   Real. For every matching attachment (term+language), resolves its
      *   real observation ids (observationIds + relatedObservationIds —
@@ -67,39 +136,52 @@
      *   for interface symmetry with the planner's own call site and future
      *   goal-scoping, but is not yet used to filter (no per-goal field
      *   exists on a canonical-concept attachment today — honestly unused
-     *   rather than fabricated). Returns {success:true, evidence:[...]}
-     *   — evidence may be an empty array (honest "nothing learned yet"),
-     *   never fabricated.
+     *   rather than fabricated). PHASE 5 addition: when this primary
+     *   attachment-based path finds nothing, ALSO tries
+     *   collectCozyLearnTaughtEvidence() above (a second, real,
+     *   already-governed source) before conceding — never overrides
+     *   real attachment-based evidence when it exists. Returns
+     *   {success:true, evidence:[...]} — evidence may be an empty array
+     *   (honest "nothing learned yet"), never fabricated.
      */
     function collectLearnedEvidence({ goal = null, entityValue, language = null, actorId = "system" } = {}) {
         const store = window.CozyOS.ObservationStore;
         const bridge = window.CozyOS.ObservationEvidenceBridge;
-        if (!store || !bridge) return { success: false, reason: "ObservationStore/ObservationEvidenceBridge are not both loaded.", evidence: [] };
         if (!isNonEmptyString(entityValue)) return { success: false, reason: "A real, non-empty entityValue is required.", evidence: [] };
 
-        const attachments = findMatchingAttachments(entityValue, language, actorId);
-        const evidence = [];
-        const seenObservationIds = new Set();
-        for (const attachment of attachments) {
-            const observationIds = Array.from(new Set([...(attachment.observationIds || []), ...(attachment.relatedObservationIds || [])]));
-            for (const observationId of observationIds) {
-                if (seenObservationIds.has(observationId)) continue;
-                seenObservationIds.add(observationId);
-                const observation = store.getObservation(observationId, { actorId });
-                if (!observation || observation.lifecycleStatus !== "VERIFIED") continue;
-                const built = bridge.toVerifiedEvidence(observation, { confidence: "MEDIUM" });
-                if (built.success) evidence.push(built.evidence);
+        let evidence = [];
+        let matchedAttachments = 0;
+        if (store && bridge) {
+            const attachments = findMatchingAttachments(entityValue, language, actorId);
+            matchedAttachments = attachments.length;
+            const seenObservationIds = new Set();
+            for (const attachment of attachments) {
+                const observationIds = Array.from(new Set([...(attachment.observationIds || []), ...(attachment.relatedObservationIds || [])]));
+                for (const observationId of observationIds) {
+                    if (seenObservationIds.has(observationId)) continue;
+                    seenObservationIds.add(observationId);
+                    const observation = store.getObservation(observationId, { actorId });
+                    if (!observation || observation.lifecycleStatus !== "VERIFIED") continue;
+                    const built = bridge.toVerifiedEvidence(observation, { confidence: "MEDIUM" });
+                    if (built.success) evidence.push(built.evidence);
+                }
             }
         }
-        return { success: true, evidence, matchedAttachments: attachments.length };
+
+        if (evidence.length === 0) {
+            const taughtEvidence = collectCozyLearnTaughtEvidence(entityValue, actorId);
+            if (taughtEvidence.length > 0) evidence = taughtEvidence;
+        }
+
+        return { success: true, evidence, matchedAttachments };
     }
 
     const LearningEvidenceSupplement = Object.freeze({
-        collectLearnedEvidence, findMatchingAttachments, getVersion: () => MODULE_VERSION,
+        collectLearnedEvidence, findMatchingAttachments, collectCozyLearnTaughtEvidence, getVersion: () => MODULE_VERSION,
     });
     window.CozyOS.LearningEvidenceSupplement = LearningEvidenceSupplement;
     window.CozyOS.Modules["learning-evidence-supplement"] = Object.freeze({
         version: MODULE_VERSION,
-        description: "CozyAI Continuous Multimodal Learning — bridges VERIFIED, governed canonical-concept attachments/observations into real VerifiedEvidence for SemanticAnswerPlanner's optional supplementary evidence source. Composes CanonicalConceptRegistry/ObservationStore/ObservationEvidenceBridge only; adds no matching/translation/confidence logic. Not <script>-included by any page."
+        description: "CozyAI Continuous Multimodal Learning — bridges VERIFIED, governed canonical-concept attachments/observations into real VerifiedEvidence for SemanticAnswerPlanner's optional supplementary evidence source. Composes CanonicalConceptRegistry/ObservationStore/ObservationEvidenceBridge (primary) and, PHASE 5 addition, window.CozyOS.CozyLearn's own TRUSTED-teaching store (secondary, consulted only when the primary path finds nothing) — the same real store cozy-teach-flow.js's answerFromTrustedTeaching() already reads, now also reachable from SA-3's current pipeline. Adds no matching/translation/confidence logic of its own; never fabricates a status VerifiedEvidenceContract itself would reject. Not <script>-included by any page."
     });
 })();

@@ -52,6 +52,7 @@
         return (root && root.window && root.window.CozyOS) || (typeof window !== "undefined" ? window.CozyOS : null);
     }
     function teachIntent() { const c = cozyOS(); return c && c.CozyTeachIntent; }
+    function teachWordIntent() { const c = cozyOS(); return c && c.CozyTeachWordIntent; }
     function cozyLearn() { const c = cozyOS(); return c && c.CozyLearn; }
 
     /**
@@ -93,6 +94,38 @@
                 context: { source: "live-window-teach", candidateId, subject: subject || null, promoted: !!promoted },
                 consent: { authorized: true, scope: "SELF", grantedBy: actorId },
                 learningScope: "PERSONAL",
+            });
+        } catch (err) {
+            return { success: false, reason: err && err.message ? err.message : String(err) };
+        }
+    }
+
+    /**
+     * recordKnowledgePackEntry(promotedCandidate)
+     *   PHASE 5 — Continuous Learning & Knowledge Growth. Purely
+     *   additive, same "never gates the real reply, degrades honestly"
+     *   discipline as observeIntoFabric() above. Records ONE manifest
+     *   entry (window.CozyOS.KnowledgePackManifest, a real, thin INDEX —
+     *   see that file's own header) pointing at the just-promoted
+     *   CozyLearn TRUSTED record. The manifest entry's own `scope`
+     *   field is the SAME scope the candidate was actually promoted to
+     *   — never widened here.
+     */
+    function recordKnowledgePackEntry(promotedCandidate) {
+        try {
+            const c = cozyOS();
+            const manifest = c && c.KnowledgePackManifest;
+            if (!manifest || typeof manifest.recordPackEntry !== "function") return { success: false, reason: "KnowledgePackManifest is not loaded." };
+            return manifest.recordPackEntry({
+                packType: promotedCandidate.category || "TAUGHT_FACT",
+                sourceStore: "CozyLearn",
+                sourceRecordId: promotedCandidate.candidateId,
+                language: promotedCandidate.language || null,
+                domain: promotedCandidate.subject || null,
+                provenance: promotedCandidate.provenance || null,
+                verificationState: "VERIFIED",
+                scope: promotedCandidate.scope,
+                actorId: promotedCandidate.provenance && promotedCandidate.provenance.actorId ? promotedCandidate.provenance.actorId : null
             });
         } catch (err) {
             return { success: false, reason: err && err.message ? err.message : String(err) };
@@ -181,6 +214,36 @@
             : `Sorry, I didn't understand. Is "${claim}" correct? Please answer yes or no.`;
     }
 
+    // PHASE 5 — Continuous Learning & Knowledge Growth. Same
+    // realize()-first / en-sw-ternary-fallback discipline as every
+    // builder above.
+    function buildWordConfirmPrompt(term, meaning, language) {
+        const r = realize();
+        const realized = r && r.realize("teach:word-confirm-prompt", language, term, meaning);
+        if (realized) return realized;
+        return language === "sw"
+            ? `Nimeelewa - unanifundisha kwamba "${term}" ina maana ya "${meaning}". Je, hii ni sahihi? (ndiyo/hapana)`
+            : `Got it - you're teaching me that "${term}" means "${meaning}". Is that correct? (yes/no)`;
+    }
+
+    function buildWordNewSensePrompt(term, meaning, existingMeaning, language) {
+        const r = realize();
+        const realized = r && r.realize("teach:word-new-sense-prompt", language, term, meaning, existingMeaning);
+        if (realized) return realized;
+        return language === "sw"
+            ? `Nimeelewa - hii ni maana mpya ya "${term}" (tofauti na "${existingMeaning}" ulichonifundisha hapo awali). Unanifundisha kwamba pia ina maana ya "${meaning}". Je, hii ni sahihi? (ndiyo/hapana)`
+            : `Got it - this is a NEW meaning for "${term}" (different from "${existingMeaning}" you taught me before). You're also teaching me it means "${meaning}". Is that correct? (yes/no)`;
+    }
+
+    function buildWordAlreadyKnownPrompt(term, meaning, language) {
+        const r = realize();
+        const realized = r && r.realize("teach:word-already-known-prompt", language, term, meaning);
+        if (realized) return realized;
+        return language === "sw"
+            ? `Nimekwisha jua kwamba "${term}" ina maana ya "${meaning}". Asante hata hivyo!`
+            : `I already know that "${term}" means "${meaning}". Thanks anyway!`;
+    }
+
     /**
      * processTurn(question, { actorId, language, teachConversationState })
      *   Returns { matched: false } when this turn has nothing to do with
@@ -221,6 +284,7 @@
                 // PHASE 5 — see observeIntoFabric()'s own header. Purely
                 // additive; its result never affects this turn's reply.
                 observeIntoFabric({ claim: pendingClaim, language: pendingLanguage, actorId, candidateId, subject: opts.teachConversationState.pendingSubject, promoted: promoteResult.success });
+                if (promoteResult.success) recordKnowledgePackEntry(promoteResult.candidate);
                 return {
                     matched: true,
                     content: buildTrustedPrompt(pendingLanguage),
@@ -250,6 +314,69 @@
 
         const claim = detected.claim;
         const detectedLanguage = detected.language || language;
+
+        // PHASE 5 — Continuous Learning & Knowledge Growth. A SECOND,
+        // narrower classification stage over the SAME already-detected
+        // teaching claim (CozyTeachWordIntent, real, disclosed, never
+        // fabricated — see that file's own header): is this claim
+        // specifically teaching the MEANING of a word/phrase, rather
+        // than a flat fact about a known application? When it is, this
+        // branch routes it through the EXACT SAME CozyLearn
+        // createCandidate/confirmCandidate/promoteCandidate state
+        // machine as the TAUGHT_FACT path below — just with
+        // observedForm=term (not an application name) and claim=the
+        // meaning text (not the whole sentence) — so
+        // getTrustedTeachings(term, ...) can retrieve it later by TERM
+        // (see cozy-learn.js's own registerTrustedTeaching(), which
+        // keys on `subject || observedForm`). Real, traced dedup: an
+        // EXISTING TRUSTED meaning for the SAME term is checked BEFORE
+        // a candidate is even created — a normalized-identical meaning
+        // is reported back as already known (no new candidate, no
+        // silent re-confirmation loop); a genuinely DIFFERENT meaning
+        // proceeds as a new, disclosed SENSE (never silently replacing
+        // the first).
+        const wordIntent = teachWordIntent();
+        const wordMeaning = wordIntent ? wordIntent.detectWordMeaningClaim(claim, detectedLanguage) : { isWordMeaning: false };
+        if (wordMeaning.isWordMeaning) {
+            const term = wordMeaning.term;
+            const meaning = wordMeaning.meaning;
+            const wordLanguage = wordMeaning.language || detectedLanguage;
+            const existingSenses = learn.getTrustedTeachings(term, { scopes: ["USER", "GLOBAL"], actorId });
+            const normalizedNewMeaning = learn.normalizeForSenseComparison(meaning);
+            const duplicate = existingSenses.find((s) => learn.normalizeForSenseComparison(s.claim) === normalizedNewMeaning);
+            if (duplicate) {
+                return {
+                    matched: true,
+                    content: buildWordAlreadyKnownPrompt(term, meaning, wordLanguage),
+                    evidence: "ALREADY_KNOWN",
+                    updatedConversationState: null
+                };
+            }
+            const differentSense = existingSenses.length > 0 ? existingSenses[existingSenses.length - 1] : null;
+
+            const wordCandidate = learn.createCandidate({
+                observedForm: term,
+                subject: null,
+                claim: meaning,
+                language: wordLanguage,
+                category: "WORD_MEANING",
+                relationship: "NEW_WORD",
+                scope: "USER",
+                actorId,
+                source: "live-window-teach",
+                provenance: { capturedVia: "live-window-teach-word" }
+            });
+
+            return {
+                matched: true,
+                content: differentSense
+                    ? buildWordNewSensePrompt(term, meaning, differentSense.claim, wordLanguage)
+                    : buildWordConfirmPrompt(term, meaning, wordLanguage),
+                evidence: "CANDIDATE_PENDING",
+                updatedConversationState: { pendingCandidateId: wordCandidate.candidateId, pendingClaim: meaning, pendingLanguage: wordLanguage }
+            };
+        }
+
         const subject = resolveSubject(claim) || resolveSubject(question);
 
         if (subject) {

@@ -417,7 +417,11 @@
 <script src="core/living/cozy-ai-semantic-intent.js"></script>
 <!-- PHASE 3 (Teach Cozy / Governed Learning): cozy-teach-intent.js (explicit teaching-marker detection) and cozy-teach-flow.js (the real create/confirm/promote conversational orchestrator, composing the CozyLearn state machine above) — both read lazily at answer-time by cozy-ai.js's getContext(), so load order relative to cozy-ai.js itself does not matter, but they must load after cozy-learn.js (CozyLearn) which they compose. -->
 <script src="core/living/cozy-teach-intent.js"></script>
+<!-- PHASE 5 (Continuous Learning & Knowledge Growth): cozy-teach-word-intent.js — a second, narrower classification stage over the same detected teaching claim (word/phrase-meaning vs. flat fact). Must load before cozy-teach-flow.js, which composes it. -->
+<script src="core/living/cozy-teach-word-intent.js"></script>
 <script src="core/living/cozy-teach-flow.js"></script>
+<!-- PHASE 5 (Continuous Learning & Knowledge Growth): knowledge-pack-manifest.js — a real, thin, additive INDEX over already-verified taught knowledge (see that file's own header; never a fourth knowledge store). Read lazily by cozy-teach-flow.js's own promote branch, so load order relative to it does not matter. -->
+<script src="core/modules/learning/knowledge-pack-manifest.js"></script>
 <!-- PHASE 5 (Universal Rewiring): the CML-6 Continuous Multimodal
      Learning Fabric — real, tested, CERTIFIED code (see
      core/modules/learning/test/continuous-learning-fabric.test.js)
