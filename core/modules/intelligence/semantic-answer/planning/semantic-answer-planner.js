@@ -418,13 +418,76 @@
      *   (ambiguity.detected === true), context is never used to paper
      *   over that uncertainty.
      */
+    /**
+     * textNamesADifferentKnownApplication(normalizedText, candidateEntityValue)
+     *   SA-8 PHASE 4 regression fix — real, traced, not assumed. Reuses
+     *   window.CozyOS.CozyKnowledge.listApplicationHumanPurposeNamesFact(),
+     *   the EXISTING single source of truth for "every real, committed
+     *   application name" (built specifically so no second, competing,
+     *   manually-maintained application-name list ever drifts out of
+     *   sync — see that function's own header for the exact prior
+     *   incident this already prevented elsewhere). Returns true only
+     *   when the current turn's own normalized text literally names a
+     *   DIFFERENT known application than the one about to be trusted as
+     *   the resolved entity — never a fabricated list, never invented
+     *   here.
+     */
+    function textNamesADifferentKnownApplication(normalizedText, candidateEntityValue) {
+        if (!isNonEmptyString(normalizedText) || !isNonEmptyString(candidateEntityValue)) return false;
+        const knowledge = window.CozyOS.CozyKnowledge;
+        if (!knowledge || typeof knowledge.listApplicationHumanPurposeNamesFact !== "function") return false;
+        const fact = knowledge.listApplicationHumanPurposeNamesFact();
+        if (!fact || !Array.isArray(fact.names)) return false;
+        const lowerText = normalizedText.toLowerCase();
+        const candidateLower = candidateEntityValue.toLowerCase();
+        return fact.names.some((name) => name !== candidateLower && new RegExp(`\\b${name}\\b`, "i").test(lowerText));
+    }
+
     function resolveContextualEntity(entityHint, intentResult, conversationState) {
-        if (isNonEmptyString(entityHint)) return { entityValue: entityHint, entitySource: "explicit-hint" };
-        if (isNonEmptyString(intentResult.entity.value)) {
+        const normalizedText = intentResult.normalizedText;
+        // SA-8 PHASE 4 regression fix (real, traced, not assumed; this
+        // function's own priority order below — entityHint, then the
+        // engine's own entity.value, then conversationState — and the
+        // pre-existing ambiguity guard on the LAST tier are otherwise
+        // completely unchanged from before this fix). Every tier
+        // previously trusted its own non-empty candidate unconditionally,
+        // with no check for whether the CURRENT turn's own text actually
+        // names a real, DIFFERENT application than that candidate. Real,
+        // reproduced case: "InterestOS inamsaidia mtu na nini?" asked
+        // right after discussing ChurchOS — "InterestOS" is not in
+        // SemanticIntentEngine's own KNOWN_ENTITIES list (a pre-existing,
+        // disclosed gap, same class as MpesaOS/PharmacyOS), so both
+        // entityHint (cozy-living-assistant.js's own contextualEntityName,
+        // carried from the PRIOR turn) and the engine's own entity.value
+        // (resolvedVia:"contextual-carryover") agreed on the SAME stale
+        // "ChurchOS". Before SA-8 Phase 2's own goal-pattern additions,
+        // this was harmless: the primary engine's own ambiguity.detected
+        // stayed true with goal:null, so resolveGoal() always fell to
+        // CLARIFICATION before this stale entity was ever used to build
+        // a plan. Phase 2's new supplementary "saidia" pattern made a
+        // real goal (HUMAN_BENEFIT) reachable here for the first time
+        // even while ambiguity.detected stays true — silently promoting
+        // the SAME stale entity into a real, wrong-entity ChurchOS plan.
+        // The precise fix: before trusting ANY candidate at any tier,
+        // confirm the current text does not itself literally name a
+        // different real application (textNamesADifferentKnownApplication,
+        // above) — if it does, that candidate is skipped, so this
+        // function honestly falls through toward NO_ENTITY_RESOLVED
+        // rather than answering about the wrong application. This check
+        // alone is sufficient and precise: a genuinely bare, entity-less
+        // follow-up ("Ina umuhimu gani?") names no application at all, so
+        // it is never rejected by this check and still correctly inherits
+        // context exactly as before — confirmed by this file's own
+        // existing "CONTEXTUAL FOLLOW-UP" regression fixture.
+        if (isNonEmptyString(entityHint) && !textNamesADifferentKnownApplication(normalizedText, entityHint)) {
+            return { entityValue: entityHint, entitySource: "explicit-hint" };
+        }
+        if (isNonEmptyString(intentResult.entity.value) && !textNamesADifferentKnownApplication(normalizedText, intentResult.entity.value)) {
             return { entityValue: intentResult.entity.value, entitySource: intentResult.entity.resolvedVia === "explicit" ? "engine-explicit" : "engine-context-carryover" };
         }
         const safeToInherit = !(intentResult.ambiguity && intentResult.ambiguity.detected);
-        if (safeToInherit && conversationState && isNonEmptyString(conversationState.lastDiscussedApplication)) {
+        if (safeToInherit && conversationState && isNonEmptyString(conversationState.lastDiscussedApplication)
+            && !textNamesADifferentKnownApplication(normalizedText, conversationState.lastDiscussedApplication)) {
             return { entityValue: conversationState.lastDiscussedApplication, entitySource: "context-inherited" };
         }
         return { entityValue: null, entitySource: null };

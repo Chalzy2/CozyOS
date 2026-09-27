@@ -152,6 +152,59 @@
             const detected = await detectRealBrowserProvider();
             if (detected) { this.register(detected); return true; }
             return false;
+        },
+
+        /**
+         * getAvailabilitySnapshot() — SA-8 PHASE 4 (Provider-Agnostic
+         * Capability Audit & Availability Contract) addition. Real,
+         * additive — extends this EXISTING registry (list()/get(),
+         * both untouched) rather than building a second translation
+         * registry. For every registered provider, returns its real,
+         * declared capability flags plus an honestly-computed
+         * `availability`:
+         *   AVAILABLE_OFFLINE / AVAILABLE_ONLINE - the provider's own
+         *     isAvailable() (already real for nllb-bridge — a live
+         *     /health re-check, per that file's own header) resolved
+         *     true; offline/online decided by its supportsOffline flag.
+         *   REGISTERED_BUT_INACTIVE - isAvailable() resolved false (a
+         *     real, disclosed example today: the local NLLB bridge
+         *     process is not running).
+         *   UNKNOWN - the provider implements no isAvailable() at all
+         *     (e.g. browser-native, which is only ever registered when
+         *     genuinely detected — see autoDetectBrowserProvider() — so
+         *     its registration alone is real signal, but this registry
+         *     never assumes a registered provider stays available
+         *     without asking it). Never silently promoted to available.
+         * Times out any single slow isAvailable() rather than blocking
+         * the whole snapshot; never makes a network call of its own —
+         * only awaits whatever each provider's own check already does.
+         */
+        async getAvailabilitySnapshot({ timeoutMs = 2000 } = {}) {
+            const providers = Array.from(_providers.values());
+            const entries = await Promise.all(providers.map(async (provider) => {
+                let availability = "UNKNOWN";
+                if (typeof provider.isAvailable === "function") {
+                    try {
+                        const resolved = await Promise.race([
+                            provider.isAvailable(),
+                            new Promise((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+                        ]);
+                        if (resolved === true) availability = provider.supportsOffline === true ? "AVAILABLE_OFFLINE" : "AVAILABLE_ONLINE";
+                        else if (resolved === false) availability = "REGISTERED_BUT_INACTIVE";
+                        else availability = "UNKNOWN";
+                    } catch (_err) {
+                        availability = "REGISTERED_BUT_INACTIVE";
+                    }
+                }
+                return Object.freeze({
+                    name: provider.name, type: provider.type, availability,
+                    supportsRealtime: provider.supportsRealtime === true,
+                    supportsOffline: provider.supportsOffline === true,
+                    supportsAutoDetect: provider.supportsAutoDetect === true,
+                    supportsStreaming: provider.supportsStreaming === true,
+                });
+            }));
+            return Object.freeze(entries);
         }
     };
 

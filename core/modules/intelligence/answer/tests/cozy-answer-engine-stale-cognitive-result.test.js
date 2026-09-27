@@ -127,17 +127,31 @@ function loadFullStack() {
 
 test('A: a stale cognitiveResult inherited from the PREVIOUS turn\'s conversationState (real resolveContextualEntity() fallback, entity=ChurchOS) is discarded when the CURRENT turn\'s real entityHint names a different application (MpesaOS) — the answer is about MpesaOS, not ChurchOS', async () => {
     const { answerEngine, planner } = loadFullStack();
-    // Faithful to the real SA-3B bridge call shape: CURRENT turn's own
-    // text, OLD conversationState (as it existed before this turn's
-    // update), NO entityHint — semantic-answer-interpretation-provider.js
-    // line 174, confirmed by direct reading.
+    // SA-8 PHASE 4 update (real, traced, not a weakening): this
+    // cognitiveResult now has to be constructed from a genuinely
+    // successful PREVIOUS-turn computation — a real question actually
+    // about ChurchOS — rather than reproducing the bridge's own
+    // resolveContextualEntity() fallback on a MpesaOS-shaped question
+    // text. That specific reproduction recipe is the exact upstream gap
+    // SA-8 Phase 4 closed directly in resolveContextualEntity() itself
+    // (textNamesADifferentKnownApplication() — see semantic-answer-
+    // planner.js): a question whose own text literally names a
+    // different known application than the one about to be inherited
+    // now honestly fails closed (NO_ENTITY_RESOLVED) instead of
+    // confidently returning the wrong entity, so it can no longer be
+    // used to manufacture a "confidently wrong" cognitiveResult here.
+    // The real defect class this test exists to guard — a genuinely
+    // stale, previously-cached plan (from an ACTUAL prior turn) being
+    // blindly reused for a new turn naming a new entity — is unaffected
+    // by that upstream fix and is reproduced faithfully below.
     const bridgeComputedCognitiveResult = planner.planAnswer({
-        text: 'What does MpesaOS do?',
+        text: 'What does ChurchOS do?',
         actorId: 'wave7a-actor-a',
         conversationState: { lastIntent: null, lastApplication: 'ChurchOS', lastDiscussedApplication: 'ChurchOS', lastLanguage: 'en' },
     });
-    // Confirms the real, pre-existing SA-3 inheritance fallback actually
-    // fires here (this is the defect's real cause, not a synthetic stand-in).
+    // Confirms this IS a real, successful, ChurchOS-shaped plan — the
+    // exact real "previous turn" result Wave 7a's own repair must
+    // discard once the CURRENT turn's entityHint disagrees with it.
     assert.equal(bridgeComputedCognitiveResult.success, true);
     assert.equal(bridgeComputedCognitiveResult.plan.entity.value, 'ChurchOS');
 
