@@ -277,6 +277,12 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
         // conversational turn has actually resolved one - never
         // guessed, never defaulted to Kiswahili.
         #currentLanguage = null;
+        // Universal CozyOS Voice — Phase 1/2 (progressive speech + stale-
+        // response protection). A real, monotonically-increasing per-turn
+        // id, threaded through as VoiceManager.speakProgressive()'s
+        // responseId only for correlation/debugging (see that method's
+        // own header) — never read back or branched on by this file.
+        #speechTurnCounter = 0;
         // UNIVERSAL LANGUAGE SEAM — the richer cozy.language-identity.v1
         // object (source/confidence/dialectRegion/conflict/detectedLanguages/
         // mixedLanguage) window.CozyOS.CozyLanguageIdentifier.resolveLanguageIdentity()
@@ -647,6 +653,18 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
 
         /** #send() — composes LivingAI.think() (real state/sounds/cognitive-diagnostics side effects, unchanged) AND the verified Question -> Context -> Answer -> Advisor chain (CHECKPOINT K, real conversational answer source). Never a second reasoning/answer/advisor engine. */
         async #send(text) {
+            // Universal CozyOS Voice — Phase 2 (queue + interruption): a
+            // new user message immediately cancels any still-speaking or
+            // queued reply from the PREVIOUS turn — real
+            // speechSynthesis.cancel(), not just "stop queuing more."
+            // speakProgressive() below (via #speak()) also self-supersedes
+            // on its own, but that only happens once the NEW reply is
+            // ready; this call closes the gap between "user sent a new
+            // message" and "the new reply's speech starts," so stale
+            // speech never keeps talking after the conversation has
+            // already moved on.
+            const vmForCancel = window.CozyOS && window.CozyOS.VoiceManager;
+            if (vmForCancel && typeof vmForCancel.cancelSpeech === "function") { try { vmForCancel.cancelSpeech(); } catch (_err) { /* honest no-op */ } }
             this.#addMessage("user", text);
             const actorId = this.#resolveActorId();
 
@@ -998,7 +1016,20 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
             }
         }
 
-        /** #speak() — composes the real VoiceManager, exactly as Founder Story's narration engine already does (M361 Stage 3). Never a second TTS path. */
+        /**
+         * #speak() — composes the real VoiceManager, exactly as Founder
+         * Story's narration engine already does (M361 Stage 3). Never a
+         * second TTS path.
+         *
+         * Universal CozyOS Voice — Phase 1/2: now calls
+         * VoiceManager.speakProgressive() instead of speak() — the SAME
+         * provider/fallback chain, just realized segment-by-segment so
+         * the first sentence can be heard immediately rather than after
+         * the whole reply. speakProgressive() itself real-cancels
+         * (speechSynthesis.cancel()) and supersedes any still-in-flight
+         * previous call before starting, so a new reply's speech always
+         * takes over immediately — never a second, independent request.
+         */
         #speak(text) {
             const vm = window.CozyOS && window.CozyOS.VoiceManager;
             // TTS language-propagation dependency (output-side counterpart
@@ -1019,7 +1050,9 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
             if (catalog && typeof catalog.resolveSpeakRequest === "function") {
                 try { request = catalog.resolveSpeakRequest(request); } catch (_err) { /* honest no-op — falls back to the request built above */ }
             }
-            if (vm && typeof vm.speak === "function") { try { vm.speak(request); } catch (_err) { /* honest no-op */ } }
+            request.responseId = `living-assistant-turn-${++this.#speechTurnCounter}`;
+            if (vm && typeof vm.speakProgressive === "function") { try { vm.speakProgressive(request); } catch (_err) { /* honest no-op */ } }
+            else if (vm && typeof vm.speak === "function") { try { vm.speak(request); } catch (_err) { /* honest no-op — degrades to the pre-Phase-1 single-shot call if this VoiceManager build doesn't have speakProgressive() yet */ } }
         }
 
         /** #wireVoiceInput() — composes the real SpeechRecognitionAdapter (singleton, per-tab, same real engine already used elsewhere in this codebase). Honestly disables the mic button if unavailable, never fakes listening. */

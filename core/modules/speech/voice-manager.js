@@ -104,6 +104,16 @@
         #lastSpokenProviderId = null;
         #diagnostics = { previewCalls: 0, fallbacksToCharles: 0, fallbacksToBrowser: 0, unavailable: 0 };
         #auditLog = [];
+        // Universal CozyOS Voice — Phase 1/2 (progressive speech + queue/
+        // cancellation). #activeSpeechToken is bumped on every
+        // speakProgressive()/cancelSpeech() call; a running loop compares
+        // its own captured token against the current one before AND after
+        // every awaited segment, so a superseded/cancelled sequence stops
+        // cleanly instead of continuing to speak stale segments. This is
+        // the ONE speech-lifecycle authority — no second queue/manager.
+        #speechState = "idle"; // idle | preparing | speaking | queued | cancelled | completed | error
+        #activeSpeechToken = 0;
+        #activeResponseId = null;
 
         constructor() { this.#loadSettings(); }
 
@@ -337,6 +347,122 @@
             this.#diagnostics.unavailable++;
             this.#lastSpokenProviderId = null;
             return { available: false, played: false, providerId: null, reason: "No provider — including Charles and this browser's generic voice — could speak this request." };
+        }
+
+        // ── PROGRESSIVE SPEECH + QUEUE/CANCELLATION (Universal CozyOS
+        // Voice — Phase 1/2) ─────────────────────────────────────────────
+        // Real, additive extension of the SAME speak()/fallback chain
+        // above — never a second TTS engine, provider registry, or
+        // dispatch path. speakProgressive() calls this.speak() once per
+        // real, punctuation-derived segment (via SpeechSegmenter, when
+        // loaded; honestly falls back to treating the whole text as one
+        // segment if it isn't), so the first segment can be heard while
+        // later segments are still being spoken in order — never
+        // re-synthesizing or re-resolving the response, only realizing it
+        // progressively. cancelSpeech()/a newer speakProgressive() call
+        // both invalidate any earlier in-flight sequence via the same
+        // token check, and both perform a REAL speechSynthesis.cancel()
+        // (the same real transport-control call already used by
+        // founder-story-narration.js's stop()) so a currently-playing
+        // browser utterance stops immediately rather than finishing on
+        // its own after the conversation has moved on.
+
+        #emitVoiceEvent(event, detail) {
+            const bus = window.CozyOS && window.CozyOS.PlatformEventBus;
+            if (bus && typeof bus.emit === "function") {
+                try { bus.emit(event, detail); } catch (_err) { /* non-fatal, matches living-tts.js's own pattern */ }
+            }
+        }
+
+        /** getSpeechState() — honest, fully-derived snapshot of the current progressive-speech lifecycle; never asserted independently of the real loop below. */
+        getSpeechState() { return { state: this.#speechState, responseId: this.#activeResponseId }; }
+
+        /**
+         * cancelSpeech()
+         *   Real, immediate cancellation: invalidates any in-flight
+         *   speakProgressive() sequence (its next check will observe the
+         *   bumped token and stop) AND calls the browser's own
+         *   speechSynthesis.cancel() so a currently-playing utterance
+         *   stops now, not after it finishes naturally. Honest no-op
+         *   (wasActive:false) if nothing was actually speaking/queued.
+         */
+        cancelSpeech() {
+            const wasActive = this.#speechState === "preparing" || this.#speechState === "speaking" || this.#speechState === "queued";
+            this.#activeSpeechToken++;
+            try { if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel(); } catch (_err) { /* honest no-op if unsupported */ }
+            if (wasActive) {
+                this.#speechState = "cancelled";
+                this.#emitVoiceEvent("voicemanager:speech-cancelled", { responseId: this.#activeResponseId, manual: true });
+            }
+            return { success: true, wasActive };
+        }
+
+        /**
+         * speakProgressive({ text, context, language, providerId, settingsId, voiceURI, responseId })
+         *   Splits `text` into real speakable segments and speaks them in
+         *   order through the existing speak()/fallback chain, starting
+         *   the first segment immediately rather than waiting for the
+         *   whole response. Superseding this call with another
+         *   speakProgressive() call (or cancelSpeech()) stops the earlier
+         *   sequence cleanly — checked both before starting a segment and
+         *   immediately after it resolves, so a mid-utterance supersede
+         *   (which also real-cancels the browser utterance, see above)
+         *   is honestly reported as `cancelled`, never misreported as a
+         *   provider error.
+         *
+         *   Returns: { available, played, providerId, reason, segmentsSpoken, cancelled }
+         */
+        async speakProgressive(request = {}) {
+            const token = ++this.#activeSpeechToken;
+            this.#activeResponseId = request.responseId || null;
+            try { if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel(); } catch (_err) { /* honest no-op if unsupported */ }
+            this.#speechState = "preparing";
+
+            const segmenter = window.CozyOS && window.CozyOS.SpeechSegmenter;
+            const segments = (segmenter && typeof segmenter.splitIntoSegments === "function")
+                ? segmenter.splitIntoSegments(request.text)
+                : (request.text && String(request.text).trim() ? [String(request.text).trim()] : []);
+
+            if (segments.length === 0) {
+                this.#speechState = "idle";
+                return { available: false, played: false, providerId: null, reason: "Empty text — nothing to speak.", segmentsSpoken: 0, cancelled: false };
+            }
+
+            let lastResult = null;
+            for (let i = 0; i < segments.length; i++) {
+                if (token !== this.#activeSpeechToken) {
+                    this.#emitVoiceEvent("voicemanager:speech-cancelled", { responseId: this.#activeResponseId, atSegment: i, totalSegments: segments.length });
+                    return { available: true, played: i > 0, providerId: lastResult ? lastResult.providerId : null, reason: "Superseded by a newer speech request.", segmentsSpoken: i, cancelled: true };
+                }
+                this.#speechState = "speaking";
+                this.#emitVoiceEvent("voicemanager:segment-started", { index: i, total: segments.length, text: segments[i], responseId: this.#activeResponseId });
+                lastResult = await this.speak({
+                    text: segments[i], context: request.context, language: request.language,
+                    providerId: request.providerId, settingsId: request.settingsId, voiceURI: request.voiceURI,
+                });
+                this.#emitVoiceEvent("voicemanager:segment-ended", { index: i, total: segments.length, result: lastResult, responseId: this.#activeResponseId });
+
+                // Staleness is checked BEFORE treating a failed segment as
+                // a real provider error — a cancel-triggered interruption
+                // resolves speak() with played:false too, and must be
+                // honestly reported as cancelled, not error.
+                if (token !== this.#activeSpeechToken) {
+                    this.#emitVoiceEvent("voicemanager:speech-cancelled", { responseId: this.#activeResponseId, atSegment: i + 1, totalSegments: segments.length });
+                    return { available: true, played: i > 0 || !!(lastResult && lastResult.played), providerId: lastResult ? lastResult.providerId : null, reason: "Superseded by a newer speech request.", segmentsSpoken: lastResult && lastResult.played ? i + 1 : i, cancelled: true };
+                }
+
+                if (!lastResult || !lastResult.played) {
+                    this.#speechState = "error";
+                    this.#emitVoiceEvent("voicemanager:speech-error", { responseId: this.#activeResponseId, atSegment: i, reason: lastResult && lastResult.reason });
+                    return { ...(lastResult || { available: false, played: false, providerId: null }), reason: (lastResult && lastResult.reason) || "No provider could speak this segment.", segmentsSpoken: i, cancelled: false };
+                }
+
+                if (i < segments.length - 1) this.#speechState = "queued";
+            }
+
+            this.#speechState = "completed";
+            this.#emitVoiceEvent("voicemanager:speech-completed", { responseId: this.#activeResponseId, totalSegments: segments.length });
+            return { ...lastResult, segmentsSpoken: segments.length, cancelled: false };
         }
 
         // ── RL-014 Platform Inspection Contract ─────────────────────────────
