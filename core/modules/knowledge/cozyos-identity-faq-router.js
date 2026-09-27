@@ -76,7 +76,8 @@
         COZYOS_NAME_MEANING: "COZYOS_NAME_MEANING",
         COZYOS_FUTURE: "COZYOS_FUTURE",
         COZYOS_PURPOSE: "COZYOS_PURPOSE",
-        COZYOS_COMMUNITY: "COZYOS_COMMUNITY"
+        COZYOS_COMMUNITY: "COZYOS_COMMUNITY",
+        COZYOS_HOW_HELPS: "COZYOS_HOW_HELPS"
     });
 
     // ── Trigger phrases per intent, EN + SW. Matching is substring/word- ─
@@ -263,6 +264,39 @@
         [INTENTS.COZYOS_COMMUNITY]: {
             en: ["how can people contribute to cozyos", "can i teach cozyos my language", "how do i join the african knowledge initiative"],
             sw: ["watu wanawezaje kuchangia cozyos", "naweza kufundisha cozyos lugha yangu", "nawezaje kujiunga na african knowledge initiative"]
+        },
+        // PRODUCTION ANSWER-PATH AUDIT — real Incognito production bug:
+        // the bare, no-named-beneficiary "how does CozyOS help
+        // (people)?" question (EN and, critically, its real Kiswahili
+        // phrasings) had NO trigger anywhere in this router, so it fell
+        // through to rule-based-conversational-provider.js's own
+        // "why-use-cozyos" case, which answers from the SAME real
+        // getWhyUseCozyOSFact() content this intent now also reads —
+        // but that case unconditionally wraps a non-English `lang` in
+        // cozy-language-templates.js's "no verified translation yet"
+        // disclosure, since WHY_USE_ANSWER had no Kiswahili sibling at
+        // the time. This intent does not re-author that content (see
+        // ANSWER_BUILDERS below, which reads window.CozyOS.
+        // CozyPublicKnowledge.getWhyUseCozyOSFact() directly) — it only
+        // gives this specific, already-answered question a real trigger
+        // so the router matches BEFORE that older English-only path
+        // ever runs, letting the caller's own real detected language
+        // reach a real Kiswahili answer.
+        // Deliberately narrow and multi-word (never a bare "help"/
+        // "inasaidia" alone) so this does NOT re-capture the DIFFERENT,
+        // beneficiary-named question this router's own COZYOS_FUTURE
+        // history above explicitly removed a trigger for ("how can
+        // cozyos help communities/churches/schools" — that one still
+        // correctly falls through to the same getWhyUseCozyOSFact()
+        // content via cozy-ai.js's CONTEXT_KNOWLEDGE_ROUTES, unchanged).
+        // Every Kiswahili phrase below is an exact literal substring of
+        // the real, reported production query, so it matches
+        // deterministically via the substring check, never the fuzzy
+        // word-overlap fallback.
+        [INTENTS.COZYOS_HOW_HELPS]: {
+            en: ["what does cozyos help people with", "what does cozyos help with", "how does cozyos help people",
+                "how does cozyos help ordinary people", "what does cozyos help ordinary people with"],
+            sw: ["cozyos inasaidiaje", "cozyos inasaidia nini", "cozyos inasaidia watu vipi", "cozyos inawasaidiaje watu"]
         }
     };
 
@@ -506,6 +540,21 @@
                 en: `${c.summary} You can teach CozyAI things like ${_joinList(c.teachCozyAIExamples.slice(0, 4), "or")}. ${c.note}`,
                 sw: "Kila mtu anayependa anaweza kuwa mwanafunzi na mwalimu. Yeyote anayetaka kuhifadhi maarifa ya Kiafrika anakaribishwa kuchangia — kwa mfano maneno 10, misemo miwili muhimu, methali moja, hadithi moja, au mila moja ya kitamaduni. Michango midogo kutoka kwa watu wengi inakuwa hazina ya maarifa ya kudumu kwa vizazi vijavyo."
             };
+        },
+        // Reads window.CozyOS.CozyPublicKnowledge directly (not `id` =
+        // DeveloperIdentity, unlike every other builder above) — see
+        // the TRIGGERS comment above for why: this intent composes the
+        // SAME real, single content authority the older "why-use-
+        // cozyos" case already used for English, now given a real
+        // Kiswahili sibling there too. No new fact, no new authority.
+        [INTENTS.COZYOS_HOW_HELPS]: () => {
+            const source = window.CozyOS && window.CozyOS.CozyPublicKnowledge;
+            if (!source || typeof source.getWhyUseCozyOSFact !== "function") {
+                return { en: "", sw: "", known: false };
+            }
+            const en = source.getWhyUseCozyOSFact("en");
+            const sw = source.getWhyUseCozyOSFact("sw");
+            return { en: en.answer, sw: sw.answer, known: true };
         }
     };
 

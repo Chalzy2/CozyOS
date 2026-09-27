@@ -87,6 +87,28 @@
         "CozyOS exists to solve practical, everyday problems — for individuals, churches, schools, and communities — rather than technology for its own sake. It's built community-oriented and offline-first, with strong support for local languages, so useful tools, information, and media stay accessible even without a reliable internet connection. The wider goal is for African communities to help create technology, not only consume it, while remaining open to contributors, developers, translators, and supporters from anywhere who want to help build it. CozyOS stays honest about what's actually working, what's still being built, and what isn't available yet, rather than overstating its own readiness.";
 
     /**
+     * WHY_USE_ANSWER_SW
+     *   PRODUCTION ANSWER-PATH AUDIT (real Incognito production bug fix)
+     *   — real, hand-authored Kiswahili articulation of the SAME
+     *   underlying facts as WHY_USE_ANSWER above (practical everyday
+     *   problems for individuals/churches/schools/communities,
+     *   offline-first/local-language orientation, honesty about what's
+     *   working vs. still being built) — not a machine translation of
+     *   the English string, same authoring discipline already used for
+     *   every other bilingual pair in this repository (e.g. this
+     *   router's sibling cozyos-identity-faq-router.js's own
+     *   ANSWER_BUILDERS). Composed, never duplicated: callers that want
+     *   this content in Kiswahili now get this real sibling directly
+     *   instead of the English string being wrapped in an apologetic
+     *   "no verified translation yet" disclosure by
+     *   cozy-language-templates.js's "why-use-cozyos:verified" sw frame
+     *   — which was the real root cause traced for the "CozyOS
+     *   inasaidiaje?" Live Window production symptom.
+     */
+    const WHY_USE_ANSWER_SW =
+        "CozyOS inasaidia watu kutatua changamoto za kila siku kwa urahisi zaidi, badala ya kuwa teknolojia kwa ajili yake yenyewe. Kwa mtu binafsi, inasaidia kupata huduma, taarifa, na zana muhimu kwa njia rahisi na kwa lugha anayoifahamu. Kwa makanisa, shule, na jamii, inasaidia kupanga shughuli, kuhudumia watu, na kuhifadhi maarifa muhimu — ikiwa imejengwa kufanya kazi hata pale mtandao hautegemewi. Lengo kubwa zaidi ni jamii za Kiafrika kushiriki kujenga teknolojia, si kuitumia tu, huku ikiwa wazi kwa wachangiaji, watengenezaji, wafasiri, na wasaidizi kutoka mahali popote wanaotaka kusaidia kuijenga. CozyOS inabaki wazi kuhusu kile kinachofanya kazi kwa sasa, kile kinachoendelea kujengwa, na kile ambacho hakijakamilika bado, badala ya kujidai zaidi ya uwezo wake halisi.";
+
+    /**
      * DIFFERENTIATION_ANSWER
      *   Condenses "Why Someone Might Prefer CozyOS." Deliberately
      *   preserves the source document's own explicit constraint: never
@@ -143,13 +165,25 @@
     }
 
     /**
-     * getWhyUseCozyOSFact()
+     * getWhyUseCozyOSFact(language)
      *   Always VERIFIED — this file's own committed content is its
      *   evidence source, so there is no live dependency that can be
      *   "missing" the way founder/list-apps/list-providers can be.
+     *
+     *   language: optional. Omitted/anything other than "sw" returns
+     *   the original English answer, byte-identical to before this
+     *   parameter existed — every pre-existing caller (e.g. the rule-
+     *   based conversational provider's own "why-use-cozyos" case,
+     *   which still calls this with no arguments) is unaffected.
+     *   "sw" returns the real, hand-authored WHY_USE_ANSWER_SW sibling
+     *   directly, so a caller that already knows it wants a Kiswahili
+     *   answer (e.g. cozyos-identity-faq-router.js's new
+     *   COZYOS_HOW_HELPS intent) never has to route English text
+     *   through a "translation not verified" disclosure wrapper.
      */
-    function getWhyUseCozyOSFact() {
-        return { evidence: "VERIFIED", answer: WHY_USE_ANSWER, source: SOURCE_DOC };
+    function getWhyUseCozyOSFact(language) {
+        const answer = language === "sw" ? WHY_USE_ANSWER_SW : WHY_USE_ANSWER;
+        return { evidence: "VERIFIED", answer, language: language === "sw" ? "sw" : "en", source: SOURCE_DOC };
     }
 
     /** getDifferentiationFact() — same VERIFIED-by-committed-content basis as above. */
