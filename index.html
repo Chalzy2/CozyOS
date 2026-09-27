@@ -201,6 +201,12 @@
 <script src="core/plugins/pharmacyOS-core.js"></script>
 <script src="core/modules/Cozy-Authenticator/authenticator.js"></script>
 <script src="core/modules/intelligence/media/cozy-media-intelligence.js"></script>
+<!-- Universal CozyOS Voice — Application Integration Matrix, Live
+     Camera Capture row (VOICE-APPLICATION-INTEGRATION-AUDIT.md 5.1) —
+     same real-engine-loading fix as dashboard.html; see that file's
+     own comment. -->
+<script src="core/engines/camera/browser-camera-provider.js"></script>
+<script src="core/engines/video/live-video-capture-engine.js"></script>
 <script src="core/engines/video/ui/cozy-live-camera-capture-app.js"></script>
 <script src="core/shell/live/cozy-live-session.js"></script>
 <script src="core/connectivity/ui/cozy-live-connectivity-app.js"></script>
@@ -510,6 +516,13 @@
 <script src="core/shell/learning-panel-ui.js"></script>
 <script src="core/shell/user-dashboard.js"></script>
 <script src="core/living/cozy-living-assistant.js"></script>
+<!-- Universal CozyOS Voice — Application Integration Matrix, Live
+     Camera Capture row: same real-engine-event bridge as dashboard.html
+     (see that file's own comment); live-video-capture-engine.js is
+     loaded earlier on this page (with browser-camera-provider.js). No
+     LDCESessionEngine on this page, so the Live Session bridge is not
+     wired here — it is added only where its real dependency exists. -->
+<script src="core/engines/video/live-camera-capture-voice-bridge.js"></script>
 <script src="core/shell/startup-orchestrator.js"></script>
 <script src="core/shell/launch-sequence.js?v=2"></script>
 <script>

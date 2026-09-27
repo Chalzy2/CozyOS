@@ -269,6 +269,17 @@
 <script src="core/plugins/pharmacyOS-core.js"></script>
 <script src="core/modules/Cozy-Authenticator/authenticator.js"></script>
 <script src="core/modules/intelligence/media/cozy-media-intelligence.js"></script>
+<!-- Universal CozyOS Voice — Application Integration Matrix, Live
+     Camera Capture row (VOICE-APPLICATION-INTEGRATION-AUDIT.md 5.1):
+     the App facade below composes window.CozyOS.LiveVideoCapture, but
+     the engine that actually defines it was never script-loaded on
+     this page — only its facade was. Its real, already-emitted
+     capture events (previewStarted/recordStarted/error/etc.) were
+     therefore unreachable from this page under any name. Loading the
+     real engine + its one real dependency here closes that gap; no
+     behavior of either file changes. -->
+<script src="core/engines/camera/browser-camera-provider.js"></script>
+<script src="core/engines/video/live-video-capture-engine.js"></script>
 <script src="core/engines/video/ui/cozy-live-camera-capture-app.js"></script>
 <script src="core/shell/live/cozy-live-session.js"></script>
 <script src="core/connectivity/ui/cozy-live-connectivity-app.js"></script>
@@ -751,6 +762,14 @@
      after both dependencies so its own auto-install() call finds them
      already attached to window.CozyOS. See that file's own header. -->
 <script src="core/shell/live/live-session-voice-bridge.js"></script>
+<!-- Universal CozyOS Voice — Application Integration Matrix, Live
+     Camera Capture row: subscribes to LiveVideoCapture's real,
+     already-existing capture events (loaded above, alongside its
+     browser-camera-provider.js dependency) and forwards them through
+     the same LivingAssistant.announceStatus() entry point. Placed
+     after both dependencies for the same reason as the Live Session
+     bridge above. See that file's own header. -->
+<script src="core/engines/video/live-camera-capture-voice-bridge.js"></script>
 <!-- PHASE 4 (Universal Language Capability / "ONE Live Window" rule):
      real cross-page hand-off consumer for the real, disclosed
      sessionStorage key InterestOS's own "Ask CozyAI" button sets (see
