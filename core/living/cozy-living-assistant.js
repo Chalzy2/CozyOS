@@ -1073,6 +1073,30 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
             }
             micBtn.addEventListener("click", () => {
                 if (asr.isActive()) { asr.stop(); return; }
+                // Universal CozyOS Voice — Phase 3 (Kiswahili-first ASR
+                // default). Real bug this closes: before a single
+                // conversational turn has happened, #currentLanguage is
+                // still null, so the FIRST mic utterance of a session
+                // fell straight through to SpeechRecognitionAdapter's own
+                // generic "en-US" default — a Kiswahili-first user's very
+                // first spoken question was recognized as English. Fixed
+                // by consulting the SAME real, already-persisted
+                // per-user preference the login language selector itself
+                // writes (IdentityEngine.setLanguagePreference(), M212 —
+                // never a new settings store) before falling through to
+                // that generic default. Still generic, not a Kiswahili-
+                // specific branch: whichever language the user actually
+                // registered benefits identically, and an unauthenticated/
+                // preference-less session degrades to the exact prior
+                // behavior.
+                let firstUtteranceLanguage = null;
+                if (!this.#currentLanguage) {
+                    const identity = window.CozyOS && window.CozyOS.IdentityEngine;
+                    const actorId = this.#resolveActorId();
+                    if (identity && actorId && typeof identity.getLanguagePreference === "function") {
+                        try { firstUtteranceLanguage = identity.getLanguagePreference(actorId) || null; } catch (_err) { firstUtteranceLanguage = null; }
+                    }
+                }
                 // Kiswahili Capability Dependency #2 — requests
                 // recognition in the current conversational language
                 // (Dependency #2's own new #currentLanguage state, set
@@ -1081,11 +1105,13 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
                 // English. Generic wiring, not a Kiswahili-specific
                 // branch: any language the existing conversational
                 // provider resolves benefits identically. When no real
-                // language has been resolved yet, languageCode is
-                // omitted entirely, so SpeechRecognitionAdapter's own
+                // per-turn language has been resolved yet AND no real
+                // persisted user preference exists either, languageCode
+                // is omitted entirely, so SpeechRecognitionAdapter's own
                 // existing "en-US" default applies exactly as before -
                 // the existing fallback is preserved, not replaced.
-                asr.start(this.#currentLanguage ? { continuous: false, interimResults: false, languageCode: this.#currentLanguage } : { continuous: false, interimResults: false });
+                const effectiveLanguage = this.#currentLanguage || firstUtteranceLanguage;
+                asr.start(effectiveLanguage ? { continuous: false, interimResults: false, languageCode: effectiveLanguage } : { continuous: false, interimResults: false });
             });
         }
 
