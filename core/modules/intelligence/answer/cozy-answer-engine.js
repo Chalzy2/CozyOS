@@ -370,16 +370,29 @@
         // No new entity-resolution system, no new comparison authority —
         // this reuses the exact two signals the real call chain already,
         // separately, computes.
+        // SA-8 PHASE 2 (§ latency instrumentation) — real, minimal timing,
+        // never a performance-optimization project: just enough to tell
+        // apart "SemanticIntentEngine + evidence retrieval" (planAnswer())
+        // from "language realization" (repairLoop.realizeValidated())
+        // from total time, so a real regression in either stage is
+        // distinguishable later. When cognitiveResult is reused (already
+        // computed earlier this same turn by CognitiveCoordinator),
+        // semanticMs is honestly reported as 0 rather than re-timed work
+        // that did not actually happen on this call.
+        const timingStart = Date.now();
         let planResult;
+        let reusedCognitiveResult = false;
         const cachedEntityValue = cognitiveResult && cognitiveResult.plan && cognitiveResult.plan.entity && cognitiveResult.plan.entity.value;
         const cachedEntityAgreesWithThisTurn = !isNonEmptyString(entityHint)
             || (isNonEmptyString(cachedEntityValue) && cachedEntityValue.trim().toLowerCase() === entityHint.trim().toLowerCase());
         if (cognitiveResult && cognitiveResult.success === true && cognitiveResult.plan && cognitiveResult.plan.goal && cachedEntityAgreesWithThisTurn) {
             planResult = cognitiveResult;
+            reusedCognitiveResult = true;
         } else {
             try { planResult = planner.planAnswer({ text: question, actorId, entityHint, requestedLanguage: language }); }
             catch (_err) { return null; }
         }
+        const timingAfterPlan = Date.now();
         if (!planResult || !planResult.success) return null;
 
         const plan = planResult.plan;
@@ -407,9 +420,18 @@
                 actorContext: (typeof actorId === "string" && actorId.trim() && actorId !== "anonymous") ? { actorId } : null,
             });
         } catch (_err) { return null; }
+        const timingAfterRealize = Date.now();
         if (!outcome || !outcome.success) return null;
 
-        return { plan, candidate: outcome.candidate, evidence: planResult.evidence || [] };
+        return {
+            plan, candidate: outcome.candidate, evidence: planResult.evidence || [],
+            timing: {
+                semanticInterpretationAndEvidenceMs: reusedCognitiveResult ? 0 : (timingAfterPlan - timingStart),
+                generationMs: timingAfterRealize - timingAfterPlan,
+                totalMs: timingAfterRealize - timingStart,
+                reusedCognitiveResult,
+            },
+        };
     }
 
     /**
@@ -767,7 +789,7 @@
         // question it declines falls through unchanged. ---
         const semanticConstruction = await tryConstructSemanticAnswer({ question, actorId, entityHint, language, cognitiveResult });
         if (semanticConstruction) {
-            const { plan, candidate, evidence } = semanticConstruction;
+            const { plan, candidate, evidence, timing } = semanticConstruction;
             return {
                 answer: candidate.text,
                 intent: plan.goal,
@@ -780,7 +802,11 @@
                 reasoningUsed: candidate.evidenceIds.length > 1,
                 contextUsed: ctxResults,
                 businessDataConversationState, teachDataConversationState,
-                cognitiveContext
+                cognitiveContext,
+                // SA-8 Phase 2 — real, minimal timing diagnostics (see
+                // tryConstructSemanticAnswer()'s own comment). Additive
+                // field; no existing consumer reads or requires it.
+                constructionTiming: timing || null,
             };
         }
 

@@ -181,8 +181,32 @@
      * not conjugated.
      */
     const SUPPLEMENTARY_GOAL_PATTERNS = Object.freeze({
-        HUMAN_BENEFIT: { sw: [/\bumuhimu\b/i, /faidika/i], en: [/\bimportant\b/i, /\bbenefit(?:s|ed|ing)?\b/i] },
-        PRACTICAL_WORK_CONTRIBUTION: { sw: [/changia/i, /\bmchango\b/i], en: [/\bcontribut(?:e|es|ion|ing)\b.*\bwork\b/i, /\bhelps?\s+with\s+(?:our|my|the|daily)\s+work\b/i] },
+        // SA-8 Phase 2 (Fresh Generative Sentence Construction) addition —
+        // real trace, not assumed: natural "how can/could/does X help
+        // me/us" (en) and "X inaweza kunisaidiaje/kusaidiaje" (sw)
+        // phrasings were empirically confirmed (real dashboard.html probe,
+        // 4 genuinely novel questions) to match ZERO of SemanticIntentEngine's
+        // own primary GOAL_MAP patterns (ambiguity reason: "no_pattern_matched")
+        // AND zero of this file's own pre-existing supplementary patterns
+        // (umuhimu/faidika/important/benefit — all literal "importance/
+        // benefit" nouns, none covering the ordinary verb "help"/"saidia"
+        // itself). Every one of those 4 questions fell all the way through
+        // to CLARIFICATION instead of engaging the real, evidence-grounded
+        // HUMAN_BENEFIT construction path that already exists and already
+        // works correctly once the goal resolves. /saidia/i (no leading
+        // \b, same Kiswahili-verb-stem convention as changia/mchango
+        // above — subject/tense prefixes fuse onto the stem with no
+        // space: "kunisaidiaje" = ku+ni+saidia+je, "itasaidia" = ita+saidia)
+        // and /\bhelp(?:s|ed|ing)?\b/i are the real, minimal additions.
+        HUMAN_BENEFIT: { sw: [/\bumuhimu\b/i, /faidika/i, /saidia/i], en: [/\bimportant\b/i, /\bbenefit(?:s|ed|ing)?\b/i, /\bhelp(?:s|ed|ing)?\b/i] },
+        // /punguza/i ("kupunguza kazi" = reduce/lessen work) — the same
+        // real trace's 4th question ("...kupunguza kazi za admin?")
+        // matched neither changia/mchango nor any primary-engine pattern;
+        // "reducing work" is semantically the same PRACTICAL_WORK_CONTRIBUTION
+        // shape as "contributing to work," just phrased as relief rather
+        // than addition — same real evidence fields (GOAL_FIELD_MAP below
+        // is unchanged), never a new goal or a new evidence source.
+        PRACTICAL_WORK_CONTRIBUTION: { sw: [/changia/i, /\bmchango\b/i, /punguza/i], en: [/\bcontribut(?:e|es|ion|ing)\b.*\bwork\b/i, /\bhelps?\s+with\s+(?:our|my|the|daily)\s+work\b/i, /\breduc(?:e|es|ing)\b.*\bwork\b/i] },
         DIFFERENTIATION: { sw: [/\btofauti\s+na\b/i], en: [/\bdifferen(?:t|ce)s?\s+from\b/i, /\bdiffers?\s+from\b/i] },
         VALUE: { sw: [/\bthamani\b/i], en: [/\bworth\s+it\b/i, /\bvalue\b/i] },
     });
@@ -273,8 +297,21 @@
         // SemanticIntentEngine found nothing real (goal===null always
         // pairs with ambiguity.clarificationRequired===true — see this
         // file's own header). Try the narrow supplementary layer before
-        // conceding to clarification.
-        const supplementary = matchSupplementaryGoal(normalizedText);
+        // conceding to clarification — UNLESS the real engine's own
+        // ambiguity reason is "competing_goals": that reason means two
+        // genuinely different real intents were both detected (e.g. a
+        // purchase intent AND a benefit question in the same utterance),
+        // which is real, structural ambiguity about WHICH goal the user
+        // wants answered — never something a single narrow regex is
+        // entitled to silently pick a side on (SA-8 Phase 1's own
+        // clarification-intelligence guarantee: a competing-goals input
+        // always reaches its real clarifying question, never a guess).
+        // Every other ambiguity reason ("no_pattern_matched",
+        // "short_low_evidence_no_entity", etc.) means the real engine
+        // simply has no rule at all for this phrasing — nothing is
+        // competing, so the supplementary layer safely fills the gap.
+        const isCompetingGoals = !!(intentResult.ambiguity && intentResult.ambiguity.reasons && intentResult.ambiguity.reasons.includes("competing_goals"));
+        const supplementary = isCompetingGoals ? null : matchSupplementaryGoal(normalizedText);
         if (supplementary) return { goal: supplementary, goalSource: "supplementary-pattern", clarificationQuestion: null };
 
         if (intentResult.ambiguity && intentResult.ambiguity.clarificationRequired) {
@@ -286,6 +323,53 @@
     /** pathMatchesField(path, field) — real, matches SA-2's own real evidence.source.path convention ("...​.<field>" or "...​.<field>Sw"). */
     function pathMatchesField(path, field) {
         return typeof path === "string" && (path.endsWith("." + field) || path.endsWith("." + field + "Sw"));
+    }
+
+    /**
+     * SA-8 PHASE 2 (Fresh Generative Sentence Construction) addition —
+     * rankClaimsByRelevance(claims, questionText).
+     *
+     * Real trace, not assumed: probing the real dashboard.html with the
+     * project brief's own novel questions showed that two DIFFERENT
+     * novel phrasings of the SAME goal ("ChurchOS inaweza kusaidiaje kwa
+     * attendance ya branches zetu?" vs "...kama tuna waumini wengi na
+     * matawi kadhaa?") produced BYTE-IDENTICAL composed answers, even
+     * though real, grounded, attendance-specific evidence already exists
+     * in cozy-knowledge-registry.js's churchos entry ("better visibility
+     * into attendance and relevant church information" /
+     * "mwonekano bora wa mahudhurio na taarifa muhimu za kanisa") — it
+     * was just never surfaced first, because claims were always emitted
+     * in the evidence source's fixed authoring order regardless of what
+     * the specific question actually asked about.
+     *
+     * This is the minimal, grounded fix: rank the SAME claims (never
+     * invents, drops meaning, or adds a claim not already backed by a
+     * real evidence id) by real keyword overlap between the user's own
+     * normalized question text and each claim's own already-verified
+     * text, so the claims most relevant to THIS specific question
+     * surface first. When nothing overlaps (score is 0 for every claim),
+     * the original evidence-authoring order is left completely
+     * unchanged — this is a per-question SELECTION/ORDERING decision
+     * over existing verified evidence (still SA-3's "WHAT to
+     * communicate", never "HOW to word it"), not a new evidence source,
+     * not a second intent engine, not sentence generation.
+     */
+    function tokenizeForRelevance(text) {
+        return (isNonEmptyString(text) ? text : "").toLowerCase().match(/[a-z0-9]{4,}/gi) || [];
+    }
+
+    function rankClaimsByRelevance(claims, questionText) {
+        const questionTokens = new Set(tokenizeForRelevance(questionText));
+        if (questionTokens.size === 0 || claims.length < 2) return claims;
+        const scored = claims.map((claim, originalIndex) => {
+            const claimTokens = tokenizeForRelevance(claim.text);
+            let score = 0;
+            for (const t of claimTokens) if (questionTokens.has(t)) score++;
+            return { claim, score, originalIndex };
+        });
+        if (!scored.some((s) => s.score > 0)) return claims;
+        scored.sort((a, b) => (b.score - a.score) || (a.originalIndex - b.originalIndex));
+        return scored.map((s) => s.claim);
     }
 
     /**
@@ -608,11 +692,12 @@
             return { success: false, reason: "EVIDENCE_CONFLICT", goal, goalSource, entity: entityValue, language, conflictedEvidenceIds: conflicted.map((ev) => ev.id), diagnostics: { intentResult, entitySource, cognitiveStatus: classifyCognitiveStatus({ kind: "evidence-conflict" }) } };
         }
 
-        const claims = authoritative.map((ev, index) => ({
+        const unrankedClaims = authoritative.map((ev, index) => ({
             claimId: `claim-${index}`,
             text: ev.claim,
             evidenceIds: [ev.id],
         }));
+        const claims = rankClaimsByRelevance(unrankedClaims, intentResult.normalizedText || text);
 
         const built = window.CozyOS.SemanticAnswerPlanContract.create({
             goal,
