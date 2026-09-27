@@ -236,17 +236,28 @@
     // that particular knowledge getter isn't tried, CozyMemory/Living
     // Memory search still runs regardless.
     // ---------------------------------------------------------------
+    // UNIVERSAL LANGUAGE SEAM — Kiswahili keyword stems added alongside
+    // the original English ones (never replacing them), reusing the
+    // SAME real Kiswahili vocabulary already committed and verified
+    // elsewhere in this repository (cozyos-identity-faq-router.js's own
+    // sw TRIGGERS lists, cozy-language-templates.js's own sw frames) —
+    // not a new translation authority. Origin/founder Kiswahili entries
+    // are deliberately full/near-full phrases, not bare stems, so a
+    // "who founded it" question and a "why was it founded" question
+    // stay routed to their own distinct getters, the same discipline
+    // the English keyword lists already use for their own multi-word
+    // entries (e.g. "who made"/"who built" below).
     const CONTEXT_STORY_ROUTES = Object.freeze([
-        { keywords: ["vision"], getter: "getVisionFact" },
-        { keywords: ["mission"], getter: "getMissionFact" },
-        { keywords: ["why", "start", "started", "origin", "founded"], getter: "getProjectOriginFact" },
-        { keywords: ["history", "background"], getter: "getProjectHistoryFact" },
-        { keywords: ["story"], getter: "getPublicStoryFact" }
+        { keywords: ["vision", "maono"], getter: "getVisionFact" },
+        { keywords: ["mission", "dhamira", "kusudi"], getter: "getMissionFact" },
+        { keywords: ["why", "start", "started", "origin", "founded", "kwa nini cozyos ilianzishwa", "cozyos ilianzaje", "chanzo cha cozyos", "asili ya cozyos"], getter: "getProjectOriginFact" },
+        { keywords: ["history", "background", "historia"], getter: "getProjectHistoryFact" },
+        { keywords: ["story", "hadithi"], getter: "getPublicStoryFact" }
     ]);
     const CONTEXT_KNOWLEDGE_ROUTES = Object.freeze([
-        { keywords: ["architecture", "application", "app", "module", "system"], getter: "listApplicationsFact" },
-        { keywords: ["provider"], getter: "listProvidersFact" },
-        { keywords: ["founder", "creator", "who made", "who built", "who created"], getter: "getFounderFact" },
+        { keywords: ["architecture", "application", "app", "module", "system", "programu", "mfumo"], getter: "listApplicationsFact" },
+        { keywords: ["provider", "mtoa huduma", "watoa huduma"], getter: "listProvidersFact" },
+        { keywords: ["founder", "creator", "who made", "who built", "who created", "mwanzilishi", "muumbaji", "aliyeunda", "aliyeanzisha"], getter: "getFounderFact" },
         // UNIVERSAL QUESTION UNDERSTANDING REPAIR — real root cause of
         // the observed "How is human benefits with it in real life?" /
         // "Human benefits with cozyos" / "What problems does cozyos
@@ -280,8 +291,8 @@
         // this needs: never answer with PLATFORM-level content when the
         // question actually names a specific sub-application (that
         // remains getApplicationHumanPurposeFact()'s job).
-        { keywords: ["benefit", "gain", "useful", "usefulness"], getter: "getWhyUseCozyOSFact" },
-        { keywords: ["problem", "solve", "solving", "solves"], getter: "getWhyUseCozyOSFact" },
+        { keywords: ["benefit", "gain", "useful", "usefulness", "faida", "manufaa"], getter: "getWhyUseCozyOSFact" },
+        { keywords: ["problem", "solve", "solving", "solves", "tatizo", "matatizo", "kutatua"], getter: "getWhyUseCozyOSFact" },
         // LIVE WINDOW NEXT REPAIR — real production gap: "How can
         // cozyos helps churches" names no specific application (unlike
         // "How does ChurchOS help people?", which _mentionsNamedApplication()
@@ -291,8 +302,8 @@
         // stems did. getWhyUseCozyOSFact() already, honestly, names
         // churches/schools/communities as real beneficiaries (see the
         // comment above) — this was a routing gap, not a knowledge gap.
-        { keywords: ["help"], getter: "getWhyUseCozyOSFact" },
-        { keywords: ["important", "importance", "matter", "point of cozyos"], getter: "getDifferentiationFact" },
+        { keywords: ["help", "msaada", "kusaidia"], getter: "getWhyUseCozyOSFact" },
+        { keywords: ["important", "importance", "matter", "point of cozyos", "muhimu", "umuhimu"], getter: "getDifferentiationFact" },
         // LIVE WINDOW INCOGNITO REPAIR — real production gap: general
         // "I want to know more about CozyOS" / "Tell me more about
         // CozyOS" / "Learn more about CozyOS" phrasing shared no
@@ -306,7 +317,7 @@
         // PLATFORM_ONLY_GETTERS guard so a question naming a real,
         // specific sub-application still defers to that application's
         // own answer instead of this platform-level one).
-        { keywords: ["know more", "learn more", "more about cozyos", "tell me more"], getter: "getWhyUseCozyOSFact" },
+        { keywords: ["know more", "learn more", "more about cozyos", "tell me more", "jua zaidi kuhusu cozyos", "elezea zaidi kuhusu cozyos"], getter: "getWhyUseCozyOSFact" },
         // LIVE WINDOW INCOGNITO REPAIR — the bare general-description
         // question ("What is CozyOS?", "CozyOS ni nini?", "What can
         // CozyOS do?", "CozyOS inafanya nini?", "CozyOS ina msaada

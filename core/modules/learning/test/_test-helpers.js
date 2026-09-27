@@ -66,6 +66,14 @@ const PATHS = Object.freeze({
     activeLearning: path.join(__dirname, '..', 'adapters', 'active-learning.js'),
     learningPriority: path.join(__dirname, '..', 'adapters', 'learning-priority.js'),
     continuousLearningFabric: path.join(__dirname, '..', 'continuous-learning-fabric.js'),
+    // UNIVERSAL LANGUAGE SEAM — the shared identifier the fabric's own
+    // IDENTIFY LANGUAGE/DIALECT-REGION stage composes (see that file's
+    // own comment). Optional/additive to the load list below: any
+    // existing test that omits it exercises the fabric's honest,
+    // already-tested fallback ("no identifier loaded" -> trust
+    // input.candidateLanguage as given, byte-identical to before).
+    languageIdentityContract: path.join(__dirname, '..', '..', 'intelligence', 'language', 'language-identity-contract.js'),
+    languageIdentifier: path.join(__dirname, '..', '..', 'intelligence', 'language', 'cozy-language-identifier.js'),
 });
 
 function freshLoad(selectedKeys) {
@@ -212,7 +220,54 @@ function loadFullStackWithFabric() {
     };
 }
 
+/**
+ * UNIVERSAL LANGUAGE SEAM — same real stack as loadFullStackWithFabric(),
+ * PLUS the real CozyLanguageIdentifier (+ its language-identity-contract.js
+ * dependency), so the fabric's own IDENTIFY LANGUAGE/DIALECT-REGION stage
+ * has something real to compose. Kept as a SEPARATE loader (never folded
+ * into loadFullStackWithFabric() itself) so every one of that function's
+ * existing 217 callers keeps its exact, already-certified behavior
+ * (several genuinely omit candidateLanguage to test the "no language
+ * signal at all" path) — this is purely additive, new test surface only.
+ */
+function loadFullStackWithFabricAndIdentifier() {
+    const w = freshLoad([
+        'memoryEngine', 'sense', 'cozyLearn', 'safetyGate', 'languagePackRegistry', 'languageAcquisitionPipeline', 'languageKnowledgeModel',
+        'multimodalObservationCore', 'evidenceContract',
+        'observationContract', 'conceptContract', 'observationAdapter', 'observationLifecycle', 'evidenceBridge', 'conceptRegistry',
+        'observationStore', 'learningCorrelation', 'correctionLearning',
+        'knowledgeIngestion', 'searchEngine', 'searchLearnBridge',
+        'semanticIntent', 'knowledgeRegistry', 'publicKnowledge', 'planContract', 'cognitiveDecision', 'evidenceAdapter', 'knowledgeAdapter', 'planner',
+        'gapDetection', 'regressionGenerator', 'learningEvidenceSupplement',
+        'evidenceProfile', 'conflictDetection', 'languageGapRegistry', 'learningGapDiscovery', 'activeLearning', 'learningPriority',
+        'languageIdentityContract', 'languageIdentifier', 'continuousLearningFabric',
+    ]);
+    if (w.CozyOS.CozyLanguagePacks && typeof w.CozyOS.CozyLanguagePacks.registerDefaultPacks === 'function') {
+        w.CozyOS.CozyLanguagePacks.registerDefaultPacks();
+    }
+    return {
+        memory: w.CozyOS.CozyMemory,
+        sense: w.CozyOS.CozySense,
+        learn: w.CozyOS.CozyLearn,
+        adapter: w.CozyOS.MultimodalObservationAdapter,
+        lifecycle: w.CozyOS.ObservationLifecycle,
+        bridge: w.CozyOS.ObservationEvidenceBridge,
+        conceptRegistry: w.CozyOS.CanonicalConceptRegistry,
+        correlation: w.CozyOS.LearningCorrelation,
+        knowledge: w.CozyOS.CozyKnowledge,
+        evidenceProfile: w.CozyOS.EvidenceProfile,
+        conflictDetection: w.CozyOS.ConflictDetection,
+        languageGapRegistry: w.CozyOS.LanguageGapRegistry,
+        learningGapDiscovery: w.CozyOS.LearningGapDiscovery,
+        activeLearning: w.CozyOS.ActiveLearning,
+        learningPriority: w.CozyOS.LearningPriority,
+        identifier: w.CozyOS.CozyLanguageIdentifier,
+        fabric: w.CozyOS.ContinuousLearningFabric,
+        window: w,
+    };
+}
+
 const AUTHORIZED_CONSENT = Object.freeze({ authorized: true, scope: 'SELF', grantedBy: 'test-user' });
 const UNAUTHORIZED_CONSENT = Object.freeze({ authorized: false, scope: 'SESSION_PARTICIPANTS', grantedBy: null });
 
-module.exports = { PATHS, freshLoad, loadFullStack, loadFullStackWithPlanner, loadFullStackWithFabric, AUTHORIZED_CONSENT, UNAUTHORIZED_CONSENT };
+module.exports = { PATHS, freshLoad, loadFullStack, loadFullStackWithPlanner, loadFullStackWithFabric, loadFullStackWithFabricAndIdentifier, AUTHORIZED_CONSENT, UNAUTHORIZED_CONSENT };

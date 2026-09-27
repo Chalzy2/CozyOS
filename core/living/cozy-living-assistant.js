@@ -277,6 +277,21 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
         // conversational turn has actually resolved one - never
         // guessed, never defaulted to Kiswahili.
         #currentLanguage = null;
+        // UNIVERSAL LANGUAGE SEAM — the richer cozy.language-identity.v1
+        // object (source/confidence/dialectRegion/conflict/detectedLanguages/
+        // mixedLanguage) window.CozyOS.CozyLanguageIdentifier.resolveLanguageIdentity()
+        // returns for the CURRENT turn's text, alongside (never replacing)
+        // #currentLanguage above. #currentLanguage remains the one real,
+        // already-verified "which language to ANSWER in" signal (rule-
+        // based-conversational-provider.js's own resolveLanguage(), fed
+        // straight to CozyAnswerEngine.answer() below) — this field is
+        // purely additive metadata: honest disclosure of HOW that
+        // language was identified this turn (dialect/region, conflict
+        // with an explicit request, mixed-language input), available for
+        // CML-6 continuous-learning observation and any future dialect-
+        // aware STT/TTS wiring. null until a real turn has resolved one;
+        // never fabricated when the identifier module isn't loaded.
+        #currentLanguageIdentity = null;
         #conversationId = null; // M366.3 - lazily created once per session via #getOrCreateConversationId(), reused thereafter
         // UNIVERSAL QUESTION UNDERSTANDING REPAIR — real, confirmed gap:
         // rule-based-conversational-provider.js's own think() already
@@ -697,6 +712,35 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
             // guessing or defaulting to Kiswahili.
             if (result && result.success && result.result && result.result.language) {
                 this.#currentLanguage = result.result.language;
+            }
+
+            // UNIVERSAL LANGUAGE SEAM — resolve the richer identity
+            // object for THIS turn's raw text. This is NOT a second
+            // decision for which language to answer in — #currentLanguage
+            // above (the provider's own already-verified resolveLanguage())
+            // remains the sole, unchanged signal CozyAnswerEngine.answer()
+            // is called with below. This is purely additive: honest
+            // disclosure of dialect/region, conflict, and mixed-language
+            // signal for this turn, for CML-6 continuous-learning
+            // observation and any future dialect-aware STT/TTS wiring.
+            // conversationState carries the PRIOR turn's own identity
+            // object forward (captured before #currentLanguageIdentity is
+            // overwritten below), so a genuinely unresolved current turn
+            // can honestly inherit context via resolveLanguageIdentity()'s
+            // own CONVERSATION_CARRYOVER tier — which never overrides a
+            // confident current-turn detection, so this cannot make a
+            // clear English follow-up "stick" in Kiswahili the way the
+            // M363 comment above (Dependency #2) found naively carrying
+            // #currentLanguage itself forward would have.
+            const priorLanguageIdentity = this.#currentLanguageIdentity;
+            const identifier = window.CozyOS && window.CozyOS.CozyLanguageIdentifier;
+            if (identifier && typeof identifier.resolveLanguageIdentity === "function") {
+                try {
+                    this.#currentLanguageIdentity = identifier.resolveLanguageIdentity({
+                        text, modality: "text",
+                        conversationState: priorLanguageIdentity ? { languageIdentity: priorLanguageIdentity } : null
+                    });
+                } catch (_err) { /* honest no-op — never fabricate an identity */ }
             }
 
             // WAVE 1 (Cognitive-to-Answer Contract) — result.result.pipeline

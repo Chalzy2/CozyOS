@@ -220,12 +220,55 @@
         // is what EvidenceProfile's own independent-contributor tracking
         // actually reads.
         const term = termFromObservation(input, observation);
+
+        // --- IDENTIFY LANGUAGE + DIALECT/REGION (the first two of the
+        // four previously-missing lifecycle stages — UNIVERSAL LANGUAGE
+        // SEAM §17). Before this, every downstream stage below (EVIDENCE/
+        // GROUP/GAP/etc.) trusted input.candidateLanguage as given, with
+        // no real identification step of its own — a caller that got the
+        // language wrong (or omitted it) silently mis-tagged the shared
+        // evidence profile forever. window.CozyOS.CozyLanguageIdentifier
+        // (the SAME shared detector now composed by detectLanguageHeuristic()/
+        // detectLanguages() — no second detector) resolves a real identity
+        // for the observed term/text; an explicit input.candidateLanguage
+        // still always wins (EXPLICIT_USER_SELECTION outranks detection —
+        // see that module's own SOURCE priority), so no existing caller's
+        // behavior changes. dialectRegion is carried through honestly —
+        // null today for every real call (no dialect-detection logic
+        // exists yet anywhere in this repository), never fabricated;
+        // once real dialect signal exists in the identifier, it flows
+        // through here with zero further change to this file.
+        let languageIdentity = null;
+        const identifier = window.CozyOS.CozyLanguageIdentifier;
+        if (identifier && typeof identifier.resolveLanguageIdentity === "function" && isNonEmptyString(term)) {
+            // observation.modality is MultimodalObservationCore's own,
+            // DIFFERENT vocabulary ("TEXT"/"AUDIO"/"VISUAL"/...) — never
+            // the same enum as cozy.language-identity.v1's modality
+            // field ("text"/"voice"/"image-ocr"). Mapped honestly here;
+            // an unrecognized/absent value defaults to "text" (the
+            // language-identity-contract.js's own defensive guard also
+            // catches this, but mapping it correctly here means the
+            // disclosed modality on a real voice/OCR observation is
+            // accurate, not just non-crashing).
+            const identityModality = observation && observation.modality === "AUDIO" ? "voice"
+                : observation && observation.modality === "VISUAL" ? "image-ocr"
+                : "text";
+            try {
+                languageIdentity = identifier.resolveLanguageIdentity({
+                    text: term, modality: identityModality,
+                    explicitLanguage: input.candidateLanguage || null,
+                });
+            } catch (_err) { languageIdentity = null; }
+        }
+        const effectiveLanguage = input.candidateLanguage
+            || (languageIdentity && languageIdentity.languageId !== "UNKNOWN" ? languageIdentity.languageId : null);
+
         let profileResult = null, correlationResult = null, conflictResult = null, gapResult = null, activeLearningQuestion = null;
 
         const profiles = window.CozyOS.EvidenceProfile;
         if (profiles && isNonEmptyString(term)) {
             profileResult = profiles.recordOccurrence({
-                term, language: input.candidateLanguage, observation, meaning: input.meaning,
+                term, language: effectiveLanguage, observation, meaning: input.meaning,
                 contributorId: input.contributorId || input.actorId || null, contextLabel: input.contextLabel, actorId: SYSTEM_ACTOR,
             });
         }
@@ -235,7 +278,7 @@
         if (correlation && isNonEmptyString(term)) {
             let conceptId = input.conceptId || null;
             if (!conceptId && supplement) {
-                const existingMatches = supplement.findMatchingAttachments(term, input.candidateLanguage, SYSTEM_ACTOR);
+                const existingMatches = supplement.findMatchingAttachments(term, effectiveLanguage, SYSTEM_ACTOR);
                 if (existingMatches.length > 0) conceptId = existingMatches[0].conceptId;
             }
             if (conceptId) {
@@ -248,12 +291,12 @@
 
         const conflicts = window.CozyOS.ConflictDetection;
         if (conflicts && profileResult && profileResult.success) {
-            conflictResult = conflicts.checkAndRecordConflict({ term, language: input.candidateLanguage, profile: profileResult.profile, actorId: SYSTEM_ACTOR });
+            conflictResult = conflicts.checkAndRecordConflict({ term, language: effectiveLanguage, profile: profileResult.profile, actorId: SYSTEM_ACTOR });
         }
 
         const gapDiscovery = window.CozyOS.LearningGapDiscovery;
         if (gapDiscovery && isNonEmptyString(term) && !(correlationResult && correlationResult.success)) {
-            gapResult = gapDiscovery.discoverUnknownWordGap({ term, language: input.candidateLanguage, actorId: SYSTEM_ACTOR });
+            gapResult = gapDiscovery.discoverUnknownWordGap({ term, language: effectiveLanguage, actorId: SYSTEM_ACTOR });
         }
 
         const activeLearning = window.CozyOS.ActiveLearning;
@@ -278,17 +321,87 @@
             verificationQuality: input.verificationQuality || 0,
         }) : null;
 
+        // --- CONTINUE (the fourth previously-missing stage) — honest
+        // proof that the pipeline remains available across repeated
+        // observations, not a one-shot run: observationCount/lastObservedAt
+        // are read straight off EvidenceProfile's own real, persistent
+        // occurrence history (never a second counter), so they reflect
+        // every real call ever recorded for this exact term+language,
+        // across sessions. "Continuously" (per §17) means available and
+        // able to process the NEXT observation the moment it arrives —
+        // demonstrated structurally by this function being callable again
+        // immediately with no reset/re-init step, not by any polling loop.
+        const occurrences = profileResult && profileResult.success ? profileResult.profile.occurrences : [];
+
         return {
             success: true, deduplicated: false, observation,
+            languageIdentity, effectiveLanguage,
             profile: profileResult, correlation: correlationResult, conflict: conflictResult,
             gap: gapResult, activeLearningQuestion, priority,
+            observationCount: occurrences.length,
+            lastObservedAt: occurrences.length > 0 ? occurrences[occurrences.length - 1].occurredAt : null,
         };
     }
 
     // ---- thin governance/evidence/regression delegates (see header) ----
     function advanceToCandidate(observation, opts) { return window.CozyOS.ObservationLifecycle.toCandidate(observation, opts); }
     function advanceToValidated(observation, opts) { return window.CozyOS.ObservationLifecycle.toValidated(observation, opts); }
-    function advanceToVerified(observation, opts) { return window.CozyOS.ObservationLifecycle.toVerified(observation, opts); }
+    /**
+     * advanceToVerified(observation, opts)
+     *   UPDATE CAPABILITY (the third previously-missing stage) — when the
+     *   caller supplies opts.conceptId (+ optional opts.targetLanguages,
+     *   defaulting to just this observation's own candidateLanguage), a
+     *   successful promotion to VERIFIED is immediately followed by the
+     *   SAME, already-real LanguageGapRegistry.checkConceptLanguageCoverage()
+     *   this file already exposes as checkLanguageGaps() below — never a
+     *   second capability-tracking mechanism, just no longer requiring a
+     *   separate caller-remembered call. This is the real place newly-
+     *   VERIFIED evidence becomes reflected, disclosed CAPABILITY state
+     *   (open/closed LANGUAGE_GAP records) — the actual "usable by
+     *   CozyAI's semantic/answer path" step is unchanged and already real
+     *   (learning-evidence-supplement.js's collectLearnedEvidence() reads
+     *   VERIFIED observations directly; this stage only updates the
+     *   separate, honest gap-tracking ledger). Never invoked, never
+     *   blocking, when conceptId is omitted — byte-identical to the prior
+     *   behavior for every existing caller.
+     *
+     *   LanguageGapRegistry.hasVerifiedCoverage() re-reads the observation
+     *   from window.CozyOS.ObservationStore (never trusts an in-memory
+     *   status) — but ObservationLifecycle.toVerified() only ever returns
+     *   a new in-memory object, it never re-persists (confirmed by
+     *   reading that file's own source: it composes no ObservationStore
+     *   call anywhere). Concretely: the observation must already be
+     *   attached to opts.conceptId (via the SAME real
+     *   LearningCorrelation.correlateObservation() observeEvent() itself
+     *   already uses — never a second attachment mechanism here), and
+     *   this stage's own job is only to re-save that ALREADY-attached
+     *   observation's freshly-VERIFIED status back into the SAME store
+     *   LearningCorrelation itself writes, under its own observationId,
+     *   so the coverage check that follows sees the truth instead of a
+     *   stale pre-verification status.
+     */
+    function advanceToVerified(observation, opts = {}) {
+        const result = window.CozyOS.ObservationLifecycle.toVerified(observation, opts);
+        if (!result || !result.success || !isNonEmptyString(opts.conceptId)) return result;
+        const store = window.CozyOS.ObservationStore;
+        const registry = window.CozyOS.LanguageGapRegistry;
+        if (!store || typeof store.saveObservation !== "function" || !registry || typeof registry.checkConceptLanguageCoverage !== "function") return result;
+
+        const verifiedObservation = Object.assign({}, result.observation, { canonicalConceptId: opts.conceptId });
+        try { store.saveObservation(verifiedObservation, { actorId: opts.actorId || SYSTEM_ACTOR }); } catch (_err) { /* honest no-op — capability update is best-effort, never blocks the real promotion above */ }
+
+        const verifiedLanguage = verifiedObservation.candidateLanguage || null;
+        const targetLanguages = Array.isArray(opts.targetLanguages) && opts.targetLanguages.length > 0
+            ? opts.targetLanguages
+            : (verifiedLanguage ? [verifiedLanguage] : []);
+        if (targetLanguages.length === 0) return result;
+        try {
+            const capabilityUpdate = registry.checkConceptLanguageCoverage({ conceptId: opts.conceptId, targetLanguages, actorId: SYSTEM_ACTOR });
+            return Object.assign({}, result, { capabilityUpdate });
+        } catch (_err) {
+            return result;
+        }
+    }
     function bridgeToEvidence(observation, opts) { return window.CozyOS.ObservationEvidenceBridge.toVerifiedEvidence(observation, opts); }
     function generateRegression(observation, opts) { return window.CozyOS.RegressionGenerator.generateFromVerifiedObservation(observation, opts); }
     function verifyImprovement(opts) { return window.CozyOS.RegressionGenerator.verifyNoRegression(opts); }

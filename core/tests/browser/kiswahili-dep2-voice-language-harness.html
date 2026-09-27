@@ -34,6 +34,12 @@
 <script src="/core/modules/knowledge/cozyos-identity-faq-router.js"></script>
 <script src="/core/modules/intelligence/answer/cozy-answer-engine.js"></script>
 <script src="/core/modules/intelligence/advisor/cozy-advisor.js"></script>
+<!-- UNIVERSAL LANGUAGE SEAM — see dashboard.html's own comment on this
+     same script pair: without it, detectLanguageHeuristic()/
+     detectLanguages() silently fall back to their own narrower,
+     disagreeing marker lists. -->
+<script src="/core/modules/intelligence/language/language-identity-contract.js"></script>
+<script src="/core/modules/intelligence/language/cozy-language-identifier.js"></script>
 <script src="/core/modules/intelligence/providers/rule-based-conversational-provider.js"></script>
 <script src="/core/living/cozy-living-assistant.js"></script>
 <script>

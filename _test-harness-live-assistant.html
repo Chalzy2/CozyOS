@@ -68,8 +68,15 @@
 <script src="core/modules/intelligence/knowledge/cozy-public-knowledge-source.js"></script>
 <script src="core/modules/intelligence/cozy-ai.js"></script>
 <script src="core/modules/knowledge/cozyos-identity-faq-router.js"></script>
+<script src="core/modules/intelligence/semantic-answer/comparison-intent.js"></script>
 <script src="core/modules/intelligence/answer/cozy-answer-engine.js"></script>
 <script src="core/modules/intelligence/advisor/cozy-advisor.js"></script>
+<!-- UNIVERSAL LANGUAGE SEAM — same "written, tested, never actually
+     loaded on any real page" class of bug as the PHASE 6C fix
+     immediately below (see dashboard.html's own, fuller comment on
+     this same script pair). -->
+<script src="core/modules/intelligence/language/language-identity-contract.js"></script>
+<script src="core/modules/intelligence/language/cozy-language-identifier.js"></script>
 <!-- PHASE 6C fix: cozy-ai-semantic-intent.js (Universal Semantic Engine) and cozy-learn.js (CozyLearn) were real, fully tested files that were NEVER actually loaded on any real page - the same class of bug found in M363 for cozy-public-knowledge-source.js. Confirmed live via a real screenshot: the browser Live Window was still hitting the old path only. Both must load before the provider below, since the provider checks window.CozyOS.SemanticIntentEngine at call time. -->
 <script src="core/living/cozy-learn.js"></script>
 <script src="core/living/cozy-ai-semantic-intent.js"></script>

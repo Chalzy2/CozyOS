@@ -57,7 +57,21 @@ async function ask(page, text) {
 }
 
 const FALLBACK_PATTERN = /Some related context exists|I don't have verified information/i;
-const GENERIC_LIST_PATTERN = /CozyOS currently includes these applications:|CozyOS ina programu .* halisi zilizosajiliwa/i;
+// UNIVERSAL LANGUAGE SEAM — "Kwa sasa CozyOS ina programu hizi:" is the
+// real, now-committed Kiswahili wording CozyAnswerEngine's own
+// renderResultContent() produces via the new "answer:known-applications-
+// list" template (cozy-language-templates.js), once cozy-ai.js's
+// getContext() gained real Kiswahili routes to listApplicationsFact
+// ("programu"/"mfumo" — the exact documented gap from KISWAHILI-FIRST-
+// READINESS-REPORT.md §2.2/§2.5). CozyAnswerEngine now answers this
+// class of question in Kiswahili exactly as it already did in English
+// (see this file's own EN cases below: "What applications are
+// available?"/"Which apps are in CozyOS?" also resolve to CozyAnswerEngine's
+// plain list, never the richer rule-based-provider count+purpose answer
+// "CozyOS ina programu ... halisi zilizosajiliwa" — kept here only
+// because a genuinely differently-worded VERIFIED answer for this exact
+// intent is also acceptable, never because it's expected to win).
+const GENERIC_LIST_PATTERN = /CozyOS currently includes these applications:|CozyOS ina programu .* halisi zilizosajiliwa|Kwa sasa CozyOS ina programu hizi:/i;
 
 test('LIVE WINDOW APPLICATION SEMANTIC REPAIR: named-application EN questions reach ChurchOS/InterestOS/QuarryOS knowledge, never the generic application list', async () => {
     const { browser, page } = await openLiveWindow();

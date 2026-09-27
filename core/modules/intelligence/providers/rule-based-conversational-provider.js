@@ -870,102 +870,61 @@
     }
 
     /**
-     * detectLanguageHeuristic(text) — RP-036
-     *   A small, disclosed, real keyword-overlap heuristic — NOT a
-     *   language-ID model — used only to fill in the "requested"
-     *   language slot when the caller didn't already supply one (via
-     *   options.language/options.requestedLanguage). Mirrors the same
-     *   honesty discipline core/engines/media/language/provider-
-     *   lexical.js already uses elsewhere in this codebase (real,
-     *   computed keyword overlap against a curated reference lexicon;
-     *   an honest `null` — never a guess — when nothing matches). Kept
-     *   local/self-contained here (rather than importing that ES
-     *   module) since this file is a plain, non-module script loaded
-     *   the same way as every other CozyOS core script. Only Kiswahili
-     *   is covered this pass — the same disclosed, partial-coverage
-     *   pattern RP-027 already established for its 5 default languages.
+     * detectLanguageHeuristic(text) — RP-036, UNIVERSAL LANGUAGE SEAM
+     *   UPDATE
+     *   Previously a small, self-contained, closed Kiswahili marker-word
+     *   list (the full original list is preserved verbatim, unioned into
+     *   cozy-language-identifier.js's own SW_MARKERS — see that file's
+     *   own reconciliation comment; nothing that used to match here
+     *   stops matching). That list is now owned by
+     *   window.CozyOS.CozyLanguageIdentifier — the one, authoritative,
+     *   layered (marker + Kiswahili verb-morphology + statistical
+     *   trigram-profile) detector this repository uses everywhere,
+     *   per UNIVERSAL-LANGUAGE-SEAM-DESIGN-PROPOSAL.md. This function
+     *   now DELEGATES to it, keeping its own exact signature/contract
+     *   (text -> "sw" | null) so its one real call site (below) and
+     *   every existing test against IT specifically keeps working
+     *   unmodified — only the DETECTION QUALITY improves (generalizes
+     *   to novel Kiswahili verbs and honestly returns null on genuinely
+     *   unrecognized text, instead of only ever matching this file's
+     *   own closed list). Degrades to this function's own ORIGINAL,
+     *   self-contained marker check (preserved verbatim below, never
+     *   deleted — Rule: do not remove capability to add capability)
+     *   when the identifier module hasn't loaded on a given page or in
+     *   a given test harness — never throws, never guesses, and never
+     *   silently loses the detection capability this function has
+     *   always had on its own.
      */
     function detectLanguageHeuristic(text) {
         if (typeof text !== "string" || !text.trim()) return null;
-        const SW_MARKERS = new Set([
+        const identifier = window.CozyOS && window.CozyOS.CozyLanguageIdentifier;
+        if (identifier && typeof identifier.resolveLanguageIdentity === "function") {
+            const identity = identifier.resolveLanguageIdentity({ text, modality: "text" });
+            if (identity && identity.languageId === "sw") return "sw";
+            if (identity && identity.languageId && identity.languageId !== "UNKNOWN") return null;
+            // identity genuinely UNRESOLVED — fall through to this
+            // function's own original check below rather than giving
+            // up. In practice the identifier's reconciled list is a
+            // strict superset of the original one, so this is a safety
+            // net for when the identifier module isn't loaded, not the
+            // expected common path when it is.
+        }
+        const ORIGINAL_SW_MARKERS = new Set([
             "habari", "hujambo", "mambo", "nataka", "nisaidie", "nisaidi", "fungua",
             "nionyeshe", "ninawezaje", "naweza", "wapi", "akaunti", "sajili", "kujisajili",
             "kusajili", "dashibodi", "mipangilio", "arifa", "nini", "karibuni", "shughuli",
             "kuona", "kufungua", "kuingia", "msaada", "nipe", "asante", "sawa", "kwenye",
-            // COZYAI-PUBLIC-VISION-KNOWLEDGE — markers for the new
-            // why-use-cozyos/differentiation/language-support-list
-            // Swahili trigger phrasings above (e.g. "Kwa nini
-            // nitumie CozyOS?", "CozyOS inatofautianaje?", "Lugha
-            // zipi zinazoungwa mkono?").
             "nitumie", "tumie", "faida", "inatofautianaje", "tofauti", "tofautiana",
             "lugha", "zinazoungwa", "mkono", "zinazotumika", "zipi", "gani",
-            // REGISTRATION/AUTH milestone — markers for the new
-            // registration-phrasing Swahili trigger phrases above.
-            // "usajili" closes a real gap: this heuristic matches
-            // whole words only (not substrings), so "usajili" (as in
-            // "Ninaanzaje usajili wa CozyOS?") needs its own entry —
-            // it is not covered by the existing "sajili"/"kusajili"/
-            // "kujisajili" entries. "kutengeneza"/"tengeneza"/
-            // "kuunda"/"unda"/"nifanye"/"ninaanzaje" are added for the
-            // same reason, to genuinely detect the new phrasings
-            // rather than relying on "akaunti" alone happening to be
-            // present.
             "usajili", "kutengeneza", "tengeneza", "kuunda", "unda", "nifanye", "ninaanzaje",
-            // M363 — a handful more real, common, unambiguous Kiswahili
-            // words (not English homographs), added after a live
-            // browser test showed genuinely novel Kiswahili sentences
-            // using these exact words had no marker to detect on at
-            // all. Whole-word matching only, same as every marker
-            // above — no behavior change for any existing marker/test.
             "sielewi", "elewi", "samahani", "kwaheri", "karibu", "ndiyo", "hapana", "vizuri",
-            // M363 — human-benefit-question markers ("why is X
-            // important", "what problem does X solve", "how does
-            // CozyOS change lives"), added after the same live-test
-            // pass that broadened app-importance/why-use-cozyos above.
             "muhimu", "tatizo", "nzuri", "nufaika", "atanufaika", "maisha", "inabadilisha", "ngapi", "hii", "aje",
-            // UNIVERSAL APPLICATION UNDERSTANDING REPAIR — real,
-            // common, unambiguous Kiswahili words with no English
-            // homograph risk, found missing after a live test showed
-            // "Matumizi ya ShopOS ni yapi?" (a genuine, natural Kiswahili
-            // application-uses question) had no marker to detect on at
-            // all and was answered in English despite being correctly
-            // understood semantically.
             "matumizi", "yapi", "vipi", "yake", "wanaofaidika", "kanisa", "kanuni", "ndani",
-            // LIVE WINDOW NEXT REPAIR — real gap: "ChurchOS inasaidia
-            // nani?" (a required Kiswahili test-matrix question, now
-            // correctly matched by APP_IMPORTANCE_PATTERN above) was
-            // answered with the right, verified content but in English,
-            // because "nani" ("who") — its only real Kiswahili word
-            // besides the app name and the already-covered "inasaidia"
-            // typo-normalization target — was never in this marker set.
-            // Common, unambiguous, no English homograph risk, same
-            // selection criteria as every marker above it.
-            "nani",
-            // LIVE WINDOW LANGUAGE-REALIZATION REPAIR — real gap found
-            // via a live Kiswahili test-matrix question this repair's
-            // own spec required ("Nieleze kuhusu CozyOS." — a genuine,
-            // natural "explain to me about CozyOS" request): none of
-            // "nieleze"/"eleza"/"kuhusu" were in this marker set (the
-            // FAQ router's OWN, separate stopword list already
-            // recognized them as request-connective words — see
-            // cozyos-identity-faq-router.js's OVERLAP_STOPWORDS — but
-            // that is a different mechanism from THIS file's per-turn
-            // language detection, and stopwording them there does not
-            // register them here). Real, common, unambiguous Kiswahili
-            // words with no English homograph risk, same selection
-            // criteria as every marker above.
-            "nieleze", "eleza", "kuhusu"
+            "nani", "nieleze", "eleza", "kuhusu",
         ]);
         const words = text.toLowerCase().match(/[a-zà-ÿ]+/g) || [];
         if (words.length === 0) return null;
-        const hits = words.filter((w) => SW_MARKERS.has(w)).length;
-        if (hits > 0) return "sw";
-        // Generic morphological signal (not another word to memorize):
-        // "-je" is a real, unambiguous Kiswahili interrogative suffix
-        // ("...saidiaje?", "...fanyaje?", "...tumikaje?" - "how does X
-        // ...?") that never occurs as an English word ending. Catches
-        // genuinely novel Kiswahili verb forms this word list was never
-        // going to enumerate one at a time.
+        if (words.some((w) => ORIGINAL_SW_MARKERS.has(w))) return "sw";
         if (words.some((w) => w.length > 4 && w.endsWith("je"))) return "sw";
 
         // KISWAHILI STRUCTURAL LAYER (new, additive) — composed only as
@@ -1776,12 +1735,22 @@
             // APPLICATION_COMPARISON — real, generic side-by-side using
             // the SAME two named applications' own real verified data.
             case "app-comparison": {
-                const compMatch = /\bbetween\s+([a-z][\w' -]{1,30}?)\s+and\s+([a-z][\w' -]{1,30}?)\??\s*$|\b([a-z][\w' -]{1,30}?)\s+(?:vs\.?|versus)\s+([a-z][\w' -]{1,30}?)\b|\bkati\s+ya\s+([a-z][\w' -]{1,30}?)\s+na\s+([a-z][\w' -]{1,30}?)\s+ni\s+nini\b|\b([a-z][\w' -]{1,30}?)\s+na\s+([a-z][\w' -]{1,30}?)\s+zina(?:to)?fautianaje\b|\b([a-z][\w' -]{1,30}?)\s+na\s+([a-z][\w' -]{1,30}?)\s+zina\s+tofauti\s+gani\b/i.exec(rawText || "");
-                const nameA = compMatch ? (compMatch[1] || compMatch[3] || compMatch[5] || compMatch[7] || compMatch[9] || "").trim() : "";
-                const nameB = compMatch ? (compMatch[2] || compMatch[4] || compMatch[6] || compMatch[8] || compMatch[10] || "").trim() : "";
+                // GAP 1 (Comparison Intent) — this case's own former
+                // inline regex (a narrower duplicate of INTENT_RULES'
+                // "app-comparison" pattern above) is now replaced by a
+                // call to the ONE shared, broadened detector in
+                // comparison-intent.js — composed here AND by
+                // cozy-answer-engine.js's own early comparison check,
+                // never two separately-typed-out copies. See that
+                // file's own header for the full root-cause rationale.
+                const comparisonIntent = window.CozyOS && window.CozyOS.ComparisonIntent
+                    ? window.CozyOS.ComparisonIntent.detectComparisonIntent(rawText || "")
+                    : null;
+                const nameA = comparisonIntent ? comparisonIntent.entityAName : "";
+                const nameB = comparisonIntent ? comparisonIntent.entityBName : "";
                 const knowledge = window.CozyOS && window.CozyOS.CozyKnowledge;
                 const compResult = nameA && nameB && knowledge && typeof knowledge.compareApplicationsFact === "function"
-                    ? knowledge.compareApplicationsFact(nameA.toLowerCase().replace(/[^a-z0-9]/g, ""), nameB.toLowerCase().replace(/[^a-z0-9]/g, ""), lang)
+                    ? knowledge.compareApplicationsFact(nameA, nameB, lang)
                     : { evidence: "NOT_FOUND", answer: null };
                 if (compResult.evidence === "VERIFIED") return compResult.answer;
                 return template("app-detailed-info:not_found", lang);
@@ -2618,6 +2587,59 @@
                     // benefits does it have?") must be able to resolve
                     // against that same application - not just against
                     // whatever the LAST app-importance turn discussed.
+                    // GAP 2 FIX (conversation-context generalization) —
+                    // real, reproduced defect: a genuinely novel, pronoun-
+                    // less, omitted-subject follow-up ("Inawezaje kunisaidia
+                    // kufuatilia mafuta ya mashine?" right after "Niambie
+                    // kuhusu QuarryOS.") matches none of the fixed intent
+                    // patterns above, classifies as "unsupported", and this
+                    // closure previously reset lastDiscussedApplication to
+                    // null unconditionally for every intent outside the
+                    // three-item allowlist below — discarding the real
+                    // prior-turn topic even though the current turn
+                    // asserted no new one. An "unsupported" turn is, by
+                    // definition, one where nothing else in this file
+                    // recognized a fresh intent or entity — so the honest,
+                    // minimal behavior is to preserve whatever topic was
+                    // already active, not silently forget it. This is the
+                    // SAME single tracker (never a second/competing
+                    // context store), extended to one more real case; every
+                    // OTHER intent (greeting/thanks/reminder/app-launch/
+                    // etc.) keeps its exact prior reset-to-null behavior,
+                    // since those ARE genuine, deliberate topic changes.
+                    //
+                    // REGRESSION FOUND AND FIXED during this same pass's
+                    // own regression sweep (real-browser test, never
+                    // hypothetical): an initial version of this fix used
+                    // previousState.lastDiscussedApplication UNCONDITIONALLY
+                    // whenever intent === "unsupported" — but "unsupported"
+                    // only means the LEGACY classifyIntent() found no
+                    // pattern; it does NOT mean the CURRENT turn is topic-
+                    // less. "How can cozyos helps churches" (a real,
+                    // malformed-but-real production question — see the
+                    // LIVE WINDOW NEXT REPAIR test this exact regression
+                    // was caught by) genuinely names its OWN topic
+                    // ("cozyos", spotted explicitly by semanticResult.entity
+                    // via KNOWN_ENTITIES, same as PLATFORM_LEVEL_INTENTS's
+                    // own "CozyOS" branch above) even though its intent
+                    // still classifies as "unsupported" — blindly reusing
+                    // the PRIOR turn's ChurchOS topic there was itself a
+                    // real, reproduced bug. The fix: prefer whatever THIS
+                    // turn's own semanticResult.entity already resolved
+                    // (which is itself either a genuinely fresh, explicit
+                    // entity in the current text, OR the SAME real
+                    // contextual-carryover SemanticIntentEngine.analyze()
+                    // already computed from previousEntity at its own call
+                    // site above — never re-derived here), and only fall
+                    // back to the raw previous-turn value on the rare
+                    // chance semanticResult itself is unavailable. This is
+                    // the exact same OR-chain this file's own COMPETING-
+                    // ambiguity branch already uses a few dozen lines above
+                    // (line ~2123) — reused, not reinvented.
+                    if (intent === "unsupported") {
+                        return (semanticResult && semanticResult.entity && semanticResult.entity.value)
+                            || (previousState ? (previousState.lastDiscussedApplication || null) : null);
+                    }
                     if (intent !== "app-importance" && intent !== "app-info" && intent !== "app-detailed-info") return null;
                     let candidateToCheck = null;
                     if (intent === "app-importance") {

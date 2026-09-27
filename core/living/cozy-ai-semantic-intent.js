@@ -296,15 +296,51 @@
         }
     };
 
+    /**
+     * detectLanguages(text) — UNIVERSAL LANGUAGE SEAM UPDATE
+     *   Previously this function's own, independent SW_MARKERS/
+     *   EN_MARKERS word-list check (both lists preserved verbatim,
+     *   unioned into cozy-language-identifier.js's own SW_MARKERS/
+     *   EN_MARKERS — nothing that used to match here stops matching).
+     *   Now delegates real detection to the one, shared, layered
+     *   window.CozyOS.CozyLanguageIdentifier (marker + Kiswahili verb-
+     *   morphology + statistical trigram profile) before ever falling
+     *   back to this function's own original "en" default — so a
+     *   genuinely novel Kiswahili sentence this function's own closed
+     *   list would have missed (e.g. "Nina duka.") is now correctly
+     *   detected, while this function's OWN external contract
+     *   (`primary` is always a real 2-letter code, never "UNKNOWN") is
+     *   kept byte-for-byte unchanged, since every existing caller in
+     *   this large, already-tested codebase assumes exactly that shape.
+     *   The real, honest UNKNOWN state this identity can carry is only
+     *   ever surfaced at the richer, additive `resolveLanguageIdentity()`
+     *   entry point cozy-living-assistant.js now also calls directly —
+     *   not injected retroactively into this function's own, narrower,
+     *   widely-depended-upon return shape.
+     */
     function detectLanguages(text) {
-        const lower = text.toLowerCase();
-        const hasSw = SW_MARKERS.some((m) => new RegExp(`\\b${m}\\b`, "i").test(lower));
-        const hasEn = EN_MARKERS.some((m) => new RegExp(`\\b${m}\\b`, "i").test(lower));
-        const detected = [];
-        if (hasSw) detected.push("sw");
-        if (hasEn) detected.push("en");
-        if (detected.length === 0) detected.push("en"); // honest default, matches existing repo-wide convention
-        return { detectedLanguages: detected, mixedLanguage: detected.length > 1, primary: detected[0] };
+        const identifier = window.CozyOS && window.CozyOS.CozyLanguageIdentifier;
+        let identity = null;
+        if (identifier && typeof identifier.resolveLanguageIdentity === "function") {
+            identity = identifier.resolveLanguageIdentity({ text, modality: "text" });
+        }
+        const detected = (identity && Array.isArray(identity.detectedLanguages) && identity.detectedLanguages.length > 0)
+            ? identity.detectedLanguages.slice()
+            : [];
+        if (detected.length === 0) {
+            // Fall back to this function's own original marker check —
+            // never throws, never assumes the identifier loaded (this
+            // engine has its own real, disclosed test suite that loads
+            // it in isolation without the identifier present).
+            const lower = text.toLowerCase();
+            const hasSw = SW_MARKERS.some((m) => new RegExp(`\\b${m}\\b`, "i").test(lower));
+            const hasEn = EN_MARKERS.some((m) => new RegExp(`\\b${m}\\b`, "i").test(lower));
+            if (hasSw) detected.push("sw");
+            if (hasEn) detected.push("en");
+        }
+        if (detected.length === 0) detected.push("en"); // honest default, matches existing repo-wide convention — this function's own contract, unchanged
+        const primary = (identity && identity.languageId && identity.languageId !== "UNKNOWN") ? identity.languageId : detected[0];
+        return { detectedLanguages: detected, mixedLanguage: detected.length > 1, primary };
     }
 
     function detectNegation(clause) {

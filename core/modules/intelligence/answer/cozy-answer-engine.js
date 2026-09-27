@@ -112,7 +112,7 @@
      *   getContext() already confirmed evidence === "VERIFIED" before
      *   this result ever reached us; this only reformats it for display.
      */
-    function renderResultContent(result) {
+    function renderResultContent(result, effLang) {
         if (isNonEmptyString(result.content)) return result.content;
         if (!result.getter) return null;
         const knowledge = window.CozyOS.CozyKnowledge;
@@ -121,7 +121,14 @@
         try { raw = knowledge[result.getter](); } catch (_err) { return null; }
         if (!raw || raw.evidence !== "VERIFIED") return null;
         if (Array.isArray(raw.applications) && raw.applications.length > 0) {
-            return `CozyOS currently includes these applications: ${raw.applications.join(", ")}.`;
+            // UNIVERSAL LANGUAGE SEAM — previously always English regardless
+            // of effLang (KISWAHILI-FIRST-READINESS-REPORT.md §2.5). Real
+            // ServiceRegistry-sourced list, only the sentence wrapping it
+            // is language-realized; falls back to the original literal
+            // English sentence when the realizer/template isn't loaded.
+            const realizer = window.CozyOS && window.CozyOS.CozyLanguageRealize;
+            const realized = realizer && realizer.realize("answer:known-applications-list", effLang || "en", raw.applications.join(", "));
+            return realized || `CozyOS currently includes these applications: ${raw.applications.join(", ")}.`;
         }
         if (Array.isArray(raw.entries) && raw.entries.length > 0) {
             return `Registered providers: ${raw.entries.join("; ")}.`;
@@ -419,9 +426,27 @@
         const realizer = window.CozyOS && window.CozyOS.CozyLanguageRealize;
         const pieces = [];
         for (const r of ctxResults) {
-            const text = renderResultContent(r);
+            const text = renderResultContent(r, lang);
             if (!isNonEmptyString(text)) continue;
-            if (lang !== "en" && r.authority === "knowledge-registry") {
+            // UNIVERSAL LANGUAGE SEAM — listApplicationsFact's own sentence
+            // is now genuinely realized per-language by renderResultContent()
+            // itself (answer:known-applications-list), not English content
+            // needing the "still English, no translation yet" disclosure
+            // below. That template branch is reached ONLY when getContext()
+            // supplied no pre-composed `content` of its own (mirroring
+            // renderResultContent()'s own `isNonEmptyString(result.content)`
+            // early-return) — a result that already arrived with literal
+            // content (e.g. a caller-composed English sentence, as in this
+            // engine's own test fixtures) is untouched by the new template
+            // and must still get the honest disclosure below. Every OTHER
+            // knowledge-registry getter's raw fact content also remains the
+            // confirmed English-only source this wrap exists for (see this
+            // function's own header comment) — this is a narrow, named
+            // exemption, not a change to that default.
+            const alreadyRealizedInLang = lang !== "en" && !isNonEmptyString(r.content) && r.getter === "listApplicationsFact"
+                && realizer && typeof realizer.isRealizedInLanguage === "function"
+                && realizer.isRealizedInLanguage("answer:known-applications-list", lang);
+            if (lang !== "en" && r.authority === "knowledge-registry" && !alreadyRealizedInLang) {
                 const wrapped = realizer && realizer.realize("content:english-only-notice", lang, text);
                 pieces.push(wrapped || `Additionally: ${text}`);
             } else {
@@ -499,6 +524,52 @@
 
         const whyLike = WHY_PATTERN.test(question);
         const comparisonLike = COMPARISON_PATTERN.test(question);
+
+        // --- Step: TWO-APPLICATION COMPARISON (GAP 1) — checked EARLY,
+        // before the FAQ router and the later single-entity
+        // application-knowledge path (below) ever get a chance to
+        // short-circuit with a VERIFIED-but-wrong answer about only
+        // the first-named application. Real, live-traced defect (see
+        // comparison-intent.js's own header for the full root cause):
+        // a genuine two-app comparison question ("Kati ya ChurchOS na
+        // ShopOS, tofauti yao ni nini?") was previously answered as if
+        // it were a single-application question about ChurchOS alone,
+        // because nothing checked for two-entity comparison intent
+        // ahead of that path. window.CozyOS.ComparisonIntent (shared,
+        // composed by this file AND rule-based-conversational-
+        // provider.js — never duplicated) only detects the MEANING and
+        // extracts two name candidates; window.CozyOS.CozyKnowledge.
+        // compareApplicationsFact() — real, pre-existing, unmodified —
+        // remains the sole comparison-content authority. Never ranks
+        // or picks a "winner": that function's own header states it
+        // only describes each application's own verified purpose/
+        // capabilities side by side.
+        const comparisonIntent = window.CozyOS && window.CozyOS.ComparisonIntent
+            ? window.CozyOS.ComparisonIntent.detectComparisonIntent(question)
+            : null;
+        if (comparisonIntent) {
+            const comparisonKnowledge = window.CozyOS && window.CozyOS.CozyKnowledge;
+            const compResult = (comparisonKnowledge && typeof comparisonKnowledge.compareApplicationsFact === "function")
+                ? comparisonKnowledge.compareApplicationsFact(comparisonIntent.entityAName, comparisonIntent.entityBName, normalizeLanguage(language))
+                : null;
+            if (compResult && compResult.evidence === "VERIFIED" && compResult.answer) {
+                return {
+                    answer: compResult.answer,
+                    intent: "APP_COMPARISON",
+                    responseMode: "COMPARISON",
+                    evidenceState: "VERIFIED",
+                    sources: [{ authority: "knowledge-registry-comparison", provenance: "window.CozyOS.CozyKnowledge.compareApplicationsFact", evidence: "VERIFIED" }],
+                    reasoningUsed: true,
+                    contextUsed: [],
+                    businessDataConversationState: null, teachDataConversationState: null, cognitiveContext
+                };
+            }
+            // One or both names didn't resolve to a real, verified
+            // application — honestly fall through to every other path
+            // below rather than fabricate a comparison. A genuinely
+            // unrecognized name still gets whatever honest response the
+            // rest of this function would otherwise produce.
+        }
 
         // --- Step: existing FAQ/Knowledge path (identity/origin/vision/etc.) ---
         // UNIVERSAL QUESTION UNDERSTANDING REPAIR — real bug found via
@@ -644,8 +715,18 @@
 
         // --- No FAQ match: general Question-Understanding + Context path ---
         if (ctxResults.length === 0) {
+            // UNIVERSAL LANGUAGE SEAM — previously always English regardless
+            // of the real, already-resolved `language` (KISWAHILI-FIRST-
+            // READINESS-REPORT.md §2.1: "Nina duka."/"Unaweza kunisaidia?"
+            // both fell here and got an English-only reply). Honest content
+            // stays identical to the original English string in every
+            // language — never claims more than "I genuinely don't know."
+            const noEvidenceRealizer = window.CozyOS && window.CozyOS.CozyLanguageRealize;
+            const noEvidenceLang = normalizeLanguage(language);
+            const noEvidenceText = (noEvidenceRealizer && noEvidenceRealizer.realize("answer:no-verified-information", noEvidenceLang))
+                || "I don't have verified information to answer that yet. Please rephrase, or this may not be something CozyOS has documented/verified.";
             return {
-                answer: "I don't have verified information to answer that yet. Please rephrase, or this may not be something CozyOS has documented/verified.",
+                answer: noEvidenceText,
                 intent: "UNKNOWN", responseMode: "INSUFFICIENT_EVIDENCE",
                 evidenceState: (ai && typeof ai.getContext === "function") ? "INSUFFICIENT_DATA" : "UNAVAILABLE",
                 sources: [], reasoningUsed: false, contextUsed: [], businessDataConversationState, teachDataConversationState, cognitiveContext

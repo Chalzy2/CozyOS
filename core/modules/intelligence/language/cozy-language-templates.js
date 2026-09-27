@@ -506,6 +506,39 @@
             so: "Intaa waxaa dheer,"
         }),
 
+        // UNIVERSAL LANGUAGE SEAM — the honest "nothing verified was
+        // found" fallback (cozy-answer-engine.js's own last-resort
+        // reply, previously hard-coded English regardless of the real,
+        // already-resolved language — KISWAHILI-FIRST-READINESS-
+        // REPORT.md §2.1, reproduced from "Nina duka."/"Unaweza
+        // kunisaidia?"). Same honest content in every language — never
+        // claims MORE certainty than "I genuinely don't know," just in
+        // the user's own language instead of always English.
+        "answer:no-verified-information": Object.freeze({
+            en: "I don't have verified information to answer that yet. Please rephrase, or this may not be something CozyOS has documented/verified.",
+            sw: "Sina bado taarifa iliyothibitishwa ya kujibu hilo. Tafadhali eleza kwa njia nyingine, au huenda hili si jambo ambalo CozyOS imelithibitisha bado.",
+            fr: "Je n'ai pas encore d'information vérifiée pour répondre à cela. Merci de reformuler, ou il se peut que CozyOS n'ait pas encore documenté ce sujet.",
+            ar: "ليس لدي بعد معلومات موثّقة للإجابة على ذلك. يرجى إعادة الصياغة، أو قد يكون هذا أمرًا لم توثّقه CozyOS بعد.",
+            so: "Weli ma haysto macluumaad la xaqiijiyay oo aan ku jawaabi karo. Fadlan si kale u qor, ama tani waxay noqon kartaa wax aan CozyOS weli xaqiijin.",
+        }),
+        // The genuinely UNKNOWN-language case (design §6) — a real,
+        // minimal, deliberately multilingual clarification, never a
+        // guess at which language to answer honest uncertainty in.
+        "answer:unknown-language-clarification": Object.freeze({
+            en: "Samahani, sielewi vizuri. / Sorry, I didn't catch that clearly. Could you rephrase?",
+        }),
+        // UNIVERSAL LANGUAGE SEAM — the real, current CozyOS application
+        // list (previously hard-coded English in renderResultContent(),
+        // KISWAHILI-FIRST-READINESS-REPORT.md §2.5). `apps` is the real,
+        // live ServiceRegistry-sourced list — never invented here.
+        "answer:known-applications-list": Object.freeze({
+            en: (apps) => `CozyOS currently includes these applications: ${apps}.`,
+            sw: (apps) => `Kwa sasa CozyOS ina programu hizi: ${apps}.`,
+            fr: (apps) => `CozyOS comprend actuellement ces applications : ${apps}.`,
+            ar: (apps) => `تشمل CozyOS حاليًا هذه التطبيقات: ${apps}.`,
+            so: (apps) => `CozyOS hadda waxa ku jira barnaamijyadan: ${apps}.`,
+        }),
+
         "differentiation:not_found": Object.freeze({
             en: "I don't have a verified answer yet for how CozyOS differs from other options.",
             sw: "Sina bado jibu lililothibitishwa kuhusu jinsi CozyOS inavyotofautiana na chaguo zingine.",

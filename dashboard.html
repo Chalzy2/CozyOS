@@ -402,6 +402,27 @@
 <script src="core/modules/intelligence/language/cozy-language-templates.js"></script>
 <!-- PHASE 4 (Universal Language Capability): cozy-language-realize.js — the generic realization seam composing the two files above. Read lazily at call time by cozy-teach-flow.js/cozy-living-assistant.js/cozy-learn.js/cozy-business-data-intent.js, so load order relative to those files does not matter. -->
 <script src="core/modules/intelligence/language/cozy-language-realize.js"></script>
+<!-- UNIVERSAL LANGUAGE SEAM — same "written, tested, never actually
+     loaded on any real page" class of bug as the UNIVERSAL QUESTION
+     UNDERSTANDING REPAIR block immediately below (confirmed live via a
+     real browser diagnostic: window.CozyOS.CozyLanguageIdentifier was
+     undefined on this exact page, silently forcing BOTH
+     detectLanguageHeuristic() (rule-based-conversational-provider.js)
+     AND detectLanguages() (cozy-ai-semantic-intent.js) into their own
+     narrower, pre-existing marker-list fallbacks — which disagree with
+     each other (rule-based-conversational-provider.js's own list
+     includes "faida"; cozy-ai-semantic-intent.js's own SW_LANGUAGE_MARKERS
+     list does not), producing an English SemanticAnswerPlanner.planAnswer()
+     result for a genuinely Kiswahili question like "ChurchOS ina faida
+     gani?" even though the SAME turn's rule-based provider correctly
+     resolved "sw". language-identity-contract.js has no dependency on
+     anything else here; cozy-language-identifier.js depends only on it
+     (both read defensively at call time by the two consumer files
+     above, so load order relative to them is not load-bearing, same
+     discipline as cozy-language-registry.js/cozy-language-templates.js
+     above). -->
+<script src="core/modules/intelligence/language/language-identity-contract.js"></script>
+<script src="core/modules/intelligence/language/cozy-language-identifier.js"></script>
 <!-- UNIVERSAL QUESTION UNDERSTANDING REPAIR (continuing the M363/PHASE
      6C class of fix above): two more real, fully-written, referenced-
      by-name files were never actually loaded on any real page.
@@ -467,6 +488,7 @@
      CozyAdvisor. No new AI/Answer/Advisor/Memory/Knowledge engine. -->
 <script src="core/modules/intelligence/cozy-ai.js"></script>
 <script src="core/modules/knowledge/cozyos-identity-faq-router.js"></script>
+<script src="core/modules/intelligence/semantic-answer/comparison-intent.js"></script>
 <script src="core/modules/intelligence/answer/cozy-answer-engine.js"></script>
 <script src="core/modules/intelligence/advisor/cozy-advisor.js"></script>
 <!-- PHASE 6C fix: cozy-ai-semantic-intent.js (Universal Semantic Engine) and cozy-learn.js (CozyLearn) were real, fully tested files that were NEVER actually loaded on any real page - the same class of bug found in M363 for cozy-public-knowledge-source.js. Confirmed live via a real screenshot: the browser Live Window was still hitting the old path only. Both must load before the provider below, since the provider checks window.CozyOS.SemanticIntentEngine at call time. -->
