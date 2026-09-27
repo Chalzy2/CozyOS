@@ -359,6 +359,21 @@ test('translateSegment() sends sw->fr directly to the provider registry — neve
     assert.deepEqual(registry._calls[0].opts, { sourceLanguage: 'sw', targetLanguage: 'fr' }, 'the real provider call must request sw->fr directly, with no intermediate "en" anywhere in the request');
 });
 
+test('translateSegment() sends ki->luo directly to the provider registry — proves the "no English pivot" architecture is source-agnostic, not merely target-agnostic-from-Kiswahili (every existing test above always used sw as the source)', async () => {
+    const service = freshWindow();
+    global.window.CozyOS.VoiceManager = fakeVoiceManager();
+    global.window.CozyOS.LivingLanguageVerification = fakeLanguageVerification({ recommendation: { available: false } });
+    const registry = fakeProviderRegistry({ translateResult: { isReal: true, translatedText: 'REAL_LUO_TRANSLATION' } });
+    global.window.CozyOS.SpeechTranslationProviders = registry;
+
+    const result = await service.translateSegment({ sourceLanguage: 'ki', targetLanguage: 'luo', sourceText: 'Wĩ mwega?' });
+    assert.equal(result.success, true);
+    assert.equal(result.segment.targetLanguage, 'luo');
+    assert.equal(result.segment.translatedText, 'REAL_LUO_TRANSLATION');
+    assert.equal(registry._calls.length, 1, 'exactly one real provider call — no intermediate lookup/call for any pivot language');
+    assert.deepEqual(registry._calls[0].opts, { sourceLanguage: 'ki', targetLanguage: 'luo' }, 'the real provider call must request ki->luo directly; neither "sw" nor "en" may appear anywhere in the request');
+});
+
 test('three independent listeners selecting sw, en, and fr from the SAME Kiswahili source each get their own correct, independently-routed result', async () => {
     const service = freshWindow();
     global.window.CozyOS.VoiceManager = fakeVoiceManager();
