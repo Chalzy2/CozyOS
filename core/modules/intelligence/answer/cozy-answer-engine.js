@@ -554,7 +554,7 @@
      *   own real, disclosed updated state for the caller to carry
      *   forward — this file adds no teaching/governance logic of its own.
      */
-    async function answer(question, { actorId = null, language = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null, businessContext = null, businessConversationState = null, teachConversationState = null, cognitiveResult = null } = {}) {
+    async function answerInternal(question, { actorId = null, language = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null, businessContext = null, businessConversationState = null, teachConversationState = null, cognitiveResult = null } = {}) {
         // WAVE 1 (Cognitive-to-Answer Contract) — computed once, honestly,
         // from whatever the caller actually supplied (cozy-living-
         // assistant.js passes CognitiveCoordinator's real per-turn result;
@@ -915,6 +915,38 @@
             teachDataConversationState,
             cognitiveContext
         };
+    }
+
+    /**
+     * answer(question, options)
+     *   SA-8 PHASE 3 — permanent product/security rule: the one, single
+     *   choke point every caller (Live Window, voice, tests) actually
+     *   receives text from. Calls the real, unmodified answerInternal()
+     *   above (every existing behavior, branch, and return shape is
+     *   untouched) and sanitizes only the final `answer` string through
+     *   window.CozyOS.AnswerSecurityBoundary before returning — never a
+     *   second answer pipeline, never a rewrite of answerInternal()'s own
+     *   logic. Real, traced reason this exists: APPLICATION_HUMAN_PURPOSE_
+     *   DATA's own implementedAwaitingConnection/partiallyImplemented
+     *   fields (authored for internal audit disclosure) contain real
+     *   source file paths and function-call syntax, and this exact text
+     *   was empirically observed reaching a real Live Window answer via
+     *   the old synthesizeFromContext() path above — this wrapper is the
+     *   fix, applied once, universally, rather than patched into every
+     *   individual return statement above (11 of them) where a future new
+     *   branch could otherwise silently skip it. Degrades honestly: if
+     *   AnswerSecurityBoundary is not loaded (e.g. an older page, or a
+     *   test that intentionally excludes it), the real, unsanitized
+     *   answerInternal() result passes through unchanged — additive,
+     *   never a hard dependency.
+     */
+    async function answer(question, options) {
+        const result = await answerInternal(question, options);
+        const boundary = window.CozyOS && window.CozyOS.AnswerSecurityBoundary;
+        if (result && typeof result.answer === "string" && boundary && typeof boundary.sanitize === "function") {
+            return { ...result, answer: boundary.sanitize(result.answer) };
+        }
+        return result;
     }
 
     const CozyAnswerEngine = Object.freeze({ answer, getVersion: () => VERSION });

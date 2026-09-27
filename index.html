@@ -409,6 +409,7 @@
 <script src="core/modules/intelligence/cozy-ai.js"></script>
 <script src="core/modules/knowledge/cozyos-identity-faq-router.js"></script>
 <script src="core/modules/intelligence/semantic-answer/comparison-intent.js"></script>
+<script src="core/modules/intelligence/answer/cozy-answer-security-boundary.js"></script>
 <script src="core/modules/intelligence/answer/cozy-answer-engine.js"></script>
 <script src="core/modules/intelligence/advisor/cozy-advisor.js"></script>
 <!-- PHASE 6C fix: cozy-ai-semantic-intent.js (Universal Semantic Engine) and cozy-learn.js (CozyLearn) were real, fully tested files that were NEVER actually loaded on any real page - the same class of bug found in M363 for cozy-public-knowledge-source.js. Confirmed live via a real screenshot: the browser Live Window was still hitting the old path only. Both must load before the provider below, since the provider checks window.CozyOS.SemanticIntentEngine at call time. -->
