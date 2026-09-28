@@ -59,8 +59,92 @@
     "use strict";
     window.CozyOS = window.CozyOS || {};
     window.CozyOS.Modules = window.CozyOS.Modules || {};
-    const VERSION = "1.0.0-ENTERPRISE";
+    const VERSION = "1.1.0-public-story-depth";
     if (window.CozyOS.Modules["cozyos-identity-faq-router"]) return;
+
+    /**
+     * RESPONSE_DEPTH + DEPTH_MARKER_PATTERNS + classifyOriginStoryDepth()
+     *   PUBLIC-STORY-DEPTH milestone. Real, disclosed, narrow marker-
+     *   table depth detection for the COZYOS_ORIGIN / COZYOS_WHY_CREATED
+     *   intents ONLY — same small-marker-table discipline already used
+     *   throughout this repository's real intent/depth systems (see
+     *   core/modules/intelligence/semantic-answer/planning/semantic-
+     *   answer-planner.js's own PAA-4 DEPTH_MARKER_PATTERNS /
+     *   classifyAnswerDepth(), which this deliberately mirrors rather
+     *   than re-invents — SA-3's planner is a real, tested, parallel
+     *   pipeline, but it is NOT the router this codebase's live chat
+     *   assistant actually calls first (cozy-ai.js's ask()/answer()
+     *   check window.CozyOS.CozyIdentityFAQRouter.resolve() before ever
+     *   reaching CognitiveCoordinator — confirmed by reading cozy-ai.js
+     *   directly before writing this). Adding the same real depth
+     *   concept here, in the file that is actually live, is the correct
+     *   integration point; SA-3's own planner is left completely
+     *   unmodified.
+     *
+     *   CONVERSATIONAL CONTINUITY (directive requirement) — a genuinely
+     *   honest note, not an invented mechanism: this router has exactly
+     *   ONE subject in its entire domain (CozyOS itself; a query naming
+     *   any OTHER real application is already excluded before intent
+     *   detection even runs — see _mentionsOtherApplication() above).
+     *   A follow-up like "Tell me the full story." therefore never needs
+     *   a repeated "CozyOS" to disambiguate WHAT story is meant — there
+     *   is nothing else it could mean within this router's scope. Its
+     *   existing substring/word-overlap matching (unmodified by this
+     *   change) already resolves such a follow-up to COZYOS_ORIGIN on
+     *   its own, statelessly, via shared vocabulary with real triggers
+     *   like "cozyos story" — no new conversation-state store, no
+     *   second context-tracking system, and no dependency on the real
+     *   one that exists elsewhere (SA-3's own conversationState /
+     *   cozy-living-assistant.js's #conversationState, both left
+     *   untouched).
+     */
+    const RESPONSE_DEPTH = Object.freeze({
+        CONCISE: "concise",
+        DETAILED: "detailed",
+        FULL_ORIGINAL: "full_original"
+    });
+
+    const DEPTH_MARKER_PATTERNS = Object.freeze({
+        FULL_ORIGINAL: {
+            en: [/\bfull\s+story\b/i, /\bcomplete\s+story\b/i, /\bentire\s+story\b/i, /\boriginal\s+(?:full\s+)?story\b/i,
+                /\bgive\s+me\s+the\s+(?:original|full|complete)\b/i, /\beverything\s+about\b/i, /\bwhole\s+story\b/i,
+                /\bunabridged\b/i],
+            sw: [/\bhadithi\s+kamili\b/i, /\bhadithi\s+yote\b/i, /\bkwa\s+ukamilifu\b/i, /\bhabari\s+kamili\b/i,
+                /\basili\s+kamili\b/i]
+        },
+        DETAILED: {
+            en: [/\btell\s+me\s+more\b/i, /\bmore\s+about\b/i, /\bin[\s-]?depth\b/i, /\bin\s+detail\b/i,
+                /\bmore\s+detail\b/i, /\bexplain\s+more\b/i],
+            sw: [/\bzaidi\s+kuhusu\b/i, /\bkwa\s+undani\b/i, /\bkwa\s+kina\b/i, /\bkwa\s+kirefu\b/i, /\bnieleze\s+zaidi\b/i]
+        }
+    });
+
+    function _matchesAnyDepthPattern(normQuery, patternsByLang) {
+        for (const lang of ["en", "sw"]) {
+            for (const re of patternsByLang[lang] || []) if (re.test(normQuery)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * classifyOriginStoryDepth(rawText)
+     *   Real. Runs against the RAW (non-stopworded) text — depth markers
+     *   like "full"/"more"/"kamili" are exactly the kind of short,
+     *   otherwise-generic words OVERLAP_STOPWORDS would strip for intent
+     *   scoring, so this intentionally does NOT reuse that stopword
+     *   pipeline. FULL_ORIGINAL is checked before DETAILED because
+     *   "give me the original full story" would otherwise also loosely
+     *   read as "more/detail" in casual phrasing — an explicit request
+     *   for the complete original always wins when both could apply.
+     *   Absence of any marker is the real, honest, unchanged default:
+     *   CONCISE — never a behavior change for the bare origin question.
+     */
+    function classifyOriginStoryDepth(rawText) {
+        const text = String(rawText || "");
+        if (_matchesAnyDepthPattern(text, DEPTH_MARKER_PATTERNS.FULL_ORIGINAL)) return RESPONSE_DEPTH.FULL_ORIGINAL;
+        if (_matchesAnyDepthPattern(text, DEPTH_MARKER_PATTERNS.DETAILED)) return RESPONSE_DEPTH.DETAILED;
+        return RESPONSE_DEPTH.CONCISE;
+    }
 
     // ── Canonical intents (per Charles's spec) ──────────────────────────
     const INTENTS = Object.freeze({
@@ -127,7 +211,17 @@
                 // Substring-match (_scorePhrase) means "cozyos story" alone
                 // also covers "Tell me the CozyOS story" for free, since
                 // the shorter phrase is a substring of the longer query.
-                "cozyos story", "tell me about cozyos"],
+                "cozyos story", "tell me about cozyos",
+                // PUBLIC-STORY-DEPTH milestone — real, confirmed gap:
+                // "born" shares no vocabulary with any trigger above once
+                // stopwords are removed ("begin"/"start"/"created"/
+                // "founded"/"story" are all distinct words from "born"),
+                // so "How was CozyOS born?" scored 0 against every
+                // existing trigger and would not have matched this
+                // intent at all. Real, natural phrasing, not fabricated.
+                "how was cozyos born", "cozyos was born", "how cozyos came to be",
+                "how did cozyos come to be", "tell me the full story of how cozyos was born",
+                "give me the original full story", "tell me everything about how cozyos was born"],
             sw: ["cozyos ilianzaje", "cozyos ilianzishwa lini", "kwa nini cozyos iliundwa", "wazo la cozyos lilitoka wapi",
                 "ni nini kilichochochea cozyos", "hadithi ya cozyos ni nini", "tatizo gani lilisababisha cozyos",
                 "cozyos ilianzishwa kutatua tatizo gani",
@@ -166,7 +260,14 @@
                 // already-answered general-information question
                 // (answerWhyCreated(), real Kiswahili prose, unchanged)
                 // — not a new intent, not new prose.
-                "cozyos ni nini"]
+                "cozyos ni nini",
+                // PUBLIC-STORY-DEPTH milestone — real, confirmed gap,
+                // same class as the EN "born"/"full story" additions
+                // above: no shared vocabulary with any existing SW
+                // trigger, so these would not have matched at all.
+                "cozyos ilizaliwa vipi", "cozyos ilizaliwaje",
+                "nipe hadithi kamili ya cozyos", "hadithi kamili ya jinsi cozyos ilivyozaliwa",
+                "niambie hadithi kamili ya cozyos"]
         },
         [INTENTS.COZYOS_MISSION]: {
             en: ["what is cozyos's mission", "what is the mission of cozyos", "what does cozyos aim to achieve",
@@ -491,11 +592,53 @@
                 sw: `CozyOS na CozyAI zilianzishwa na ${id.getOfficialName()} (anajulikana pia kama ${id.getKnownAs().join(" / ")}) kutoka ${id.getCountry()}, ambaye ni ${id.getRoles().join(", ")}.`
             };
         },
-        [INTENTS.COZYOS_ORIGIN]: (id) => ({
-            en: id.answerWhyCreated().answer,
-            sw: "Kabla ya kuunda CozyOS, Charles Owuor alipata uzoefu wa kuuza bidhaa nyumba kwa nyumba. Akifanya kazi moja kwa moja na familia na wafanyabiashara, aligundua watu wengi walishindwa kufikia teknolojia muhimu kwa sababu ya vikwazo vya lugha, mtandao usiotegemewa, gharama, na programu zisizoendana na mahitaji ya jamii za mitaani. Uzoefu huo ulimtia moyo kujenga jukwaa la AI linaloweza kufanya kazi hata bila mtandao (offline-first), lenye lugha nyingi, lililoundwa kutatua matatizo halisi ya jamii."
-        }),
-        [INTENTS.COZYOS_WHY_CREATED]: (id) => ANSWER_BUILDERS[INTENTS.COZYOS_ORIGIN](id),
+        /**
+         * COZYOS_ORIGIN — PUBLIC-STORY-DEPTH milestone: `depth` (one of
+         * RESPONSE_DEPTH, or null/undefined for the pre-existing
+         * default) selects which real, non-fabricated text is returned:
+         *   CONCISE (default, unchanged)  -> id.answerWhyCreated().answer
+         *     (project-history.js's own real background paragraph) —
+         *     byte-identical to this function's pre-existing behavior,
+         *     zero regression for every caller that doesn't pass depth.
+         *   DETAILED / FULL_ORIGINAL -> window.CozyOS.CozyPublicKnowledge.
+         *     getPublicOriginStoryFact()'s real `detailed`/`full.text` —
+         *     see that function's own header (cozy-public-knowledge-
+         *     source.js) for exactly how those are curated (verbatim
+         *     excerpts of the one real source document, never generated
+         *     or paraphrased). Honestly falls back to CONCISE (never
+         *     fabricates new prose) if that fact isn't VERIFIED — e.g.
+         *     CozyPublicKnowledge isn't loaded.
+         * The returned object's `en` is always real. `sw` is the
+         * pre-existing, real, hand-authored Kiswahili CONCISE answer for
+         * depth===CONCISE only — for DETAILED/FULL_ORIGINAL there is no
+         * genuine original-Kiswahili text (the source document is
+         * English-only; see cozy-public-knowledge-source.js's own
+         * header), so `sw` is intentionally omitted here and resolve()
+         * below routes those two depths through the SAME real machine-
+         * translation path (_translateIfPossible) it already uses for
+         * every language beyond en/sw, honestly disclosed via the
+         * existing `machineTranslated` field — never presented as an
+         * original Kiswahili story.
+         */
+        [INTENTS.COZYOS_ORIGIN]: (id, depth) => {
+            const concise = {
+                en: id.answerWhyCreated().answer,
+                sw: "Kabla ya kuunda CozyOS, Charles Owuor alipata uzoefu wa kuuza bidhaa nyumba kwa nyumba. Akifanya kazi moja kwa moja na familia na wafanyabiashara, aligundua watu wengi walishindwa kufikia teknolojia muhimu kwa sababu ya vikwazo vya lugha, mtandao usiotegemewa, gharama, na programu zisizoendana na mahitaji ya jamii za mitaani. Uzoefu huo ulimtia moyo kujenga jukwaa la AI linaloweza kufanya kazi hata bila mtandao (offline-first), lenye lugha nyingi, lililoundwa kutatua matatizo halisi ya jamii."
+            };
+            if (depth !== RESPONSE_DEPTH.DETAILED && depth !== RESPONSE_DEPTH.FULL_ORIGINAL) {
+                return Object.assign({ depth: RESPONSE_DEPTH.CONCISE }, concise);
+            }
+            const source = window.CozyOS && window.CozyOS.CozyPublicKnowledge;
+            const storyFact = source && typeof source.getPublicOriginStoryFact === "function" ? source.getPublicOriginStoryFact() : null;
+            if (!storyFact || storyFact.evidence !== "VERIFIED") {
+                // Honest degrade — never fabricate a "detailed"/"full"
+                // text that doesn't really exist as data.
+                return Object.assign({ depth: RESPONSE_DEPTH.CONCISE, depthFallback: true }, concise);
+            }
+            const en = depth === RESPONSE_DEPTH.FULL_ORIGINAL ? storyFact.full.text : storyFact.detailed;
+            return { en, depth, noOriginalTranslation: true, storySource: storyFact.source };
+        },
+        [INTENTS.COZYOS_WHY_CREATED]: (id, depth) => ANSWER_BUILDERS[INTENTS.COZYOS_ORIGIN](id, depth),
         [INTENTS.COZYOS_MISSION]: (id) => {
             const list = id.getMission();
             return {
@@ -597,37 +740,93 @@
         const builder = ANSWER_BUILDERS[hit.intentId];
         if (!builder) return { matched: false };
 
-        const rendered = builder(id);
+        // PUBLIC-STORY-DEPTH milestone — depth is only ever meaningful
+        // for the origin/why-created story itself; every other intent
+        // gets `depth: undefined`, and every builder above except
+        // COZYOS_ORIGIN/COZYOS_WHY_CREATED ignores its second argument
+        // entirely, so this is purely additive.
+        const isOriginIntent = hit.intentId === INTENTS.COZYOS_ORIGIN || hit.intentId === INTENTS.COZYOS_WHY_CREATED;
+        const depth = isOriginIntent ? classifyOriginStoryDepth(text) : undefined;
+
+        const rendered = builder(id, depth);
         const directiveParser = window.CozyOS.CozyLanguageDirective;
         const directive = directiveParser && typeof directiveParser.extractLanguageDirective === "function"
             ? directiveParser.extractLanguageDirective(text)
             : { code: null };
         const targetLang = language || directive.code || hit.matchedLanguageHint || "en";
+        const subject = "cozyos"; // this router's only real subject/domain — see RESPONSE_DEPTH's own header
 
-        if (targetLang === "en" || targetLang === "sw") {
+        // A depth-extended (DETAILED/FULL_ORIGINAL) render has no genuine
+        // original-language text beyond English — see ANSWER_BUILDERS'
+        // COZYOS_ORIGIN comment. Route it exactly like any language
+        // beyond en/sw, even when the target IS sw, rather than through
+        // the native-sw branch below.
+        const isDepthExtendedRender = rendered.noOriginalTranslation === true;
+
+        if (!isDepthExtendedRender && (targetLang === "en" || targetLang === "sw")) {
             return {
                 matched: true, success: true, isReal: rendered.known === false ? false : true,
                 intentId: hit.intentId, confidence: hit.confidence, language: targetLang,
                 answer: rendered[targetLang], certified: targetLang === "sw" ? false : undefined,
+                subject, responseDepth: rendered.depth || RESPONSE_DEPTH.CONCISE,
+                source: rendered.storySource || "DeveloperIdentity (public profile)"
+            };
+        }
+
+        if (!isDepthExtendedRender) {
+            // Any other registered language, CONCISE/non-story intents:
+            // real, disclosed machine translation of the English canonical answer (unchanged pre-existing path).
+            const translated = await _translateIfPossible(rendered.en, targetLang);
+            if (translated) {
+                return {
+                    matched: true, success: true, isReal: translated.isReal,
+                    intentId: hit.intentId, confidence: hit.confidence, language: targetLang,
+                    answer: translated.text, machineTranslated: true,
+                    subject, responseDepth: rendered.depth || RESPONSE_DEPTH.CONCISE,
+                    source: "DeveloperIdentity (public profile), machine-translated from English"
+                };
+            }
+            return {
+                matched: true, success: true, isReal: true,
+                intentId: hit.intentId, confidence: hit.confidence, language: "en",
+                answer: rendered.en, fallbackReason: `No real translator available for "${targetLang}" — returned English.`,
+                subject, responseDepth: rendered.depth || RESPONSE_DEPTH.CONCISE,
                 source: "DeveloperIdentity (public profile)"
             };
         }
 
-        // Any other registered language: real, disclosed machine translation of the English canonical answer.
+        // DETAILED / FULL_ORIGINAL render. English is the real original
+        // language (see cozy-public-knowledge-source.js's own header —
+        // the source document is English-only). English requests get
+        // that real text verbatim, unsummarized, unrewritten. Every
+        // other requested language (including sw) gets a real, disclosed
+        // machine translation of it via the SAME existing translation
+        // seam this router already uses for any non-en/sw language —
+        // never presented as an original text in that language.
+        if (targetLang === "en") {
+            return {
+                matched: true, success: true, isReal: true,
+                intentId: hit.intentId, confidence: hit.confidence, language: "en",
+                answer: rendered.en, subject, responseDepth: rendered.depth,
+                source: rendered.storySource
+            };
+        }
         const translated = await _translateIfPossible(rendered.en, targetLang);
         if (translated) {
             return {
                 matched: true, success: true, isReal: translated.isReal,
                 intentId: hit.intentId, confidence: hit.confidence, language: targetLang,
-                answer: translated.text, machineTranslated: true,
-                source: "DeveloperIdentity (public profile), machine-translated from English"
+                answer: translated.text, machineTranslated: true, originalLanguage: "en",
+                subject, responseDepth: rendered.depth,
+                source: `${rendered.storySource}, machine-translated from English — no original ${targetLang} version of the full story exists yet`
             };
         }
         return {
             matched: true, success: true, isReal: true,
             intentId: hit.intentId, confidence: hit.confidence, language: "en",
-            answer: rendered.en, fallbackReason: `No real translator available for "${targetLang}" — returned English.`,
-            source: "DeveloperIdentity (public profile)"
+            answer: rendered.en, subject, responseDepth: rendered.depth,
+            fallbackReason: `No real translator available for "${targetLang}" — returned the real original English text.`,
+            source: rendered.storySource
         };
     }
 
@@ -635,12 +834,14 @@
         getVersion: () => VERSION,
         getIntents: () => Object.values(INTENTS),
         detectIntent,
-        resolve
+        resolve,
+        RESPONSE_DEPTH,
+        classifyOriginStoryDepth
     });
 
     window.CozyOS.CozyIdentityFAQRouter = CozyIdentityFAQRouter;
     window.CozyOS.Modules["cozyos-identity-faq-router"] = Object.freeze({
         version: VERSION,
-        description: "Identity FAQ intent router — maps many EN/Kiswahili phrasings (founder/origin/mission/vision/differentiation/values/name-meaning/future/purpose/community) onto canonical intents, answered ONLY from the real public window.CozyOS.DeveloperIdentity. Never reads the private Founder Story Vault. No Gemini/generative use for these deterministic facts."
+        description: "Identity FAQ intent router — maps many EN/Kiswahili phrasings (founder/origin/mission/vision/differentiation/values/name-meaning/future/purpose/community) onto canonical intents, answered ONLY from the real public window.CozyOS.DeveloperIdentity. Never reads the private Founder Story Vault. No Gemini/generative use for these deterministic facts. PUBLIC-STORY-DEPTH milestone: COZYOS_ORIGIN/COZYOS_WHY_CREATED now carry a real responseDepth (concise/detailed/full_original, classifyOriginStoryDepth()) — concise stays the pre-existing, unchanged DeveloperIdentity/project-history.js answer; detailed/full_original read window.CozyOS.CozyPublicKnowledge.getPublicOriginStoryFact()'s real, verbatim, owner-approved public-story text (never founder-story-seed.js). No genuine original exists in any language but English for the detailed/full_original depths; every other requested language (sw included) is honestly machine-translated via this router's own pre-existing _translateIfPossible(), flagged machineTranslated:true — never presented as an original."
     });
 })();

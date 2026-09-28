@@ -72,7 +72,7 @@
     window.CozyOS.Modules = window.CozyOS.Modules || {};
     if (window.CozyOS.Modules["cozy-public-knowledge-source"]) return;
 
-    const VERSION = "1.1.0"; // LIVE-WINDOW-LANGUAGE-AUDIT: TARGET_LANGUAGES now includes Luganda/Igbo, matching the source document's own NOT_READY(6) statement and the live registry — fixes a real target-list/registered-language inconsistency in the language-support-list reply.
+    const VERSION = "1.2.0"; // PUBLIC-STORY-DEPTH: adds getPublicOriginStoryFact() — see that function's own header.
     const SOURCE_DOC = "docs/builder/knowledge/cozyos-public-vision-and-language-policy.md";
 
     /**
@@ -156,6 +156,82 @@
         "Luo", "Kikuyu", "Kikamba", "isiZulu", "Luganda", "Igbo"
     ]);
 
+    /**
+     * ORIGIN_STORY_FULL_PARAGRAPHS
+     *   PUBLIC-STORY-DEPTH milestone. Verbatim, unshortened, unrewritten
+     *   paragraphs copied — sequence, wording, and paragraph boundaries
+     *   all preserved exactly — from this file's own SOURCE_DOC, section
+     *   "## Public Vision & Motivation — owner-provided story". That
+     *   section is the doc's own Appendix B: "this personal story is
+     *   owner-approved for public-story use" — a real, explicit approval
+     *   distinct from (and never drawn from) the private Founder Story
+     *   Vault (founder-story-seed.js — visibility "only-me", status
+     *   "draft" — never read by this file, per this file's own
+     *   pre-existing SOURCE OF TRUTH header above).
+     *
+     *   This is the ONE authoritative public origin-story text this
+     *   file now exposes. It is never independently paraphrased here —
+     *   every derived depth below is either this exact array (
+     *   FULL_ORIGINAL) or a real, verbatim PREFIX SUBSET of it
+     *   (DETAILED) — never a rewritten/generated sentence. A caller
+     *   wanting a still-shorter CONCISE form has an existing, separate,
+     *   real, already-live, already-condensed public answer of its own
+     *   — core/identity/project-history.js's `background` field
+     *   (exposed via DeveloperIdentity.answerWhyCreated(), and via this
+     *   repository's live chat path, cozyos-identity-faq-router.js's
+     *   COZYOS_ORIGIN intent). That text already describes the SAME
+     *   real facts this array's own first paragraphs describe (the
+     *   owner's door-to-door sales experience and the language-barrier
+     *   problem it revealed) at a shorter grain — it is kept as the
+     *   default CONCISE answer, unchanged, rather than duplicated or
+     *   replaced here, so there is exactly one condensed public form and
+     *   exactly one full original form, never two competing full
+     *   stories. See cozyos-identity-faq-router.js's own header for how
+     *   the three depths (concise/detailed/full_original) are composed
+     *   together from these two real sources.
+     */
+    const ORIGIN_STORY_FULL_PARAGRAPHS = Object.freeze([
+        "CozyOS was inspired by the owner's experience as a salesperson, moving door-to-door and meeting ordinary people and customers with different challenges. Those experiences encouraged the owner to ask how technology could solve practical problems in people's work and everyday lives.",
+        "The owner's community and church experiences also influenced the idea. People, including the owner, requested help in Church with media and technology-related work, including situations where assistance could sometimes have been offered freely, but existing systems did not always allow the owner to help in the way he wanted — which led the owner to think more about being part of the system in God's way.",
+        "This contributed to the idea of creating CozyOS as a practical problem-solving technology platform that can make useful tools, information, media, and services more accessible to communities.",
+        "The owner describes having three fathers in his personal spiritual understanding: God, unseen; his spiritual father, Pastor Ezekiel, whom he sees; and his physical father, whom he has not seen since he was six months old. The owner had to learn how to struggle for a living when his mother, Jane Achieng Owuor, passed away in 2004, while he was in pre-primary school (class 3).",
+        "The teachings of Pastor Ezekiel and the owner's experiences encouraged him to think about solving problems tied to language barriers — the owner felt this was a reason he was created to solve: he was touched by how people get healed and helped, and the solution he arrived at was an idea to solve the language-barrier problem, where any community through CozyOS can select their own language and understand what his pastor is teaching — a way for the owner to be part of his spiritual father's mission, making useful teachings and information more accessible. One important inspiration was the possibility that teachings and media could be made available through websites or applications, delivered in people's own community languages.",
+        "The owner believes technology can improve African lives and communities and should not be viewed only as a source of dependence or destruction. Technology created elsewhere can be used, adapted, and extended to solve local problems, while Africans also create their own solutions and contribute new technology to the world.",
+        "The owner's stated motto is \"ABOVE ONLY.\" The wider vision is that Africa should participate in creating solutions that bring positive change to African communities and, ultimately, to the entire world."
+    ]);
+
+    // DETAILED — a real, verbatim PREFIX of ORIGIN_STORY_FULL_PARAGRAPHS
+    // (paragraphs 1-5 of 7): fuller than the existing project-history.js
+    // CONCISE answer, short of the complete, unabridged FULL_ORIGINAL —
+    // never a rewrite, purely a shorter curated excerpt of the same text.
+    const ORIGIN_STORY_DETAILED_PARAGRAPH_COUNT = 5;
+
+    /**
+     * getPublicOriginStoryFact()
+     *   Always VERIFIED — same committed-content basis as
+     *   getWhyUseCozyOSFact()/getDifferentiationFact() above (this
+     *   file's own content is its evidence source; see this file's
+     *   header, "WHY THIS CONTENT IS VERIFIED RATHER THAN LIVE-READ").
+     *   Returns `detailed` (string) and `full` ({paragraphs, text})
+     *   only — never a `concise` field (see ORIGIN_STORY_FULL_
+     *   PARAGRAPHS' own header for why the existing project-history.js
+     *   text remains the one real CONCISE source, composed directly by
+     *   the caller, not duplicated here).
+     */
+    function getPublicOriginStoryFact() {
+        const detailedParagraphs = ORIGIN_STORY_FULL_PARAGRAPHS.slice(0, ORIGIN_STORY_DETAILED_PARAGRAPH_COUNT);
+        return {
+            evidence: "VERIFIED",
+            detailed: detailedParagraphs.join("\n\n"),
+            full: {
+                paragraphs: ORIGIN_STORY_FULL_PARAGRAPHS.slice(),
+                text: ORIGIN_STORY_FULL_PARAGRAPHS.join("\n\n")
+            },
+            language: "en", // this is the ONLY language the source document itself is written in — see this file's own header and cozyos-identity-faq-router.js's own handling for any other requested language
+            source: `${SOURCE_DOC} (section "Public Vision & Motivation — owner-provided story", Appendix B: owner-approved for public-story use)`
+        };
+    }
+
     function safeCall(fn) {
         try {
             return fn();
@@ -222,11 +298,12 @@
         getVersion() { return VERSION; },
         getWhyUseCozyOSFact,
         getDifferentiationFact,
-        getLanguageSupportListFact
+        getLanguageSupportListFact,
+        getPublicOriginStoryFact
     });
 
     window.CozyOS.Modules["cozy-public-knowledge-source"] = Object.freeze({
         version: VERSION,
-        description: "COZYAI-PUBLIC-VISION-KNOWLEDGE — static, owner-approved public-knowledge content sourced exclusively from docs/builder/knowledge/cozyos-public-vision-and-language-policy.md (never from founder-story-seed.js, which stays untouched and private). Provides why-use-CozyOS and differentiation facts (always VERIFIED, since the committed document is their own evidence source) and a language-support-list fact that honestly separates the document's 17-language policy target list from cozy-language-registry.js's live AVAILABLE/NOT_READY runtime state (PARTIALLY_VERIFIED). Consumed by cozy-knowledge-registry.js; does not itself compose user-facing text."
+        description: "COZYAI-PUBLIC-VISION-KNOWLEDGE + PUBLIC-STORY-DEPTH — static, owner-approved public-knowledge content sourced exclusively from docs/builder/knowledge/cozyos-public-vision-and-language-policy.md (never from founder-story-seed.js, which stays untouched and private). Provides why-use-CozyOS and differentiation facts, a language-support-list fact (PARTIALLY_VERIFIED, live registry state), and getPublicOriginStoryFact() — the one authoritative public origin-story text (detailed = a verbatim 5-of-7-paragraph prefix, full = all 7 paragraphs verbatim, English-only; see that function's own header for why no `concise` field is duplicated here). Consumed by cozy-knowledge-registry.js and cozyos-identity-faq-router.js; does not itself compose user-facing text."
     });
 })();

@@ -9,9 +9,22 @@ Governed by Rule 83
 (`docs/builder/rules/28-universal-builder-and-public-knowledge-governance-rule.md`).
 
 **Status: reference material for a future public-knowledge
-implementation.** Nothing in this file has been wired into
-`cozy-knowledge-registry.js` or the conversational provider yet — that
-is future work, to be Composed as its own repair, following the same
+implementation.** Most of this document (why-use/differentiation/
+language-support-list) is wired into `cozy-knowledge-registry.js` via
+`cozy-public-knowledge-source.js` — see that file's own header. The
+"Public Vision & Motivation — owner-provided story" section below is
+now ALSO wired, as of the PUBLIC-STORY-DEPTH milestone:
+`cozy-public-knowledge-source.js`'s `getPublicOriginStoryFact()`
+exposes it verbatim (detailed = a 5-of-7-paragraph prefix, full =
+all 7 paragraphs), consumed by `cozyos-identity-faq-router.js`'s
+depth-aware COZYOS_ORIGIN/COZYOS_WHY_CREATED intents (concise remains
+the pre-existing, separate `project-history.js` text — see that
+router's own header for why). It is still not wired into the
+conversational provider (`rule-based-conversational-provider.js`,
+diff-guarded) directly — this router is the real, live seam
+`cozy-ai.js`'s `ask()`/`answer()` already call first, so no guarded
+file needed to change. Any other section of this document not named
+above remains future work, following the same
 VERIFIED/PARTIALLY_VERIFIED/NOT_FOUND evidence discipline RP-027
 already established, never simply pasted in as unverified prose.
 
