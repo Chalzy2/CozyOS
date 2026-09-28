@@ -233,10 +233,21 @@
      * sentence is ABOUT - it carries no facts about that application at
      * all. Verified facts remain exclusively CozyKnowledge's job.
      */
-    const KNOWN_ENTITIES = Object.freeze(["cozyos", "churchos", "shopos", "quarryos"]);
+    // SPIRITUALOS HUMAN-BENEFIT PHASE addition — "spiritualos" is a
+    // single-word application-style name (like quarryos before it), so
+    // it is added here the exact same way, purely for entity SPOTTING
+    // (which application is this sentence ABOUT — see this const's own
+    // header). This is unrelated to the SPIRITUAL_* PATTERNS above,
+    // which recognize a personal prayer/scripture/devotional/worship
+    // REQUEST regardless of whether the word "SpiritualOS" is even used
+    // ("help me pray" names no entity at all). Adding "spiritualos" here
+    // only lets a genuine benefit/capability QUESTION ABOUT SpiritualOS
+    // itself ("What does SpiritualOS help with?") resolve an entity, the
+    // same way "What does QuarryOS help with?" already does.
+    const KNOWN_ENTITIES = Object.freeze(["cozyos", "churchos", "shopos", "quarryos", "spiritualos"]);
 
     function canonicalEntityName(lowerName) {
-        const map = { cozyos: "CozyOS", churchos: "ChurchOS", shopos: "ShopOS", quarryos: "QuarryOS" };
+        const map = { cozyos: "CozyOS", churchos: "ChurchOS", shopos: "ShopOS", quarryos: "QuarryOS", spiritualos: "SpiritualOS" };
         return map[lowerName] || null;
     }
 

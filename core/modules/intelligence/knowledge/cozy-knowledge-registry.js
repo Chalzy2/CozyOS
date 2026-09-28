@@ -1219,6 +1219,110 @@
             visionSourceNote: "Drawn directly from core/modules/intelligence/media/cozy-media-intelligence.js's own file header, including its explicit 'NO FABRICATION' section."
         }),
 
+        // SPIRITUALOS HUMAN-BENEFIT PHASE (2026-09-28) — HONEST FINDING,
+        // confirmed by directly reading core/living/spiritual-capability.js
+        // and core/living/spiritual-intent-router.js (Cozy SpiritualOS —
+        // Phase 1: Spiritual Foundation) before authoring this entry:
+        // unlike QuarryOS/ChurchOS, "SpiritualOS" is NOT a distinct
+        // registerApplication()/ServiceRegistry entry - no such call
+        // exists anywhere in this repository. What is real is a
+        // conversational CAPABILITY composed straight into the Live
+        // Window: core/modules/intelligence/cozy-ai.js's getContext()
+        // hands any SPIRITUAL_PRAYER/SPIRITUAL_SCRIPTURE/
+        // SPIRITUAL_DEVOTIONAL/SPIRITUAL_WORSHIP intent (classified only
+        // by cozy-ai-semantic-intent.js) to
+        // window.CozyOS.SpiritualIntentRouter.dispatch(), which composes
+        // spiritual-capability.js's own classifyContext()/route()/
+        // handlePersonal*() functions. Recording it here under the same
+        // key shape every other application uses (never inventing a
+        // ServiceRegistry registration that does not exist) lets
+        // SpiritualOS answer "how does it help" questions through the
+        // exact same human-benefit/PAA-3/PAA-4 pipeline QuarryOS/ChurchOS
+        // already use - it is deliberately NOT keyed/labeled as if it
+        // were a full, separate registered application like those two.
+        spiritualos: Object.freeze({
+            humanPurpose: "SpiritualOS is CozyOS's personal spiritual-practice capability - a set of honest, deterministic aids (never a prayer engine, never a doctrinal authority) that help someone structure their own prayer, look up a Bible reference, follow a simple daily devotional pattern, and understand in general terms what a worship service usually includes. It never prays on your behalf, never claims supernatural or theological authority, and never invents Scripture wording - real verse text is shown only once a licensed Bible translation is actually installed on the device.",
+            humanPurposeSw: "SpiritualOS ni uwezo wa kibinafsi wa CozyOS kuhusu mazoezi ya kiroho - seti ya visaidizi vya wazi, thabiti (kamwe si injini ya kuomba, kamwe si mamlaka ya kimafundisho) vinavyomsaidia mtu kupanga maombi yake mwenyewe, kutafuta andiko la Biblia, kufuata muundo rahisi wa ibada ya kila siku, na kuelewa kwa jumla ni nini ibada ya kanisa mara nyingi hujumuisha. Haiombi kwa niaba yako, haidai mamlaka ya kimungu au ya kimafundisho, na haitengenezi maneno ya Biblia - maandishi halisi ya mstari huonyeshwa tu baada ya tafsiri ya Biblia yenye leseni kuwekwa kwenye kifaa.",
+            realLifeProblems: Object.freeze([
+                "wanting a simple, honest structure to organize personal prayer instead of not knowing where to start",
+                "naming a specific Bible reference and having no confirmation it was even understood correctly",
+                "wanting a lightweight daily devotional habit without a ready-made structure to follow",
+                "not knowing, in general, what a worship service usually includes"
+            ]),
+            realLifeProblemsSw: Object.freeze([
+                "kutaka muundo rahisi, wa kweli wa kupanga maombi ya kibinafsi badala ya kutokujua pa kuanzia",
+                "kutaja andiko mahususi la Biblia bila uthibitisho kwamba limeeleweka kwa usahihi",
+                "kutaka desturi rahisi ya ibada ya kila siku bila muundo tayari wa kuufuata",
+                "kutokujua, kwa jumla, ni nini ibada ya kanisa mara nyingi hujumuisha"
+            ]),
+            whoBenefits: Object.freeze(["an individual wanting a personal structure for prayer, Scripture, or devotional time", "a participant in a real, active church live session submitting a prayer request"]),
+            whoBenefitsSw: Object.freeze(["mtu binafsi anayetaka muundo wa kibinafsi wa maombi, Biblia, au muda wa ibada", "mshiriki katika kikao halisi, kinachoendelea cha kanisa anayewasilisha ombi la maombi"]),
+            humanBenefits: Object.freeze([
+                "a repeatable, honest prayer structure (Adoration/Confession/Thanksgiving/Supplication) in English or Kiswahili, with zero claim of praying on your behalf",
+                "honest confirmation that a named Bible reference was understood, even on a device with no licensed translation installed yet - never invented verse wording in its place",
+                "a repeatable Read/Reflect/Pray/Apply devotional structure, clearly labeled as CozyOS's own structure, not Scripture or any church's official teaching",
+                "a general, disclosed overview of common worship elements instead of a false claim about one specific church's live schedule",
+                "a real prayer request submitted during a live church session is forwarded to that church's own real prayer-request system, not answered as if it were generic"
+            ]),
+            humanBenefitsSw: Object.freeze([
+                "muundo wa maombi wenye kurudiwa, wa kweli (Kumsifu Mungu/Kutubu/Kushukuru/Kuomba) kwa Kiingereza au Kiswahili, bila madai yoyote ya kuomba kwa niaba yako",
+                "uthibitisho wa kweli kwamba andiko mahususi la Biblia limeeleweka, hata kwenye kifaa kisicho na tafsiri yenye leseni bado - kamwe hakuna maneno ya mstari yaliyotengenezwa badala yake",
+                "muundo wa ibada wenye kurudiwa wa Soma/Tafakari/Omba/Tumia, ulioainishwa waziwazi kama muundo wa CozyOS mwenyewe, si Biblia wala mafundisho rasmi ya kanisa lolote",
+                "muhtasari wa jumla, wa wazi wa vipengele vya kawaida vya ibada badala ya madai ya uwongo kuhusu ratiba halisi ya kanisa fulani",
+                "ombi halisi la maombi lililowasilishwa wakati wa kikao halisi cha kanisa hupelekwa kwenye mfumo halisi wa kanisa hilo wa maombi, badala ya kujibiwa kana kwamba ni la jumla"
+            ]),
+            // ADDITIVE ONLY, humanBenefits/realLifeProblems/currentVerified
+            // Capabilities above remain byte-identical. Reorganizes ONLY
+            // the already-verified facts above into 4 named topics -
+            // deliberately excludes any "leadership"/"pastoral" topic (no
+            // such capability exists anywhere in spiritual-capability.js;
+            // inventing one here would be exactly the fabrication this
+            // registry's own discipline forbids) and excludes worship/
+            // gospel-music composition or any audio generation (a
+            // separate, explicitly out-of-scope future phase per this
+            // milestone's own directive - no such code exists anywhere
+            // in this repository).
+            benefitAreas: Object.freeze([
+                "Personal Prayer — Helps you follow a simple, honest structure (Adoration, Confession, Thanksgiving, Supplication) to organize your own prayer, in English or Kiswahili, on a topic you name. Benefit: A repeatable way to pray with intention, with CozyOS never claiming to pray on your behalf or speak with spiritual authority.",
+                "Scripture Reference Lookup — Helps you name a specific Bible reference (e.g. \"John 3:16\") and confirms it was understood correctly. Benefit: Honest confirmation today, and the real verse text itself once a licensed Bible translation is installed on this device - CozyOS never invents Scripture wording in the meantime.",
+                "Daily Devotional Structure — Helps you follow a simple Read, Reflect, Pray, Apply structure for your own devotional time, optionally built around a Scripture reference you name. Benefit: A repeatable personal starting point, clearly labeled as CozyOS's own structure - never presented as Scripture or as any church's official teaching.",
+                "Worship Overview — Helps you understand, in general terms, what a worship service commonly includes (song, prayer, Scripture reading, teaching, testimony, giving). Benefit: An honest, general orientation, not a specific church's actual live schedule, which stays the job of that church's own live session."
+            ]),
+            benefitAreasSw: Object.freeze([
+                "Maombi ya Kibinafsi — Husaidia kufuata muundo rahisi, wa kweli (Kumsifu Mungu, Kutubu, Kushukuru, Kuomba) kupanga maombi yako mwenyewe, kwa Kiingereza au Kiswahili, kuhusu jambo unalotaja. Faida: Njia ya kurudiwa ya kuomba kwa nia, huku CozyOS haidai kamwe kuomba kwa niaba yako au kuzungumza kwa mamlaka ya kiroho.",
+                "Utafutaji wa Andiko la Biblia — Husaidia kutaja andiko mahususi la Biblia (mfano \"Yohana 3:16\") na kuthibitisha limeeleweka kwa usahihi. Faida: Uthibitisho wa kweli leo, na maandishi halisi ya mstari mara tafsiri ya Biblia yenye leseni ikiwekwa kwenye kifaa hiki - CozyOS haitengenezi maneno ya Biblia wakati huo.",
+                "Muundo wa Ibada ya Kila Siku — Husaidia kufuata muundo rahisi wa Soma, Tafakari, Omba, Tumia kwa muda wako wa ibada, ukiwa na hiari wa kujengwa kuzunguka andiko unalotaja. Faida: Mwanzo wa kibinafsi wenye kurudiwa, ulioainishwa waziwazi kama muundo wa CozyOS mwenyewe - kamwe haujawasilishwa kama Biblia au mafundisho rasmi ya kanisa lolote.",
+                "Muhtasari wa Ibada — Husaidia kuelewa, kwa jumla, ni nini ibada ya kanisa mara nyingi hujumuisha (kuimba, kuomba, kusoma Biblia, mafundisho, ushuhuda, sadaka). Faida: Mwelekeo wa kweli, wa jumla, si ratiba halisi ya kanisa fulani, ambayo inasalia kuwa jukumu la kikao halisi cha kanisa hilo."
+            ]),
+            currentVerifiedCapabilities: Object.freeze([
+                "personal prayer structure (Adoration/Confession/Thanksgiving/Supplication), deterministic, fully offline, in English and Kiswahili",
+                "Scripture reference parsing (e.g. \"John 3:16\") using the app's real, existing Bible-lookup capability - always available; actual verse TEXT is honestly reported as not yet available because no licensed Bible translation is installed in this deployment",
+                "a personal devotional structure (Read/Reflect/Pray/Apply) that can optionally compose the same Scripture lookup for its \"Read\" step",
+                "a general, disclosed overview of common worship elements - never a specific church's actual live schedule",
+                "when a real, active church live session exists, a prayer request is forwarded to ChurchOS's own real prayer-request system instead of being answered generically"
+            ]),
+            currentVerifiedCapabilitiesSw: Object.freeze([
+                "muundo wa maombi ya kibinafsi (Kumsifu Mungu/Kutubu/Kushukuru/Kuomba), wenye uthabiti, nje ya mtandao kikamilifu, kwa Kiingereza na Kiswahili",
+                "uchambuzi wa andiko la Biblia (mfano \"Yohana 3:16\") kwa kutumia uwezo halisi, uliopo wa kutafuta Biblia - inapatikana kila wakati; maandishi halisi ya mstari yanaripotiwa kwa uwazi kama bado hayapatikani kwa sababu hakuna tafsiri ya Biblia yenye leseni iliyowekwa kwenye mazingira haya",
+                "muundo wa ibada ya kibinafsi (Soma/Tafakari/Omba/Tumia) unaoweza kujengwa kuzunguka utafutaji huo huo wa andiko kwa hatua yake ya \"Soma\"",
+                "muhtasari wa jumla, wa wazi wa vipengele vya kawaida vya ibada - kamwe si ratiba halisi ya kanisa fulani",
+                "wakati kikao halisi, kinachoendelea cha kanisa kipo, ombi la maombi hupelekwa kwenye mfumo halisi wa kanisa hilo wa maombi badala ya kujibiwa kwa jumla"
+            ]),
+            visionCapabilities: Object.freeze([
+                "actual Scripture verse text - depends on a licensed Bible translation being installed, a separate, explicit step that is never automatic; no translation is installed in this repository today",
+                "worship or gospel-music composition, or any audio/beat generation - explicitly a separate, much larger future phase requiring its own audit; no such code exists anywhere in this repository",
+                "a distinct leadership- or pastoral-care-specific benefit area - no such capability exists in spiritual-capability.js today",
+                "carrying what you last prayed about or looked up through the main Live Window entry point across turns - the underlying conversationState.spiritual mechanism is real and tested standalone (spiritual-capability.test.js), but is not yet threaded through cozy-living-assistant.js's own turn-to-turn state"
+            ]),
+            visionCapabilitiesSw: Object.freeze([
+                "maandishi halisi ya mstari wa Biblia - hutegemea tafsiri ya Biblia yenye leseni iliyowekwa, hatua tofauti, ya wazi ambayo si ya kiotomatiki kamwe; hakuna tafsiri iliyowekwa katika hazina hii leo",
+                "utengenezaji wa muziki wa ibada/wa injili, au utengenezaji wowote wa sauti/beat - kwa uwazi ni awamu tofauti, kubwa zaidi ya baadaye inayohitaji ukaguzi wake - hakuna msimbo wowote kama huo uliopo katika hazina hii",
+                "eneo maalum la faida kuhusu uongozi au huduma ya kichungaji - hakuna uwezo kama huo uliopo katika spiritual-capability.js leo",
+                "kubeba kile ulichokuwa ukiomba au kutafuta hivi karibuni kupitia sehemu kuu ya Live Window katika mazungumzo yanayofuata - mfumo wa conversationState.spiritual upo na umepimwa peke yake (spiritual-capability.test.js), lakini bado haujaunganishwa kupitia hali ya mazungumzo ya cozy-living-assistant.js"
+            ]),
+            visionSourceNote: "Drawn directly from core/living/spiritual-capability.js and core/living/spiritual-intent-router.js's own source and header comments (Cozy SpiritualOS — Phase 1: Spiritual Foundation), and from core/modules/intelligence/cozy-ai.js's getContext() integration comment describing the same, disclosed conversationState.spiritual threading gap. SpiritualOS has no registerApplication()/ServiceRegistry entry of its own, unlike QuarryOS/ChurchOS - it is a composed conversational capability, not a separately registered application."
+        }),
+
         // DEEP APPLICATION AUDIT (2026-09-15) — HONEST FINDING:
         // HospitalOS and SchoolOS are NOT part of the ServiceRegistry/
         // registerApplication() architecture every other entry in this
