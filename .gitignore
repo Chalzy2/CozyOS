@@ -4,3 +4,7 @@
 # meant to be committed; an earlier one, cozy-taskbar-cdp-diagnostic-1789096050090,
 # already predates version control here and was never tracked).
 cozy-taskbar-cdp-diagnostic-*/
+
+# CozyOS offline generation model weights (322 MB GGUF) — fetched and
+# hash-verified by scripts/offline-model/fetch-offline-model.js; never committed.
+.cozy-offline-model/
