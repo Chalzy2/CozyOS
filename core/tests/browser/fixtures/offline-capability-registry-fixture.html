@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<!--
+  core/tests/browser/fixtures/offline-capability-registry-fixture.html
+
+  Loads the real, unmodified
+  core/modules/intelligence/offline/cozy-offline-capability-registry.js
+  with a plain <script src> tag (NOT type="module") — deliberately, to
+  demonstrate the fix-forward pattern this milestone's audit points to:
+  core/storage.js cannot be given a plain <script> tag today because it
+  ends in a top-level `export default ...` (a real, independently
+  reproduced defect this session confirmed throws a CORS error when that
+  file is loaded as an ES module from a file:// page). This new registry
+  is written as a classic script specifically so it has no such problem,
+  from file:// or http://, on day one.
+
+  No business logic lives in this fixture. All assertions run from the
+  Node side via page.evaluate() against the real
+  window.CozyOS.OfflineCapabilityRegistry global.
+-->
+<html>
+<head><meta charset="utf-8"><title>CozyOS OfflineCapabilityRegistry — browser fixture</title></head>
+<body>
+  <script src="../../../modules/intelligence/offline/cozy-offline-capability-registry.js"></script>
+</body>
+</html>
