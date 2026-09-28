@@ -1904,6 +1904,32 @@
     <script src="core/plugins/wholesaleOS-core.js"></script>
     <script src="core/plugins/interestOS-core.js"></script>
     <script src="core/plugins/pharmacyOS-core.js"></script>
+    <!-- LIVE WINDOW APPLICATION COVERAGE PASS — every other real CozyOS
+         application had ZERO Live Window presence (only ChurchOS/
+         Worship was registered — see worship-live-window-mode.js
+         above). Each mode file below follows the exact same
+         registerMode() pattern and composes only real, already-loaded
+         engines on this page (the full ShopOS suite above, MpesaFloat/
+         Till/Paybill/Reporting, MpesaOS engine, QuarryOS, WholesaleOS,
+         InterestOS core, PharmacyOS core, organization-registry.js) —
+         no second AI, no second window, no new business logic. Loaded
+         after live-window-controller.js and after every engine each
+         mode composes. window.CozyOS.InterestOSBusinessWorkspace is
+         not loaded on this page (only on dashboard.html — a real,
+         pre-existing difference in this page's own script list), so
+         the interest mode's Business Workspace section honestly
+         renders "not connected on this page" here; its Directives
+         section (window.CozyOS.InterestOS, loaded above) is
+         unaffected. spiritual-capability.js is likewise not loaded on
+         this page, so no spiritual-live-window-mode.js tag is added
+         here — it is only added to dashboard.html, the one real page
+         that already loads it. -->
+    <script src="core/modules/QuarryOS/quarry-live-window-mode.js"></script>
+    <script src="core/plugins/shop-live-window-mode.js"></script>
+    <script src="core/plugins/mpesa-live-window-mode.js"></script>
+    <script src="core/plugins/interest-live-window-mode.js"></script>
+    <script src="core/plugins/pharmacy-live-window-mode.js"></script>
+    <script src="core/plugins/wholesale-live-window-mode.js"></script>
     <script src="core/plugins/pharmacyOS.js"></script>
     <script src="core/modules/intelligence/media/cozy-media-intelligence.js"></script>
     <script src="core/engines/video/ui/cozy-live-camera-capture-app.js"></script>
