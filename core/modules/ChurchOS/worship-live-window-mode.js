@@ -22,10 +22,12 @@
  *     own header for its honestly-disclosed limits: recording and
  *     attendance are already reported unavailable/deferred there, not
  *     re-litigated here).
- *   - window.CozyOS.LiveCaptureEngine / LiveHotspotEngine — the exact
- *     same real preview/remote MediaStream sources
- *     living-worship-player.js's own bindToService() already uses, for
- *     a compact Live Video/Audio element inside this mode's region.
+ *   - window.CozyOS.LivingWorshipPlayer — the real, single Live
+ *     Video/Audio player (owns the one real <video>, its
+ *     LiveCaptureEngine/LiveHotspotEngine stream connection, and
+ *     Theater/Float/PiP/Fullscreen). This file never streams to a
+ *     second <video> of its own — see renderVideo()'s delegation to
+ *     LivingWorshipPlayer.attachTo() below.
  *
  * HONEST SCOPE (disclosed, not fabricated)
  *   Questions / Prayer-Ministry / Contributions / Attendance compose
@@ -56,6 +58,19 @@
  *   #cozy-living-assistant-form/mic/input/send controls already
  *   present in the Live Window (below this mode's region, unchanged)
  *   remain the one real text/voice input path for every mode.
+ *
+ * CORRECTIVE PASS — Live Window repair (removes the second <video>)
+ *   A prior pass's own renderVideo() below independently created its
+ *   OWN real <video> element and connected it to
+ *   LiveCaptureEngine/LiveHotspotEngine itself — a genuine second,
+ *   separately-streamed Worship video, while living-worship-player.js
+ *   already owned the real one (plus Theater/Float/PiP/Fullscreen
+ *   controls no video here had). That duplication is now gone:
+ *   renderVideo() delegates entirely to the real, existing
+ *   window.CozyOS.LivingWorshipPlayer.attachTo(container, serviceId),
+ *   which mounts its own single, real player DOM (video + controls)
+ *   directly inside this mode's region. Exactly one real Worship
+ *   <video> exists for the active context, composed here — not two.
  */
 (function () {
     "use strict";
@@ -113,30 +128,31 @@
         return null;
     }
 
+    /**
+     * renderVideo(container, serviceId)
+     *   Delegates entirely to the real, existing
+     *   window.CozyOS.LivingWorshipPlayer — its own single, real
+     *   <video> plus Theater/Float/PiP/Fullscreen controls and
+     *   Translation/Scripture/Timeline/Chat panels, all mounted
+     *   directly inside this mode's region via attachTo(). Never a
+     *   second, independently-streamed <video> here (see file header's
+     *   corrective-pass note) and never a second stream-connection path
+     *   duplicating LivingWorshipPlayer's own bindToService()/
+     *   #connectStream().
+     */
     function renderVideo(container, serviceId) {
+        const player = window.CozyOS.LivingWorshipPlayer;
+        if (player && typeof player.attachTo === "function") {
+            player.attachTo(container, serviceId);
+            return;
+        }
+        // Honest fallback only if the real player module somehow isn't
+        // loaded on this page - never a fabricated stream connection,
+        // never a second video implementation.
         const wrap = document.createElement("div");
         wrap.className = "cozy-living-card cozy-live-window-worship-video";
-        wrap.innerHTML = `<video id="cozy-live-window-worship-video-el" autoplay muted playsinline style="width:100%;max-height:180px;border-radius:8px;background:#000;"></video>
-            <p class="cozy-disclosure-note" id="cozy-live-window-worship-video-status">${serviceId ? "Connecting to the real live stream…" : "No active worship service is bound yet."}</p>`;
+        wrap.innerHTML = `<p class="cozy-disclosure-note">The real Live Worship player (window.CozyOS.LivingWorshipPlayer) is not loaded on this page.</p>`;
         container.appendChild(wrap);
-        if (!serviceId) return;
-
-        const videoEl = wrap.querySelector("#cozy-live-window-worship-video-el");
-        const statusEl = wrap.querySelector("#cozy-live-window-worship-video-status");
-        const capture = window.CozyOS.LiveCaptureEngine;
-        const hotspot = window.CozyOS.LiveHotspotEngine;
-        let stream = null;
-        if (capture && typeof capture.getPreviewStream === "function") stream = capture.getPreviewStream(serviceId) || null;
-        if (!stream && hotspot && typeof hotspot.getRemoteStreams === "function") {
-            const remote = hotspot.getRemoteStreams(serviceId);
-            if (remote && remote.length) stream = remote[0];
-        }
-        if (stream) {
-            videoEl.srcObject = stream;
-            if (statusEl) statusEl.textContent = "Live.";
-        } else if (statusEl) {
-            statusEl.textContent = "No real stream is available yet for this service.";
-        }
     }
 
     function renderTranscriptAndTranslation(container, serviceId) {
@@ -343,6 +359,6 @@
 
     window.CozyOS.Modules["worship-live-window-mode"] = Object.freeze({
         version: VERSION,
-        description: "Registers ChurchOS's 'worship' mode with the universal window.CozyOS.LiveWindow — real Live Video/Audio, Translation, Service Phase controls (ChurchWorshipSession/WorshipModeCoordinator), and Questions/Prayer-Ministry/Contributions/Participation (real engines, functional only when a real LDCE sessionId is supplied — otherwise an honest disclosure, never fabricated). Speak/Type/Reply reuses the Live Window's own existing chat form, never duplicated."
+        description: "Registers ChurchOS's 'worship' mode with the universal window.CozyOS.LiveWindow — real Live Video/Audio (delegated entirely to LivingWorshipPlayer.attachTo(), never a second <video>), Translation, Service Phase controls (ChurchWorshipSession/WorshipModeCoordinator), and Questions/Prayer-Ministry/Contributions/Participation (real engines, functional only when a real LDCE sessionId is supplied — otherwise an honest disclosure, never fabricated). Speak/Type/Reply reuses the Live Window's own existing chat form, never duplicated."
     });
 })();
