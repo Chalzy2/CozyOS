@@ -244,21 +244,45 @@ test('E28: existing turn-aware behavior (rule-based-conversational-provider.js\'
     // Cognitive-to-Answer Contract): this test ORIGINALLY asserted an
     // empty diff across all three files below, encoding SA-3B's own
     // promise not to touch the real Live Window entry point at all. That
-    // promise still holds for rule-based-conversational-provider.js and
-    // cozy-living-ai.js — checked below, unchanged. cozy-living-assistant.js
-    // is the ONE file Wave 1 was explicitly authorized to extend (to
-    // carry CognitiveCoordinator's own already-computed semanticPlan
-    // through to the answer path instead of discarding it — see that
-    // file's own "WAVE 1 (Cognitive-to-Answer Contract)" comment). Rather
-    // than deleting this regression guard, it now also verifies that
-    // file's diff is real, genuinely marked as the Wave 1 change, and
-    // stays small/additive — so this test still fails loudly if a future
+    // promise still holds for cozy-living-ai.js — checked below,
+    // unchanged. cozy-living-assistant.js is the ONE file Wave 1 was
+    // explicitly authorized to extend (to carry CognitiveCoordinator's
+    // own already-computed semanticPlan through to the answer path
+    // instead of discarding it — see that file's own "WAVE 1
+    // (Cognitive-to-Answer Contract)" comment). Rather than deleting
+    // this regression guard, it now also verifies that file's diff is
+    // real, genuinely marked as the Wave 1 change, and stays
+    // small/additive — so this test still fails loudly if a future
     // change touches cozy-living-assistant.js for an unrelated reason.
+    //
+    // UPDATE — LIVE-WINDOW-SIMPLE-QUESTION fix (explicit, disclosed,
+    // user-approved exception): rule-based-conversational-provider.js's
+    // own "how-to-register" intent regex was missing the ordinary
+    // English/Kiswahili synonym "join"/"jiunge" ("How can I join
+    // CozyOS?"), which real Live Window reproduction confirmed fell
+    // through to the "unsupported" fallback. This is the one authorized,
+    // narrowly-scoped exception to this file's own no-touch rule — same
+    // discipline as cozy-living-assistant.js above: the diff must carry
+    // this change's own disclosed marker and stay tiny/additive, so this
+    // test still fails loudly on any other, undocumented edit to this
+    // file.
     const { execSync } = require('node:child_process');
     const repoRoot = require('node:path').join(__dirname, '..', '..', '..', '..', '..');
 
-    const untouchedDiff = execSync('git diff --stat HEAD -- core/modules/intelligence/providers/rule-based-conversational-provider.js core/living/cozy-living-ai.js', { cwd: repoRoot }).toString().trim();
-    assert.equal(untouchedDiff, '', 'SA-3B/Wave 1 must not modify the rule-based provider or LivingAI');
+    const livingAiDiff = execSync('git diff --stat HEAD -- core/living/cozy-living-ai.js', { cwd: repoRoot }).toString().trim();
+    assert.equal(livingAiDiff, '', 'SA-3B/Wave 1 must not modify LivingAI');
+
+    const ruleProviderDiff = execSync('git diff HEAD -- core/modules/intelligence/providers/rule-based-conversational-provider.js', { cwd: repoRoot }).toString();
+    if (ruleProviderDiff.trim() !== '') {
+        assert.match(ruleProviderDiff, /LIVE-WINDOW-SIMPLE-QUESTION fix/, 'expected the rule-based-conversational-provider.js diff to be the one documented, authorized "join" synonym fix, not an unrelated/undocumented edit');
+        assert.match(ruleProviderDiff, /\\bjoin\\b/, 'expected the diff to be about adding the \\bjoin\\b alternative specifically');
+        const statOutput = execSync('git diff --stat HEAD -- core/modules/intelligence/providers/rule-based-conversational-provider.js', { cwd: repoRoot }).toString();
+        const statMatch = statOutput.match(/(\d+) insertions?\(\+\).*?(?:(\d+) deletions?\(-\))?/);
+        const insertions = statMatch ? Number(statMatch[1]) : 0;
+        const deletions = statMatch && statMatch[2] ? Number(statMatch[2]) : 0;
+        assert.ok(insertions <= 20, `expected a tiny, additive join-synonym diff (<=20 insertions), got ${insertions}`);
+        assert.ok(deletions <= 1, `expected a near-zero-deletion diff (<=1 deletion), got ${deletions}`);
+    }
 
     const livingAssistantDiff = execSync('git diff HEAD -- core/living/cozy-living-assistant.js', { cwd: repoRoot }).toString();
     if (livingAssistantDiff.trim() === '') return; // nothing staged yet to compare against (e.g. a clean checkout) — nothing to verify

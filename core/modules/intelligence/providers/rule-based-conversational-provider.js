@@ -755,7 +755,19 @@
         //     "always the two-word phrase, never bare akaunti" discipline
         //     as kufungua/fungua above, so this still never collides
         //     with the Kiswahili account-status intent below.
-        { id: "how-to-register", pattern: /\bregist(?:er|ration)\b|\bsign\s*me\s*up\b|\bsign\s*up\b|\bcreate\s+an?\s+(?:\w+\s+)?account\b|sajili\b|\bkufungua\s+akaunti\b|\bfungua\s+akaunti\b|\bkutengeneza\s+akaunti\b|\btengeneza\s+akaunti\b|\bkuunda\s+akaunti\b|\bunda\s+akaunti\b/i },
+        //   - LIVE-WINDOW-SIMPLE-QUESTION fix: "join" is an ordinary,
+        //     common English synonym for "register"/"sign up" ("How can
+        //     one join CozyOS?", "How can I join CozyOS?") that was never
+        //     in this alternation, so it fell through to "unsupported" —
+        //     confirmed via a real Live Window reproduction before this
+        //     change. \bjoin\b added (no existing pattern in this file
+        //     uses "join", confirmed by search, so there is no collision
+        //     risk with any other intent). Kiswahili "kujiunga"
+        //     (infinitive, "Ninawezaje kujiunga na CozyOS?") and "jiunge"
+        //     (imperative) both added, real-browser-confirmed distinct
+        //     conjugations, same two-form-per-verb convention this file
+        //     already uses for kufungua/fungua above.
+        { id: "how-to-register", pattern: /\bregist(?:er|ration)\b|\bsign\s*me\s*up\b|\bsign\s*up\b|\bcreate\s+an?\s+(?:\w+\s+)?account\b|\bjoin\b|sajili\b|\bkujiunga\b|\bjiunge\b|\bkufungua\s+akaunti\b|\bfungua\s+akaunti\b|\bkutengeneza\s+akaunti\b|\btengeneza\s+akaunti\b|\bkuunda\s+akaunti\b|\bunda\s+akaunti\b/i },
 
         // RP-036 — real navigation intents. Each maps (in
         // cozy-living-assistant.js's #send(), the DOM-owning file — this
