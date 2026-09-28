@@ -569,6 +569,31 @@
                 "uhakika kwamba bidhaa iliyohifadhiwa au iliyositishwa haitatendewa kimakosa kama inapatikana",
                 "upangaji halisi wa kiwango cha tawi badala ya rekodi moja isiyobainishwa ya duka"
             ]),
+            // PHASE 7 (Universal Application Human-Benefit Evidence) addition
+            // — ADDITIVE ONLY, humanBenefits/realLifeProblems above remain
+            // byte-identical. Reorganizes ONLY the already-verified facts
+            // above into 3 named topics — audited before writing (see this
+            // session's own Phase 7 audit): a 4th cluster (sales/checkout/
+            // payments/stock-quantity) is real, partly test-verified code in
+            // core/plugins/shopOS-inventory.js/shopOS-payments.js, but is
+            // explicitly, currently contradicted by THIS record's own
+            // visionCapabilities/visionSourceNote above and by an existing
+            // regression test (cozy-knowledge-shopos-human-purpose.test.js)
+            // that locks in the stale "no such capability" claim — a real,
+            // disclosed pre-existing data-integrity gap in this record,
+            // deliberately NOT corrected here (a separate, larger fix than
+            // evidence reorganization) and deliberately excluded from
+            // benefitAreas below rather than fabricated around.
+            benefitAreas: Object.freeze([
+                "Product catalog — Helps shop staff look up any product by barcode or SKU and know its real current status. Benefit: An archived or discontinued product is never mistakenly shown as available.",
+                "Branches and access — Helps organize which products and staff belong to which branch, with login and permissions handled by the same trusted identity system used across CozyOS. Benefit: Real branch-level organization instead of one undifferentiated shop record.",
+                "Shared data across CozyOS apps — Helps other CozyOS applications like WholesaleOS read the same real product catalog directly, including wholesale pricing. Benefit: One trusted source of product truth, never a second, drifting copy."
+            ]),
+            benefitAreasSw: Object.freeze([
+                "Orodha ya bidhaa — Husaidia wafanyakazi wa duka kutafuta bidhaa yoyote kwa barcode au SKU na kujua hali yake halisi ya sasa. Faida: Bidhaa iliyohifadhiwa au iliyositishwa haitatendewa kimakosa kama inapatikana.",
+                "Matawi na ufikiaji — Husaidia kupanga bidhaa na wafanyakazi wa tawi gani, huku kuingia na ruhusa zikisimamiwa na mfumo mmoja wa utambulisho unaotumika katika CozyOS. Faida: Upangaji halisi wa kiwango cha tawi badala ya rekodi moja isiyobainishwa ya duka.",
+                "Data inayoshirikiwa kati ya programu za CozyOS — Husaidia programu nyingine za CozyOS kama WholesaleOS kusoma orodha halisi ya bidhaa moja kwa moja, ikiwemo bei ya jumla. Faida: Chanzo kimoja cha kuaminika cha ukweli wa bidhaa, kamwe si nakala ya pili inayotofautiana."
+            ]),
             currentVerifiedCapabilities: Object.freeze([
                 "branch registration and listing (registerBranch()/listBranches())",
                 "real login delegated entirely to the existing IdentityEngine - no separate/duplicate authentication logic",
@@ -633,6 +658,25 @@
                 "ulinzi dhidi ya kuchakata miamala chini ya kampuni/tawi lisilosajiliwa au lililohifadhiwa",
                 "ulinzi dhidi ya matumizi ya njia ya malipo isiyo halali",
                 "huduma ya haraka zaidi kwa wateja wanaorudi kupitia utafutaji halisi wa mteja badala ya kuingiza tena"
+            ]),
+            // PHASE 7 addition — ADDITIVE ONLY, see ShopOS's own comment
+            // above for the full discipline this follows. All 4 topics
+            // below are audited, evidence-backed reorganizations of the
+            // humanBenefits/currentVerifiedCapabilities fields above.
+            // Deliberately excludes anything from visionCapabilities below
+            // (identity/KYC, payment reconciliation, an external command
+            // interface) — none of that is real today.
+            benefitAreas: Object.freeze([
+                "Fee & commission accuracy — Helps a business calculate the correct fee and commission on every transaction using a real, tiered tariff lookup. Benefit: Customers and business owners can trust the numbers, not worry about inconsistent charges.",
+                "Tamper-evident transaction records — Helps keep a real, cryptographically-verifiable (SHA-256) record of every transaction. Benefit: Auditors or anyone verifying a transaction later can trust the record hasn't been silently altered.",
+                "Valid, registered processing only — Helps prevent transactions from being processed under a company, branch, or payment channel that isn't genuinely valid or registered. Benefit: Protection against invalid or unregistered processing, not just a passive log.",
+                "Faster repeat-customer service — Helps recognize a returning customer by real lookup instead of re-entering their details every time. Benefit: Faster, smoother service for customers who transact more than once."
+            ]),
+            benefitAreasSw: Object.freeze([
+                "Usahihi wa ada na kamisheni — Husaidia biashara kuhesabu ada na kamisheni sahihi kwa kila muamala kwa kutumia utafutaji halisi wa viwango vya ngazi. Faida: Wateja na wamiliki wa biashara wanaweza kuamini namba, badala ya kuwa na wasiwasi kuhusu malipo yasiyo thabiti.",
+                "Rekodi za miamala zisizoweza kubadilishwa bila kujulikana — Husaidia kutunza rekodi halisi, inayothibitishwa kwa njia ya kihesabu (SHA-256) ya kila muamala. Faida: Wakaguzi au mtu yeyote anayethibitisha muamala baadaye anaweza kuamini kuwa rekodi haijabadilishwa kwa siri.",
+                "Uchakataji halali na uliosajiliwa pekee — Husaidia kuzuia miamala kuchakatwa chini ya kampuni, tawi, au njia ya malipo isiyo halali au isiyosajiliwa kikweli. Faida: Ulinzi dhidi ya uchakataji batili au usiosajiliwa, si rekodi tu ya kupita.",
+                "Huduma ya haraka kwa wateja wanaorudi — Husaidia kumtambua mteja anayerudi kwa utafutaji halisi badala ya kuingiza tena maelezo yake kila wakati. Faida: Huduma ya haraka na rahisi zaidi kwa wateja wanaofanya muamala zaidi ya mara moja."
             ]),
             currentVerifiedCapabilities: Object.freeze([
                 "real tiered tariff lookup and fee/commission calculation (calculateCharges())",
@@ -969,6 +1013,24 @@
                 "jedwali linaloweza kubadilika la biashara kwa kurekodi bidhaa, hisa, mauzo, na taarifa za ununuzi/gharama, likiwa na jumla za moja kwa moja za mapato, gharama, faida, matumizi, akiba, na salio la fedha taslimu kwa vipindi vya kila siku, wiki, mwezi, au mwaka",
                 "ufuatiliaji halisi wa mzunguko wa hisa kwa kila bidhaa katika kipindi ulichochagua, ukihesabiwa tu kutoka kile kilichorekodiwa kwa uhalisia, kamwe si kubahatisha"
             ]),
+            // PHASE 7 addition — ADDITIVE ONLY, same discipline as ShopOS's
+            // own comment above. Goals and Calculations are real
+            // (currentVerifiedCapabilities below) but have no dedicated
+            // realLifeProblems/humanBenefits sentence of their own —
+            // too thin evidence for a standalone topic, deliberately
+            // folded out rather than invented. Excludes everything in
+            // visionCapabilities below (PDF/OCR/share/print, cross-app
+            // Daily Balance, real AI directive interpretation).
+            benefitAreas: Object.freeze([
+                "Documents & Reminders — Helps keep documents and reminders in one private, owner-only place instead of a phone gallery, a paper pile, or a lost conversation. Benefit: A document or a reminder answer is always there when you need it, with a real way to close the loop once it's handled.",
+                "Directives & Teaching CozyOS — Helps you give CozyOS a personal directive or teach it something, with a confirm-before-persist step so a misunderstanding is corrected before anything is saved. Benefit: Honestly-labeled, user-taught knowledge, never an assumption presented as fact.",
+                "Business Management — Helps a small business record its products, sales, and costs in a flexible table, with automatic revenue, cost, profit, and cash totals. Benefit: Knowing, at a glance, whether the business made a profit and what its current cash position is, without forcing it into someone else's fixed template."
+            ]),
+            benefitAreasSw: Object.freeze([
+                "Hati na Vikumbusho — Husaidia kutunza hati na vikumbusho mahali pamoja pa faragha, panapofikiwa na mmiliki pekee, badala ya picha za simu, rundo la karatasi, au mazungumzo yaliyopotea. Faida: Hati au jibu la kikumbusho lipo kila wakati unapolihitaji, likiwa na njia halisi ya kukamilisha jambo baada ya kulishughulikia.",
+                "Maagizo na Kufundisha CozyOS — Husaidia kumpa CozyOS agizo la kibinafsi au kumfundisha kitu, likiwa na hatua ya kuthibitisha kabla ya kuhifadhi ili kosa la uelewa lirekebishwe kabla kitu chochote kuhifadhiwa. Faida: Maarifa yaliyofundishwa na mtumiaji yaliyowekwa alama kwa uaminifu, kamwe si dhana inayowasilishwa kama ukweli.",
+                "Usimamizi wa Biashara — Husaidia biashara ndogo kurekodi bidhaa, mauzo, na gharama zake kwenye jedwali linaloweza kubadilika, likiwa na jumla za moja kwa moja za mapato, gharama, na fedha taslimu. Faida: Kujua, kwa haraka, kama biashara imepata faida na hali yake ya sasa ya fedha taslimu, bila kulazimishwa kwenye muundo uliowekwa na mtu mwingine."
+            ]),
             currentVerifiedCapabilities: Object.freeze([
                 "user directives with a confirm-before-persist draft step, backed by CozyMemory",
                 "Teach Cozy — user-taught knowledge saved with honest provenance, not claimed as system-verified",
@@ -1092,6 +1154,23 @@
             humanBenefitsSw: Object.freeze([
                 "utafutaji halisi kwa rejeleo la mtu, aina ya utafiti, au lugha juu ya maudhui yaliyokwisha orodheshwa",
                 "matokeo ya uwazi ya \"NOT_AVAILABLE\" wakati hakuna ushahidi ulioorodheshwa unaolingana, badala ya jibu la kubashiri"
+            ]),
+            // PHASE 7 addition — ADDITIVE ONLY, same discipline as above.
+            // Deliberately excludes anything from visionCapabilities below
+            // (face/voice recognition, ASR, OCR, embeddings, semantic
+            // NLU) — this application's own "NO FABRICATION" header
+            // explicitly disclaims all of these; a benefitAreas topic
+            // implying "recognition" or content-language identification
+            // would be fabrication.
+            benefitAreas: Object.freeze([
+                "Finding testimony by keyword or type — Helps search already-indexed testimony/evidence media by research type or keyword. Benefit: Locating relevant indexed content quickly, without manually reviewing everything.",
+                "Confirmed person-reference search — Helps find indexed media that references a specific person, honestly separating confirmed appearances from possible ones. Benefit: You can trust which matches are confirmed, and which are only possible, never treated the same.",
+                "Honest \"not found\" instead of a guess — Helps you know when no indexed evidence actually matches your search. Benefit: An honest NOT_AVAILABLE result, never a guessed or fabricated answer."
+            ]),
+            benefitAreasSw: Object.freeze([
+                "Kutafuta ushuhuda kwa neno muhimu au aina — Husaidia kutafuta maudhui ya ushuhuda/ushahidi yaliyokwisha orodheshwa kwa aina ya utafiti au neno muhimu. Faida: Kupata maudhui muhimu yaliyoorodheshwa kwa haraka, bila kupitia kila kitu kwa mkono.",
+                "Utafutaji wa rejeleo la mtu lililothibitishwa — Husaidia kupata maudhui yaliyoorodheshwa yanayomtaja mtu fulani, ikitenganisha kwa uaminifu mahudhurio yaliyothibitishwa na yale yanayowezekana. Faida: Unaweza kuamini ni mlinganisho gani umethibitishwa, na gani unawezekana tu, kamwe havitendewi sawa.",
+                "Ukweli wa \"haipatikani\" badala ya kubashiri — Husaidia kujua wakati hakuna ushahidi ulioorodheshwa unaolingana na utafutaji wako kikweli. Faida: Matokeo ya uwazi ya NOT_AVAILABLE, kamwe si jibu la kubashiri au la kutengenezwa."
             ]),
             currentVerifiedCapabilities: Object.freeze([
                 "search by person reference, research type, and language over indexed media (composes the existing CozyResearchSearch/CozyResearchIntelligence/CozyMediaEvidence engines only)",
