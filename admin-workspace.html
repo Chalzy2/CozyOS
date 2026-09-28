@@ -932,6 +932,11 @@
          CozyOS application window. Loaded early so any consumer below
          can register with it. -->
     <script src="core/shell/window-manager.js"></script>
+    <!-- LIVE WINDOW ARCHITECTURE AUDIT — the universal Live Window
+         facade (window.CozyOS.LiveWindow). Loaded early, same
+         "loaded early so any consumer below can register with it"
+         convention as window-manager.js immediately above. -->
+    <script src="core/shell/live-window-controller.js"></script>
     <!-- Taskbar capability — real, additive consumer of WindowManager's
          onChange()/getSnapshot() read model added for this purpose.
          Loaded immediately after window-manager.js, matching that
@@ -1573,7 +1578,27 @@
          (all loaded above) for real status. Loaded before its first
          consumer, the Worship Player. -->
     <script src="core/living/language-badge.js"></script>
+    <!-- LIVE WINDOW ARCHITECTURE AUDIT — confirmed absent from every real
+         entry point in this repository despite having real, tested
+         production code depending on them (see the LIVE INTEGRATION
+         AUDIT comment further below on church-live-moderation.js's own
+         "loaded vs. integrated" class of gap) — church-prayer-
+         interaction.js, church-offering-interaction.js and
+         church-live-attendance.js were never <script>-included
+         anywhere. Loaded here, before living-worship-player.js and this
+         page's own Church Live Session Controller, so worship-live-
+         window-mode.js's Prayer/Ministry, Contributions and
+         Participation sections are real and functional on this page
+         instead of only ever rendering their honest "not connected"
+         disclosure. -->
+    <script src="core/modules/ChurchOS/church-prayer-interaction.js"></script>
+    <script src="core/modules/ChurchOS/church-offering-interaction.js"></script>
+    <script src="core/modules/ChurchOS/church-live-attendance.js"></script>
     <script src="core/modules/ChurchOS/living-worship-player.js"></script>
+    <!-- LIVE WINDOW ARCHITECTURE AUDIT — registers ChurchOS's "worship"
+         mode with the universal window.CozyOS.LiveWindow. Loaded after
+         living-worship-player.js and every real engine it composes. -->
+    <script src="core/modules/ChurchOS/worship-live-window-mode.js"></script>
     <!-- M367 — Church Intelligence Provider. Real orchestration
          composing ChurchWorshipSession/MultiBranchCoordinator/
          LiveCaptureEngine, all already loaded above. Not an LLM. -->

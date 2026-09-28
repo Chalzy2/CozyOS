@@ -710,6 +710,22 @@
      could not previously succeed here. This is a real, disclosed
      pre-existing gap this change closes, not new functionality. -->
 <script src="core/shell/window-manager.js"></script>
+<!-- LIVE WINDOW ARCHITECTURE AUDIT — CozyOffline (real network-quality/
+     local-queue engine) was already loaded on admin-workspace.html but
+     never here, the same "loaded vs. integrated" gap this page's own
+     comments already describe for other engines. Loaded so the Live
+     Window can honestly report network-dependent capability state via
+     this real, existing engine instead of having none reachable at
+     all on this page. -->
+<script src="core/living/cozy-living-offline.js"></script>
+<!-- LIVE WINDOW ARCHITECTURE AUDIT — the universal Live Window facade
+     (window.CozyOS.LiveWindow). Composes the real WindowManager
+     (immediately above) and LivingAssistant (loaded further below on
+     this page) purely by lazy runtime lookup, so its position relative
+     to LivingAssistant's own script tag does not matter; it must load
+     before any mode module (e.g. worship-live-window-mode.js below)
+     that calls LiveWindow.registerMode() at load time. -->
+<script src="core/shell/live-window-controller.js"></script>
 <script src="core/shell/application-launcher.js"></script>
 <!-- Level 2B repair: core/shell/application-launcher.js's real Mode 2
      (fetch-based) launch path requires window.CozyOS.ModuleRegistry to
@@ -773,8 +789,32 @@
 <script src="core/modules/communication/ldce-session-engine.js"></script>
 <script src="core/modules/ChurchOS/church-live-moderation.js"></script>
 <script src="core/modules/ChurchOS/church-live-moderation-controls.js"></script>
+<!-- LIVE WINDOW ARCHITECTURE AUDIT — these three real ChurchOS
+     interaction engines (Prayer/Ministry, Contributions, Participation)
+     were already loaded on admin-workspace.html but never here, the
+     same "loaded vs. integrated" gap this page's own comments already
+     describe for other engines above. Loaded here so worship-live-
+     window-mode.js below has real data to compose instead of only ever
+     rendering its honest "not connected" disclosure on this page. -->
+<script src="core/modules/ChurchOS/church-prayer-interaction.js"></script>
+<script src="core/modules/ChurchOS/church-offering-interaction.js"></script>
+<script src="core/modules/ChurchOS/church-live-attendance.js"></script>
 <script src="core/modules/ChurchOS/church-live-session-controller.js"></script>
+<!-- LIVE WINDOW ARCHITECTURE AUDIT — WorshipModeCoordinator (already
+     used elsewhere in this repository — see its own header) was never
+     loaded on this page either. Composes ChurchWorshipSession/CozySense/
+     MediaEngine only; loaded here so worship-live-window-mode.js's
+     Service Phase controls are real and functional on this page. -->
+<script src="core/modules/ChurchOS/worship-mode-coordinator.js"></script>
 <script src="core/modules/ChurchOS/living-worship-player.js"></script>
+<!-- LIVE WINDOW ARCHITECTURE AUDIT — registers ChurchOS's "worship"
+     mode with the universal window.CozyOS.LiveWindow (loaded above,
+     near window-manager.js). Loaded after every real engine it
+     composes and after living-worship-player.js itself (whose
+     #mountWindow() now calls LiveWindow.activateMode("worship", ...)
+     on open) so the mode is registered before it can first be
+     activated by a real user action. -->
+<script src="core/modules/ChurchOS/worship-live-window-mode.js"></script>
 <!-- Dashboard Prompt 1: pure-logic navigation/AI-context module. Loads
      before user-dashboard.js, which now composes it for the real
      Home/Community/AI/Live Video/Apps/Documents/Calculations/Request an

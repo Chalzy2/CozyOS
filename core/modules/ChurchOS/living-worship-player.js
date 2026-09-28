@@ -94,6 +94,19 @@
          *   actually opens Live View via the real controller below.
          */
         #mountWindow() {
+            // LIVE WINDOW ARCHITECTURE AUDIT — re-activates the shared
+            // worship context on every real open, including a re-open of
+            // an already-mounted video window (the fast-path return
+            // immediately below) — not just the first mount. Cheap and
+            // idempotent (LiveWindow.activate() only re-renders its own
+            // mode region; it registers no new listener each call), so
+            // this keeps the ONE Live Window's context correctly synced
+            // even if something else switched it away in the meantime.
+            const liveWindow = window.CozyOS.LiveWindow;
+            if (liveWindow && typeof liveWindow.activateMode === "function") {
+                try { liveWindow.activateMode("worship", { serviceId: this.#serviceId }); } catch (_err) { /* honest no-op — video must still open even if the shared mode region isn't available */ }
+            }
+
             if (this.#root) { const wm = window.CozyOS.WindowManager; if (wm && this.#windowHandle) this.#windowHandle.focus(); return; }
             const prefs = loadPrefs();
             this.#openPanels = new Set(prefs.openPanels || []);
@@ -132,10 +145,21 @@
             this.#videoEl = this.#root.querySelector("#cozy-worship-player-video");
             this.#wirePip(pipSupported);
 
+            // LIVE WINDOW ARCHITECTURE AUDIT — this video window remains
+            // a separate, real WindowManager registration for its own
+            // disclosed reason (Theater/Float/native Picture-in-Picture
+            // genuinely need a window that can leave the browser
+            // viewport entirely — a mode region inside another window
+            // cannot do that) — a real, disclosed, remaining gap for the
+            // VIDEO surface specifically. Its title makes clear this is
+            // the SAME Live Window's worship video, not a second,
+            // competing application (see the LiveWindow.activateMode()
+            // call at the top of this method, which keeps the shared
+            // Live Window's context in sync on every real open).
             const wm = window.CozyOS.WindowManager;
             if (wm && typeof wm.create === "function") {
                 this.#windowHandle = wm.create({
-                    id: "living-worship-player", title: "Live Worship", element: this.#root,
+                    id: "living-worship-player", title: "🟢 Live Window · Worship Video", element: this.#root,
                     icon: "🎥", draggable: true, resizable: true, minimizable: true, maximizable: true, closable: true,
                     // Item 5 (Move/Pin) — enables the real, existing,
                     // generic WindowManager pin capability for this
@@ -192,6 +216,16 @@
 
         bindToService(serviceId) {
             this.#serviceId = serviceId;
+            // Real serviceId may only become known after the window/mode
+            // was first opened (see #mountWindow()'s own comment above) —
+            // refresh the same shared Live Window worship context so its
+            // Translation/Service Phase controls (which are serviceId-
+            // scoped) get the real id, never a stale/null one. Honest
+            // no-op if the Live Window controller isn't loaded.
+            const liveWindow = window.CozyOS.LiveWindow;
+            if (liveWindow && typeof liveWindow.getActiveMode === "function" && liveWindow.getActiveMode().mode === "worship") {
+                try { liveWindow.activateMode("worship", { serviceId }); } catch (_err) { /* honest no-op */ }
+            }
             const capture = window.CozyOS.LiveCaptureEngine;
             const hotspot = window.CozyOS.LiveHotspotEngine;
             let stream = null;

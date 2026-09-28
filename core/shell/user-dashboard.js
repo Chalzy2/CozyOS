@@ -810,7 +810,17 @@
             const openBtn = host.querySelector("#cozy-ud-ai-open");
             if (openBtn) {
                 openBtn.addEventListener("click", () => {
-                    if (assistant && typeof assistant.open === "function") assistant.open(context);
+                    // LIVE WINDOW ARCHITECTURE AUDIT — prefer the universal
+                    // window.CozyOS.LiveWindow facade when it's loaded
+                    // (core/shell/live-window-controller.js), so opening
+                    // this button always returns the ONE Live Window to
+                    // its plain assistant context rather than leaving a
+                    // previously-activated application mode's content
+                    // showing. Composes the same real assistant.open()
+                    // either way — never a second window.
+                    const liveWindow = window.CozyOS && window.CozyOS.LiveWindow;
+                    if (liveWindow && typeof liveWindow.activate === "function") liveWindow.activate({ mode: "assistant" });
+                    else if (assistant && typeof assistant.open === "function") assistant.open(context);
                 });
             }
 
