@@ -218,8 +218,15 @@ async function main() {
     // git invocations) rooted at REPO_ROOT, skipping .git/node_modules
     // and every test/ directory (test files legitimately quote/echo
     // these exact patterns as strings under test — only real
-    // production assignments count).
-    const SKIP_DIRS = new Set(['.git', 'node_modules']);
+    // production assignments count). LIVE-WINDOW-UNIVERSAL-AI-WIRING fix
+    // — also skip .claude (this repo's own agent-worktree scratch
+    // directories, e.g. .claude/worktrees/agent-*/core/...), confirmed
+    // via a real repro that a leftover agent worktree's own full copy of
+    // core/shell/live-window-controller.js was being walked as if it
+    // were a second, real production file, inflating this count for
+    // every worktree left on disk — never a genuine duplicate
+    // registration in the actual deployed tree.
+    const SKIP_DIRS = new Set(['.git', 'node_modules', '.claude']);
     function walk(dir, out) {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         if (SKIP_DIRS.has(entry.name)) continue;
