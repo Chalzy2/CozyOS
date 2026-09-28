@@ -577,7 +577,7 @@
      *   own real, disclosed updated state for the caller to carry
      *   forward — this file adds no teaching/governance logic of its own.
      */
-    async function answerInternal(question, { actorId = null, language = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null, businessContext = null, businessConversationState = null, teachConversationState = null, cognitiveResult = null } = {}) {
+    async function answerInternal(question, { actorId = null, language = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null, businessContext = null, businessConversationState = null, teachConversationState = null, cognitiveResult = null, offlineGeneration = null } = {}) {
         // WAVE 1 (Cognitive-to-Answer Contract) — computed once, honestly,
         // from whatever the caller actually supplied (cozy-living-
         // assistant.js passes CognitiveCoordinator's real per-turn result;
@@ -810,7 +810,7 @@
         // generic-context-concatenation path immediately below, for the
         // application-level questions it can actually plan for; every
         // question it declines falls through unchanged. ---
-        const semanticConstruction = await tryConstructSemanticAnswer({ question, actorId, entityHint, language, cognitiveResult });
+        const semanticConstruction = await tryConstructSemanticAnswer({ question, actorId, entityHint, language, cognitiveResult, offlineGeneration });
         if (semanticConstruction) {
             const { plan, candidate, evidence, timing } = semanticConstruction;
             return {
