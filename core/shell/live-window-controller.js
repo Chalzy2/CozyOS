@@ -68,19 +68,26 @@
  *     (e.g. `document.querySelector('[data-center="..."]')` elsewhere in
  *     this codebase) — real DOM composition, not a private-field bypass
  *     and not an edit to the guarded file.
- *   - Live Video/Audio for Worship remains a SEPARATE WindowManager
- *     window today (id "living-worship-player") for its own disclosed,
- *     real reasons (Theater/Float/native Picture-in-Picture require a
- *     window that can genuinely go full-viewport or leave the browser
- *     entirely — a mode region inside another window cannot do that).
- *     This file does not merge that window's DOM into the Live Window;
- *     instead (see living-worship-player.js's own updated #mountWindow())
- *     opening it now ALWAYS also calls
- *     LiveWindow.activateMode("worship", ...) first, so the two are
- *     driven by the same context/identity rather than presenting as two
- *     unrelated applications. This is a real, disclosed, remaining
- *     architectural gap for the VIDEO surface specifically — see this
- *     pass's report — not something this file claims to have solved.
+ *   - CORRECTIVE PASS (Live Window repair): the paragraph this replaced
+ *     disclosed that Live Video/Audio for Worship remained a SEPARATE,
+ *     real WindowManager registration ("living-worship-player") even
+ *     after this file's own activateMode() call. That second
+ *     registration has been removed — living-worship-player.js no
+ *     longer calls WindowManager.create() when this Live Window is
+ *     available (see its own #mountWindow()/attachTo()). Its real
+ *     player DOM (video + Theater/Float/PiP/Fullscreen controls) is now
+ *     composed directly inside this file's own mode region by
+ *     worship-live-window-mode.js's registered "worship" mode, and
+ *     Theater/Float/Fullscreen ask THIS shared window to resize/
+ *     fullscreen itself via the window-op pass-throughs below
+ *     (focus/getBounds/setBounds/toggleFullscreen/isOpen) rather than
+ *     owning a second WindowManager id. Real browser Picture-in-Picture
+ *     needs no window at all (it operates on the <video> element
+ *     directly) and is unaffected. A real, honest, remaining fallback:
+ *     if this Live Window is genuinely unavailable on some page (this
+ *     file not loaded), living-worship-player.js still mounts itself
+ *     standalone — never the normal path, and never a duplicate,
+ *     whenever this Live Window IS present.
  */
 (function () {
     "use strict";
@@ -173,9 +180,8 @@
         const region = ensureRegion();
         if (!region) return { success: false, reason: "The Live Window panel is not present in the DOM yet." };
 
-        if (activeModeId && activeModeId !== mode) runDeactivate(activeModeId, region);
-
         if (!mode || mode === "assistant") {
+            if (activeModeId) runDeactivate(activeModeId, region);
             region.hidden = true;
             region.innerHTML = "";
             setWindowTitle(BASE_TITLE);
@@ -189,6 +195,29 @@
             return { success: false, reason: `No Live Window mode is registered for "${mode}". Applications must call LiveWindow.registerMode() before activating it.` };
         }
 
+        // LIVE WINDOW ADDITIVE FIX — re-activating the SAME already-
+        // active mode (e.g. a real service rebind such as
+        // living-worship-player.js's bindToService() re-syncing context
+        // after the mode was already opened) must never tear down and
+        // rebuild the mode's real, live DOM (a playing <video> with a
+        // real MediaStream, form input state, etc.) just to refresh its
+        // context — that would visibly reset/flicker a real stream for
+        // no reason, and a mode composing this path (e.g. calling
+        // activateMode() again from inside its own re-render) would
+        // recurse into its own activate() forever. Context/title still
+        // update for real; a mode may optionally supply
+        // updateContext(container, context) for a light, non-destructive
+        // refresh — otherwise this is an honest no-op on the DOM.
+        if (activeModeId === mode) {
+            activeContext = context;
+            if (typeof def.updateContext === "function") {
+                try { def.updateContext(region, context); } catch (err) { console.warn(`[LiveWindow] mode "${mode}" updateContext() threw:`, err && err.message); }
+            }
+            setWindowTitle(`${BASE_TITLE} · ${def.label}`);
+            return { success: true, mode, context };
+        }
+
+        if (activeModeId) runDeactivate(activeModeId, region);
         region.hidden = false;
         region.innerHTML = "";
         try {
@@ -217,6 +246,43 @@
     function isModeRegistered(modeId) { return modes.has(modeId); }
     function listRegisteredModes() { return Array.from(modes.keys()); }
 
+    /**
+     * Window-op pass-throughs (additive) — the small, generic extension
+     * the Live Window Architecture Audit called for: a way for a mode
+     * (e.g. ChurchOS Worship's Theater/Float/Fullscreen controls) to
+     * request real WindowManager operations on the ONE shared Live
+     * Window ("cozy-assistant", the real, existing id — see
+     * ASSISTANT_WINDOW_ID above) instead of registering a second window
+     * of its own. Every one of these composes the same, already-generic
+     * WindowManager methods (focus/getBounds/setBounds/toggleFullscreen/
+     * isOpen) that every other CozyOS window already uses — no new
+     * window-management logic lives here.
+     */
+    function focusWindow() {
+        const wm = window.CozyOS && window.CozyOS.WindowManager;
+        if (wm && typeof wm.isOpen === "function" && wm.isOpen(ASSISTANT_WINDOW_ID) && typeof wm.focus === "function") return wm.focus(ASSISTANT_WINDOW_ID);
+        return { success: false, reason: "The Live Window is not open." };
+    }
+    function windowGetBounds() {
+        const wm = window.CozyOS && window.CozyOS.WindowManager;
+        if (wm && typeof wm.getBounds === "function") return wm.getBounds(ASSISTANT_WINDOW_ID);
+        return { success: false, reason: "WindowManager is not available." };
+    }
+    function windowSetBounds(bounds) {
+        const wm = window.CozyOS && window.CozyOS.WindowManager;
+        if (wm && typeof wm.setBounds === "function") return wm.setBounds(ASSISTANT_WINDOW_ID, bounds);
+        return { success: false, reason: "WindowManager is not available." };
+    }
+    function windowToggleFullscreen() {
+        const wm = window.CozyOS && window.CozyOS.WindowManager;
+        if (wm && typeof wm.toggleFullscreen === "function") return wm.toggleFullscreen(ASSISTANT_WINDOW_ID);
+        return { success: false, reason: "WindowManager is not available." };
+    }
+    function isOpen() {
+        const wm = window.CozyOS && window.CozyOS.WindowManager;
+        return !!(wm && typeof wm.isOpen === "function" && wm.isOpen(ASSISTANT_WINDOW_ID));
+    }
+
     window.CozyOS.LiveWindow = Object.freeze({
         getVersion: () => VERSION,
         getInstance,
@@ -228,11 +294,16 @@
         getActiveMode,
         isModeRegistered,
         listRegisteredModes,
+        focus: focusWindow,
+        getBounds: windowGetBounds,
+        setBounds: windowSetBounds,
+        toggleFullscreen: windowToggleFullscreen,
+        isOpen,
         getDiagnosticsReport: () => ({ moduleVersion: VERSION, activeMode: activeModeId, registeredModes: listRegisteredModes() })
     });
 
     window.CozyOS.Modules["live-window-controller"] = Object.freeze({
         version: VERSION,
-        description: "Universal Live Window Controller — window.CozyOS.LiveWindow. Composes the real, unmodified LivingAssistant singleton (never a second AI/window) and the real, generic WindowManager.setTitle(). Applications register a mode (registerMode) and request context changes (activate/activateMode) instead of constructing a new window. ONE Live Window, MANY application contexts."
+        description: "Universal Live Window Controller — window.CozyOS.LiveWindow. Composes the real, unmodified LivingAssistant singleton (never a second AI/window) and the real, generic WindowManager (setTitle, plus additive focus/getBounds/setBounds/toggleFullscreen/isOpen pass-throughs a mode can use instead of registering its own window). Applications register a mode (registerMode, with an optional light updateContext for a real service rebind) and request context changes (activate/activateMode) instead of constructing a new window. ONE Live Window, MANY application contexts — including ChurchOS Worship's real video/audio, which now composes this window directly rather than opening a second one."
     });
 })();

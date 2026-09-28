@@ -150,11 +150,21 @@ async function main() {
         const page = await newPage();
         await page.evaluate(() => window.CozyOS.LiveWindow.activateMode('worship', { orgId: 'test-org', serviceId: 'no-real-service' }));
         await page.waitForSelector('#cozy-live-window-mode-region:not([hidden])');
-        // This sandbox genuinely has no active LiveCaptureEngine/LiveHotspotEngine
-        // stream for an unbound serviceId — the real, honest disclosure
-        // path (never a crash, never a fabricated "Live" status).
-        const videoStatus = await page.$eval('#cozy-live-window-worship-video-status', (el) => el.textContent);
-        if (!/No real stream/i.test(videoStatus)) throw new Error(`expected an honest "no real stream" disclosure, got: "${videoStatus}"`);
+        // Live Window repair: worship-live-window-mode.js's own
+        // renderVideo() no longer renders a second, independent
+        // <video>/status element (#cozy-live-window-worship-video-status
+        // was that duplicate — removed on purpose). It now delegates
+        // entirely to the real, single LivingWorshipPlayer, whose own
+        // real status element (#cozy-worship-player-status, inside the
+        // real player root this delegation mounts into the mode region)
+        // is the one real place this disclosure now appears. This
+        // sandbox genuinely has no active LiveCaptureEngine/
+        // LiveHotspotEngine stream for an unbound serviceId — the real,
+        // honest disclosure path (never a crash, never a fabricated
+        // "Live" status).
+        await page.waitForSelector('#cozy-worship-player-status');
+        const videoStatus = await page.$eval('#cozy-worship-player-status', (el) => el.textContent);
+        if (!/No stream/i.test(videoStatus)) throw new Error(`expected an honest "no stream" disclosure, got: "${videoStatus}"`);
         // The rest of the Live Window (chat/text) must remain fully functional.
         await page.evaluate(() => window.CozyOS.LivingAssistant.open());
         await page.fill('#cozy-living-assistant-input', 'Still working?');

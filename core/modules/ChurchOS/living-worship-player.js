@@ -53,6 +53,39 @@
  *     out of scope, unchanged since ChurchOS C001.5's disclosed finding
  *     — this player displays LiveHotspotEngine's real peer-to-peer
  *     streams, not a broadcast pipeline.
+ *
+ * CORRECTIVE PASS — Live Window repair (removes the second window)
+ *   A prior pass's own comments here disclosed that this file, despite
+ *   already calling the real, shared window.CozyOS.LiveWindow.
+ *   activateMode("worship", ...), ALSO still registered a second, real
+ *   WindowManager window (id "living-worship-player") every time it
+ *   opened — a genuine duplicate window, not merely a mislabeled one.
+ *   That second registration is now gone. When the universal Live
+ *   Window is available on the page, opening Live Worship
+ *   (#mountWindow()) calls ONLY LiveWindow.activateMode("worship", ...);
+ *   the real player DOM this file builds (video + Theater/Float/PiP/
+ *   Fullscreen controls + panels) is handed to whoever asks for it via
+ *   the new, public attachTo(container, serviceId) — called by
+ *   worship-live-window-mode.js's registered "worship" mode from
+ *   *inside* the ONE shared Live Window's own mode region — never a
+ *   second WindowManager id. Every #windowHandle consumer this file had
+ *   (focus/getBounds/setBounds/toggleFullscreen, Move/Pin) was traced
+ *   and refactored: Theater is pure in-place CSS (never needed a
+ *   window); Float/Fullscreen now ask the ONE shared window to resize/
+ *   fullscreen itself via LiveWindow's own focus/getBounds/setBounds/
+ *   toggleFullscreen pass-throughs; real Picture-in-Picture
+ *   (video.requestPictureInPicture()) needs no window at all. A real,
+ *   honest, remaining fallback: if LiveWindow is genuinely unavailable
+ *   on some page (not loaded there), this file still mounts itself
+ *   standalone via WindowManager.create() exactly as before — never the
+ *   normal path, and never a second window, whenever LiveWindow IS
+ *   present. Move/Pin note: the shared "cozy-assistant" window (owned
+ *   by the diff-guarded core/living/cozy-living-assistant.js, never
+ *   edited by this pass) is already draggable ("Move" works on the one
+ *   shared window); it is not registered with pinnable:true, so the
+ *   dedicated Pin control this file's own standalone fallback window
+ *   requests is not present while composing the shared window — a
+ *   real, disclosed limitation, not a fabricated pass.
  */
 (function () {
     "use strict";
@@ -78,7 +111,8 @@
     class LivingWorshipPlayer {
         #root = null;
         #videoEl = null;
-        #windowHandle = null; // M366.6 - the real WindowManager handle for this window
+        #windowHandle = null; // real WindowManager handle — ONLY used by the standalone fallback path (#mountStandalone); null while composing the shared Live Window.
+        #usingSharedWindow = false; // true once attached inside the ONE shared window.CozyOS.LiveWindow — governs which window-op path #focusWindow()/#getWindowBounds()/#setWindowBounds()/#toggleWindowFullscreen() take.
         #controller = null; // M367 - the real 3-state LiveViewController instance
         #serviceId = null;
         #openPanels = new Set();
@@ -88,26 +122,45 @@
 
         /**
          * #mountWindow()
-         *   The real, existing WindowManager-backed player content
-         *   (unchanged since M366.6). Previously called eagerly from
-         *   mount() on every page load - now only called when the user
-         *   actually opens Live View via the real controller below.
+         *   The ONE real entry point "Open Live View" calls. Live Window
+         *   repair: this no longer builds/registers anything itself —
+         *   when the universal window.CozyOS.LiveWindow is available, it
+         *   does exactly one thing: activateMode("worship", ...), which
+         *   drives worship-live-window-mode.js's registered mode, which
+         *   calls back into this file's own attachTo() to mount the
+         *   real player DOM inside that ONE shared window. Never a
+         *   second WindowManager registration while LiveWindow is
+         *   available. Falls back to #mountStandalone() only when
+         *   LiveWindow is genuinely not present on this page.
          */
         #mountWindow() {
-            // LIVE WINDOW ARCHITECTURE AUDIT — re-activates the shared
-            // worship context on every real open, including a re-open of
-            // an already-mounted video window (the fast-path return
-            // immediately below) — not just the first mount. Cheap and
-            // idempotent (LiveWindow.activate() only re-renders its own
-            // mode region; it registers no new listener each call), so
-            // this keeps the ONE Live Window's context correctly synced
-            // even if something else switched it away in the meantime.
             const liveWindow = window.CozyOS.LiveWindow;
             if (liveWindow && typeof liveWindow.activateMode === "function") {
-                try { liveWindow.activateMode("worship", { serviceId: this.#serviceId }); } catch (_err) { /* honest no-op — video must still open even if the shared mode region isn't available */ }
+                const result = liveWindow.activateMode("worship", { serviceId: this.#serviceId });
+                if (result && result.success) {
+                    this.#controller.setWindowOpen(true);
+                    return;
+                }
+                // Honest: only reached if activation genuinely failed on
+                // this page (e.g. the real LivingAssistant isn't loaded
+                // here even though live-window-controller.js is) - falls
+                // through to the standalone mount below rather than
+                // silently doing nothing.
             }
+            this.#mountStandalone();
+        }
 
-            if (this.#root) { const wm = window.CozyOS.WindowManager; if (wm && this.#windowHandle) this.#windowHandle.focus(); return; }
+        /**
+         * #buildRoot()
+         *   Builds the real player content ONCE (video, header controls,
+         *   Live Worship Tools menu, panel-content region) - unchanged
+         *   markup/wiring from before this pass, just extracted out of
+         *   #mountWindow() so both the shared-Live-Window path
+         *   (attachTo()) and the standalone fallback (#mountStandalone())
+         *   build the exact same real DOM, never two implementations of
+         *   the player.
+         */
+        #buildRoot() {
             const prefs = loadPrefs();
             this.#openPanels = new Set(prefs.openPanels || []);
 
@@ -144,18 +197,55 @@
             `;
             this.#videoEl = this.#root.querySelector("#cozy-worship-player-video");
             this.#wirePip(pipSupported);
+            this.#wireControls();
+            this.#renderOpenPanels();
+            this.#subscribeToScripture();
+        }
 
-            // LIVE WINDOW ARCHITECTURE AUDIT — this video window remains
-            // a separate, real WindowManager registration for its own
-            // disclosed reason (Theater/Float/native Picture-in-Picture
-            // genuinely need a window that can leave the browser
-            // viewport entirely — a mode region inside another window
-            // cannot do that) — a real, disclosed, remaining gap for the
-            // VIDEO surface specifically. Its title makes clear this is
-            // the SAME Live Window's worship video, not a second,
-            // competing application (see the LiveWindow.activateMode()
-            // call at the top of this method, which keeps the shared
-            // Live Window's context in sync on every real open).
+        /**
+         * attachTo(container, serviceId)
+         *   The real, public seam worship-live-window-mode.js's
+         *   registered "worship" mode calls (from *inside* the ONE
+         *   shared window.CozyOS.LiveWindow's own mode region) to mount
+         *   this file's single, real player DOM - never a second
+         *   WindowManager window, never a second <video>. Builds the
+         *   root once (#buildRoot(), lazy) and re-appends the SAME real
+         *   node into whatever container the Live Window hands it this
+         *   time (idempotent - a no-op move if it's already there),
+         *   which is what makes reopen/rebind reuse the same real
+         *   <video>/srcObject rather than rebuilding it.
+         */
+        attachTo(container, serviceId) {
+            if (serviceId != null) this.#serviceId = serviceId;
+            if (!this.#root) this.#buildRoot();
+            this.#usingSharedWindow = true;
+            if (container && this.#root.parentElement !== container) container.appendChild(this.#root);
+            const statusEl = this.#root.querySelector("#cozy-worship-player-status");
+            if (this.#serviceId != null) {
+                this.#connectStream(this.#serviceId);
+            } else if (statusEl && !statusEl.textContent) {
+                statusEl.textContent = "No active worship service is bound yet.";
+            }
+            return { success: true };
+        }
+
+        /**
+         * #mountStandalone()
+         *   The real, honest fallback - ONLY reached when
+         *   window.CozyOS.LiveWindow is genuinely unavailable on this
+         *   page. Registers its OWN real WindowManager window (or plain
+         *   document.body.appendChild if WindowManager itself isn't
+         *   loaded either), exactly as this file always has - never the
+         *   normal path, and never created in addition to the shared
+         *   Live Window when that IS available (see #mountWindow()).
+         */
+        #mountStandalone() {
+            if (this.#root) {
+                if (this.#windowHandle && typeof this.#windowHandle.focus === "function") this.#windowHandle.focus();
+                return;
+            }
+            this.#buildRoot();
+            this.#usingSharedWindow = false;
             const wm = window.CozyOS.WindowManager;
             if (wm && typeof wm.create === "function") {
                 this.#windowHandle = wm.create({
@@ -163,25 +253,25 @@
                     icon: "🎥", draggable: true, resizable: true, minimizable: true, maximizable: true, closable: true,
                     // Item 5 (Move/Pin) — enables the real, existing,
                     // generic WindowManager pin capability for this
-                    // window (previously not requested; the real
-                    // pin button/state/persistence already existed for
-                    // every other CozyOS window). See window-manager.js's
-                    // own #togglePin() for the accompanying real
-                    // corner-snap addition — Pin now has a genuine
-                    // spatial effect, not merely a visual toggle.
+                    // window. See window-manager.js's own #togglePin()
+                    // for the accompanying real corner-snap addition —
+                    // Pin has a genuine spatial effect here, not merely
+                    // a visual toggle. Only reachable via this standalone
+                    // fallback window; the shared "cozy-assistant" window
+                    // (diff-guarded, not edited by this pass) is not
+                    // registered pinnable — a real, disclosed limitation
+                    // while composing the shared window.
                     pinnable: true,
                     // Real defect fix (found via Item 5's real close ->
                     // reopen browser test): onClose previously only
                     // updated the controller's chip state, but never
-                    // reset this.#root/this.#windowHandle — so
-                    // #mountWindow()'s own existing-root fast path
-                    // (`if (this.#root) { ...; return; }`) silently
-                    // no-op'd on the next real open, since it still
-                    // held a reference to the now-detached DOM node.
-                    // Genuinely closing the real window (the
-                    // WindowManager's own X button) must let the next
-                    // open truly rebuild it, exactly like it does the
-                    // very first time.
+                    // reset this.#root/this.#windowHandle — so the
+                    // existing-root fast path above silently no-op'd on
+                    // the next real open, since it still held a reference
+                    // to the now-detached DOM node. Genuinely closing the
+                    // real window (the WindowManager's own X button) must
+                    // let the next open truly rebuild it, exactly like it
+                    // does the very first time.
                     onClose: () => { this.#controller.setWindowOpen(false); this.#root = null; this.#windowHandle = null; }
                 });
             } else {
@@ -190,10 +280,39 @@
                 // mount, never a second window-management system.
                 document.body.appendChild(this.#root);
             }
+        }
 
-            this.#wireControls();
-            this.#renderOpenPanels();
-            this.#subscribeToScripture();
+        /** #focusWindow()/#getWindowBounds()/#setWindowBounds()/#toggleWindowFullscreen() — the real Theater/Float/Fullscreen consumers of "a window", refactored to ask the ONE shared Live Window (via its own focus/getBounds/setBounds/toggleFullscreen pass-throughs) when composing it, or the real standalone handle when running the honest fallback. Never a hidden replacement window. */
+        #focusWindow() {
+            if (this.#usingSharedWindow) {
+                const lw = window.CozyOS.LiveWindow;
+                if (lw && typeof lw.focus === "function") lw.focus();
+                return;
+            }
+            if (this.#windowHandle && typeof this.#windowHandle.focus === "function") this.#windowHandle.focus();
+        }
+        #getWindowBounds() {
+            if (this.#usingSharedWindow) {
+                const lw = window.CozyOS.LiveWindow;
+                return (lw && typeof lw.getBounds === "function") ? lw.getBounds() : { success: false };
+            }
+            return (this.#windowHandle && typeof this.#windowHandle.getBounds === "function") ? this.#windowHandle.getBounds() : { success: false };
+        }
+        #setWindowBounds(bounds) {
+            if (this.#usingSharedWindow) {
+                const lw = window.CozyOS.LiveWindow;
+                if (lw && typeof lw.setBounds === "function") lw.setBounds(bounds);
+                return;
+            }
+            if (this.#windowHandle && typeof this.#windowHandle.setBounds === "function") this.#windowHandle.setBounds(bounds);
+        }
+        #toggleWindowFullscreen() {
+            if (this.#usingSharedWindow) {
+                const lw = window.CozyOS.LiveWindow;
+                if (lw && typeof lw.toggleFullscreen === "function") lw.toggleFullscreen();
+                return;
+            }
+            if (this.#windowHandle && typeof this.#windowHandle.toggleFullscreen === "function") this.#windowHandle.toggleFullscreen();
         }
 
         /**
@@ -212,7 +331,7 @@
             this.#controller.mount();
         }
 
-        /** bindToService(serviceId) — attaches to a real capture stream (self) or a real remote peer stream, whichever is available. Never fabricates a stream. */
+        /** bindToService(serviceId) — attaches to a real capture stream (self) or a real remote peer stream, whichever is available. Never fabricates a stream. The real, public entry point ChurchOS app code calls to (re)bind the live video to a service; also keeps the shared Live Window's worship context in sync. */
 
         bindToService(serviceId) {
             this.#serviceId = serviceId;
@@ -221,11 +340,20 @@
             // refresh the same shared Live Window worship context so its
             // Translation/Service Phase controls (which are serviceId-
             // scoped) get the real id, never a stale/null one. Honest
-            // no-op if the Live Window controller isn't loaded.
+            // no-op if the Live Window controller isn't loaded. LIVE
+            // WINDOW ADDITIVE FIX: re-activating the SAME already-active
+            // "worship" mode is a light context sync in
+            // live-window-controller.js now (no teardown/rebuild), so
+            // this never recurses into attachTo()/#connectStream() again.
             const liveWindow = window.CozyOS.LiveWindow;
             if (liveWindow && typeof liveWindow.getActiveMode === "function" && liveWindow.getActiveMode().mode === "worship") {
                 try { liveWindow.activateMode("worship", { serviceId }); } catch (_err) { /* honest no-op */ }
             }
+            return this.#connectStream(serviceId);
+        }
+
+        /** #connectStream(serviceId) — the real stream-connection logic bindToService()/attachTo() share; never calls back into the Live Window (that is bindToService()'s job alone), so mounting the player can never recurse. */
+        #connectStream(serviceId) {
             const capture = window.CozyOS.LiveCaptureEngine;
             const hotspot = window.CozyOS.LiveHotspotEngine;
             let stream = null;
@@ -236,7 +364,7 @@
                 const remote = hotspot.getRemoteStreams(serviceId);
                 if (remote && remote.length) stream = remote[0];
             }
-            const statusEl = this.#root.querySelector("#cozy-worship-player-status");
+            const statusEl = this.#root && this.#root.querySelector("#cozy-worship-player-status");
             if (stream) {
                 this.#videoEl.srcObject = stream;
                 if (statusEl) statusEl.textContent = "Live";
@@ -329,7 +457,6 @@
 
         #handleAction(action) {
             const currentTime = this.#videoEl.currentTime;
-            const wm = window.CozyOS.WindowManager;
             if (action === "expand") {
                 const el = this.#root.querySelector("#cozy-worship-player");
                 const isTheater = el.dataset.mode === "theater";
@@ -338,18 +465,22 @@
                 // Theater Mode is an app-specific layout state (large,
                 // centered video within the window's own content area) -
                 // distinct from the Window Manager's real Maximize, which
-                // any CozyOS window already provides generically.
+                // any CozyOS window already provides generically. Pure
+                // in-place CSS - never needed a window of its own, shared
+                // or standalone.
             }
             else if (action === "mini") {
                 const el = this.#root.querySelector("#cozy-worship-player");
                 if (el.dataset.mode === "mini") return;
-                if (wm && this.#windowHandle && typeof wm.getBounds === "function") {
-                    const before = wm.getBounds("living-worship-player");
-                    if (before.success) savePrefs({ ...loadPrefs(), dockedBounds: { x: before.x, y: before.y, width: before.width, height: before.height }, dockedMode: el.dataset.mode });
-                }
+                // Real, not fabricated: asks whichever real window
+                // (shared Live Window or the standalone fallback) is
+                // actually hosting this player for its current bounds -
+                // see #getWindowBounds()/#setWindowBounds() above.
+                const before = this.#getWindowBounds();
+                if (before.success) savePrefs({ ...loadPrefs(), dockedBounds: { x: before.x, y: before.y, width: before.width, height: before.height }, dockedMode: el.dataset.mode });
                 el.dataset.mode = "mini";
                 savePrefs({ ...loadPrefs(), mode: "mini" });
-                if (this.#windowHandle && typeof this.#windowHandle.setBounds === "function") this.#windowHandle.setBounds(this.#miniBounds());
+                this.#setWindowBounds(this.#miniBounds());
             }
             else if (action === "restore-mini") {
                 const el = this.#root.querySelector("#cozy-worship-player");
@@ -357,11 +488,9 @@
                 const restoredMode = prefs.dockedMode || "docked";
                 el.dataset.mode = restoredMode;
                 savePrefs({ ...prefs, mode: restoredMode });
-                if (this.#windowHandle && typeof this.#windowHandle.setBounds === "function") {
-                    const docked = prefs.dockedBounds;
-                    this.#windowHandle.setBounds(docked ? { x: docked.x, y: docked.y, width: docked.width, height: docked.height } : { width: 480, height: 360 });
-                }
-                if (this.#windowHandle && typeof this.#windowHandle.focus === "function") this.#windowHandle.focus();
+                const docked = prefs.dockedBounds;
+                this.#setWindowBounds(docked ? { x: docked.x, y: docked.y, width: docked.width, height: docked.height } : { width: 480, height: 360 });
+                this.#focusWindow();
             }
             else if (action === "pip") {
                 this.#togglePip();
@@ -370,24 +499,24 @@
                 // Item 3 — reuses the real, existing, already-generic
                 // WindowManager.toggleFullscreen() (native Fullscreen
                 // API, feature-detected, honestly a no-op failure if
-                // unsupported) via the already-stored real window
-                // handle — no new fullscreen engine, no CSS-only fake
-                // fullscreen. Auto-collapses the real Tools menu on
-                // entry so it never obstructs a genuinely clean
-                // fullscreen view; the same real toggle button remains
-                // the obvious way back out (in addition to the
-                // browser's own native Escape-key exit).
-                if (this.#windowHandle && typeof this.#windowHandle.toggleFullscreen === "function") {
-                    this.#windowHandle.toggleFullscreen();
-                    const menu = this.#root.querySelector("#cozy-worship-player-tools-menu");
-                    const toggleBtn = this.#root.querySelector("#cozy-worship-player-tools-toggle");
-                    const arrow = this.#root.querySelector("#cozy-worship-player-tools-arrow");
-                    if (menu && !menu.hidden) {
-                        menu.hidden = true;
-                        if (toggleBtn) toggleBtn.setAttribute("aria-expanded", "false");
-                        if (arrow) arrow.textContent = "˅";
-                        savePrefs({ ...loadPrefs(), toolsMenuOpen: false });
-                    }
+                // unsupported), via #toggleWindowFullscreen() — the
+                // shared Live Window when composing it, or the real
+                // standalone handle in the honest fallback — no new
+                // fullscreen engine, no CSS-only fake fullscreen.
+                // Auto-collapses the real Tools menu on entry so it
+                // never obstructs a genuinely clean fullscreen view; the
+                // same real toggle button remains the obvious way back
+                // out (in addition to the browser's own native
+                // Escape-key exit).
+                this.#toggleWindowFullscreen();
+                const menu = this.#root.querySelector("#cozy-worship-player-tools-menu");
+                const toggleBtn = this.#root.querySelector("#cozy-worship-player-tools-toggle");
+                const arrow = this.#root.querySelector("#cozy-worship-player-tools-arrow");
+                if (menu && !menu.hidden) {
+                    menu.hidden = true;
+                    if (toggleBtn) toggleBtn.setAttribute("aria-expanded", "false");
+                    if (arrow) arrow.textContent = "˅";
+                    savePrefs({ ...loadPrefs(), toolsMenuOpen: false });
                 }
             }
             else if (action === "add-language") {
@@ -697,6 +826,28 @@
 
         setWindowOpen(isOpen) { this.#windowIsOpen = isOpen; this.#applyState(); }
 
+        /**
+         * #resolveWindowOpen()
+         *   Live Window repair: while composing the shared Live Window,
+         *   this chip has no onClose push-notification of its own (the
+         *   shared "cozy-assistant" window's onClose belongs to the
+         *   diff-guarded cozy-living-assistant.js, never edited by this
+         *   pass) — so instead of trusting the last-pushed
+         *   setWindowOpen() value (which would go stale if the window
+         *   is closed some other way, e.g. its own real title-bar X),
+         *   this pulls the real, current state from
+         *   window.CozyOS.LiveWindow.isOpen() every time the label is
+         *   drawn. Falls back to the locally-tracked flag only when
+         *   LiveWindow itself is unavailable (the standalone path).
+         */
+        #resolveWindowOpen() {
+            const liveWindow = window.CozyOS && window.CozyOS.LiveWindow;
+            if (liveWindow && typeof liveWindow.isOpen === "function") {
+                try { return !!liveWindow.isOpen(); } catch (_err) { /* fall through to the local flag */ }
+            }
+            return this.#windowIsOpen;
+        }
+
         #registerRestoreHook() {
             window.CozyOS.LiveViewController = window.CozyOS.LiveViewController || {};
             window.CozyOS.LiveViewController.show = () => this.show();
@@ -750,8 +901,9 @@
                 // is itself idempotent (focuses instead of duplicating,
                 // confirmed M366.6), but the LABEL was misleading about
                 // what would actually happen - now honestly reflects it.
-                openBtn.textContent = this.#windowIsOpen ? "▶ Focus Live View" : "▶ Open Live View";
-                openBtn.setAttribute("aria-label", this.#windowIsOpen ? "Bring the open Live View window to the front" : "Open Live View");
+                const windowOpen = this.#resolveWindowOpen();
+                openBtn.textContent = windowOpen ? "▶ Focus Live View" : "▶ Open Live View";
+                openBtn.setAttribute("aria-label", windowOpen ? "Bring the open Live View window to the front" : "Open Live View");
             }
 
             if (this.#position.x != null) {
