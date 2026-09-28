@@ -534,6 +534,14 @@
 <script src="core/modules/intelligence/semantic-answer/realization/language-realizer.js"></script>
 <script src="core/modules/intelligence/semantic-answer/validation/response-validator.js"></script>
 <script src="core/modules/intelligence/semantic-answer/repair/repair-loop.js"></script>
+<!-- SA-4 extension (GENERATIVE_OFFLINE) — registers window.CozyOS.OfflineGenerationProvider
+     only. Loads no model, fetches nothing, spawns no worker at parse
+     time (see that file's own header) — this <script> tag adds zero
+     page-load cost. language-realizer.js's default COMPOSED path never
+     references it; only an explicit, opt-in {offlineGeneration:
+     {enabled:true, provider: window.CozyOS.OfflineGenerationProvider}}
+     passed to CozyAnswerEngine.answer() takes the generative path. -->
+<script src="core/modules/intelligence/semantic-answer/generation/offline-generation-provider.js"></script>
 <!-- Checkpoint K — the verified intelligence chain (Checkpoints F-J),
      real and previously reachable only from admin-workspace.html /
      Node tests. Wired here, in the same dependency order already

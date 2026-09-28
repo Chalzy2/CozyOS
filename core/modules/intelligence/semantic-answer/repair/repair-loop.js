@@ -121,10 +121,75 @@
         };
     }
 
-    const RepairLoop = Object.freeze({ realizeValidated, getVersion: () => MODULE_VERSION });
+    /**
+     * realizeValidatedGenerative({request, actorContext, maxAttempts, generative})
+     *   SA-4 EXTENSION — a NEW, separate, async sibling of realizeValidated()
+     *   above, added ONLY so a caller can opt into the generative/offline
+     *   path (LanguageRealizer.realizeCandidateSentenceGenerative())
+     *   without touching realizeValidated() itself at all. Same real
+     *   realize -> validate -> repair -> validate cycle, same honest
+     *   REALIZATION_FAILED/REJECTED/MAX_REPAIR_ATTEMPTS_EXCEEDED
+     *   semantics — the only difference is which SA-4 entry point is
+     *   called each attempt. `generative` is passed straight through to
+     *   LanguageRealizer.realizeCandidateSentenceGenerative(); when it is
+     *   not {enabled:true, provider}, that function is itself a pure
+     *   passthrough to the sync realizeCandidateSentence(), so calling
+     *   this instead of realizeValidated() with no real `generative`
+     *   config produces the identical result (just via one extra await).
+     *   REPAIRED re-attempts here still call the SAME generative entry
+     *   point — a repair re-attempt against real evidence may genuinely
+     *   re-generate different (still evidence-grounded) wording, not
+     *   only re-compose; rebuildAsRepaired() then re-tags whatever mode
+     *   that attempt actually produced.
+     */
+    async function realizeValidatedGenerative({ request, actorContext = null, maxAttempts = DEFAULT_MAX_ATTEMPTS, generative = null } = {}) {
+        const realizer = window.CozyOS.LanguageRealizer;
+        const validator = window.CozyOS.ResponseValidator;
+        if (!realizer || typeof realizer.realizeCandidateSentenceGenerative !== "function") {
+            return { success: false, reason: "LANGUAGE_REALIZER_NOT_LOADED", attempts: 0 };
+        }
+        if (!validator || typeof validator.validateCandidate !== "function") {
+            return { success: false, reason: "RESPONSE_VALIDATOR_NOT_LOADED", attempts: 0 };
+        }
+
+        let attempt = 1;
+        let lastValidationResult = null;
+        let lastCandidate = null;
+
+        while (attempt <= maxAttempts) {
+            const realized = await realizer.realizeCandidateSentenceGenerative(request, { attempt, generative });
+            if (!realized.success) {
+                return { success: false, reason: "REALIZATION_FAILED", attempts: attempt, realizationError: realized };
+            }
+
+            const candidate = attempt === 1 ? realized.candidate : rebuildAsRepaired(realized.candidate, attempt);
+            const validated = validator.validateCandidate({ candidate, plan: request.semanticPlan, evidence: request.evidence, actorContext });
+            if (!validated.success) {
+                return { success: false, reason: "VALIDATION_FAILED", attempts: attempt, validationError: validated };
+            }
+
+            lastValidationResult = validated.result;
+            lastCandidate = candidate;
+
+            if (validated.result.status === "PASS") {
+                return { success: true, candidate, validation: validated.result, attempts: attempt };
+            }
+            if (validated.result.status === "REJECT") {
+                return { success: false, reason: "REJECTED", attempts: attempt, validation: validated.result, candidate };
+            }
+            attempt++;
+        }
+
+        return {
+            success: false, reason: "MAX_REPAIR_ATTEMPTS_EXCEEDED", attempts: maxAttempts,
+            lastValidation: lastValidationResult, lastCandidate,
+        };
+    }
+
+    const RepairLoop = Object.freeze({ realizeValidated, realizeValidatedGenerative, getVersion: () => MODULE_VERSION });
     window.CozyOS.RepairLoop = RepairLoop;
     window.CozyOS.Modules["repair-loop"] = Object.freeze({
         version: MODULE_VERSION,
-        description: "SA-6 — Repair Loop. Composes SA-4 (LanguageRealizer) + SA-5 (ResponseValidator) into one bounded realize->validate->repair->validate cycle (default max 3 attempts). A REJECT (BLOCKING violation) never enters the loop — those are real request defects, not repairable by re-realizing the same evidence. A REPAIR_REQUIRED (MAJOR violation, e.g. a claim with real evidence dropped) re-invokes the SAME realizer against the SAME request, tagged GENERATION_MODE REPAIRED. Never fabricates a PASS — genuinely exhausting all attempts returns an honest MAX_REPAIR_ATTEMPTS_EXCEEDED failure. No new AI, no new realization/validation logic of its own."
+        description: "SA-6 — Repair Loop. Composes SA-4 (LanguageRealizer) + SA-5 (ResponseValidator) into one bounded realize->validate->repair->validate cycle (default max 3 attempts). A REJECT (BLOCKING violation) never enters the loop — those are real request defects, not repairable by re-realizing the same evidence. A REPAIR_REQUIRED (MAJOR violation, e.g. a claim with real evidence dropped) re-invokes the SAME realizer against the SAME request, tagged GENERATION_MODE REPAIRED. Never fabricates a PASS — genuinely exhausting all attempts returns an honest MAX_REPAIR_ATTEMPTS_EXCEEDED failure. realizeValidated() is untouched. realizeValidatedGenerative() is a NEW, separate, opt-in-only async sibling calling LanguageRealizer.realizeCandidateSentenceGenerative() each attempt instead, for callers that explicitly supply a `generative` provider config. No new AI, no new realization/validation logic of its own."
     });
 })();

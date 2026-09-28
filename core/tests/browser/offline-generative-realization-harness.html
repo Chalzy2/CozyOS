@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<!--
+  core/tests/browser/offline-generative-realization-harness.html
+
+  Test fixture only - not a shipped application entry point, not
+  referenced from index.html/dashboard.html. Loads the exact real,
+  unmodified file set core/modules/intelligence/answer/tests/cozy-
+  answer-engine-semantic-construction.test.js's own loadFullStack()
+  already proves loads correctly and answers real questions (same
+  order), in a REAL browser instead of Node - bypassing dashboard.html's
+  own ~150-script app shell, login gate, and startup/redirect sequence,
+  none of which the real SA-1..SA-6 construction pipeline or the new
+  GENERATIVE_OFFLINE extension depend on. window.CozyOS.CozyAnswerEngine
+  and window.CozyOS.OfflineGenerationProvider are the same real,
+  unmodified objects either way - this file adds no business logic of
+  its own, only the <script> tags to load them plus a real crypto
+  global (already present in any real browser, unlike the Node test's
+  own fake window).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Offline generative realization test fixture</title>
+</head>
+<body>
+<script>window.CozyOS = window.CozyOS || {}; window.CozyOS.Modules = window.CozyOS.Modules || {};</script>
+
+<script src="/core/modules/vault/secret-registry.js"></script>
+<script src="/core/modules/vault/encryption-manager.js"></script>
+<script src="/core/modules/vault/secret-manager.js"></script>
+<script src="/core/modules/vault/typed-managers.js"></script>
+<script src="/core/modules/vault/rotation-and-health.js"></script>
+<script src="/core/modules/vault/cozy-vault-engine.js"></script>
+<script src="/core/modules/founder-story/founder-story-engine.js"></script>
+<script src="/core/modules/founder-story/founder-story-seed.js"></script>
+<script src="/core/modules/intelligence/knowledge/cozy-knowledge-registry.js"></script>
+<script src="/core/modules/intelligence/knowledge/cozy-public-knowledge-source.js"></script>
+<script src="/core/modules/memory/cozy-memory-engine.js"></script>
+<script src="/core/modules/knowledge/cozyos-identity-faq-router.js"></script>
+<script src="/core/living/cozy-ai-semantic-intent.js"></script>
+
+<script src="/core/modules/intelligence/language/cozy-language-templates.js"></script>
+<script src="/core/modules/intelligence/language/cozy-language-realize.js"></script>
+<script src="/core/modules/intelligence/language/cozy-language-registry.js"></script>
+<script src="/core/modules/intelligence/cozy-ai.js"></script>
+
+<script src="/core/modules/intelligence/semantic-answer/contracts/semantic-answer-plan-contract.js"></script>
+<script src="/core/modules/intelligence/semantic-answer/contracts/verified-evidence-contract.js"></script>
+<script src="/core/modules/intelligence/semantic-answer/contracts/language-realization-request-contract.js"></script>
+<script src="/core/modules/intelligence/semantic-answer/contracts/candidate-sentence-contract.js"></script>
+<script src="/core/modules/intelligence/semantic-answer/contracts/response-validation-result-contract.js"></script>
+<script src="/core/modules/intelligence/semantic-answer/contracts/cognitive-decision-contract.js"></script>
+
+<script src="/core/modules/intelligence/semantic-answer/evidence/source-adapters/cozy-knowledge-adapter.js"></script>
+<script src="/core/modules/intelligence/semantic-answer/evidence/source-adapters/cozy-memory-adapter.js"></script>
+<script src="/core/modules/intelligence/semantic-answer/evidence/verified-evidence-adapter.js"></script>
+
+<script src="/core/modules/intelligence/semantic-answer/planning/semantic-answer-planner.js"></script>
+<script src="/core/modules/intelligence/semantic-answer/realization/language-realizer.js"></script>
+<script src="/core/modules/intelligence/semantic-answer/validation/response-validator.js"></script>
+<script src="/core/modules/intelligence/semantic-answer/repair/repair-loop.js"></script>
+
+<!-- The one new file this test fixture exists to exercise in a REAL
+     browser (real @wllama/wllama WASM + a real local model file) -->
+<script src="/core/modules/intelligence/semantic-answer/generation/offline-generation-provider.js"></script>
+
+<script src="/core/modules/intelligence/answer/cozy-answer-engine.js"></script>
+
+<script>
+  // Signal to the test that every module above finished registering,
+  // without depending on any DOM-mount/login-gate sequence dashboard.html
+  // itself runs.
+  window.__harnessReady = true;
+</script>
+</body>
+</html>

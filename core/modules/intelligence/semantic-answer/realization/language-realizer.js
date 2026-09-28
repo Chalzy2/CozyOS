@@ -53,6 +53,24 @@
  *   itself, which always comes from real evidence). It does not decide
  *   goal/entity/claims (SA-3's job) and does not decide whether a
  *   candidate is good enough to show a user (SA-5's job).
+ *
+ * GENERATIVE_OFFLINE EXTENSION (real, opt-in only — default unchanged)
+ *   realizeCandidateSentence() above is untouched: every existing caller
+ *   still gets exactly GENERATION_MODE "COMPOSED", byte-for-byte. A NEW,
+ *   separate, opt-in entry point — realizeCandidateSentenceGenerative()
+ *   — exists alongside it for callers that explicitly pass
+ *   {generative:{enabled:true, provider}}. When taken, it builds a
+ *   grounded prompt from the SAME real evidence pieces (never free-form)
+ *   and calls a real local model (generation/offline-generation-
+ *   provider.js — @wllama/wllama, llama.cpp compiled to WASM, running
+ *   INSIDE the browser page, zero network once loaded) to genuinely
+ *   construct new wording — SA-1's own pre-existing "MODEL_GENERATED"
+ *   enum value, never invented here. A NEW candidate.generation.realizationMode
+ *   field (GENERATIVE_OFFLINE / COMPOSED_FALLBACK / UNAVAILABLE) records,
+ *   honestly and internally-testably, which actually happened; on any
+ *   failure the text falls back to the IDENTICAL COMPOSED output the
+ *   default path would have produced — never worse, never silently
+ *   mislabeled.
  */
 (function () {
     "use strict";
@@ -84,6 +102,94 @@
     function realizeSeam() {
         const c = window.CozyOS;
         return c && c.CozyLanguageRealize;
+    }
+
+    /**
+     * collectRealizablePieces(plan, evidenceById, language)
+     *   Extracted, UNCHANGED-BEHAVIOR helper (pure refactor — the exact
+     *   loop that used to live inline in realizeCandidateSentence()
+     *   below) so the new, opt-in generative path (
+     *   realizeCandidateSentenceGenerative()) can gather the SAME real,
+     *   claim-ordered, language-filtered evidence pieces the COMPOSED
+     *   path already does, rather than re-deriving (and risking
+     *   diverging from) that logic. Returns {pieces, usedEvidenceIds} —
+     *   both empty when nothing is realizable, exactly as before.
+     */
+    function collectRealizablePieces(plan, evidenceById, language) {
+        const pieces = [];
+        const usedEvidenceIds = [];
+        for (const claim of plan.claims) {
+            const ev = (claim.evidenceIds || []).map((id) => evidenceById.get(id)).find(Boolean);
+            if (!ev) continue; // honest skip — no matching evidence record was supplied for this claim
+            if (isNonEmptyString(ev.language) && ev.language !== language) continue; // honest skip — defense in depth, see file header
+            if (!isNonEmptyString(ev.claim)) continue;
+            pieces.push(ev.claim);
+            usedEvidenceIds.push(ev.id);
+        }
+        return { pieces, usedEvidenceIds };
+    }
+
+    // Real, disclosed, fixed per-goal question framings used ONLY to give
+    // the generative model (SA-4 extension — see generation/offline-
+    // generation-provider.js) a natural instruction to answer FROM the
+    // real evidence pieces below — never shown to a user, never itself a
+    // source of facts. A goal this map doesn't cover gets the honest
+    // generic framing; this is prompt scaffolding, not a new knowledge
+    // authority (compare introFor()'s own per-goal intro sentences, the
+    // SAME discipline applied to instruction-framing instead of output
+    // wording).
+    const GENERATIVE_GOAL_QUESTION = Object.freeze({
+        HUMAN_BENEFIT: (name) => `How does ${name} help people?`,
+        BENEFITS: (name) => `What are the benefits of ${name}?`,
+        CAPABILITY: (name) => `What can ${name} do?`,
+        UNDERSTAND_CAPABILITIES: (name) => `What can ${name} do?`,
+        IMPORTANCE: (name) => `Why is ${name} important?`,
+        VALUE: (name) => `What value does ${name} provide?`,
+        PRACTICAL_WORK_CONTRIBUTION: (name) => `How does ${name} contribute to real work?`,
+        DIFFERENTIATION: (name) => `What makes ${name} different?`,
+        DEFINITION: (name) => `What is ${name}?`,
+        UNDERSTAND_ENTITY: (name) => `What is ${name}?`,
+        UNDERSTAND_USEFULNESS: (name) => `How is ${name} useful?`,
+        UNDERSTAND_USEFULNESS_BEFORE_PURCHASE: (name) => `How is ${name} useful?`,
+        LIST: (name) => `List the relevant items about ${name}.`,
+        HOW_TO: (name) => `How do you use ${name}?`,
+    });
+
+    function generativeQuestionHint(goal, entityName) {
+        const name = isNonEmptyString(entityName) ? entityName : "this";
+        const framer = GENERATIVE_GOAL_QUESTION[goal];
+        return framer ? framer(name) : `Tell me about ${name}.`;
+    }
+
+    /**
+     * buildGenerativePrompt(pieces, goal, language, entityName)
+     *   Real, grounded prompt construction — the ONLY facts the model is
+     *   ever given are `pieces` (the SAME real, already-VERIFIED evidence
+     *   claim sentences collectRealizablePieces() gathered — never
+     *   free-form, never re-derived). The system instruction explicitly
+     *   forbids adding facts not listed and fixes the target language by
+     *   its real languageId (e.g. "sw"/"en") — SA-4's own composition
+     *   discipline (see this file's header) extended to a generative
+     *   path instead of a template join.
+     */
+    function buildGenerativePrompt(pieces, goal, language, entityName) {
+        const languageNote = language === "en"
+            ? "Respond in English."
+            : `Respond only in the language with ISO code "${language}" — do not switch to English.`;
+        const factLines = pieces.map((p, i) => `${i + 1}. ${p.trim()}`).join("\n");
+        const question = generativeQuestionHint(goal, entityName);
+        return [
+            {
+                role: "system",
+                content: "You are CozyOS's assistant. Answer using ONLY the numbered facts you are given. "
+                    + "Do not invent, assume, or add any fact that is not listed. Write ONE short, natural, "
+                    + "fluent answer that uses every fact. " + languageNote,
+            },
+            {
+                role: "user",
+                content: `Question: ${question}\nFacts:\n${factLines}\nAnswer:`,
+            },
+        ];
     }
 
     /**
@@ -180,16 +286,7 @@
             return built;
         }
 
-        const pieces = [];
-        const usedEvidenceIds = [];
-        for (const claim of plan.claims) {
-            const ev = (claim.evidenceIds || []).map((id) => evidenceById.get(id)).find(Boolean);
-            if (!ev) continue; // honest skip — no matching evidence record was supplied for this claim
-            if (isNonEmptyString(ev.language) && ev.language !== language) continue; // honest skip — defense in depth, see file header
-            if (!isNonEmptyString(ev.claim)) continue;
-            pieces.push(ev.claim);
-            usedEvidenceIds.push(ev.id);
-        }
+        const { pieces, usedEvidenceIds } = collectRealizablePieces(plan, evidenceById, language);
 
         if (pieces.length === 0) {
             const seam = realizeSeam();
@@ -209,13 +306,31 @@
         return buildCandidate({ text, language, plan, evidenceIds: usedEvidenceIds, attempt });
     }
 
-    function buildCandidate({ text, language, plan, evidenceIds, attempt }) {
+    /**
+     * buildCandidate({text, language, plan, evidenceIds, attempt, mode,
+     *                 provider, realizationMode})
+     *   `mode`/`provider`/`realizationMode` are NEW, additive, optional
+     *   overrides — every existing call site (this file's own sync
+     *   realizeCandidateSentence(), every pre-existing caller/test) omits
+     *   them and gets EXACTLY the prior generation shape
+     *   ({mode:"COMPOSED", provider:"language-realizer"}, no
+     *   realizationMode key at all) — byte-for-byte unchanged.
+     *   `realizationMode` (GENERATIVE_OFFLINE / COMPOSED_FALLBACK /
+     *   UNAVAILABLE) is the new, real, internally-testable state the
+     *   generative path (realizeCandidateSentenceGenerative() below)
+     *   sets; CandidateSentenceContract.validate() does not reject
+     *   unknown extra fields, so this is safe to add without touching
+     *   that contract's own fixed GENERATION_MODE enum.
+     */
+    function buildCandidate({ text, language, plan, evidenceIds, attempt, mode, provider, realizationMode }) {
         const contract = window.CozyOS.CandidateSentenceContract;
+        const generation = { mode: mode || "COMPOSED", provider: provider || "language-realizer", attempt };
+        if (isNonEmptyString(realizationMode)) generation.realizationMode = realizationMode;
         const fields = {
             text, language,
             sourcePlanId: generatePlanId(plan),
             evidenceIds,
-            generation: { mode: "COMPOSED", provider: "language-realizer", attempt },
+            generation,
         };
         if (contract && typeof contract.create === "function") {
             const built = contract.create(fields);
@@ -224,13 +339,103 @@
         return { success: true, candidate: Object.assign({ schemaVersion: "cozy.candidate-sentence.v1" }, fields) };
     }
 
+    /**
+     * realizeCandidateSentenceGenerative(request, {attempt, generative})
+     *   SA-4 EXTENSION — real, opt-in ONLY. `generative` must be
+     *   {enabled:true, provider} (an object exposing an async
+     *   `generate({messages, maxTokens, temperature})`, e.g.
+     *   window.CozyOS.OfflineGenerationProvider) or this function is a
+     *   pure passthrough to the SAME synchronous realizeCandidateSentence()
+     *   above — every caller that does not explicitly ask for generation
+     *   gets the EXACT existing COMPOSED behavior, unchanged.
+     *
+     *   When generation IS requested and there is real evidence to
+     *   construct from, this: (1) builds a grounded prompt from the SAME
+     *   real evidence pieces the COMPOSED path would have joined
+     *   (buildGenerativePrompt() — never free-form), (2) calls the
+     *   supplied provider, bounded by a real timeout (never hangs), (3)
+     *   on genuine success, returns a candidate with generation.mode
+     *   "MODEL_GENERATED" (SA-1's own pre-existing enum value — this file
+     *   is simply the first to use it) and realizationMode
+     *   "GENERATIVE_OFFLINE", (4) on ANY failure (provider unavailable,
+     *   timeout, inference error, empty output), falls back to the
+     *   IDENTICAL COMPOSED text composeClaims() would have produced,
+     *   tagged realizationMode "UNAVAILABLE" (provider/model never
+     *   usable) or "COMPOSED_FALLBACK" (provider was invoked but this
+     *   specific attempt failed) — the user-visible text is never worse
+     *   than the existing default, only ever the same or a genuinely new
+     *   sentence. Zero-claim plans and NO_REALIZABLE_EVIDENCE_IN_LANGUAGE
+     *   are honest degrades identical to the sync function (nothing to
+     *   generate FROM by definition) — delegated straight to it.
+     */
+    async function realizeCandidateSentenceGenerative(request, options = {}) {
+        const genConfig = options.generative;
+        if (!genConfig || genConfig.enabled !== true || !genConfig.provider || typeof genConfig.provider.generate !== "function") {
+            return realizeCandidateSentence(request, options);
+        }
+
+        const reqContract = window.CozyOS.LanguageRealizationRequestContract;
+        if (reqContract && typeof reqContract.validate === "function") {
+            const v = reqContract.validate(request);
+            if (!v.valid) return { success: false, reason: "INVALID_REALIZATION_REQUEST", errors: v.errors };
+        } else if (!request || typeof request !== "object") {
+            return { success: false, reason: "INVALID_REALIZATION_REQUEST", errors: ["request must be a real object."] };
+        }
+
+        const plan = request.semanticPlan;
+        const language = request.language.languageId;
+        const attempt = (Number.isInteger(options.attempt) && options.attempt > 0) ? options.attempt : 1;
+
+        if (!Array.isArray(plan.claims) || plan.claims.length === 0) {
+            return realizeCandidateSentence(request, options); // zero-claim: nothing to generate from — same honest disclosure as COMPOSED
+        }
+
+        const evidenceById = new Map();
+        for (const ev of request.evidence || []) { if (ev && ev.id) evidenceById.set(ev.id, ev); }
+        const { pieces, usedEvidenceIds } = collectRealizablePieces(plan, evidenceById, language);
+
+        if (pieces.length === 0) {
+            return realizeCandidateSentence(request, options); // NO_REALIZABLE_EVIDENCE_IN_LANGUAGE — identical to COMPOSED, nothing to generate from
+        }
+
+        const entityName = (plan.entity && isNonEmptyString(plan.entity.value)) ? plan.entity.value : null;
+        const composedFallbackText = composeClaims(pieces, plan.goal, language, entityName, plan.detailLevel);
+
+        const timeoutMs = Number.isInteger(genConfig.timeoutMs) && genConfig.timeoutMs > 0 ? genConfig.timeoutMs : 30000;
+        const messages = buildGenerativePrompt(pieces, plan.goal, language, entityName);
+
+        let genResult = null;
+        try {
+            genResult = await Promise.race([
+                genConfig.provider.generate({ messages, maxTokens: genConfig.maxTokens, temperature: genConfig.temperature }),
+                new Promise((resolve) => setTimeout(() => resolve({ available: true, success: false, reason: "GENERATION_TIMEOUT" }), timeoutMs)),
+            ]);
+        } catch (_err) {
+            genResult = { available: true, success: false, reason: "GENERATION_THREW" };
+        }
+
+        if (!genResult || genResult.available === false) {
+            return buildCandidate({ text: composedFallbackText, language, plan, evidenceIds: usedEvidenceIds, attempt, realizationMode: "UNAVAILABLE" });
+        }
+        if (!genResult.success || !isNonEmptyString(genResult.text)) {
+            return buildCandidate({ text: composedFallbackText, language, plan, evidenceIds: usedEvidenceIds, attempt, realizationMode: "COMPOSED_FALLBACK" });
+        }
+
+        return buildCandidate({
+            text: genResult.text, language, plan, evidenceIds: usedEvidenceIds, attempt,
+            mode: "MODEL_GENERATED", provider: genConfig.providerName || "offline-generation-provider",
+            realizationMode: "GENERATIVE_OFFLINE",
+        });
+    }
+
     const LanguageRealizer = Object.freeze({
-        realizeCandidateSentence, introFor, composeClaims, generatePlanId,
+        realizeCandidateSentence, realizeCandidateSentenceGenerative,
+        introFor, composeClaims, generatePlanId, buildGenerativePrompt,
         getVersion: () => MODULE_VERSION,
     });
     window.CozyOS.LanguageRealizer = LanguageRealizer;
     window.CozyOS.Modules["language-realizer"] = Object.freeze({
         version: MODULE_VERSION,
-        description: "SA-4 — Language Realizer (\"Cozy Construction Sentence\" realization). Constructs a real cozy.candidate-sentence.v1 directly in the target language from a validated LanguageRealizationRequest's real claims + real, already-target-language VerifiedEvidence — never English-generated-then-translated, never a stored-answer lookup. Composes SA-1's contracts and Phase 4's CozyLanguageRealize seam (intro sentences only, never claim content) — no new AI, no new template store, no machine translation. GENERATION_MODE is always COMPOSED (join already-VERIFIED evidence text); MODEL_GENERATED realization is explicitly out of scope (SA-8)."
+        description: "SA-4 — Language Realizer (\"Cozy Construction Sentence\" realization). Constructs a real cozy.candidate-sentence.v1 directly in the target language from a validated LanguageRealizationRequest's real claims + real, already-target-language VerifiedEvidence — never English-generated-then-translated, never a stored-answer lookup. realizeCandidateSentence() (default, every existing caller) composes SA-1's contracts and Phase 4's CozyLanguageRealize seam (intro sentences only, never claim content) — no new AI, no new template store, no machine translation — GENERATION_MODE is always COMPOSED, byte-for-byte unchanged. realizeCandidateSentenceGenerative() is a NEW, separate, opt-in-only entry point (generative.enabled:true + a provider, e.g. window.CozyOS.OfflineGenerationProvider) that builds a grounded prompt from the SAME real evidence pieces and runs a real local model (in-browser @wllama/wllama WASM) to genuinely construct new wording, tagged generation.mode MODEL_GENERATED + a new generation.realizationMode (GENERATIVE_OFFLINE/COMPOSED_FALLBACK/UNAVAILABLE); on any failure it falls back to the identical COMPOSED text. Not called by any existing caller unless it explicitly opts in."
     });
 })();

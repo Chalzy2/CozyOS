@@ -7,6 +7,7 @@
     "node": ">=22.5.0"
   },
   "dependencies": {
+    "@wllama/wllama": "3.6.1",
     "pg": "^8.13.1"
   },
   "devDependencies": {

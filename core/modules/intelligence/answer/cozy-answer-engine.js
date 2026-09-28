@@ -318,7 +318,7 @@
      *   as it did before this integration — byte-identical, zero
      *   regression risk for every case this new pipeline declines.
      */
-    async function tryConstructSemanticAnswer({ question, actorId, entityHint, language, cognitiveResult }) {
+    async function tryConstructSemanticAnswer({ question, actorId, entityHint, language, cognitiveResult, offlineGeneration }) {
         const planner = window.CozyOS.SemanticAnswerPlanner;
         if (!planner || typeof planner.planAnswer !== "function") return null;
 
@@ -413,12 +413,35 @@
         });
         if (!built.success) return null;
 
+        const actorContext = (typeof actorId === "string" && actorId.trim() && actorId !== "anonymous") ? { actorId } : null;
+
+        // SA-4 EXTENSION (GENERATIVE_OFFLINE) — real, opt-in ONLY.
+        // `offlineGeneration` is a NEW, additive parameter (see answer()/
+        // answerInternal()'s own header) that every existing caller of
+        // this file leaves undefined, so the exact call below
+        // (repairLoop.realizeValidated(), unchanged) runs for every
+        // existing test/production path. Only a caller that explicitly
+        // supplies {enabled:true, provider} (e.g. a browser test proving
+        // genuine offline construction, or a future Live Window setting)
+        // takes the async realizeValidatedGenerative() branch instead.
         let outcome;
         try {
-            outcome = repairLoop.realizeValidated({
-                request: built.request,
-                actorContext: (typeof actorId === "string" && actorId.trim() && actorId !== "anonymous") ? { actorId } : null,
-            });
+            if (offlineGeneration && offlineGeneration.enabled === true && offlineGeneration.provider && typeof repairLoop.realizeValidatedGenerative === "function") {
+                outcome = await repairLoop.realizeValidatedGenerative({
+                    request: built.request,
+                    actorContext,
+                    generative: {
+                        enabled: true,
+                        provider: offlineGeneration.provider,
+                        providerName: offlineGeneration.providerName,
+                        maxTokens: offlineGeneration.maxTokens,
+                        temperature: offlineGeneration.temperature,
+                        timeoutMs: offlineGeneration.timeoutMs,
+                    },
+                });
+            } else {
+                outcome = repairLoop.realizeValidated({ request: built.request, actorContext });
+            }
         } catch (_err) { return null; }
         const timingAfterRealize = Date.now();
         if (!outcome || !outcome.success) return null;
@@ -554,7 +577,7 @@
      *   own real, disclosed updated state for the caller to carry
      *   forward — this file adds no teaching/governance logic of its own.
      */
-    async function answerInternal(question, { actorId = null, language = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null, businessContext = null, businessConversationState = null, teachConversationState = null, cognitiveResult = null } = {}) {
+    async function answerInternal(question, { actorId = null, language = null, memoryQuery = null, entityHint = null, liveSessionId = null, supportScope = null, businessContext = null, businessConversationState = null, teachConversationState = null, cognitiveResult = null, offlineGeneration = null } = {}) {
         // WAVE 1 (Cognitive-to-Answer Contract) — computed once, honestly,
         // from whatever the caller actually supplied (cozy-living-
         // assistant.js passes CognitiveCoordinator's real per-turn result;
@@ -787,7 +810,7 @@
         // generic-context-concatenation path immediately below, for the
         // application-level questions it can actually plan for; every
         // question it declines falls through unchanged. ---
-        const semanticConstruction = await tryConstructSemanticAnswer({ question, actorId, entityHint, language, cognitiveResult });
+        const semanticConstruction = await tryConstructSemanticAnswer({ question, actorId, entityHint, language, cognitiveResult, offlineGeneration });
         if (semanticConstruction) {
             const { plan, candidate, evidence, timing } = semanticConstruction;
             return {
