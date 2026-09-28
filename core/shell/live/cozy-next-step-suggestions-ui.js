@@ -97,7 +97,6 @@
     const MESSAGES_ID = "cozy-living-assistant-messages";
     const FORM_ID = "cozy-living-assistant-form";
     const INPUT_ID = "cozy-living-assistant-input";
-    const MODE_REGION_ID = "cozy-live-window-mode-region";
     const REGION_ID = "cozy-next-step-suggestions-region";
 
     let state = "NO_SUGGESTIONS";
@@ -105,7 +104,7 @@
     let currentLanguage = "en";
     let currentApplicationName = null;
     let modeObserver = null;
-    let observedModeRegion = null;
+    let observedPanel = null;
 
     function escapeHtml(s) {
         return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -194,6 +193,12 @@
     }
 
     function renderSuggestions(suggestions, language, applicationName) {
+        // Re-check the panel observer on every real render (cheap,
+        // idempotent — see attachModeObserver()) and record the mode
+        // these suggestions belong to, so checkModeChanged() has a real
+        // baseline to compare a later mutation against.
+        attachModeObserver();
+        lastRenderedMode = currentActiveMode();
         currentSuggestions = Array.isArray(suggestions) ? suggestions : [];
         currentLanguage = language || "en";
         currentApplicationName = applicationName || null;
@@ -386,20 +391,58 @@
     }
 
     // -----------------------------------------------------------------
-    // Teardown on context/mode switch (test 6) — observes the real
-    // mode-region node created by live-window-controller.js's own
-    // ensureRegion(). Read-only observation; never mutates that node.
+    // Teardown on context/mode switch (test 6) — REAL BUG FOUND AND
+    // FIXED while writing this feature's own browser acceptance test:
+    // an earlier version of this file observed the mode-region node
+    // itself (#cozy-live-window-mode-region, created by
+    // live-window-controller.js's own ensureRegion()) with a BOUNDED
+    // retry (40 attempts, 10s) to find it — but that node genuinely
+    // does not exist in the DOM until a user's FIRST real mode switch,
+    // which can easily happen more than 10 real seconds after page
+    // load once real, multi-second answer-pipeline round trips are
+    // accounted for, silently leaving teardown never wired up.
+    //
+    // This version instead tracks LiveWindow.getActiveMode() — a real,
+    // already-existing, read-only method that works correctly whether
+    // or not the mode region has ever been created — and observes the
+    // PANEL itself (#cozy-living-assistant-panel, which exists from the
+    // moment the Live Window is first opened, independent of any mode
+    // ever being activated). Any panel-level DOM mutation (a mode
+    // switch always causes one — the mode region is inserted, cleared,
+    // or repopulated by activate()) triggers a real comparison: if the
+    // active mode differs from what it was when these suggestions were
+    // rendered, they are torn down. A mutation with no real mode change
+    // (e.g. this file's own suggestion-region updates) is a correct,
+    // cheap no-op — never a duplicate/self-triggered clear, because
+    // clearSuggestions() itself is idempotent (transition(x,
+    // NO_SUGGESTIONS) is always legal, see NextStepLifecycle) and empty
+    // regions produce no further mutation.
     // -----------------------------------------------------------------
+    let lastRenderedMode = undefined; // undefined = "not yet observed this render"; distinct from null ("assistant" mode).
+
+    function currentActiveMode() {
+        const lw = window.CozyOS && window.CozyOS.LiveWindow;
+        if (!lw || typeof lw.getActiveMode !== "function") return null;
+        try { return lw.getActiveMode().mode; } catch (_err) { return null; }
+    }
+
+    function checkModeChanged() {
+        if (lastRenderedMode === undefined) return; // no suggestions rendered yet this page — nothing to tear down.
+        const active = currentActiveMode();
+        if (active !== lastRenderedMode) {
+            lastRenderedMode = active;
+            clearSuggestions();
+        }
+    }
+
     function attachModeObserver() {
         const panel = panelEl();
-        if (!panel) return false;
-        const modeRegion = panel.querySelector("#" + MODE_REGION_ID);
-        if (!modeRegion || modeRegion === observedModeRegion) return !!modeRegion;
+        if (!panel || panel === observedPanel) return !!panel;
         if (modeObserver) modeObserver.disconnect();
-        observedModeRegion = modeRegion;
+        observedPanel = panel;
         if (typeof MutationObserver === "undefined") return true;
-        modeObserver = new MutationObserver(() => { clearSuggestions(); });
-        modeObserver.observe(modeRegion, { childList: true, attributes: true, attributeFilter: ["hidden"] });
+        modeObserver = new MutationObserver(checkModeChanged);
+        modeObserver.observe(panel, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
         return true;
     }
 
