@@ -81,6 +81,35 @@ expansion beyond production, manifest auto-generation from a route
 registry, health/latency diagnostics, and the unit test suite. These
 require either a new subsystem or a broader change than an engineering
 hardening pass, and are left for a dedicated future release.
+
+CHANGE NOTE (1.4.1 -> 1.4.2):
+Root-cause persistence fix — no route/permission/schema/finance-path
+changes. CONFIRMED ROOT CAUSE: every one of this module's ~45 mutating/
+reading routes referenced `window.CozyOS?.Storage`, which is never
+assigned anywhere in this repository. Since that guard was always false,
+every `storage.insert()`/`storage.find()` call silently no-op'd —
+QuarryOS never actually persisted anything, with no crash and no error.
+Fixed by routing every one of those calls through the real, universal
+storage gateway, `window.CozyStorage` (core/storage.js's
+CozyStorageGateway), via a new `_getStorage()` accessor:
+  - `storage.insert(collection, record)` -> `storage.save(collection, record)`
+  - `storage.find(collection, query)` -> real `.list(collection)` + an
+    equality filter over `query`'s own keys (the real gateway has no
+    `find()`; this preserves the same effective "match all query fields"
+    read contract every call site already assumed).
+  - `storage.update(collection, { queryObj }, patch)` -> the real
+    `.update(collection, key, patch)`, using the pre-fetched previous
+    record's real generated `id` (its IndexedDB primary key) in place of
+    the query object the real gateway does not accept. Added the same
+    previous-record lookup to executeCustomerUpdate, which previously had
+    none, so its update() call can resolve a real key too.
+  - getHealth()'s storage probe now checks for `.save`/`.list` (the real
+    gateway's actual methods) instead of the nonexistent `.find`.
+`core/storage.js`'s `BLUEPRINT_OBJECT_STORES` was extended with the 35
+`quarry_*` collection names this module actually references (see that
+file's own F-13 changelog entry) — required because the real gateway's
+`_validateAccess()` rejects any store not in that list, and none of
+these existed there before this fix.
 */
 
 
@@ -89,7 +118,7 @@ hardening pass, and are left for a dedicated future release.
 class CozyQuarryManager {
 constructor() {
 this.moduleId = "quarry_manager_001";
-this.version = "1.4.1";
+this.version = "1.4.2";
 this.activeLanguage = "en";
 
 // Immutable Seven-Key Structural Schema Invariant Template  
@@ -391,7 +420,7 @@ async executeWorkforceAssignment(payload) {
         throw new Error("Validation Error: Machine assignment matrix rules specify 1 to 3 operators max.");  
     }  
 
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const assignmentEntry = {  
         assignmentId: "ASGN-" + Date.now(),  
         machineId: payload.machineId,  
@@ -401,8 +430,8 @@ async executeWorkforceAssignment(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_assignments", assignmentEntry);  
+    if (storage) {  
+        await storage.save("quarry_assignments", assignmentEntry);  
     }  
 
     return { responseText: "👥 Workforce assignment matrix configured and logged to history register.", status: 200 };  
@@ -420,7 +449,7 @@ async executeAttendanceLog(payload) {
         throw new Error("Validation Error: Invalid attendance code variant supplied.");  
     }  
 
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const record = {  
         logId: "ATT-" + Date.now(),  
         operatorId: payload.operatorId,  
@@ -431,8 +460,8 @@ async executeAttendanceLog(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_attendance", record);  
+    if (storage) {  
+        await storage.save("quarry_attendance", record);  
     }  
 
     // Automatically notify payroll loop via Event Bus abstraction simulation  
@@ -447,7 +476,7 @@ async executeAttendanceLog(payload) {
 async executeParcelRegistration(payload) {  
     const C = window.CozyOS?.Shared?.QuarryConstants;
     this._validate(payload, ["parcelId", "landOwnerId"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const parcelRecord = {  
         parcelId: payload.parcelId,  
         landOwnerId: payload.landOwnerId,  
@@ -458,8 +487,8 @@ async executeParcelRegistration(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_parcels", parcelRecord);  
+    if (storage) {  
+        await storage.save("quarry_parcels", parcelRecord);  
     }  
 
     this._auditLog(
@@ -480,7 +509,7 @@ async executeParcelRegistration(payload) {
 async executeMaintenanceUpdate(payload) {  
     const C = window.CozyOS?.Shared?.QuarryConstants;
     this._validate(payload, ["machineId"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const costValue = parseFloat(payload.repairCost) || 0;  
 
     const maintenanceRecord = {  
@@ -504,8 +533,8 @@ async executeMaintenanceUpdate(payload) {
             collection: C?.COLLECTIONS?.MAINTENANCE || "quarry_maintenance",
             idField: "maintenanceId",
             insert: async () => {
-                if (storage && typeof storage.insert === "function") {
-                    await storage.insert(C?.COLLECTIONS?.MAINTENANCE || "quarry_maintenance", maintenanceRecord);
+                if (storage) {
+                    await storage.save(C?.COLLECTIONS?.MAINTENANCE || "quarry_maintenance", maintenanceRecord);
                 }
             },
             financeCall: () => this._routeExternalFinancialLegger(
@@ -516,8 +545,8 @@ async executeMaintenanceUpdate(payload) {
                 "Maintenance OpEx Outflow"
             )
         });
-    } else if (storage && typeof storage.insert === "function") {  
-        await storage.insert(C?.COLLECTIONS?.MAINTENANCE || "quarry_maintenance", maintenanceRecord);  
+    } else if (storage) {  
+        await storage.save(C?.COLLECTIONS?.MAINTENANCE || "quarry_maintenance", maintenanceRecord);  
     }  
 
     // ── Engineering Pass: audit coverage ──
@@ -855,16 +884,57 @@ _highestEntry(obj) {
     return entries.reduce((a, b) => (b[1] > a[1] ? b : a));  
 }  
 
-async _safeFind(collection, query = {}) {  
-    const storage = window.CozyOS?.Storage;  
-    if (!storage || typeof storage.find !== "function") return [];  
-    try {  
-        return (await storage.find(collection, query)) || [];  
-    } catch (e) {  
-        console.warn(`⚠️ [Quarry ERP] Storage lookup failed for '${collection}':`, e.message);  
-        return [];  
-    }  
-}  
+/**
+ * ── Root-cause fix: Real Storage Gateway Accessor ──
+ * CONFIRMED ROOT CAUSE: every one of this module's ~45 mutating/reading
+ * routes previously read `window.CozyOS?.Storage`, which is never
+ * assigned anywhere in this repository (`grep -rn "CozyOS\.Storage\s*="`
+ * returns zero matches). Since that guard was always false, every
+ * `storage.insert()`/`storage.find()` call below silently no-op'd —
+ * QuarryOS never actually persisted anything, with no crash and no error.
+ * The real, working, universal storage gateway in this codebase is
+ * `core/storage.js`'s CozyStorageGateway, exposed as the top-level global
+ * `window.CozyStorage` (NOT nested under window.CozyOS — that nested
+ * name, window.CozyOS.CozyStorage, is a separate adapter-coordinator
+ * abstraction defined in core/modules/storage/cozy-storage.js and is not
+ * what this module wants). This accessor also defensively calls
+ * storage.init() before first use: no other real caller of
+ * window.CozyStorage found anywhere in this codebase (e.g.
+ * core/calculation/business-record-engine.js) calls init() itself —
+ * that is itself an existing, separately-disclosed gap elsewhere in the
+ * codebase, not something introduced here. init() is documented as
+ * idempotent ("if (_dbInstance) return resolve(true)"), so calling it
+ * defensively here costs nothing and makes this module's persistence
+ * actually reliable rather than depending on some other, unproven
+ * bootstrap step having already run first.
+ */
+async _getStorage() {
+    const storage = (typeof window !== "undefined") ? window.CozyStorage : undefined;
+    if (!storage || typeof storage.save !== "function") return null;
+    if (typeof storage.init === "function") {
+        try {
+            await storage.init();
+        } catch (e) {
+            console.warn("⚠️ [Quarry ERP] Storage init failed:", e && e.message);
+            return null;
+        }
+    }
+    return storage;
+}
+
+async _safeFind(collection, query = {}) {
+    const storage = await this._getStorage();
+    if (!storage || typeof storage.list !== "function") return [];
+    try {
+        const records = (await storage.list(collection)) || [];
+        const filterKeys = Object.keys(query || {});
+        if (filterKeys.length === 0) return records;
+        return records.filter(r => filterKeys.every(k => r[k] === query[k]));
+    } catch (e) {
+        console.warn(`⚠️ [Quarry ERP] Storage lookup failed for '${collection}':`, e.message);
+        return [];
+    }
+}
 
 /**  
  * 9 (orig). INCREMENTAL OFFLINE COMPRESSION SYNCHRONIZATION ENGINE  
@@ -873,14 +943,14 @@ async _safeFind(collection, query = {}) {
  * same sync sweep once routed through storage.insert with a SyncStatus  
  * field — no new sync path was introduced.  
  */  
-async executeIncrementalOfflineSync() {  
-    const storage = window.CozyOS?.Storage;  
-    if (!storage || typeof storage.find !== "function") {  
-        return { responseText: "⚠️ Sync Warning: Local storage layer detached. Idle state maintained.", status: 500 };  
-    }  
+async executeIncrementalOfflineSync() {
+    const storage = await this._getStorage();
+    if (!storage || typeof storage.list !== "function") {
+        return { responseText: "⚠️ Sync Warning: Local storage layer detached. Idle state maintained.", status: 500 };
+    }
 
-    // Fetch mutated records marked as pending sync  
-    const pendingProductionData = await storage.find("quarry_production", { syncStatus: "pending" }) || [];  
+    // Fetch mutated records marked as pending sync
+    const pendingProductionData = await this._safeFind("quarry_production", { syncStatus: "pending" });
     if (pendingProductionData.length === 0) {  
         return { responseText: "⚡ Sync Complete: Incremental delta matches zero mutated elements.", status: 200 };  
     }  
@@ -1076,10 +1146,13 @@ _publishEvent(eventName, detail) {
  * prior contract to preserve here — only additive relative to the file  
  * as a whole.  
  */  
-getHealth() {  
-    const storage = window.CozyOS?.Storage;  
-    const finance = window.CozyOS?.Core?.Finance;  
-    const storageConnected = !!(storage && typeof storage.find === "function");  
+getHealth() {
+    // Sync probe — cannot await storage.init() here; reports real
+    // presence/shape of window.CozyStorage only, consistent with this
+    // method's existing synchronous contract.
+    const storage = (typeof window !== "undefined") ? window.CozyStorage : undefined;
+    const finance = window.CozyOS?.Core?.Finance;
+    const storageConnected = !!(storage && typeof storage.save === "function" && typeof storage.list === "function");
     const financeConnected = !!finance;  
     const offline = !(window.CozyOS?.Connectivity?.isOnline?.() ?? true);  
 
@@ -1172,7 +1245,7 @@ async getStatistics() {
 
 async executeEmployeeRegistration(payload) {  
     this._validate(payload, ["phone", "position"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const employeeRecord = {  
         employeeId: payload.employeeId || "EMP-" + Date.now(),  
         nationalId: payload.nationalId,  
@@ -1189,8 +1262,8 @@ async executeEmployeeRegistration(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_employees", employeeRecord);  
+    if (storage) {  
+        await storage.save("quarry_employees", employeeRecord);  
     }  
 
     this._publishEvent((window.CozyOS?.Shared?.QuarryConstants?.EVENTS?.EMPLOYEE_CREATED) || "employee.created", { employeeId: employeeRecord.employeeId, department: employeeRecord.department });  
@@ -1201,18 +1274,21 @@ async executeEmployeeRegistration(payload) {
 async executeEmployeeUpdate(payload) {  
     const C = window.CozyOS?.Shared?.QuarryConstants;
     this._validate(payload, ["employeeId"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     if (!payload.employeeId) throw new Error("Validation Error: employeeId is required to update an employee record.");  
 
     const previousRecord = (await this._safeFind("quarry_employees", { employeeId: payload.employeeId }))[0] || null;  
     const updatePatch = { ...payload, timestamp: new Date().toISOString() };  
-    if (storage && typeof storage.update === "function") {  
-        await storage.update("quarry_employees", { employeeId: payload.employeeId }, updatePatch);  
-    } else if (storage && typeof storage.insert === "function") {  
-        // Fallback for storage adapters without a dedicated update() — log a  
-        // patch record rather than silently dropping the mutation.  
-        await storage.insert("quarry_employees_patches", updatePatch);  
-    }  
+    // The real Storage Gateway's update() takes a primary key, not a
+    // query object, so the pre-fetched previousRecord's real generated
+    // "id" (its IndexedDB keyPath) is used to locate the record.
+    if (storage && previousRecord && previousRecord.id !== undefined) {
+        await storage.update("quarry_employees", previousRecord.id, updatePatch);
+    } else if (storage) {
+        // Fallback when no existing record was found to update — log a
+        // patch record rather than silently dropping the mutation.
+        await storage.save("quarry_employees_patches", updatePatch);
+    }
 
     // ── Engineering Pass: audit coverage ──
     // Employee updates carry no money leg, so they never reached
@@ -1233,7 +1309,7 @@ async executeEmployeeUpdate(payload) {
 async executeEmployeeStatusChange(payload, newStatus) {  
     const C = window.CozyOS?.Shared?.QuarryConstants;
     this._validate(payload, ["employeeId"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     if (!payload.employeeId) throw new Error("Validation Error: employeeId is required.");  
 
     const statusRecord = {  
@@ -1244,8 +1320,8 @@ async executeEmployeeStatusChange(payload, newStatus) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_employee_status_changes", statusRecord);  
+    if (storage) {  
+        await storage.save("quarry_employee_status_changes", statusRecord);  
     }  
 
     this._auditLog(
@@ -1263,7 +1339,7 @@ async executeEmployeeStatusChange(payload, newStatus) {
 async executeEmployeeTransfer(payload) {  
     const C = window.CozyOS?.Shared?.QuarryConstants;
     this._validate(payload, ["employeeId", "toDepartment"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     if (!payload.employeeId || !payload.toDepartment) {  
         throw new Error("Validation Error: employeeId and toDepartment are required for a transfer.");  
     }  
@@ -1278,8 +1354,8 @@ async executeEmployeeTransfer(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_employee_transfers", transferRecord);  
+    if (storage) {  
+        await storage.save("quarry_employee_transfers", transferRecord);  
     }  
 
     this._auditLog(
@@ -1301,7 +1377,7 @@ async executeEmployeeTransfer(payload) {
 async executeLoanIssuance(payload, loanType) {  
     const C = window.CozyOS?.Shared?.QuarryConstants;
     this._validate(payload, ["operatorId", "amount"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const principal = parseFloat(payload.amount) || 0;  
     if (principal <= 0) throw new Error("Validation Error: loan/advance amount must be greater than zero.");  
 
@@ -1329,8 +1405,8 @@ async executeLoanIssuance(payload, loanType) {
         collection: C?.COLLECTIONS?.LOANS || "quarry_loans",
         idField: "loanId",
         insert: async () => {
-            if (storage && typeof storage.insert === "function") {
-                await storage.insert(C?.COLLECTIONS?.LOANS || "quarry_loans", loanRecord);
+            if (storage) {
+                await storage.save(C?.COLLECTIONS?.LOANS || "quarry_loans", loanRecord);
             }
         },
         financeCall: () => this._routeExternalFinancialLegger(
@@ -1353,7 +1429,7 @@ async executeLoanIssuance(payload, loanType) {
 
 async executeLoanRepayment(payload) {  
     this._validate(payload, ["operatorId", "amount"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const amount = parseFloat(payload.amount) || 0;  
     if (amount <= 0) throw new Error("Validation Error: repayment amount must be greater than zero.");  
 
@@ -1365,8 +1441,8 @@ async executeLoanRepayment(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_loan_repayments", repaymentRecord);  
+    if (storage) {  
+        await storage.save("quarry_loan_repayments", repaymentRecord);  
     }  
 
     return { responseText: `💳 Repayment of KSh ${amount.toFixed(2)} recorded against ${payload.operatorId}'s loan ledger.`, status: 200 };  
@@ -1403,7 +1479,7 @@ async _getDueLoanInstallment(operatorId, returnFullBalance = false) {
 async executeCustomerRegistration(payload) {  
     const C = window.CozyOS?.Shared?.QuarryConstants;
     this._validate(payload, ["name"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const customerId = payload.customerId || "CUST-" + Date.now();  
     const customerRecord = {  
         customerId: customerId,  
@@ -1417,8 +1493,8 @@ async executeCustomerRegistration(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_customers", customerRecord);  
+    if (storage) {  
+        await storage.save("quarry_customers", customerRecord);  
     }  
 
     this.customerCreditLimits.set(customerId, { limit: customerRecord.creditLimit, balance: 0 });  
@@ -1430,14 +1506,18 @@ async executeCustomerRegistration(payload) {
 
 async executeCustomerUpdate(payload) {  
     this._validate(payload, ["customerId"]);
-    const storage = window.CozyOS?.Storage;  
-    if (!payload.customerId) throw new Error("Validation Error: customerId is required to update a customer.");  
+    const storage = await this._getStorage();  
+    if (!payload.customerId) throw new Error("Validation Error: customerId is required to update a customer.");
 
-    if (storage && typeof storage.update === "function") {  
-        await storage.update("quarry_customers", { customerId: payload.customerId }, { ...payload, timestamp: new Date().toISOString() });  
-    } else if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_customers_patches", { ...payload, timestamp: new Date().toISOString() });  
-    }  
+    // Real Storage Gateway update() needs the record's real generated
+    // "id" (primary key), not a query object — look it up first, same
+    // approach already used by executeEmployeeUpdate/executeDriverUpdate.
+    const previousRecord = (await this._safeFind("quarry_customers", { customerId: payload.customerId }))[0] || null;
+    if (storage && previousRecord && previousRecord.id !== undefined) {
+        await storage.update("quarry_customers", previousRecord.id, { ...payload, timestamp: new Date().toISOString() });
+    } else if (storage) {
+        await storage.save("quarry_customers_patches", { ...payload, timestamp: new Date().toISOString() });
+    }
 
     if (typeof payload.creditLimit === "number" || typeof payload.creditLimit === "string") {  
         const existing = this.customerCreditLimits.get(payload.customerId) || { limit: 0, balance: 0 };  
@@ -1466,7 +1546,7 @@ _calculateLineTotals(items, taxRatePercent, discountAmount) {
 
 async executeQuotationCreate(payload) {  
     this._validate(payload, ["customerId", "items"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const totals = this._calculateLineTotals(payload.items, payload.taxRatePercent, payload.discount);  
     const quotation = {  
         quotationId: "QUOTE-" + Date.now(),  
@@ -1477,8 +1557,8 @@ async executeQuotationCreate(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_quotations", quotation);  
+    if (storage) {  
+        await storage.save("quarry_quotations", quotation);  
     }  
 
     return { responseText: `📃 Quotation '${quotation.quotationId}' generated. Total: KSh ${totals.total.toFixed(2)}.`, status: 200, quotationId: quotation.quotationId };  
@@ -1486,7 +1566,7 @@ async executeQuotationCreate(payload) {
 
 async executeSalesOrderCreate(payload) {  
     this._validate(payload, ["customerId", "items"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const totals = this._calculateLineTotals(payload.items, payload.taxRatePercent, payload.discount);  
     const order = {  
         orderId: "ORD-" + Date.now(),  
@@ -1497,8 +1577,8 @@ async executeSalesOrderCreate(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_sales_orders", order);  
+    if (storage) {  
+        await storage.save("quarry_sales_orders", order);  
     }  
 
     return { responseText: `🛒 Sales order '${order.orderId}' created. Total: KSh ${totals.total.toFixed(2)}.`, status: 200, orderId: order.orderId };  
@@ -1507,7 +1587,7 @@ async executeSalesOrderCreate(payload) {
 async executeSaleRecord(payload) {  
     const C = window.CozyOS?.Shared?.QuarryConstants;
     this._validate(payload, ["customerId", "items"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const totals = this._calculateLineTotals(payload.items, payload.taxRatePercent, payload.discount);  
     const header = this._buildHeader(payload, payload.customerId);  
 
@@ -1553,8 +1633,8 @@ async executeSaleRecord(payload) {
             collection: C?.COLLECTIONS?.SALES || "quarry_sales",
             idField: "saleId",
             insert: async () => {
-                if (storage && typeof storage.insert === "function") {
-                    await storage.insert(C?.COLLECTIONS?.SALES || "quarry_sales", sale);
+                if (storage) {
+                    await storage.save(C?.COLLECTIONS?.SALES || "quarry_sales", sale);
                 }
             },
             financeCall: () => this._routeExternalFinancialLegger(
@@ -1566,8 +1646,8 @@ async executeSaleRecord(payload) {
             )
         });
     } else {  
-        if (storage && typeof storage.insert === "function") {  
-            await storage.insert(C?.COLLECTIONS?.SALES || "quarry_sales", sale);  
+        if (storage) {  
+            await storage.save(C?.COLLECTIONS?.SALES || "quarry_sales", sale);  
         }  
         const credit = this.customerCreditLimits.get(payload.customerId) || { limit: 0, balance: 0 };  
         credit.balance += totals.total;  
@@ -1581,7 +1661,7 @@ async executeSaleRecord(payload) {
 
 async executeInvoiceGenerate(payload) {  
     this._validate(payload, ["customerId", "items"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const totals = this._calculateLineTotals(payload.items, payload.taxRatePercent, payload.discount);  
     const invoice = {  
         invoiceId: "INV-" + Date.now(),  
@@ -1594,8 +1674,8 @@ async executeInvoiceGenerate(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_invoices", invoice);  
+    if (storage) {  
+        await storage.save("quarry_invoices", invoice);  
     }  
 
     return { responseText: `🧮 Invoice '${invoice.invoiceId}' generated. Amount due: KSh ${totals.total.toFixed(2)}.`, status: 200, invoiceId: invoice.invoiceId };  
@@ -1604,7 +1684,7 @@ async executeInvoiceGenerate(payload) {
 async executeReceiptRecord(payload) {  
     const C = window.CozyOS?.Shared?.QuarryConstants;
     this._validate(payload, ["customerId", "amount"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const amount = parseFloat(payload.amount) || 0;  
     const header = this._buildHeader(payload, payload.customerId);  
 
@@ -1623,8 +1703,8 @@ async executeReceiptRecord(payload) {
         collection: C?.COLLECTIONS?.RECEIPTS || "quarry_receipts",
         idField: "receiptId",
         insert: async () => {
-            if (storage && typeof storage.insert === "function") {
-                await storage.insert(C?.COLLECTIONS?.RECEIPTS || "quarry_receipts", receipt);
+            if (storage) {
+                await storage.save(C?.COLLECTIONS?.RECEIPTS || "quarry_receipts", receipt);
             }
         },
         financeCall: () => this._routeExternalFinancialLegger(
@@ -1647,7 +1727,7 @@ async executeReceiptRecord(payload) {
 
 async executeDeliveryNoteCreate(payload) {  
     this._validate(payload, ["customerId"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const note = {  
         deliveryNoteId: "DN-" + Date.now(),  
         customerId: payload.customerId,  
@@ -1659,8 +1739,8 @@ async executeDeliveryNoteCreate(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_delivery_notes", note);  
+    if (storage) {  
+        await storage.save("quarry_delivery_notes", note);  
     }  
 
     return { responseText: `📦 Delivery note '${note.deliveryNoteId}' created.`, status: 200, deliveryNoteId: note.deliveryNoteId };  
@@ -1673,7 +1753,7 @@ async executeDeliveryNoteCreate(payload) {
 
 async executeTruckAssignment(payload) {  
     this._validate(payload, ["truckId", "driverId"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const dispatch = {  
         dispatchId: "DISP-" + Date.now(),  
         truckId: payload.truckId,  
@@ -1685,8 +1765,8 @@ async executeTruckAssignment(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_truck_dispatch", dispatch);  
+    if (storage) {  
+        await storage.save("quarry_truck_dispatch", dispatch);  
     }  
 
     return { responseText: `🚚 Truck '${payload.truckId}' assigned to driver '${payload.driverId}'.`, status: 200, dispatchId: dispatch.dispatchId };  
@@ -1694,7 +1774,7 @@ async executeTruckAssignment(payload) {
 
 async executeDispatchEvent(payload, eventType) {  
     this._validate(payload, ["dispatchId", "truckId"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const eventRecord = {  
         eventId: `${eventType.toUpperCase()}-` + Date.now(),  
         dispatchId: payload.dispatchId,  
@@ -1706,11 +1786,11 @@ async executeDispatchEvent(payload, eventType) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_dispatch_events", eventRecord);  
+    if (storage) {  
+        await storage.save("quarry_dispatch_events", eventRecord);  
         // Mirror onto the dispatch collection record set used by AI BI  
         // delay analysis, without altering the original dispatch schema.  
-        await storage.insert("quarry_truck_dispatch", { ...eventRecord, status: eventType });  
+        await storage.save("quarry_truck_dispatch", { ...eventRecord, status: eventType });  
     }  
 
     return { responseText: `📍 Dispatch event logged: Truck '${payload.truckId}' [${eventType}].`, status: 200 };  
@@ -1719,7 +1799,7 @@ async executeDispatchEvent(payload, eventType) {
 async executeDeliveryConfirmation(payload) {  
     const C = window.CozyOS?.Shared?.QuarryConstants;
     this._validate(payload, ["dispatchId"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const confirmation = {  
         confirmationId: "DCONF-" + Date.now(),  
         dispatchId: payload.dispatchId,  
@@ -1729,8 +1809,8 @@ async executeDeliveryConfirmation(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_delivery_confirmations", confirmation);  
+    if (storage) {  
+        await storage.save("quarry_delivery_confirmations", confirmation);  
     }  
 
     this._publishEvent(C?.EVENTS?.DELIVERY_CONFIRMED || "delivery.confirmed", { dispatchId: payload.dispatchId, deliveryStatus: confirmation.deliveryStatus, confirmationId: confirmation.confirmationId });  
@@ -1744,7 +1824,7 @@ async executeDeliveryConfirmation(payload) {
 
 async executeDriverRegistration(payload) {  
     this._validate(payload, ["name", "licenseNumber"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const driver = {  
         driverId: payload.driverId || "DRV-" + Date.now(),  
         name: payload.name,  
@@ -1758,8 +1838,8 @@ async executeDriverRegistration(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_drivers", driver);  
+    if (storage) {  
+        await storage.save("quarry_drivers", driver);  
     }  
 
     return { responseText: `🪪 Driver '${driver.name}' registered with license '${driver.licenseNumber}'.`, status: 200, driverId: driver.driverId };  
@@ -1768,16 +1848,18 @@ async executeDriverRegistration(payload) {
 async executeDriverUpdate(payload) {  
     const C = window.CozyOS?.Shared?.QuarryConstants;
     this._validate(payload, ["driverId"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     if (!payload.driverId) throw new Error("Validation Error: driverId is required to update a driver record.");  
 
     const previousRecord = (await this._safeFind("quarry_drivers", { driverId: payload.driverId }))[0] || null;  
     const updatePatch = { ...payload, timestamp: new Date().toISOString() };  
-    if (storage && typeof storage.update === "function") {  
-        await storage.update("quarry_drivers", { driverId: payload.driverId }, updatePatch);  
-    } else if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_drivers_patches", updatePatch);  
-    }  
+    // Real Storage Gateway update() needs the record's real generated
+    // "id" (primary key), not a query object.
+    if (storage && previousRecord && previousRecord.id !== undefined) {
+        await storage.update("quarry_drivers", previousRecord.id, updatePatch);
+    } else if (storage) {
+        await storage.save("quarry_drivers_patches", updatePatch);
+    }
 
     this._auditLog(
         "driver_update",
@@ -1793,7 +1875,7 @@ async executeDriverUpdate(payload) {
 
 async executeDriverViolationLog(payload) {  
     this._validate(payload, ["driverId", "description"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const violation = {  
         violationId: "VIOL-" + Date.now(),  
         driverId: payload.driverId,  
@@ -1802,8 +1884,8 @@ async executeDriverViolationLog(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_driver_violations", violation);  
+    if (storage) {  
+        await storage.save("quarry_driver_violations", violation);  
     }  
 
     return { responseText: `⚠️ Violation logged for driver '${payload.driverId}': ${payload.description}.`, status: 200 };  
@@ -1816,7 +1898,7 @@ async executeDriverViolationLog(payload) {
 async executeFuelPurchase(payload) {  
     const C = window.CozyOS?.Shared?.QuarryConstants;
     this._validate(payload, ["liters"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const cost = parseFloat(payload.cost) || 0;  
     const header = this._buildHeader(payload);  
 
@@ -1835,8 +1917,8 @@ async executeFuelPurchase(payload) {
             collection: C?.COLLECTIONS?.FUEL_PURCHASES || "quarry_fuel_purchases",
             idField: "purchaseId",
             insert: async () => {
-                if (storage && typeof storage.insert === "function") {
-                    await storage.insert(C?.COLLECTIONS?.FUEL_PURCHASES || "quarry_fuel_purchases", purchase);
+                if (storage) {
+                    await storage.save(C?.COLLECTIONS?.FUEL_PURCHASES || "quarry_fuel_purchases", purchase);
                 }
             },
             financeCall: () => this._routeExternalFinancialLegger(
@@ -1847,8 +1929,8 @@ async executeFuelPurchase(payload) {
                 `Fuel Purchase ${purchase.purchaseId}`
             )
         });
-    } else if (storage && typeof storage.insert === "function") {  
-        await storage.insert(C?.COLLECTIONS?.FUEL_PURCHASES || "quarry_fuel_purchases", purchase);  
+    } else if (storage) {  
+        await storage.save(C?.COLLECTIONS?.FUEL_PURCHASES || "quarry_fuel_purchases", purchase);  
     }  
 
     return { responseText: `⛽ Fuel purchase logged: ${purchase.liters}L for KSh ${cost.toFixed(2)}.`, status: 200, purchaseId: purchase.purchaseId };  
@@ -1857,7 +1939,7 @@ async executeFuelPurchase(payload) {
 async executeFuelIssue(payload) {  
     const C = window.CozyOS?.Shared?.QuarryConstants;
     this._validate(payload, ["machineId", "liters"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const issue = {  
         issueId: "FUELISSUE-" + Date.now(),  
         machineId: payload.machineId,  
@@ -1867,8 +1949,8 @@ async executeFuelIssue(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_fuel_issues", issue);  
+    if (storage) {  
+        await storage.save("quarry_fuel_issues", issue);  
     }  
 
     this._publishEvent(C?.EVENTS?.FUEL_ISSUED || "fuel.issued", { machineId: payload.machineId, liters: issue.liters, issueId: issue.issueId });  
@@ -1878,7 +1960,7 @@ async executeFuelIssue(payload) {
 
 async executeFuelTheftFlag(payload) {  
     this._validate(payload, ["machineId"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const flag = {  
         flagId: "FUELFLAG-" + Date.now(),  
         machineId: payload.machineId,  
@@ -1890,8 +1972,8 @@ async executeFuelTheftFlag(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_fuel_theft_flags", flag);  
+    if (storage) {  
+        await storage.save("quarry_fuel_theft_flags", flag);  
     }  
 
     this._notifyNotificationCenter("Manager", `Fuel Theft Alert: Machine ${payload.machineId} shows a variance of ${flag.variance.toFixed(1)}L.`);  
@@ -1905,7 +1987,7 @@ async executeFuelTheftFlag(payload) {
 
 async executeMachineHoursLog(payload) {  
     this._validate(payload, ["machineId"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const working = parseFloat(payload.workingHours) || 0;  
     const idle = parseFloat(payload.idleHours) || 0;  
     const overtime = parseFloat(payload.overtimeHours) || 0;  
@@ -1925,8 +2007,8 @@ async executeMachineHoursLog(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_machine_hours", record);  
+    if (storage) {  
+        await storage.save("quarry_machine_hours", record);  
     }  
 
     return { responseText: `⏲️ Machine hours logged for '${payload.machineId}'. Utilization: ${utilization}%.`, status: 200, utilizationPercent: utilization };  
@@ -1938,7 +2020,7 @@ async executeMachineHoursLog(payload) {
 
 async executeCrusherProductionLog(payload) {  
     this._validate(payload, ["machineId"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const record = {  
         productionId: "CRUSH-" + Date.now(),  
         machineId: payload.machineId,  
@@ -1950,8 +2032,8 @@ async executeCrusherProductionLog(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_crusher_production", record);  
+    if (storage) {  
+        await storage.save("quarry_crusher_production", record);  
     }  
 
     return { responseText: `🪨 Crusher production logged: ${record.outputTons} tons from '${payload.machineId}' (Section ${record.section}).`, status: 200 };  
@@ -1964,7 +2046,7 @@ async executeCrusherProductionLog(payload) {
 async executeStockAdjustment(payload) {  
     const C = window.CozyOS?.Shared?.QuarryConstants;
     this._validate(payload, ["category"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const category = payload.category;  
     const delta = parseFloat(payload.delta) || 0;  
     if (!category) throw new Error("Validation Error: stock category is required.");  
@@ -1982,8 +2064,8 @@ async executeStockAdjustment(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_stock_adjustments", record);  
+    if (storage) {  
+        await storage.save("quarry_stock_adjustments", record);  
     }  
 
     // ── Engineering Pass: explicit audit entry ──
@@ -2023,7 +2105,7 @@ _deductStock(category, quantity) {
 
 async executeLandOwnerRegistration(payload) {  
     this._validate(payload, ["name"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const landOwnerId = payload.landOwnerId || "OWNER-" + Date.now();  
     const record = {  
         landOwnerId: landOwnerId,  
@@ -2033,8 +2115,8 @@ async executeLandOwnerRegistration(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert("quarry_land_owners", record);  
+    if (storage) {  
+        await storage.save("quarry_land_owners", record);  
     }  
 
     if (payload.ratePerTon) {  
@@ -2054,7 +2136,7 @@ executeRoyaltyRateSet(payload) {
 async executeRoyaltyAccrual(payload) {  
     const C = window.CozyOS?.Shared?.QuarryConstants;
     this._validate(payload, ["landOwnerId"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const tons = parseFloat(payload.tons) || 0;  
     const rateInfo = this.royaltyRates.get(payload.landOwnerId);  
     const rate = rateInfo ? rateInfo.ratePerTon : (parseFloat(payload.ratePerTon) || 0);  
@@ -2071,8 +2153,8 @@ async executeRoyaltyAccrual(payload) {
         timestamp: new Date().toISOString()  
     };  
 
-    if (storage && typeof storage.insert === "function") {  
-        await storage.insert(C?.COLLECTIONS?.ROYALTY_ACCRUALS || "quarry_royalty_accruals", record);  
+    if (storage) {  
+        await storage.save(C?.COLLECTIONS?.ROYALTY_ACCRUALS || "quarry_royalty_accruals", record);  
     }  
 
     this._publishEvent(C?.EVENTS?.ROYALTY_GENERATED || "royalty.generated", { landOwnerId: payload.landOwnerId, accruedAmount: accrued, tons });  
@@ -2098,7 +2180,7 @@ async executeRoyaltyStatement(payload) {
 async executeRoyaltySettlement(payload) {  
     const C = window.CozyOS?.Shared?.QuarryConstants;
     this._validate(payload, ["landOwnerId", "amount"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const amount = parseFloat(payload.amount) || 0;  
     const header = this._buildHeader(payload, payload.landOwnerId);  
 
@@ -2116,8 +2198,8 @@ async executeRoyaltySettlement(payload) {
         collection: C?.COLLECTIONS?.ROYALTY_SETTLEMENTS || "quarry_royalty_settlements",
         idField: "settlementId",
         insert: async () => {
-            if (storage && typeof storage.insert === "function") {
-                await storage.insert(C?.COLLECTIONS?.ROYALTY_SETTLEMENTS || "quarry_royalty_settlements", settlement);
+            if (storage) {
+                await storage.save(C?.COLLECTIONS?.ROYALTY_SETTLEMENTS || "quarry_royalty_settlements", settlement);
             }
         },
         financeCall: () => this._routeExternalFinancialLegger(
@@ -2139,7 +2221,7 @@ async executeRoyaltySettlement(payload) {
 async executeExpenseLog(payload) {  
     const C = window.CozyOS?.Shared?.QuarryConstants;
     this._validate(payload, ["amount"]);
-    const storage = window.CozyOS?.Storage;  
+    const storage = await this._getStorage();  
     const amount = parseFloat(payload.amount) || 0;  
     const validCategories = C?.EXPENSE_CATEGORIES || ["Fuel", "Repairs", "Explosives", "Salaries", "Utilities", "Security", "Rentals", "Miscellaneous"];  
     const category = validCategories.includes(payload.category) ? payload.category : "Miscellaneous";  
@@ -2163,8 +2245,8 @@ async executeExpenseLog(payload) {
         collection: C?.COLLECTIONS?.EXPENSES || "quarry_expenses",
         idField: "expenseId",
         insert: async () => {
-            if (storage && typeof storage.insert === "function") {
-                await storage.insert(C?.COLLECTIONS?.EXPENSES || "quarry_expenses", expense);
+            if (storage) {
+                await storage.save(C?.COLLECTIONS?.EXPENSES || "quarry_expenses", expense);
             }
         },
         financeCall: () => this._routeExternalFinancialLegger(
@@ -2245,7 +2327,7 @@ window.CozyOS.Modules.QuarryManager = new CozyQuarryManager();
 if (window.CozyOS.ServiceRegistry && typeof window.CozyOS.ServiceRegistry.registerApplication === "function") {
     try {
         window.CozyOS.ServiceRegistry.registerApplication({
-            id: "quarry_manager_001", name: "QuarryOS", version: "1.4.1",
+            id: "quarry_manager_001", name: "QuarryOS", version: "1.4.2",
             category: "business-application", icon: "quarry.svg", enabled: true,
             launcher: "applications/QuarryOS/quarry.html", entryPoint: "applications/QuarryOS/quarry.html",
             sourcePath: "applications/QuarryOS/quarry.html", certificationStatus: "NOT_CERTIFIED"

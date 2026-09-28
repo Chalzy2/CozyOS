@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<!--
+  core/modules/QuarryOS/tests/fixtures/quarry-storage-persistence-fixture.html
+
+  NOT a redesign of applications/QuarryOS/quarry.html and NOT a substitute
+  for it. This fixture exists only to browser-load the two REAL,
+  unmodified files this milestone's root-cause fix touches —
+  core/storage.js (window.CozyStorage) and
+  core/modules/QuarryOS/quarry-index.js (window.CozyOS.Modules.QuarryManager)
+  — with real <script> tags, exactly the same loading mechanism every real
+  CozyOS page uses, and the same fixture pattern already established by
+  core/tests/browser/fixtures/business-record-engine-fixture.html for the
+  same reason (BusinessRecordEngine's real dependency on the real
+  IndexedDB-backed window.CozyStorage cannot be exercised in Node, which
+  has no real IndexedDB).
+
+  core/storage.js ends with a top-level `export default CozyStorageGateway;`,
+  so — exactly as business-record-engine-fixture.html already found and
+  disclosed — it is loaded here via a real `<script type="module">` tag,
+  not a plain <script src>, which would fail to parse. quarry-index.js has
+  no import/export of its own and is loaded as a plain classic <script>,
+  exactly as applications/QuarryOS/quarry.html loads it. Module scripts are
+  deferred relative to classic scripts, so quarry-index.js's own top-level
+  self-registration code may run before core/storage.js's module body has
+  finished executing — this is harmless here because, like
+  business-record-engine.js, quarry-index.js resolves window.CozyStorage
+  LAZILY inside each execute*() call (via its own _getStorage() helper),
+  never at module-load time, and every real assertion below runs from the
+  Node side via page.evaluate() only after the page's 'load' event, by
+  which point both scripts have unconditionally finished.
+
+  HONEST DISCLOSED GAP (out of scope for this milestone — see the
+  hand-back report): applications/QuarryOS/quarry.html itself has NO
+  <script> tag for core/storage.js anywhere in the real repository today
+  (confirmed: no production HTML page in this repository loads
+  core/storage.js — only test fixtures like this one and
+  business-record-engine-fixture.html do). This fixture proves
+  quarry-index.js's OWN storage calls are now correct and that real,
+  cross-reload IndexedDB persistence genuinely works once the real
+  gateway is present. It does NOT by itself make quarry.html persist data
+  in production — that would additionally require adding a
+  `<script type="module" src="../../storage.js">` tag to quarry.html,
+  which is outside the specific files this milestone was scoped to touch.
+
+  No business logic of its own lives here. All test assertions run against
+  window.CozyOS.Modules.QuarryManager and window.CozyStorage from the Node
+  side via page.evaluate().
+-->
+<html>
+<head><meta charset="utf-8"><title>CozyOS QuarryOS storage persistence — browser fixture</title></head>
+<body>
+  <script type="module" src="/core/storage.js"></script>
+  <script src="/core/modules/QuarryOS/quarry-index.js"></script>
+</body>
+</html>

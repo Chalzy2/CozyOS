@@ -26,21 +26,74 @@
  *                   change — no new database/tenant mechanism). Schema version
  *                   bumped 9 → 10 so onupgradeneeded actually creates them the
  *                   next time this file runs in a real browser.
+ * F-13 [Medium]    QuarryOS Storage Integration milestone: root-cause fix for a
+ *                   confirmed, previously-silent persistence no-op. Every one of
+ *                   QuarryOS's ~45 mutating routes (core/modules/QuarryOS/
+ *                   quarry-index.js) read a nonexistent window.CozyOS.Storage
+ *                   reference (never assigned anywhere in this repository) and,
+ *                   since that guard was always false, every storage.insert()/
+ *                   find() call silently no-op'd — QuarryOS never actually
+ *                   persisted anything. quarry-index.js's storage calls are now
+ *                   corrected to use this real gateway (window.CozyStorage), but
+ *                   none of its "quarry_*" collection names existed in this
+ *                   blueprint, so they would have been rejected by
+ *                   _validateAccess() as unauthorized/unmapped stores. Added the
+ *                   35 quarry_* stores quarry-index.js actually references
+ *                   (enumerated by reading the whole file, not guessed):
+ *                   quarry_assignments, quarry_attendance,
+ *                   quarry_crusher_production, quarry_customers,
+ *                   quarry_customers_patches, quarry_delivery_confirmations,
+ *                   quarry_delivery_notes, quarry_dispatch_events,
+ *                   quarry_driver_violations, quarry_drivers,
+ *                   quarry_drivers_patches, quarry_employee_status_changes,
+ *                   quarry_employee_transfers, quarry_employees,
+ *                   quarry_employees_patches, quarry_expenses, quarry_fuel_issues,
+ *                   quarry_fuel_purchases, quarry_fuel_theft_flags,
+ *                   quarry_invoices, quarry_land_owners, quarry_loan_repayments,
+ *                   quarry_loans, quarry_machine_hours, quarry_maintenance,
+ *                   quarry_parcels, quarry_production, quarry_quotations,
+ *                   quarry_receipts, quarry_royalty_accruals,
+ *                   quarry_royalty_settlements, quarry_sales, quarry_sales_orders,
+ *                   quarry_stock_adjustments, quarry_truck_dispatch.
+ *                   ("quarry_production" is a real but never-written collection
+ *                   name referenced only by executeIncrementalOfflineSync's own
+ *                   pre-existing, separately-disclosed mismatch with the
+ *                   "quarry_crusher_production" store everything actually writes
+ *                   to — kept here only so that dead lookup keeps degrading to an
+ *                   empty result exactly as before, rather than newly throwing.)
+ *                   Smallest additive config change — no new database/tenant
+ *                   mechanism, same pattern as F-12. Schema version bumped
+ *                   10 → 11 so onupgradeneeded actually creates them the next
+ *                   time this file runs in a real browser.
  */
 
 // Private state scoped within the module architecture closure
 let _dbInstance = null;
-const SCHEMA_META = { name: "CozyOS_Storage_Cluster", version: 10 };
+const SCHEMA_META = { name: "CozyOS_Storage_Cluster", version: 11 };
 
 // Complete declarative blueprint of all mandatory default system & industry object stores
 // [F-11: corrected count from 32 → 30] [F-12: +2 for BusinessRecordEngine]
+// [F-13: +35 for QuarryOS Storage Integration — see changelog above]
 const BLUEPRINT_OBJECT_STORES = [
     "users", "settings", "organizations", "permissions", "plugins", "plugin_settings",
     "documents", "media", "images", "videos", "language_packs", "translation_memory",
     "dictionary", "learning_progress", "voice_models", "ocr_cache", "inventory",
     "products", "orders", "payments", "wallet", "audit_logs", "telemetry",
     "notifications", "sync_queue", "offline_queue", "cache", "sessions",
-    "api_tokens", "preferences", "business_records", "business_record_schemas"
+    "api_tokens", "preferences", "business_records", "business_record_schemas",
+    // [F-13: QuarryOS Storage Integration]
+    "quarry_assignments", "quarry_attendance", "quarry_crusher_production",
+    "quarry_customers", "quarry_customers_patches", "quarry_delivery_confirmations",
+    "quarry_delivery_notes", "quarry_dispatch_events", "quarry_driver_violations",
+    "quarry_drivers", "quarry_drivers_patches", "quarry_employee_status_changes",
+    "quarry_employee_transfers", "quarry_employees", "quarry_employees_patches",
+    "quarry_expenses", "quarry_fuel_issues", "quarry_fuel_purchases",
+    "quarry_fuel_theft_flags", "quarry_invoices", "quarry_land_owners",
+    "quarry_loan_repayments", "quarry_loans", "quarry_machine_hours",
+    "quarry_maintenance", "quarry_parcels", "quarry_production", "quarry_quotations",
+    "quarry_receipts", "quarry_royalty_accruals", "quarry_royalty_settlements",
+    "quarry_sales", "quarry_sales_orders", "quarry_stock_adjustments",
+    "quarry_truck_dispatch"
 ];
 
 // [F-06: Module-level RBAC map]
