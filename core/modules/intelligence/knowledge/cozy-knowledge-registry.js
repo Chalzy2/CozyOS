@@ -745,6 +745,36 @@
                 "mfuatano halisi wa mauzo/ankara/risiti na wateja",
                 "majibu yanayotokana na data kwa maswali halisi ya uendeshaji badala ya kubahatisha"
             ]),
+            // PHASE 8 (QuarryOS Full Application Integration) addition —
+            // ADDITIVE ONLY, humanBenefits/realLifeProblems/currentVerified
+            // Capabilities above remain byte-identical. Reorganizes ONLY the
+            // already-verified facts above into 5 named topics, matching
+            // this record's own 6 whoBenefits groups minus land owners and
+            // customers sharing one combined "sales" audience split out
+            // separately below. Deliberately excludes "expense logging and
+            // report generation" (too thin for its own topic, no distinct
+            // realLifeProblems/humanBenefits sentence of its own — folded
+            // out rather than invented, same discipline as InterestOS's
+            // Goals/Calculations exclusion in this same file) and excludes
+            // everything in visionCapabilities below (company setup,
+            // weighbridge, a distinct stone-product catalog, a standalone
+            // loading action, a fixed AI-advisor "profit" query, an external
+            // command interface) — none of that is real today, per this
+            // record's own visionSourceNote.
+            benefitAreas: Object.freeze([
+                "Workforce & Payroll — Helps register, update, and manage employees, with a role-based permission matrix controlling who can do what, and loans/salary advances tracked with automatic repayment deduction. Benefit: Accurate, auditable payroll instead of manual, error-prone tracking for a physically distributed workforce.",
+                "Trucks, Drivers & Deliveries — Helps assign trucks, log departure and arrival, confirm deliveries, and register and track drivers including violations. Benefit: A real record of deliveries instead of relying on memory or paper, so it's clear which trucks and drivers delivered what, and when.",
+                "Fuel & Machine Monitoring — Helps log fuel purchases and issues with explicit theft flagging, track machine hours and crusher production, and surface genuinely data-driven analyses of the least-efficient machine, driver delays, and excess fuel use. Benefit: Earlier detection of fuel theft, excessive machine downtime, or repeated worker absences, from real data rather than guesswork.",
+                "Sales & Customer Records — Helps register and update customers, and create quotations, sales orders, invoices, and receipts, including a data-driven analysis of the largest outstanding debtor. Benefit: A real sales and invoicing trail with customers, instead of informal or inconsistent records.",
+                "Land-Owner Royalties — Helps set royalty rates, log accruals, generate statements, and settle payments to land owners. Benefit: Fair, calculable royalty statements land owners can trust, instead of obligations that are hard to calculate and prove fairly."
+            ]),
+            benefitAreasSw: Object.freeze([
+                "Wafanyakazi na Mishahara — Husaidia kusajili, kusasisha, na kusimamia wafanyakazi, likiwa na jedwali la ruhusa kulingana na wadhifa linaloamua ni nani anayeweza kufanya nini, na mikopo/malipo ya awali ya mshahara yenye makato ya marejesho kiotomatiki. Faida: Mshahara sahihi, unaoweza kukaguliwa badala ya uhesabuji wa mkono, wenye makosa kwa wafanyakazi waliotawanyika kimwili.",
+                "Malori, Madereva na Uwasilishaji — Husaidia kugawa malori, kurekodi kuondoka na kuwasili, kuthibitisha uwasilishaji, na kusajili na kufuatilia madereva ikiwa ni pamoja na makosa. Faida: Rekodi halisi ya usafirishaji badala ya kutegemea kumbukumbu au karatasi, hivyo kuwa wazi ni malori na madereva gani waliopeleka nini, na lini.",
+                "Ufuatiliaji wa Mafuta na Mashine — Husaidia kurekodi manunuzi na matumizi ya mafuta ukiwa na alama wazi ya wizi, kufuatilia masaa ya mashine na uzalishaji wa mashine ya kusaga, na kutoa uchambuzi wa kweli, unaotegemea data wa mashine yenye ufanisi mdogo zaidi, ucheleweshaji wa madereva, na matumizi makubwa ya mafuta. Faida: Ubaini wa mapema wa wizi wa mafuta, muda mrefu wa mashine kutofanya kazi, au utoro wa mara kwa mara wa wafanyakazi, kutoka data halisi badala ya kubahatisha.",
+                "Mauzo na Rekodi za Wateja — Husaidia kusajili na kusasisha wateja, na kuunda nukuu za bei, oda za mauzo, ankara, na risiti, ikiwemo uchambuzi wa data wa mdaiwa mkubwa zaidi aliye na deni. Faida: Mfuatano halisi wa mauzo na ankara na wateja, badala ya rekodi zisizo rasmi au zinazotofautiana.",
+                "Mrabaha wa Wamiliki wa Ardhi — Husaidia kuweka viwango vya mrabaha, kurekodi mkusanyiko, kuzalisha taarifa, na kulipa wamiliki wa ardhi. Faida: Taarifa za mrabaha za haki, zinazoweza kuhesabiwa ambazo wamiliki wa ardhi wanaweza kuamini, badala ya wajibu mgumu wa kuhesabu na kuthibitisha kwa haki."
+            ]),
             currentVerifiedCapabilities: Object.freeze([
                 "employee registry: register, update, suspend, terminate, transfer",
                 "a real role-based permission matrix (roleMatrix/_checkPermission) governing which role can perform which action",

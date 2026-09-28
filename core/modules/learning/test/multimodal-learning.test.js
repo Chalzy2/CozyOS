@@ -490,11 +490,23 @@ test('INTEGRATION: no bypass — the bridge composes SA-1\'s real VerifiedEviden
     //     previously-unused optional plan field — no contract change).
     //     Every call with no detailLevel reproduces the exact prior
     //     behavior, byte-for-byte.
+    //
+    // PHASE 8 (QuarryOS Full Application Integration) — QuarryOS's own
+    // benefitAreas evidence gap (left open by Phase 7) was closed via the
+    // same additive registry field, no planner/adapter/realizer code
+    // changed. The only diff against this file's own tree is a TEST
+    // FILE edit: semantic-answer-planner-phase7-benefit-areas.test.js's
+    // stale "EVIDENCE GAP: QuarryOS" assertion (true when Phase 7 wrote
+    // it, no longer true now) was replaced with a pointer comment to the
+    // new, dedicated semantic-answer-planner-phase8-quarryos.test.js —
+    // never a change to this file's own guard logic, and never a
+    // loosening beyond this one named, disclosed test file.
     const permitted = [
         'core/modules/intelligence/semantic-answer/planning/semantic-answer-planner.js',
         'core/modules/intelligence/semantic-answer/evidence/source-adapters/cozy-knowledge-adapter.js',
         'core/modules/intelligence/semantic-answer/evidence/verified-evidence-adapter.js',
         'core/modules/intelligence/semantic-answer/realization/language-realizer.js',
+        'core/modules/intelligence/semantic-answer/planning/test/semantic-answer-planner-phase7-benefit-areas.test.js',
     ];
     const unexpected = changedFiles.filter((f) => !permitted.includes(f));
     assert.deepEqual(unexpected, [], 'only the disclosed SA-3 planner CML hook and the disclosed PAA-4 extension points may change; every other SA-1/SA-2/SA-3 file must remain untouched');

@@ -113,16 +113,9 @@ test('CROSS-APPLICATION ISOLATION (planner level): MpesaOS (via entityHint) in d
     assert.doesNotMatch(joined, /barcode|SKU|testimony|Teaching CozyOS/i);
 });
 
-test('EVIDENCE GAP (planner level): QuarryOS in detail still answers honestly from real humanBenefits/realLifeProblems, never fabricated benefitAreas structure', () => {
-    const { planner } = loadFullStack();
-    const result = planner.planAnswer({ text: 'How does QuarryOS help a quarry in detail?' });
-    assert.equal(result.success, true);
-    assert.equal(result.plan.entity.value, 'QuarryOS');
-    assert.equal(result.plan.detailLevel, 'DEEP_EXPLANATION');
-    assert.ok(result.plan.claims.length > 0, 'must still produce a real, honest answer even without benefitAreas authored for QuarryOS');
-    const joined = result.plan.claims.map((c) => c.text).join(' ');
-    assert.doesNotMatch(joined, /Faida:|Benefit:/, 'without authored benefitAreas, claims must come from the flat humanBenefits fallback, never a fabricated point+benefit structure');
-});
+// QuarryOS's own benefitAreas evidence gap (Phase 7) was closed in
+// Phase 8 — see semantic-answer-planner-phase8-quarryos.test.js for its
+// depth-adaptive coverage.
 
 test('SECURITY: no internal object/field/file names ever appear inside a Phase 7 benefitAreas claim text', () => {
     const { planner } = loadFullStack();

@@ -167,14 +167,9 @@ test('Media Intelligence: Kiswahili benefitAreas returns 3 real topics', () => {
     assert.ok(fact.areas.every((a) => /Faida:/.test(a)));
 });
 
-// ---- Honest gaps: QuarryOS and CozyOS-self were deliberately NOT authored ----
-
-test('EVIDENCE GAP (disclosed, deliberate): QuarryOS has no benefitAreas authored — honestly NOT_FOUND, never a fabricated/empty-dressed-as-VERIFIED result', () => {
-    const { window: win } = freshFullStack();
-    const fact = win.CozyOS.CozyKnowledge.getApplicationBenefitAreasFact('QuarryOS');
-    assert.equal(fact.evidence, 'NOT_FOUND');
-    assert.equal(fact.areas, null);
-});
+// ---- Honest gap: CozyOS-self was deliberately NOT authored ----
+// QuarryOS's own evidence gap (Phase 7) was closed in Phase 8 — see
+// cozy-knowledge-phase8-quarryos-benefit-areas.test.js for its coverage.
 
 test('NOT IMPLEMENTED (disclosed, deliberate): CozyOS-self has no benefitAreas authored via this mechanism (different mechanism required, deferred)', () => {
     const { window: win } = freshFullStack();
