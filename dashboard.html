@@ -849,6 +849,24 @@
 <script src="core/plugins/pharmacy-live-window-mode.js"></script>
 <script src="core/plugins/wholesale-live-window-mode.js"></script>
 <script src="core/living/spiritual-live-window-mode.js"></script>
+<!-- LIVE NEXT-STEP INTELLIGENCE — ChurchMembershipBridge was never
+     loaded on this page; loaded here so the "Create Member"/"View
+     Members" suggestions (composed by cozy-next-step-action-registry.js
+     below) are real and functional on this page, not just an honest
+     "not connected" disclosure. Depends only on CozyMemory (loaded
+     above) and OrganizationRegistry (loaded above). -->
+<script src="core/modules/ChurchOS/church-membership-bridge.js"></script>
+<!-- LIVE NEXT-STEP INTELLIGENCE — additive layer after the real answer
+     (cozy-answer-engine.js, loaded above). Contract -> action registry
+     -> pure engine -> lifecycle -> Live Window UI. Order here does not
+     matter for correctness (every dependency is resolved at call time,
+     never at load time — see each file's own header), but is kept
+     dependency-shaped for readability. -->
+<script src="core/modules/intelligence/semantic-answer/contracts/next-step-suggestion-contract.js"></script>
+<script src="core/modules/intelligence/next-step/cozy-next-step-action-registry.js"></script>
+<script src="core/modules/intelligence/next-step/cozy-next-step-engine.js"></script>
+<script src="core/modules/intelligence/next-step/cozy-next-step-lifecycle.js"></script>
+<script src="core/shell/live/cozy-next-step-suggestions-ui.js"></script>
 <!-- Dashboard Prompt 1: pure-logic navigation/AI-context module. Loads
      before user-dashboard.js, which now composes it for the real
      Home/Community/AI/Live Video/Apps/Documents/Calculations/Request an

@@ -1775,6 +1775,17 @@
     <script src="core/modules/intelligence/semantic-answer/comparison-intent.js"></script>
     <script src="core/modules/intelligence/answer/cozy-answer-security-boundary.js"></script>
     <script src="core/modules/intelligence/answer/cozy-answer-engine.js"></script>
+    <!-- LIVE NEXT-STEP INTELLIGENCE — additive layer after the real
+         answer above. ChurchMembershipBridge/QuarryManager/
+         ApplicationLauncher/live-window-controller.js are all already
+         loaded above on this page. Order here does not affect
+         correctness (every dependency is resolved at call time — see
+         each file's own header). -->
+    <script src="core/modules/intelligence/semantic-answer/contracts/next-step-suggestion-contract.js"></script>
+    <script src="core/modules/intelligence/next-step/cozy-next-step-action-registry.js"></script>
+    <script src="core/modules/intelligence/next-step/cozy-next-step-engine.js"></script>
+    <script src="core/modules/intelligence/next-step/cozy-next-step-lifecycle.js"></script>
+    <script src="core/shell/live/cozy-next-step-suggestions-ui.js"></script>
     <script src="core/modules/intelligence/advisor/cozy-advisor.js"></script>
     <script src="core/ai.js"></script>
     <script src="core/ai/cozy-ai-platform.js"></script>

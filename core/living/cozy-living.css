@@ -337,6 +337,19 @@ body.cozy-security-mode::after {
 .cozy-living-assistant-form { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-top: var(--cozy-glass-border, 1px solid rgba(255,255,255,0.08)); }
 .cozy-living-assistant-form button { background: none; border: none; color: inherit; cursor: pointer; font-size: 1.1rem; }
 .cozy-living-assistant-form .cozy-living-input { flex: 1; }
+
+/* LIVE NEXT-STEP INTELLIGENCE — the one real suggestion region
+   (core/shell/live/cozy-next-step-suggestions-ui.js), inserted directly
+   before .cozy-living-assistant-form (below the answer, above Speak/
+   Type/Reply). flex-wrap + max-width:100% + no fixed widths keeps this
+   inside the panel's own real width at any viewport - no horizontal
+   overflow, no second popup; a 4th candidate is structurally
+   impossible today (NextStepEngine caps at 3), so this never needs a
+   scrollable overflow of its own. */
+.cozy-next-step-suggestions { padding: 0 14px 8px; max-width: 100%; box-sizing: border-box; }
+.cozy-next-step-suggestions-list { display: flex; flex-wrap: wrap; gap: 6px; max-width: 100%; }
+.cozy-next-step-suggestion-btn { font-size: 0.8rem; padding: 6px 12px; border-radius: 999px; white-space: normal; text-align: left; max-width: 100%; }
+.cozy-next-step-confirm { display: flex; flex-direction: column; gap: 6px; }
 @media (prefers-reduced-motion: reduce) {
   .cozy-living-assistant-btn.cozy-btn-breathing { animation: none !important; }
 }
