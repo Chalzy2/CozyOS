@@ -1013,7 +1013,20 @@
             const withApp = result.contextUsed.find((r) => r && typeof r.applicationName === "string" && r.applicationName.trim());
             if (withApp) applicationName = withApp.applicationName.trim();
         }
-        const availableActions = registry.listActions(applicationName ? { appId: applicationName } : {});
+        // PRIVACY — an unresolved application means this turn carries no
+        // real evidence of WHICH application's actions would even be
+        // relevant. Rather than fall back to registry.listActions({})
+        // (which would return every registered application's real
+        // actions at once — a genuine cross-application leakage risk
+        // this file's own privacy tests exist to catch), this file
+        // narrows to [] and lets NextStepEngine's own honest "no
+        // availableActions -> []" rule apply. A real production turn
+        // almost always DOES carry a resolved applicationName (see
+        // cozy-living-assistant.js's own lastDiscussedApplication
+        // tracker, passed through as entityHint) — this only affects
+        // the rare turn with no application context at all, where zero
+        // suggestions is the correct, honest outcome anyway.
+        const availableActions = applicationName ? registry.listActions({ appId: applicationName }) : [];
         let suggestResult = null;
         try {
             suggestResult = engine.suggest({
