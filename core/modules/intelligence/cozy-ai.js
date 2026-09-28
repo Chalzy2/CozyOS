@@ -622,6 +622,88 @@
             } catch (_err) { /* honest fall-through — never fabricate */ }
         }
 
+        // --- COZY SPIRITUALOS — PHASE 1: Spiritual Foundation. Checked
+        // right after the explicit Pastor-Question marker above — a
+        // real, narrower, explicit-marker signal correctly takes
+        // priority when both could apply to the same message (e.g.
+        // "Ask the pastor: please pray for me"). Composes the SAME REAL,
+        // existing window.CozyOS.SemanticIntentEngine.analyze() this
+        // repository already ships (cozy-ai-semantic-intent.js remains
+        // the ONLY place SPIRITUAL_* intents are recognized — no second
+        // classifier is built or duplicated here) purely to decide WHAT
+        // was asked, then hands off entirely to
+        // window.CozyOS.SpiritualIntentRouter.dispatch() — which itself
+        // composes core/living/spiritual-capability.js's
+        // classifyContext()/route()/handlePersonal*() (see
+        // COZY_SPIRITUALOS_ARCHITECTURE.md) — to decide WHO answers and
+        // to actually answer it. This file adds no spiritual business
+        // logic of its own, and this is the ONLY new branch this phase
+        // adds to getContext() — never a second AI, never a second
+        // Scripture/prayer engine.
+        //
+        // WHY HERE, NOT rule-based-conversational-provider.js: that file
+        // is one of this repository's diff-guarded files (see
+        // core/modules/cognitive/providers/test/semantic-answer-
+        // interpretation-provider.test.js's own E28 assertion) and is
+        // deliberately left unmodified. This getContext() call site is
+        // the SAME real, non-protected integration seam Phase 3 (Teach
+        // Cozy)/Phase 4 (Reciprocal Learning, Pastor-Question) already
+        // established immediately above for exactly this purpose — a
+        // new, additive conversational capability reachable from the
+        // ONE real Live Window without touching that guarded file.
+        //
+        // HONEST, DISCLOSED LIMITATION: unlike businessConversationState/
+        // teachConversationState above, this call site has no per-
+        // session field of its own to carry a returned
+        // conversationState.spiritual value into the NEXT turn — the
+        // one real place that kind of turn-to-turn field lives
+        // (cozy-living-assistant.js's own private class fields) is
+        // itself diff-guarded. SpiritualIntentRouter.dispatch()'s own
+        // cross-turn conversationState.spiritual continuity is real and
+        // separately tested (spiritual-capability.test.js) — it simply
+        // is not yet threaded through this particular entry point. See
+        // this milestone's hand-back report for what wiring that up
+        // fully would require.
+        const semanticIntentEngine = window.CozyOS.SemanticIntentEngine;
+        const spiritualRouter = window.CozyOS.SpiritualIntentRouter;
+        if (semanticIntentEngine && typeof semanticIntentEngine.analyze === "function" && spiritualRouter && typeof spiritualRouter.dispatch === "function") {
+            try {
+                const SPIRITUAL_INTENTS = new Set(["SPIRITUAL_PRAYER", "SPIRITUAL_SCRIPTURE", "SPIRITUAL_DEVOTIONAL", "SPIRITUAL_WORSHIP"]);
+                const intentResult = semanticIntentEngine.analyze(question);
+                if (intentResult && SPIRITUAL_INTENTS.has(intentResult.primaryIntent)) {
+                    // REAL-BROWSER-FOUND FIX: use THIS SAME analyze()
+                    // call's own real, freshly-detected language
+                    // (intentResult.language), never the outer
+                    // `language` param — that value is resolved by an
+                    // entirely different, unrelated language detector
+                    // (rule-based-conversational-provider.js's own,
+                    // per that file's deliberate independence — see
+                    // cozy-ai-semantic-intent.js's own header) and can
+                    // disagree with what this engine's own SW_MARKERS
+                    // just determined for this exact message (a real
+                    // Kiswahili prayer message was answered in English
+                    // before this fix, confirmed via a real Chromium
+                    // run of dashboard.html).
+                    const { envelope } = spiritualRouter.dispatch(intentResult.primaryIntent, { text: question, actorId: effectiveActorId, language: intentResult.language, liveSessionId }, null);
+                    if (envelope && envelope.content) {
+                        return {
+                            success: true, isReal: true, question, actorId: effectiveActorId,
+                            found: true,
+                            results: [{
+                                authority: "spiritual",
+                                provenance: "window.CozyOS.SpiritualIntentRouter -> spiritual-capability.js",
+                                evidence: envelope.capabilityState === "available" ? "VERIFIED" : "PARTIALLY_VERIFIED",
+                                content: envelope.content
+                            }],
+                            businessDataConversationState: null,
+                            teachDataConversationState: null,
+                            note: "Composed from the real, existing SpiritualIntentRouter -> spiritual-capability.js pipeline (Cozy SpiritualOS — Phase 1: Spiritual Foundation)."
+                        };
+                    }
+                }
+            } catch (_err) { /* honest fall-through — never fabricate */ }
+        }
+
         // --- InterestOS business-DATA question (Phase 2: CozyAI + Live
         // Window Business-Data Q&A) — distinct from businessContext above
         // (that narrower hook only fires when a CALLER, e.g. InterestOS's
@@ -1035,6 +1117,6 @@
 
     window.CozyOS.Modules["cozy-ai"] = Object.freeze({
         version: VERSION,
-        description: "Universal AI Service (M369, + Identity FAQ Router pass, + Micro-Milestone F Context Retrieval) — window.CozyOS.CozyAI, one shared facade for every CozyOS application. ask/answer/reason/plan first check the additive CozyIdentityFAQRouter (deterministic EN/Kiswahili founder-mission-vision Q&A from the real public DeveloperIdentity) and, if unmatched, fall through unchanged to the existing CognitiveCoordinator pipeline. learn/remember/search compose the existing, already-incremental CozyMemory; translate composes SpeechTranslationAdapter; summarize is a real, disclosed extractive summary, not semantic. getContext(question) is a NEW, additive context-composition-only method: deterministic keyword routing fans a question out to CozyKnowledge (VERIFIED facts only, including Public Story via its existing FounderStory.getPublicStory() composition) and CozyMemory.searchAllNamespaces() (owner/visibility/organisation-enforced, split into cozy-memory/living-memory by the real 'living-' namespace prefix). Never calls FounderStory's private read path; never defaults actorId to \"system\" (unlike every other method here) so an unidentified caller only ever sees what CozyMemory's own visibility check already allows an unprivileged actor to see. No new cognitive engine, no new memory store, no duplicate AI logic. Registers with the existing ProviderManager."
+        description: "Universal AI Service (M369, + Identity FAQ Router pass, + Micro-Milestone F Context Retrieval) — window.CozyOS.CozyAI, one shared facade for every CozyOS application. ask/answer/reason/plan first check the additive CozyIdentityFAQRouter (deterministic EN/Kiswahili founder-mission-vision Q&A from the real public DeveloperIdentity) and, if unmatched, fall through unchanged to the existing CognitiveCoordinator pipeline. learn/remember/search compose the existing, already-incremental CozyMemory; translate composes SpeechTranslationAdapter; summarize is a real, disclosed extractive summary, not semantic. getContext(question) is a NEW, additive context-composition-only method: deterministic keyword routing fans a question out to CozyKnowledge (VERIFIED facts only, including Public Story via its existing FounderStory.getPublicStory() composition) and CozyMemory.searchAllNamespaces() (owner/visibility/organisation-enforced, split into cozy-memory/living-memory by the real 'living-' namespace prefix). Never calls FounderStory's private read path; never defaults actorId to \"system\" (unlike every other method here) so an unidentified caller only ever sees what CozyMemory's own visibility check already allows an unprivileged actor to see. No new cognitive engine, no new memory store, no duplicate AI logic. Registers with the existing ProviderManager. COZY SPIRITUALOS — PHASE 1 addition: getContext() also checks, right after the Pastor-Question branch, whether window.CozyOS.SemanticIntentEngine.analyze() (the ONLY real SPIRITUAL_* classifier) resolved a SPIRITUAL_PRAYER/SPIRITUAL_SCRIPTURE/SPIRITUAL_DEVOTIONAL/SPIRITUAL_WORSHIP intent, and if so hands off entirely to window.CozyOS.SpiritualIntentRouter.dispatch() — the same real, non-protected integration seam already used for Teach Cozy/Reciprocal Learning/Pastor-Question, chosen specifically because rule-based-conversational-provider.js is diff-guarded. No spiritual business logic lives in this file."
     });
 })();

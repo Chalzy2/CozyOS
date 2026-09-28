@@ -477,6 +477,17 @@
      second implementation. -->
 <script src="core/living/cozy-pastor-question-intent.js"></script>
 <script src="core/living/cozy-pastor-question-flow.js"></script>
+<!-- COZY SPIRITUALOS — PHASE 1 (Spiritual Foundation): added for
+     consistency with dashboard.html, never a second implementation.
+     Same graceful no-op discipline as cozy-pastor-question-flow.js
+     above when LDCE/ChurchOS session engines aren't loaded on this
+     page — classifyContext() honestly reports no real church context
+     rather than fabricating one. bible-engine.js is the real,
+     existing Scripture repository/parser window.CozyOS.Living.scripture
+     (living-runtime.js, loaded above) already gateways to. -->
+<script src="core/modules/bible/bible-engine.js"></script>
+<script src="core/living/spiritual-capability.js"></script>
+<script src="core/living/spiritual-intent-router.js"></script>
 <script src="core/modules/intelligence/providers/rule-based-conversational-provider.js"></script>
 <script src="core/ui/living-message-engine.js"></script>
 <script src="core/platform/application-visibility.js"></script>

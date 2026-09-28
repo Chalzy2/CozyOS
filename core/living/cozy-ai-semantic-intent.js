@@ -52,7 +52,7 @@
 
     if (window.CozyOS.SemanticIntentEngine) return; // idempotent load guard
 
-    const ENGINE_VERSION = "1.1.0-phase6a";
+    const ENGINE_VERSION = "1.2.0-cozy-spiritualos-phase1";
 
     /**
      * INTENT ONTOLOGY — Section 5. A deliberately SMALL, versioned
@@ -81,6 +81,18 @@
         TRANSLATION_REQUEST: "TRANSLATION_REQUEST",
         SEARCH_REQUEST: "SEARCH_REQUEST",
         REJECTION: "REJECTION", // Section 28 negation - "I don't want to buy" is not PURCHASE_INTENT
+        // COZY SPIRITUALOS — PHASE 1 (Spiritual Foundation). Additive,
+        // versioned intents per COZY_SPIRITUALOS_ARCHITECTURE.md §5. This
+        // file remains the ONLY place these SPIRITUAL_* intents are
+        // recognized (no second classifier) - execution/ownership
+        // (personal vs. ChurchOS) is decided entirely downstream by
+        // core/living/spiritual-capability.js's classifyContext()/route(),
+        // never here. This engine only classifies WHAT was asked, never
+        // WHO should handle it.
+        SPIRITUAL_PRAYER: "SPIRITUAL_PRAYER",
+        SPIRITUAL_SCRIPTURE: "SPIRITUAL_SCRIPTURE",
+        SPIRITUAL_DEVOTIONAL: "SPIRITUAL_DEVOTIONAL",
+        SPIRITUAL_WORSHIP: "SPIRITUAL_WORSHIP",
         UNKNOWN_INTENT: "UNKNOWN_INTENT"
     });
 
@@ -107,6 +119,13 @@
         TRANSLATION_REQUEST: "TRANSLATE_TEXT",
         SEARCH_REQUEST: "FIND_INFORMATION",
         REJECTION: "DECLINE_ACTION",
+        // COZY SPIRITUALOS — PHASE 1. Closed, controlled goal mapping,
+        // same discipline as every other entry in this table (Section 33
+        // - never invented per-sentence).
+        SPIRITUAL_PRAYER: "SEEK_PRAYER_ASSISTANCE",
+        SPIRITUAL_SCRIPTURE: "RETRIEVE_SCRIPTURE",
+        SPIRITUAL_DEVOTIONAL: "SEEK_DEVOTIONAL_ASSISTANCE",
+        SPIRITUAL_WORSHIP: "SEEK_WORSHIP_INFORMATION",
         UNKNOWN_INTENT: null
     });
 
@@ -175,7 +194,14 @@
         "nikumbushe", "kesho", "leo", "jana", "badilisha", "futa", "ondoa", "sitaki", "usinikumbushe",
         "haifanyi", "kazi", "imeshindwa", "imekataa", "gharimu", "kiasi", "bora", "nisaidie", "nieleze", "nielezee",
         "nifundishe", "nauliza", "hiyo", "hii", "hicho", "yake", "hapo", "lakini", "kwanza", "sijui", "deni", "saa",
-        "inanisaidiaje", "inanisaidia"];
+        "inanisaidiaje", "inanisaidia",
+        // COZY SPIRITUALOS PHASE 1 — real Kiswahili words this file's
+        // new SPIRITUAL_* PATTERNS above actually use, added here too so
+        // detectLanguages() (a SEPARATE, disclosed marker list — never
+        // reused from PATTERNS) correctly recognizes these messages as
+        // Kiswahili rather than defaulting to English.
+        "niombee", "kuomba", "maombi", "tunaomba", "ibada", "mstari", "andiko", "biblia", "nisomee", "aya",
+        "kifungu", "somo"];
     const SW_MARKERS = Object.freeze(SW_LANGUAGE_MARKERS);
 
     const EN_MARKERS = Object.freeze(["want", "buy", "purchase", "like", "would", "help", "does", "how", "what",
@@ -240,7 +266,15 @@
         [INTENTS.APP_BENEFITS]: {
             sw: [/\binasaidiaje\b/i, /\binasaidia\s+aje\b/i, /\binasaidia\s+nini\b/i, /\binanisaidia\s+nini\b/i, /\binanisaidiaje\b/i, /\binanisaidia\s+aje\b/i, /\binatusaidia\b/i, /\bfaida\s+gani\b/i,
                 /\bnitanufaikaje\b/i, /\bnitafaidikaje\b/i],
-            en: [/\bhow\s+does\s+\w+\s+help\b/i, /\bwhat\s+(?:are\s+the\s+)?benefits?\b/i, /\bhelp\s+me\b/i]
+            // COZY SPIRITUALOS PHASE 1 — a real, disclosed collision:
+            // this file's own generic "help me" pattern would otherwise
+            // also fire on "help me pray..." (the new SPIRITUAL_PRAYER
+            // intent's own trigger, and the architecture doc's own §1a
+            // example sentence). The negative lookahead excludes only
+            // that specific overlap - every other "help me" match
+            // (including the existing "How does CozyOS help me?" test)
+            // is completely unaffected.
+            en: [/\bhow\s+does\s+\w+\s+help\b/i, /\bwhat\s+(?:are\s+the\s+)?benefits?\b/i, /\bhelp\s+me\b(?!\s+pray)/i]
         },
         [INTENTS.APP_CAPABILITIES]: {
             sw: [/\binaweza\s+kufanya\s+nini\b/i, /\binafanya\s+nini\b/i],
@@ -293,6 +327,44 @@
         [INTENTS.SEARCH_REQUEST]: {
             sw: [/\btafuta\b/i],
             en: [/\bsearch\s+for\b/i, /\bfind\b/i]
+        },
+        // COZY SPIRITUALOS — PHASE 1 (§5 "In scope"). Real, disclosed
+        // EN/SW trigger phrases only - same bounded, honestly-scoped v1
+        // discipline as every pattern list above (Section 25). These
+        // patterns recognize WHAT was asked (prayer/scripture/devotional/
+        // worship-info); they never look at whether a church session
+        // exists - that is exclusively spiritual-capability.js's
+        // classifyContext() job (§1a of the architecture doc), never
+        // this file's.
+        [INTENTS.SPIRITUAL_PRAYER]: {
+            sw: [/\bniombee\b/i, /\bnisaidie\s+kuomba\b/i, /\bnifundishe\s+kuomba\b/i, /\bnaomba\s+maombi\b/i,
+                /\bnahitaji\s+maombi\b/i, /\btunaomba\b/i, /\bnisaidie\s+na\s+maombi\b/i],
+            en: [/\bhelp\s+me\s+pray\b/i, /\bpray\s+for\s+(?:me|my|us|our)\b/i, /\bcan\s+you\s+pray\b/i,
+                /\bteach\s+me\s+(?:to|how\s+to)\s+pray\b/i, /\bi\s+need\s+prayer\b/i, /\bsay\s+a\s+prayer\b/i]
+        },
+        [INTENTS.SPIRITUAL_SCRIPTURE]: {
+            sw: [/\bmstari\s+wa\s+biblia\b/i, /\bbiblia\s+inasemaje\b/i, /\bnisomee\s+(?:mstari|aya)\b/i,
+                /\btafuta\s+mstari\b/i, /\bnitafutie\s+andiko\b/i],
+            en: [/\bbible\s+verse\b/i, /\bwhat\s+does\s+the\s+bible\s+say\b/i, /\bread\s+(?:me\s+)?a\s+(?:bible\s+)?verse\b/i,
+                /\bshow\s+me\b.*\bverse\b/i, /\blook\s+up\b.*\b(?:verse|scripture)\b/i,
+                // A bare real-shaped Scripture reference ("John 3:16",
+                // "1 Corinthians 13:4") is itself strong, disclosed
+                // evidence of a scripture-retrieval request - the exact
+                // same reference SHAPE BibleEngine.parseReference()
+                // recognizes (composed later, not duplicated here).
+                /\b(?:[1-3]\s?)?[A-Za-z]+\s+\d{1,3}:\d{1,3}\b/]
+        },
+        [INTENTS.SPIRITUAL_DEVOTIONAL]: {
+            sw: [/\bibada\s+ya\s+kila\s+siku\b/i, /\bnisaidie\s+na\s+ibada\b/i, /\bkifungu\s+cha\s+ibada\b/i,
+                /\bsomo\s+la\s+leo\b/i],
+            en: [/\bdevotional\b/i, /\bdaily\s+devotion\b/i, /\bhelp\s+me\s+with\s+(?:my\s+)?devotion\b/i,
+                /\btoday'?s\s+devotional\b/i]
+        },
+        [INTENTS.SPIRITUAL_WORSHIP]: {
+            sw: [/\bmaelezo\s+ya\s+ibada\b/i, /\bibada\s+ni\s+saa\s+ngapi\b/i, /\bhuduma\s+ya\s+ibada\b/i,
+                /\bibada\s+ni\s+lini\b/i],
+            en: [/\bworship\s+(?:info|information|schedule|service|times?)\b/i,
+                /\bwhen\s+is\s+(?:the\s+)?(?:worship|church)\s+service\b/i, /\btell\s+me\s+about\s+worship\b/i]
         }
     };
 
@@ -805,6 +877,6 @@
     window.CozyOS.Modules = window.CozyOS.Modules || {};
     window.CozyOS.Modules["cozy-ai-semantic-intent"] = {
         version: ENGINE_VERSION,
-        description: "PHASE 6 - Semantic Intent Understanding Engine. Real, deterministic, disclosed (not statistical) separation of language/mixed-language detection, clause-split primary/secondary intent, controlled goal ontology, entity spotting (not knowledge duplication), negation handling, HIGH/MEDIUM/LOW confidence (never fabricated numeric), and ambiguity/clarification detection. Provider-independent: does not import from or modify rule-based-conversational-provider.js. Does not call CozyKnowledge/CozyAnswerEngine/IdentityFAQRouter - answering remains those systems' job. recordCorrection() creates an inert candidate only (persisted via existing CozyMemory if available) - no auto-promotion, no rule rewriting."
+        description: "PHASE 6 - Semantic Intent Understanding Engine. Real, deterministic, disclosed (not statistical) separation of language/mixed-language detection, clause-split primary/secondary intent, controlled goal ontology, entity spotting (not knowledge duplication), negation handling, HIGH/MEDIUM/LOW confidence (never fabricated numeric), and ambiguity/clarification detection. Provider-independent: does not import from or modify rule-based-conversational-provider.js. Does not call CozyKnowledge/CozyAnswerEngine/IdentityFAQRouter - answering remains those systems' job. recordCorrection() creates an inert candidate only (persisted via existing CozyMemory if available) - no auto-promotion, no rule rewriting. COZY SPIRITUALOS PHASE 1 addition: SPIRITUAL_PRAYER/SPIRITUAL_SCRIPTURE/SPIRITUAL_DEVOTIONAL/SPIRITUAL_WORSHIP (EN+SW patterns) - this remains the ONLY place these are classified; ownership (personal vs. ChurchOS) is decided downstream by core/living/spiritual-capability.js, never here."
     };
 })();

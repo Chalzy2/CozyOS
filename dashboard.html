@@ -617,6 +617,22 @@
      files above. -->
 <script src="core/living/cozy-pastor-question-intent.js"></script>
 <script src="core/living/cozy-pastor-question-flow.js"></script>
+<!-- COZY SPIRITUALOS — PHASE 1 (Spiritual Foundation): bible-engine.js
+     is the real, existing Scripture repository/parser (M334) that
+     window.CozyOS.Living.scripture (living-runtime.js, loaded above)
+     already gateways to — it was not previously loaded on this page at
+     all, so parseReference() honestly reported unavailable rather than
+     the "always available, no license dependency" state the
+     architecture doc requires. spiritual-capability.js/spiritual-
+     intent-router.js compose that same gateway (never a second Bible
+     dataset) and are read lazily at call time by cozy-ai.js's
+     getContext(), same discipline as the Teach/Learning/Pastor-Question
+     files above — load order relative to cozy-ai.js itself does not
+     matter, but spiritual-capability.js must load before spiritual-
+     intent-router.js (its own require()/window fallback resolution). -->
+<script src="core/modules/bible/bible-engine.js"></script>
+<script src="core/living/spiritual-capability.js"></script>
+<script src="core/living/spiritual-intent-router.js"></script>
 <script src="core/modules/intelligence/providers/rule-based-conversational-provider.js"></script>
 <script src="core/ui/living-message-engine.js"></script>
 <script src="core/platform/application-visibility.js"></script>
