@@ -50,7 +50,7 @@
     window.CozyOS.Modules = window.CozyOS.Modules || {};
     if (window.CozyOS.Modules["cozy-language-templates"]) return;
 
-    const VERSION = "1.3.0"; // COZYAI-PUBLIC-VISION-KNOWLEDGE: added why-use-cozyos / differentiation / language-support-list templates. REGISTRATION/AUTH: how-to-register is now evidence-backed (:verified/:not_found), Kiswahili-first with a genuine committed translation (not an English-fallback placeholder). LIVE-WINDOW-LANGUAGE-AUDIT: added language-request:confirmed/:unrecognized (explicit "greet/speak in X" requests, distinct from language-support-list).
+    const VERSION = "1.4.0"; // COZYAI-PUBLIC-VISION-KNOWLEDGE: added why-use-cozyos / differentiation / language-support-list templates. REGISTRATION/AUTH: how-to-register is now evidence-backed (:verified/:not_found), Kiswahili-first with a genuine committed translation (not an English-fallback placeholder). LIVE-WINDOW-LANGUAGE-AUDIT: added language-request:confirmed/:unrecognized (explicit "greet/speak in X" requests, distinct from language-support-list). LIVE NEXT-STEP INTELLIGENCE: added next-step:* real en/sw label + lifecycle-message templates (create-member/list-members/register-employee/terminate-employee/register-another-employee/open-quarryos/open-churchos/confirm-destructive/action-running/action-success/action-failed/try-again/choose-another/confirm-yes/confirm-cancel/more-options) — fr/ar/so intentionally absent, honest gap, same entry[lang]||entry.en fallback as every other partially-translated key in this file.
     const LANGS = ["en", "sw", "fr", "ar", "so"];
 
     const TEMPLATES = Object.freeze({
@@ -1073,7 +1073,50 @@
         "semantic-intent:clarification:generic": Object.freeze({
             en: (name) => `Could you tell me more specifically what you'd like to know about ${name}?`,
             sw: (name) => `Unamaanisha nini hasa kuhusu ${name}?`
-        })
+        }),
+
+        // LIVE NEXT-STEP INTELLIGENCE — real, genuine en/sw label pairs
+        // for the concrete real actions this feature composes
+        // (ChurchMembershipBridge, QuarryManager.handle(),
+        // ApplicationLauncher — see cozy-next-step-action-registry.js's
+        // own header for what each one actually does). fr/ar/so
+        // deliberately have no entry yet — an honest, disclosed gap,
+        // the same discipline this file's own header already documents
+        // for several existing keys above; getTemplate()'s entry[lang]
+        // || entry.en fallback applies unchanged.
+        "next-step:create-member": Object.freeze({ en: "Create Member", sw: "Unda Mwanachama" }),
+        "next-step:list-members": Object.freeze({ en: "View Members", sw: "Tazama Wanachama" }),
+        "next-step:register-employee": Object.freeze({ en: "Register Employee", sw: "Sajili Mfanyakazi" }),
+        "next-step:terminate-employee": Object.freeze({ en: "Terminate Employee", sw: "Sitisha Ajira ya Mfanyakazi" }),
+        "next-step:register-another-employee": Object.freeze({ en: "Register Another Employee", sw: "Sajili Mfanyakazi Mwingine" }),
+        "next-step:open-quarryos": Object.freeze({ en: "Open QuarryOS", sw: "Fungua QuarryOS" }),
+        "next-step:open-churchos": Object.freeze({ en: "Open ChurchOS", sw: "Fungua ChurchOS" }),
+
+        // Lifecycle-facing strings — the honest, non-fabricated
+        // messages the Live Window suggestion UI shows for
+        // ACTION_PENDING_AUTHORIZATION/ACTION_SUCCESS/ACTION_FAILED
+        // (cozy-next-step-suggestions-ui.js). Kept generic (no
+        // action-specific English baked in) so one real, reviewed
+        // en/sw pair covers every action this feature will ever
+        // register, present and future.
+        "next-step:confirm-destructive": Object.freeze({
+            en: (label) => `This will "${label}" and cannot be undone. Continue?`,
+            sw: (label) => `Kitendo hiki cha "${label}" hakiwezi kutenduliwa. Je, uendelee?`
+        }),
+        "next-step:action-running": Object.freeze({ en: "Working on it…", sw: "Ninafanyia kazi…" }),
+        "next-step:action-success": Object.freeze({
+            en: (message) => message || "Done.",
+            sw: (message) => message || "Imekamilika."
+        }),
+        "next-step:action-failed": Object.freeze({
+            en: (reason) => `That didn't work: ${reason || "the real action could not be completed."}`,
+            sw: (reason) => `Hilo halikufanikiwa: ${reason || "kitendo halisi hakikuweza kukamilika."}`
+        }),
+        "next-step:try-again": Object.freeze({ en: "Try Again", sw: "Jaribu Tena" }),
+        "next-step:choose-another": Object.freeze({ en: "Choose Another Action", sw: "Chagua Kitendo Kingine" }),
+        "next-step:confirm-yes": Object.freeze({ en: "Yes, continue", sw: "Ndiyo, endelea" }),
+        "next-step:confirm-cancel": Object.freeze({ en: "Cancel", sw: "Ghairi" }),
+        "next-step:more-options": Object.freeze({ en: "More", sw: "Zaidi" })
     });
 
     // RP-027 §12 — shown, in the resolved (AVAILABLE) language, whenever

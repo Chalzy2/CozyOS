@@ -966,10 +966,77 @@
     async function answer(question, options) {
         const result = await answerInternal(question, options);
         const boundary = window.CozyOS && window.CozyOS.AnswerSecurityBoundary;
-        if (result && typeof result.answer === "string" && boundary && typeof boundary.sanitize === "function") {
-            return { ...result, answer: boundary.sanitize(result.answer) };
+        const sanitized = (result && typeof result.answer === "string" && boundary && typeof boundary.sanitize === "function")
+            ? { ...result, answer: boundary.sanitize(result.answer) }
+            : result;
+        return attachNextStepSuggestions(question, sanitized, options);
+    }
+
+    /**
+     * attachNextStepSuggestions(question, result, options)
+     *   LIVE NEXT-STEP INTELLIGENCE — additive, ADDITIVE ONLY step at
+     *   this file's own single choke point (the SAME discipline
+     *   AnswerSecurityBoundary already established immediately above:
+     *   one universal post-processing call over the real answer,
+     *   rather than eleven individual edits inside answerInternal()'s
+     *   own return statements). Composes window.CozyOS.NextStepEngine
+     *   (pure, deterministic — see that file) with
+     *   window.CozyOS.NextStepActionRegistry.listActions() (the real,
+     *   registered action catalog) to decide whether a genuinely useful
+     *   next action exists for THIS turn's real answer. Attaches
+     *   `result.suggestions` (0-3, [] when nothing real matches — a
+     *   valid, common, non-error outcome) and, in a real browser
+     *   document, dispatches one CustomEvent so the Live Window
+     *   suggestion UI (cozy-next-step-suggestions-ui.js) can render
+     *   them without this file ever touching the DOM or the guarded
+     *   cozy-living-assistant.js. Never blocks or alters the real
+     *   answer itself; degrades to `result` unchanged (suggestions
+     *   omitted, not fabricated as []) when NextStepEngine isn't loaded.
+     *
+     *   `application` is resolved ONLY from evidence THIS SAME turn's
+     *   real result already carries (contextUsed entries' own
+     *   `applicationName` field, or the caller's own entityHint) — never
+     *   a second entity-resolution guess. `goal` is left to
+     *   NextStepEngine's own disclosed #inferGoal() fallback (a fixed,
+     *   small keyword check, not NLU) since this file has no goal
+     *   signal of its own beyond the raw question text.
+     */
+    function attachNextStepSuggestions(question, result, options) {
+        const engine = window.CozyOS && window.CozyOS.NextStepEngine;
+        const registry = window.CozyOS && window.CozyOS.NextStepActionRegistry;
+        if (!result || !engine || typeof engine.suggest !== "function" || !registry || typeof registry.listActions !== "function") {
+            return result;
         }
-        return result;
+        const opts = options || {};
+        let applicationName = (typeof opts.entityHint === "string" && opts.entityHint.trim()) ? opts.entityHint.trim() : null;
+        if (!applicationName && Array.isArray(result.contextUsed)) {
+            const withApp = result.contextUsed.find((r) => r && typeof r.applicationName === "string" && r.applicationName.trim());
+            if (withApp) applicationName = withApp.applicationName.trim();
+        }
+        const availableActions = registry.listActions(applicationName ? { appId: applicationName } : {});
+        let suggestResult = null;
+        try {
+            suggestResult = engine.suggest({
+                input: question,
+                answer: result.answer,
+                intent: result.intent,
+                context: { language: opts.language || "en" },
+                application: applicationName ? { appId: applicationName } : null,
+                availableActions,
+                permissions: null // real authorization is independently re-checked at execute() time by the app's own handler — see NextStepActionRegistry's header.
+            });
+        } catch (_err) { suggestResult = null; }
+        const suggestions = (suggestResult && Array.isArray(suggestResult.suggestions)) ? suggestResult.suggestions : [];
+        const withSuggestions = { ...result, suggestions };
+
+        if (typeof document !== "undefined" && typeof document.dispatchEvent === "function" && typeof CustomEvent !== "undefined") {
+            try {
+                document.dispatchEvent(new CustomEvent("cozyos:next-step-suggestions", {
+                    detail: { question, answerResult: withSuggestions, actorId: opts.actorId || null, applicationName }
+                }));
+            } catch (_err) { /* non-fatal — the returned result already carries suggestions either way */ }
+        }
+        return withSuggestions;
     }
 
     const CozyAnswerEngine = Object.freeze({ answer, getVersion: () => VERSION });
@@ -977,6 +1044,6 @@
 
     window.CozyOS.Modules["cozy-answer-engine"] = Object.freeze({
         version: VERSION,
-        description: "Micro-Milestone H — AnswerEngine. Composes the existing, unmodified CozyIdentityFAQRouter (identity/origin/vision/mission/differentiation/etc., tried first) and CozyAI.getContext() (CozyKnowledge VERIFIED facts + CozyMemory/Living Memory search) into one structured {answer,intent,responseMode,evidenceState,sources,reasoningUsed,contextUsed,cognitiveContext} result. No new memory/knowledge/story authority. No FounderStory reference anywhere in this file — the public/private boundary is structural, not a permission check. Never defaults actorId to \"system\". WAVE 1 (Cognitive-to-Answer Contract) — answer() now accepts an optional cognitiveResult (CognitiveCoordinator's real, already-computed SA-3 plan for this turn); when present and valid, tryConstructSemanticAnswer() reuses it instead of calling SemanticAnswerPlanner.planAnswer() a second time, and buildCognitiveContext() surfaces an honest summary of it on every return. Absent for every pre-Wave-1 caller — behavior is byte-identical when cognitiveResult is not supplied."
+        description: "Micro-Milestone H — AnswerEngine. Composes the existing, unmodified CozyIdentityFAQRouter (identity/origin/vision/mission/differentiation/etc., tried first) and CozyAI.getContext() (CozyKnowledge VERIFIED facts + CozyMemory/Living Memory search) into one structured {answer,intent,responseMode,evidenceState,sources,reasoningUsed,contextUsed,cognitiveContext,suggestions} result. No new memory/knowledge/story authority. No FounderStory reference anywhere in this file — the public/private boundary is structural, not a permission check. Never defaults actorId to \"system\". WAVE 1 (Cognitive-to-Answer Contract) — answer() now accepts an optional cognitiveResult (CognitiveCoordinator's real, already-computed SA-3 plan for this turn); when present and valid, tryConstructSemanticAnswer() reuses it instead of calling SemanticAnswerPlanner.planAnswer() a second time, and buildCognitiveContext() surfaces an honest summary of it on every return. Absent for every pre-Wave-1 caller — behavior is byte-identical when cognitiveResult is not supplied. LIVE NEXT-STEP INTELLIGENCE — answer()'s own single choke point (same discipline as the AnswerSecurityBoundary sanitize call immediately above it) now additively composes window.CozyOS.NextStepEngine + NextStepActionRegistry to attach `suggestions` (0-3, real actions only, [] when none genuinely apply) and dispatch one 'cozyos:next-step-suggestions' DOM CustomEvent for the Live Window UI. No new answer/semantic/action-authorization system; degrades to the unchanged prior result when NextStepEngine isn't loaded."
     });
 })();
