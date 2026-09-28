@@ -815,6 +815,32 @@
      on open) so the mode is registered before it can first be
      activated by a real user action. -->
 <script src="core/modules/ChurchOS/worship-live-window-mode.js"></script>
+<!-- LIVE WINDOW APPLICATION COVERAGE PASS — every other real CozyOS
+     application had ZERO Live Window presence (only ChurchOS/Worship
+     was registered). Each mode file below follows the exact same
+     registerMode() pattern as worship-live-window-mode.js above and
+     composes only real, already-existing engines this page already
+     loads (churchOS-core.js aside: shopOS-core.js at line ~252,
+     mpesaOS-engine.js, quarry-index.js, wholesaleOS-core.js,
+     interestOS-core.js, interestOS-business-workspace.js,
+     pharmacyOS-core.js, organization-registry.js, and
+     spiritual-capability.js at line ~634) — no second AI, no second
+     window, no new business logic. Loaded after live-window-
+     controller.js and after every engine each mode composes. This page
+     only loads shopOS-core.js (not the full ShopOS suite: product/
+     inventory/sales/reporting) and mpesaOS-engine.js (not the float/
+     till/paybill/reporting coordinators) — both real, pre-existing,
+     narrower script lists than admin-workspace.html's — so on this
+     page the shop/mpesa modes honestly render "not connected on this
+     page" for the sections whose specific engine isn't loaded here,
+     while every other section renders its real content. -->
+<script src="core/modules/QuarryOS/quarry-live-window-mode.js"></script>
+<script src="core/plugins/shop-live-window-mode.js"></script>
+<script src="core/plugins/mpesa-live-window-mode.js"></script>
+<script src="core/plugins/interest-live-window-mode.js"></script>
+<script src="core/plugins/pharmacy-live-window-mode.js"></script>
+<script src="core/plugins/wholesale-live-window-mode.js"></script>
+<script src="core/living/spiritual-live-window-mode.js"></script>
 <!-- Dashboard Prompt 1: pure-logic navigation/AI-context module. Loads
      before user-dashboard.js, which now composes it for the real
      Home/Community/AI/Live Video/Apps/Documents/Calculations/Request an
